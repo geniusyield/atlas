@@ -31,7 +31,7 @@ After opening a pull request, please take the following steps:
 - Wait for a review and/or approval from one of the code owners
 - Merge and celebrate!
 
-The team will do their best to help your get your across the finish line!
+The team will do their best to help you get your PRs across the finish line!
 
 ## Discussions
 Feel free to participate in [discussions](https://github.com/geniusyield/atlas/discussions) with the team and community! 

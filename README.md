@@ -71,15 +71,15 @@ We welcome all contributors! See [contributing guide](./CONTRIBUTING.md) for how
 
 ## Credits
 
-Atlas has been made possible through the support and expertise from:
+Atlas has been made possible through support and expertise from:
 
-| Organization Logo | Organization Name |
+| Organization | Homepage |
 |-------------------|-------------------|
 | <img src="https://storage.googleapis.com/geniusyield-atlas/logos/gy-black.png" width="140" />      | [Genius Yield](https://geniusyield.co)          |
-| <img src="https://storage.googleapis.com/geniusyield-atlas/logos/maestro.svg" width="140" />      | [Maestro](https://www.gomaestro.org/)          |
 | <img src="https://storage.googleapis.com/geniusyield-atlas/logos/mlabs.svg" width="140" />      | [MLabs](https://mlabs.city/)          |
 | <img src="https://storage.googleapis.com/geniusyield-atlas/logos/well-typed.svg" width="140" /> | [Well-Typed](https://well-typed.com/) |
 | <img src="https://storage.googleapis.com/geniusyield-atlas/logos/plank.svg" width="140" />      | [Plank](https://www.joinplank.com/)   |
+| <img src="https://storage.googleapis.com/geniusyield-atlas/logos/maestro.svg" width="140" />      | [Maestro](https://www.gomaestro.org/)          |
 
 ## License
 

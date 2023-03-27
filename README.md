@@ -57,7 +57,7 @@ Use an intuitive API to abstract away the complexity around building transaction
 Avoid code duplication between on-chain and off-chain code, interoperate with advanced functionalities offered by IOG's Cardano/Plutus libraries, and easily convert between Atlas and Cardano/Plutus types.
 
 ### Utilize modular data providers
-Query ledger state information from [Maestro](https://www.gomaestro.org/dapp-platform) or host your own [Cardano DB Sync](https://github.com/input-output-hk/cardano-db-sync).
+Query ledger state information from [Maestro](https://www.gomaestro.org/dapp-platform), a local node or [Cardano DB Sync](https://github.com/input-output-hk/cardano-db-sync). You can also build and contribute your own data provider!
 
 ### Test extensively
 Use Atlas' test harness to write realistic [unit tests](./getting-started/unit-tests) that correspond to on-chain behavior, and execute [integration tests](./getting-started/integration-tests) in a private network.

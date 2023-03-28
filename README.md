@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="https://storage.googleapis.com/geniusyield-atlas/logos/atlas-logo-light-mode.svg?sanitize=true#gh-light-mode-only" alt="Atlas Logo" width="425" />
+  <a href="https://atlas-app.io">
+    <img src="https://storage.googleapis.com/geniusyield-atlas/logos/atlas-logo-light-mode.svg?sanitize=true#gh-light-mode-only" alt="Atlas Logo" width="425" />
+  </a>
   <h2 align="center">Application backend for Plutus smart contracts on Cardano</h2>
   <p align="center">
     <a href="https://atlas-app.io">
@@ -73,13 +75,13 @@ We welcome all contributors! See [contributing guide](./CONTRIBUTING.md) for how
 
 Atlas has been made possible through support and expertise from:
 
-| Organization | Homepage |
-|-------------------|-------------------|
-| <img src="https://storage.googleapis.com/geniusyield-atlas/logos/gy-black.png" width="140" />      | [Genius Yield](https://geniusyield.co)          |
-| <img src="https://storage.googleapis.com/geniusyield-atlas/logos/mlabs.svg" width="140" />      | [MLabs](https://mlabs.city/)          |
-| <img src="https://storage.googleapis.com/geniusyield-atlas/logos/well-typed.svg" width="140" /> | [Well-Typed](https://well-typed.com/) |
-| <img src="https://storage.googleapis.com/geniusyield-atlas/logos/plank.svg" width="140" />      | [Plank](https://www.joinplank.com/)   |
-| <img src="https://storage.googleapis.com/geniusyield-atlas/logos/maestro.svg" width="140" />      | [Maestro](https://www.gomaestro.org/)          |
+| Organization                                                                                                              | Homepage                               |
+|---------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
+| [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/gy-black.png" width="140" />](https://geniusyield.co)   | [Genius Yield](https://geniusyield.co) | 
+| [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/mlabs.svg" width="140" />](https://mlabs.city/)         | [MLabs](https://mlabs.city/)           |
+| [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/well-typed.svg" width="140" />](https://well-typed.com/)| [Well-Typed](https://well-typed.com/)  |
+| [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/plank.svg" width="140" />](https://www.joinplank.com/)  | [Plank](https://www.joinplank.com/)    |
+| [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/maestro.svg" width="140" />](https://www.gomaestro.org/)| [Maestro](https://www.gomaestro.org/)  |
 
 ## License
 

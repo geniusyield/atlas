@@ -1,0 +1,4 @@
+{
+    "cardanoDbSync": "postgresql://user:password@localhost:5432/databasename",
+    "cardanoSubmitApiUrl": "localhost:8090"
+}

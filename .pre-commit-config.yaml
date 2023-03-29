@@ -1,0 +1,9 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.3.0
+    hooks:
+    -   id: check-yaml
+-   repo: https://github.com/4TT1L4/haskell-pre-commit-hooks
+    rev: 1a9833b13d3224b6260465f7234f1b862d564a7e
+    hooks:
+    -   id: hlint-ignore-duplication

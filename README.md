@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://atlas-app.io">
-    <img src="https://storage.googleapis.com/geniusyield-atlas/logos/atlas-logo-light-mode.svg?sanitize=true#gh-light-mode-only" alt="Atlas Logo" width="425" />
+    <img src="https://storage.googleapis.com/geniusyield-atlas/logos/atlas-logo-light-mode.svg" alt="Atlas Logo" width="425" />
   </a>
   <h2 align="center">Application backend for Plutus smart contracts on Cardano</h2>
   <p align="center">
@@ -62,7 +62,7 @@ Avoid code duplication between on-chain and off-chain code, interoperate with ad
 Query ledger state information from [Maestro](https://www.gomaestro.org/dapp-platform), a local node or [Cardano DB Sync](https://github.com/input-output-hk/cardano-db-sync). You can also build and contribute your own data provider!
 
 ### Test extensively
-Use Atlas' test harness to write realistic [unit tests](./getting-started/unit-tests) that correspond to on-chain behavior, and execute [integration tests](./getting-started/integration-tests) in a private network.
+Use Atlas' test harness to write realistic [unit tests](./getting-started/unit-tests) that correspond to on-chain behavior, and execute [integration tests](./getting-started/integration-tests) against cardano node in a private network.
 
 ### Stay up to date
 Benefit from Cardano's latest innovations such as **Reference Inputs**, **Inline Datums** and **Reference Scripts**.
@@ -82,6 +82,7 @@ Atlas has been made possible through support and expertise from:
 | [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/well-typed.svg" width="140" />](https://well-typed.com/)| [Well-Typed](https://well-typed.com/)  |
 | [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/plank.svg" width="140" />](https://www.joinplank.com/)  | [Plank](https://www.joinplank.com/)    |
 | [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/maestro.svg" width="140" />](https://www.gomaestro.org/)| [Maestro](https://www.gomaestro.org/)  |
+
 
 ## License
 

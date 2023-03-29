@@ -1,0 +1,276 @@
+cabal-version: 2.4
+name:          atlas
+version:       0.1.0.0
+synopsis:      Application backend for Plutus smart contracts on Cardano
+description:   Atlas is an all-in-one, Haskell-native application backend for writing off-chain code for on-chain Plutus smart contracts.
+
+
+license:       Apache-2.0
+license-file:  LICENSE
+copyright:     (c) 2023 GYELD GMBH
+author:        Lars Bruenjes
+maintainer:    support@geniusyield.co
+build-type:    Simple
+category:      Blockchain, Cardano, Framework
+homepage:      https://github.com/geniusyield/atlas#readme
+bug-reports:   https://github.com/geniusyield/atlas/issues
+extra-source-files: 
+  README.md
+
+source-repository head
+  type:     git
+  location: https://github.com/geniusyield/atlas
+
+common common
+  default-language:   Haskell2010
+  default-extensions:
+    BangPatterns
+    DataKinds
+    DeriveAnyClass
+    DeriveGeneric
+    DeriveTraversable
+    DerivingStrategies
+    DerivingVia
+    EmptyCase
+    FlexibleContexts
+    FlexibleInstances
+    GADTs
+    GeneralizedNewtypeDeriving
+    ImportQualifiedPost
+    MultiParamTypeClasses
+    MultiWayIf
+    NamedFieldPuns
+    NumericUnderscores
+    OverloadedStrings
+    RankNTypes
+    RecordWildCards
+    RoleAnnotations
+    ScopedTypeVariables
+    StandaloneDeriving
+    StandaloneKindSignatures
+    TupleSections
+    TypeApplications
+    TypeFamilies
+    TypeOperators
+    UndecidableInstances
+    ViewPatterns
+
+  ghc-options:
+    -Wall -Wincomplete-uni-patterns -Wno-unticked-promoted-constructors
+
+  -- speed-ups GHCi considerably
+  ghc-options:        -fno-show-valid-hole-fits
+  ghc-options:        -Wunused-packages
+
+library
+  import:          common
+  hs-source-dirs:  src
+  exposed-modules:
+    GeniusYield.CardanoApi.EraHistory
+    GeniusYield.CardanoApi.Query
+    GeniusYield.Examples.Gift
+    GeniusYield.Examples.Limbo
+    GeniusYield.Examples.Treat
+    GeniusYield.GYConfig
+    GeniusYield.HTTP.Errors
+    GeniusYield.Imports
+    GeniusYield.Providers
+    GeniusYield.Providers.CachedQueryUTxOs
+    GeniusYield.Providers.CardanoDbSync
+    GeniusYield.Providers.Common
+    GeniusYield.Providers.GCP
+    GeniusYield.Providers.Katip
+    GeniusYield.Providers.LiteChainIndex
+    GeniusYield.Providers.Maestro
+    GeniusYield.Providers.Node
+    GeniusYield.Providers.Sentry
+    GeniusYield.Providers.SubmitApi
+    GeniusYield.Api.TestTokens
+    GeniusYield.Scripts.TestToken
+    GeniusYield.Test.Utils
+    GeniusYield.Test.Privnet.Examples
+    GeniusYield.Test.Privnet.Examples.Gift
+    GeniusYield.Test.Privnet.Examples.Oracle
+    GeniusYield.Test.Privnet.Examples.Treat
+    GeniusYield.Test.Privnet.Asserts
+    GeniusYield.Test.Privnet.Ctx
+    GeniusYield.Test.Privnet.Options
+    GeniusYield.Test.Privnet.Paths
+    GeniusYield.Test.Privnet.Setup
+    GeniusYield.Test.Privnet.Utils
+    GeniusYield.Transaction
+    GeniusYield.Transaction.CoinSelection
+    GeniusYield.Transaction.CoinSelection.Types
+    GeniusYield.Transaction.Common
+    GeniusYield.TxBuilder
+    GeniusYield.TxBuilder.Class
+    GeniusYield.TxBuilder.Common
+    GeniusYield.TxBuilder.Errors
+    GeniusYield.TxBuilder.Node
+    GeniusYield.TxBuilder.NodeQuery
+    GeniusYield.TxBuilder.Random
+    GeniusYield.TxBuilder.Run
+    GeniusYield.Types
+    GeniusYield.Types.Ada
+    GeniusYield.Types.Address
+    GeniusYield.Types.Datum
+    GeniusYield.Types.Era
+    GeniusYield.Types.Key
+    GeniusYield.Types.Key.Class
+    GeniusYield.Types.Ledger
+    GeniusYield.Types.Logging
+    GeniusYield.Types.NetworkId
+    GeniusYield.Types.PlutusVersion
+    GeniusYield.Types.Providers
+    GeniusYield.Types.PubKeyHash
+    GeniusYield.Types.Rational
+    GeniusYield.Types.Redeemer
+    GeniusYield.Types.Script
+    GeniusYield.Types.Slot
+    GeniusYield.Types.SlotConfig
+    GeniusYield.Types.Time
+    GeniusYield.Types.Tx
+    GeniusYield.Types.TxBody
+    GeniusYield.Types.TxIn
+    GeniusYield.Types.TxOut
+    GeniusYield.Types.TxOutRef
+    GeniusYield.Types.UTxO
+    GeniusYield.Types.Value
+    GeniusYield.Types.Wallet
+
+  other-modules: GeniusYield.Utils
+  build-depends:
+    , aeson
+    , deriving-aeson
+    , async
+    , attoparsec
+    , base                         ^>=4.14.1.0
+    , base16-bytestring
+    , bytestring
+    , cache
+    , cardano-api                  ^>=1.35
+    , cardano-balance-tx
+    , cardano-binary
+    , cardano-coin-selection
+    , cardano-crypto-class
+    , cardano-ledger-alonzo
+    , cardano-ledger-byron
+    , cardano-ledger-core
+    , cardano-slotting
+    , cardano-wallet-primitive
+    , cardano-addresses
+    , cassava
+    , cborg
+    , containers
+    , directory
+    , either
+    , filepath
+    , hashable
+    , http-api-data
+    , http-client
+    , http-client-tls
+    , http-media
+    , http-types
+    , indexed-traversable
+    , katip                        ^>=0.8.6.0
+    , lens
+    , MonadRandom
+    , mtl
+    , network-uri
+    , ouroboros-consensus
+    , ouroboros-consensus-cardano
+    , ouroboros-network
+    , plutus-ledger-api
+    , plutus-simple-model
+    , plutus-tx
+    , postgresql-simple
+    , postgresql-simple-url
+    , raven-haskell
+    , resource-pool
+    , scientific
+    , serialise
+    , servant
+    , servant-client
+    , servant-client-core
+    , some
+    , sop-core
+    , stm
+    , swagger2
+    , tagged
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
+    , template-haskell
+    , text
+    , text-class
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+    , witherable                   ^>=0.4.2
+
+  -- needed for examples
+  build-depends:   plutus-core
+  build-depends:   framework-onchain-plutustx
+
+library             framework-onchain-plutustx
+  default-language: Haskell2010
+  ghc-options:      -Wall
+
+  -- so unfoldings are present even when compiled without optmizations
+  ghc-options:
+    -fno-ignore-interface-pragmas -fno-omit-interface-pragmas
+    -Wno-partial-type-signatures
+
+  -- expose all unfoldings, so plutustx compiler can do its job
+  ghc-options:      -fexpose-all-unfoldings -fobject-code -fplugin-opt PlutusTx.Plugin:defer-errors
+  hs-source-dirs:   src-plutustx
+  exposed-modules:
+    GeniusYield.OnChain.Examples.ReadOracle
+    GeniusYield.OnChain.Examples.ReadOracle.Compiled
+    GeniusYield.OnChain.TestToken
+    GeniusYield.OnChain.TestToken.Compiled
+
+  build-depends:
+    , base
+    , plutus-core
+    , plutus-ledger-api
+    , plutus-tx
+    , plutus-tx-plugin
+
+test-suite atlas-tests
+  import:         common
+  type:           exitcode-stdio-1.0
+  main-is:        atlas-tests.hs
+  hs-source-dirs: tests
+  ghc-options:    -threaded -rtsopts
+  other-modules:
+    GeniusYield.Test.CoinSelection
+    GeniusYield.Test.Collateral
+    GeniusYield.Test.SlotConfig
+    GeniusYield.Test.Providers
+    GeniusYield.Test.Config
+    GeniusYield.Test.GYTxSkeleton
+    GeniusYield.Test.GYTxBody
+  build-depends:
+    , aeson
+    , base
+    , bytestring
+    , cardano-api
+    , containers
+    , directory
+    , filepath
+    , atlas
+    , MonadRandom
+    , ouroboros-consensus
+    , plutus-simple-model
+    , QuickCheck
+    , quickcheck-instances
+    , some
+    , tasty
+    , tasty-golden
+    , tasty-hunit
+    , tasty-quickcheck
+    , text
+    , transformers
+    , time

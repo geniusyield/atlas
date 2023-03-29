@@ -1,0 +1,15 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    uses: ./.github/workflows/haskell.yml
+  # TODO: Download artifacts
+  # TODO: Publish artifacts as GitHub Release

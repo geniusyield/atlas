@@ -1,0 +1,4 @@
+{
+    "socketPath": "testnet/node.socket",
+    "maestroToken": "someapikey"
+}

@@ -1,0 +1,109 @@
+name: Haskell CI
+
+on: workflow_call
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v3
+    - name: Install dependencies (apt-get)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+            autoconf \
+            automake \
+            build-essential \
+            ca-certificates \
+            chrony \
+            dpkg-dev \
+            gcc \
+            gnupg \
+            g++ \
+            hlint \
+            libc6-dev \
+            libncursesw5 \
+            libffi-dev \
+            libgmp-dev \
+            liblzma-dev \
+            libnuma-dev \
+            libpq-dev \
+            libssl-dev \
+            libsystemd-dev \
+            libtinfo-dev \
+            libtool \
+            netbase \
+            pkg-config \
+            procps \
+            tmux \
+            xz-utils \
+            zlib1g-dev
+    - name: Validate code (run pre-commit hooks)
+      uses: pre-commit/action@v3.0.0
+      with:
+        extra_args: --verbose --all-files
+    - name: Setup haskell tooling
+      uses: haskell/actions/setup@v2
+      with:
+        ghc-version: '8.10.7'
+        cabal-version: '3.8'
+        enable-stack: true
+        stack-version: '2.9'
+    - name: Setup cache
+      uses: actions/cache@v3
+      env:
+        cache-name: cache-cabal
+      with:
+        path: ~/.cabal
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/cabal.project') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
+    - name: Install LIBSODIUM
+      run: |
+        git clone https://github.com/input-output-hk/libsodium
+        cd libsodium
+        git checkout 66f017f1
+        ./autogen.sh
+        ./configure
+        make
+        sudo make install
+        sudo ldconfig
+    - name: Install SEPC256K1
+      run: |
+        git clone https://github.com/bitcoin-core/secp256k1
+        cd secp256k1
+        git checkout ac83be33d0956faf6b7f61a60ab524ef7d6a473a
+        ./autogen.sh
+        ./configure --prefix=/usr --enable-module-schnorrsig --enable-experimental
+        make
+        sudo make install
+        sudo ldconfig
+    - name: Update dependencies (cabal)
+      run: cabal v2-update
+    - name: Build dependencies (cabal)
+      run: cabal v2-build --only-dependencies --enable-tests --enable-benchmarks
+    - name: Build all targets (cabal)
+      run: cabal v2-build --enable-tests --enable-benchmarks all
+    - name: Run all tests (cabal)
+      run: cabal v2-test all
+    - name: Run checks (cabal)
+      run: cabal check
+    - name: Create source distribution file (cabal)
+      run: cabal sdist
+    - name: Identify source distribution file (cabal)
+      run: |
+        export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
+        echo "SRC_TGZ: $SRC_TGZ"
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: SRC_TGZ
+        path: $SRC_TGZ

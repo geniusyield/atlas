@@ -17,7 +17,7 @@
     <a href="https://github.com/geniusyield/atlas/blob/main/LICENSE">
       <img src="https://img.shields.io/github/license/geniusyield/atlas?style=flat-square" />
     </a>
-    <a href="https://github.com/geniusyield/atlas/actions/workflows/haskell.yml">
+    <a href="https://github.com/geniusyield/atlas/actions/workflows/build.yml?query=branch%3Amain">
       <img src="https://img.shields.io/badge/github%20actions-%232671E5.svg?style=flat-square&logo=githubactions&logoColor=white" />
     </a>
     <a href="./CONTRIBUTING.md">

@@ -15,7 +15,7 @@
     tools = {
       cabal = "latest";
       hlint = "3.4.1";
-      haskell-language-server = "latest";
+      haskell-language-server = { version = "1.8.0.0"; index-state = "2022-12-17T00:00:00Z"; };
     };
 
     buildInputs = with pkgs; [

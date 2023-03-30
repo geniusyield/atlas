@@ -100,8 +100,9 @@ instance GYTxQueryMonad GYTxMonadNode where
     logMsg ns s msg = GYTxMonadNode $ \env ->
         gyLog (envProviders env) ns s msg
 
--- TODO Note: randSeed implementation should use some internal
--- state so randSeed returns different seeds if called multiple times.
+-- TODO Note: randSeed implementation should use some internal state #30
+--            state so randSeed returns different seeds if called multiple times.
+--            (https://github.com/geniusyield/atlas/issues/30)
 instance GYTxMonad GYTxMonadNode where
     someUTxO = do
         addrs         <- ownAddresses

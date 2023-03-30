@@ -55,7 +55,7 @@ Essentially, they are supposed to work on trusted inputs and outputs. As such, w
 attention in the input and output sites and ensure they are indeed constructed/deconstructed properly.
 -}
 
-{- TODO: Eventually, we ought to use our own types for this.
+{- TODO: Eventually, we ought to use our own types for this. #23 (https://github.com/geniusyield/atlas/issues/23)
 
 One might even be able to make the 'Address' type be something that can unique identify
 a tx output. This would let the compute min ada quantity function figure out whether
@@ -191,7 +191,7 @@ selectInputs
                 . tokenBundleSizeAssessor
                 $ CWallet.TxSize maxValueSize
             , computeMinimumAdaQuantity = \addr tkMap -> do
-                {- TODO: This currently doesn't care about datum/ref script, even though they affect costs
+                {- TODO: This currently doesn't care about datum/ref script, even though they affect costs #24 (https://github.com/geniusyield/atlas/issues/24)
 
                 There should be a mechanism to care for them and get more accurate min ada. -}
                 CWallet.Coin $ minimumUTxOF GYTxOut

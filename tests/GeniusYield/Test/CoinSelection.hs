@@ -387,7 +387,8 @@ coinSelectionTestParamsToEnv CoinSelectionTestParams {cstpTxExtInps, cstpTxOwnIn
     buildEnvWith
         ownUtxos
         inps
-        -- TODO: Should we use different recipient addresses for each output?
+        -- TODO: Should we use different recipient addresses for each output? #36
+        --       (https://github.com/geniusyield/atlas/issues/36)
         ((mockRecipientAddress, ) <$> cstpTxOuts)
         cstpTxMint
   where

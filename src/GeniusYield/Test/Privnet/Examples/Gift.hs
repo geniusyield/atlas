@@ -403,13 +403,12 @@ tests setup = testGroup "gift"
         -- - we cannot consume V1 script utxos (we know the version!)
         -- - and create outputs with inline datums in the same transaction.
         --
-        -- TODO: change gyTxOutDatumInline field to a GADT which can be "true" only when
-        -- transaction is "V2 scripts only"
-        --
-        -- TODO: later these tests fail due
-        -- NonOutputSupplimentaryDatums
-        -- The reason is wrong grabGifts. We should use GyTxInDatum True
-        -- there for datums
+        -- TODO: change gyTxOutDatumInline field to a GADT which can be "true" only when transaction is "V2 scripts only" #25
+        --       (https://github.com/geniusyield/atlas/issues/25)
+	    --
+        -- TODO: later these tests fail due NonOutputSupplimentaryDatums. The reason is wrong grabGifts.
+	    --       We should use GyTxInDatum True there for datums #26
+	    --       (https://github.com/geniusyield/atlas/issues/26)
         --
         let ironAC = ctxIron ctx
 

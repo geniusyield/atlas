@@ -598,9 +598,10 @@ parseAssetClassCore sep tkParser t = Atto.parseOnly parser (TE.encodeUtf8 t)
 
 -- | Token name is an arbitrary byte string up to 32 bytes long.
 --
--- TODO: it's unclear whether it's an arbitrary byte string
--- or UTF8 encoded text (which encoded byte form is 32 byte long at most).
+-- TODO: it's unclear whether it's an arbitrary byte string or UTF8 encoded text #32
+-- (which encoded byte form is 32 byte long at most).
 -- /We treat it as an arbitrary string/.
+-- (https://github.com/geniusyield/atlas/issues/32)
 --
 -- >>> LBS8.putStrLn $ Aeson.encode ("Gold" :: GYTokenName)
 -- "476f6c64"
@@ -617,7 +618,7 @@ instance IsString GYTokenName where
         (error $ "fromString @GYTokenName " ++ show s ++ ": token name too long")
         (tokenNameFromBS bs)
       where
-        bs = fromString s -- TODO: utf8-encode
+        bs = fromString s -- TODO: utf8-encode #33 (https://github.com/geniusyield/atlas/issues/33)
 
 instance Swagger.ToParamSchema GYTokenName where
   toParamSchema _ = mempty

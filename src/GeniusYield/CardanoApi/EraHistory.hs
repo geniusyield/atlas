@@ -19,7 +19,7 @@ import qualified Ouroboros.Consensus.Util.Counting as Ouroboros
 
 This is safe as long as Ouroboros.Interpeter is defined as a newtype to Ouroboros.Summary.
 
-TODO: Is there a way to ensure, at runtime, that Interpreter is still a newtype to Summary?
+TODO: Can we ensure runtime, that Interpreter is still a newtype to Summary? #20 (https://github.com/geniusyield/atlas/issues/20)
 -}
 extractEraSummaries :: Api.EraHistory Api.CardanoMode -> Ouroboros.Summary (Ouroboros.CardanoEras Ouroboros.StandardCrypto)
 extractEraSummaries (Api.EraHistory _ interpreter) = UNSAFE.unsafeCoerce interpreter

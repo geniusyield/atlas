@@ -1,8 +1,9 @@
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.3.0
+    rev: v4.4.0
     hooks:
     -   id: check-yaml
+    -   id: no-commit-to-branch
 -   repo: https://github.com/geniusyield/atlas
     rev: 467bb60894cc381ec7aa3eba118aebf58325ffd3
     hooks:

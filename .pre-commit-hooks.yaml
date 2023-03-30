@@ -1,0 +1,12 @@
+-   id: hlint-ignore-duplication
+    name: hlint-ignore-duplication
+    description: Runs HLint, but ignores duplications.
+    entry: hlint -i 'Reduce duplication'
+    language: system
+    files: '\.l?hs$'
+-   id: stylish-haskell
+    name: stylish-haskell
+    description: Prettifies Haskell code using stylish-haskell.
+    entry: stylish-haskell --inplace
+    language: system
+    files: '\.l?hs$'

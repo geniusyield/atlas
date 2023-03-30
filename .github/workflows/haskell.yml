@@ -96,17 +96,16 @@ jobs:
       run: cabal v2-test all
     - name: Run doctest (docspec)
       run: |
-        echo "=========================[ RUN DOCTEST ]========================"
-        echo " Started at $(date --iso-8601=seconds --utc) (${BASH_SOURCE[0]})."
-        echo " -> Install DOCSPEC"
+        echo "=========================[ INSTALL DOCSPEC ]========================"
+        echo " -> Started at $(date --iso-8601=seconds --utc)."
         curl -sL https://github.com/phadej/cabal-extras/releases/download/cabal-docspec-0.0.0.20211114/cabal-docspec-0.0.0.20211114.xz > ./cabal-docspec.xz
         xz -d < ./cabal-docspec.xz > ./cabal-docspec
         rm -f ./cabal-docspec.xz
         chmod a+x ./cabal-docspec
-        echo " -> RUN DOCSPEC"
-        set -x
+        echo " -> Docspec has been installed."
+        echo "===========================[ RUN DOCSPEC ]==========================="
         ./cabal-docspec
-        set +x
+        echo " ============================[ FINISHED ]============================"
     - name: Run checks (cabal)
       run: cabal check
     - name: Create source distribution file (cabal)

@@ -22,7 +22,8 @@ import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api.S
 import qualified Cardano.Ledger.Alonzo.Language       as Ledger
 import qualified Cardano.Ledger.BaseTypes             as Ledger
-import           Cardano.Slotting.Time                (RelativeTime (RelativeTime), mkSlotLength)
+import           Cardano.Slotting.Time                (RelativeTime (RelativeTime),
+                                                       mkSlotLength)
 import           Control.Monad.Except
 import           Control.Monad.Random
 import           Control.Monad.Reader
@@ -155,7 +156,7 @@ instance GYTxQueryMonad GYTxMonadRun where
                 , utxoAddress   = a
                 , utxoValue     = v
                 , utxoOutDatum  = d
-                , utxoRefScript = Nothing
+                , utxoRefScript = Nothing  -- FIXME
                 }
 
     slotConfig = do

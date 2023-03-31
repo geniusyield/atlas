@@ -278,6 +278,7 @@ test-suite atlas-tests
     , plutus-ledger-api
     , plutus-simple-model
     , plutus-tx
+    , plutus-tx-plugin
     , QuickCheck
     , quickcheck-instances
     , some

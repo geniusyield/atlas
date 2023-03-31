@@ -31,6 +31,7 @@ refInputTests = testGroup "Reference Input"
     [
       testRun "Inlined datum" $ refInputTrace True 5 5 332976
     , testRun "Inlined datum - Wrong guess" $ mustFail . refInputTrace True 5 4 332976
+    , testRun "Reference input must not be consumed" $ mustFail . tryRefInputConsume
     ]
 
 guessRefInputRun :: GYTxOutRef -> GYTxOutRef -> Integer -> GYTxMonadRun ()
@@ -68,4 +69,21 @@ refInputTrace toInline actual guess fees Wallets{..} = do
         liftRun $ logInfo $ printf "Locked ORef %s" oref
         withWalletBalancesCheck [w1 := outValue <> valueNegate (valueFromLovelace fees)] $ do
           guessRefInputRun refInputORef oref myGuess
+
+tryRefInputConsume :: Wallets -> Run ()
+tryRefInputConsume Wallets{..} = do
+  -- Approach: Create a new output with 60% of total ada. Mark this UTxO as reference input and try sending 50% of this original balance. Since coin balancer can't consume this UTxO, it won't be able to build for it.
+  void $ runWallet w1 $ do
+    walletBalance <- balance w1
+    let walletLovelaceBalance = fst $ valueSplitAda walletBalance
+        lovelaceToSend = (walletLovelaceBalance `div` 10) * 6  -- send 60% of total ada
+        lovelaceToSendValue = valueFromLovelace lovelaceToSend
+    (Tx _ plutusTxBody, txId) <- sendSkeleton' (mustHaveOutput $ mkGYTxOutNoDatum (walletAddress w1) lovelaceToSendValue)
+    bodyUtxos <- utxosInBody plutusTxBody txId
+    let bodyUtxos' = catMaybes bodyUtxos
+    unless (length bodyUtxos == length bodyUtxos') $ fail $ printf "Shouldn't happen: Not all UTxOs reflected, originally %s but got %s and they are %s" (show $ length bodyUtxos) (show $ length bodyUtxos') (show bodyUtxos')
+    desiredOutputRef <- case utxoRef <$> find (\GYUTxO{ utxoValue } -> utxoValue == lovelaceToSendValue) bodyUtxos' of
+          Nothing  -> fail "Shouldn't happen: Couldn't find the desired UTxO"
+          Just ref -> pure ref
+    void $ sendSkeleton (mustHaveRefInput @'PlutusV2 desiredOutputRef <> mustHaveOutput  (mkGYTxOutNoDatum (walletAddress w1) lovelaceToSendValue))
 

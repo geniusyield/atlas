@@ -17,7 +17,7 @@ import           GeniusYield.TxBuilder
 mintTestTokens :: GYTxMonad m
                => GYTokenName
                -> Natural
-               -> m (GYAssetClass, GYTxSkeleton PlutusV2)
+               -> m (GYAssetClass, GYTxSkeleton 'PlutusV2)
 mintTestTokens tn amt = do
     -- utxo to base token of.
     utxo <- someUTxO

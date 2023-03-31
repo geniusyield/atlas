@@ -167,8 +167,8 @@ gyScriptFromId :: PQ.Connection -> Integer -> IO (Maybe (Some GYScript))
 gyScriptFromId conn referenceScriptId = do
   res <- PQ.query conn "SELECT type, bytes FROM script WHERE id = ?;" (PQ.Only referenceScriptId)
   case res of
-    [(STPlutusV1, Just (cbor :: ByteString))] -> return $ Some <$> scriptFromCBOR' @PlutusV1 (Base16.encode cbor)
-    [(STPlutusV2, Just cbor)]                 -> return $ Some <$> scriptFromCBOR' @PlutusV2 (Base16.encode cbor)
+    [(STPlutusV1, Just (cbor :: ByteString))] -> return $ Some <$> scriptFromCBOR'  @'PlutusV1 (Base16.encode cbor)
+    [(STPlutusV2, Just cbor)]                 -> return $ Some <$> scriptFromCBOR'  @'PlutusV2 (Base16.encode cbor)
     _anyOtherMatch                            -> return Nothing
 
 modifyRes:: PQ.Connection -> [QueryUtxo] -> IO [QueryUtxo']

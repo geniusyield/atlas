@@ -22,7 +22,7 @@ import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.Types
 
-readOracleValidatorV2 :: GYValidator PlutusV2
+readOracleValidatorV2 :: GYValidator 'PlutusV2
 readOracleValidatorV2 = validatorFromPlutus readOracleValidator
 
 tests :: IO Setup -> TestTree
@@ -52,7 +52,7 @@ tests setup = testGroup "oracle"
                         unitRedeemer
                     }
                 | (ref, (_, _, d)) <- Map.toList datums
-                ] :: GYTxSkeleton PlutusV2)
+                ] :: GYTxSkeleton 'PlutusV2)
 
     , testCaseSteps "with-ref" $ \info -> withSetup setup info $ \ctx -> do
         let goldAC = ctxGold ctx
@@ -95,7 +95,7 @@ tests setup = testGroup "oracle"
                 | (ref, (_, _, d)) <- Map.toList datums
                 ] ++
                 [ mustHaveRefInput datumRef
-                ] :: GYTxSkeleton PlutusV2)
+                ] :: GYTxSkeleton 'PlutusV2)
 
         void $ submitTx ctx User1 txBodyConsume
     ]

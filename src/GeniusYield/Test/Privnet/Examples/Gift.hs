@@ -46,7 +46,7 @@ tests setup = testGroup "gift"
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTx' <- ctxRunF ctx User2 $ grabGifts @PlutusV1 giftValidatorV1
+        grabGiftsTx' <- ctxRunF ctx User2 $ grabGifts  @'PlutusV1 giftValidatorV1
         mapM_ (submitTx ctx User2) grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx User1
@@ -80,7 +80,7 @@ tests setup = testGroup "gift"
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTx' <- ctxRunF ctx User2 $ grabGifts @PlutusV1 giftValidatorV2
+        grabGiftsTx' <- ctxRunF ctx User2 $ grabGifts  @'PlutusV1 giftValidatorV2
         mapM_ (submitTx ctx User2) grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx User1
@@ -114,7 +114,7 @@ tests setup = testGroup "gift"
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTx' <- ctxRunF ctx User2 $ grabGifts @PlutusV1 giftValidatorV2
+        grabGiftsTx' <- ctxRunF ctx User2 $ grabGifts  @'PlutusV1 giftValidatorV2
         mapM_ (submitTx ctx User2) grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx User1
@@ -147,7 +147,7 @@ tests setup = testGroup "gift"
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTxBody <- __ctxRunF ctx newUser $ grabGifts @PlutusV1 giftValidatorV2
+        grabGiftsTxBody <- __ctxRunF ctx newUser $ grabGifts  @'PlutusV1 giftValidatorV2
         grabGiftsTxBody' <- case grabGiftsTxBody of
           Nothing   -> assertFailure "Unable to build tx"
           Just body -> return body
@@ -284,8 +284,8 @@ tests setup = testGroup "gift"
         -- Apparently we MUST NOT include the script if there is a utxo input with that script. Even if we consume that utxo.
         grabGiftsTx' <- ctxRunF ctx User2 $ do
             -- We spend the gifts and give the transaction (unused) reference input
-            -- we need to use PlutusV2 here.
-            s1 <- grabGifts @PlutusV2 giftValidatorV2
+            -- we need to use 'PlutusV2 here.
+            s1 <- grabGifts  @'PlutusV2 giftValidatorV2
             return (s1 <|> Just (mustHaveRefInput ref))
 
         mapM_ (submitTx ctx User2) grabGiftsTx'
@@ -306,8 +306,8 @@ tests setup = testGroup "gift"
             (snd (valueSplitAda diff2))
 
     , testCaseSteps "refscript_mixup" $ \info -> withSetup setup info $ \ctx -> do
-        -- in this test we consume PlutusV1 UTxO and PlutusV2 UTxO
-        -- that should be fine, but we are using reference scripts for consuming PlutusV2
+        -- in this test we consume 'PlutusV1 UTxO and 'PlutusV2 UTxO
+        -- that should be fine, but we are using reference scripts for consuming 'PlutusV2
         -- and that is not supported.
         --
         let ironAC = ctxIron ctx
@@ -376,7 +376,7 @@ tests setup = testGroup "gift"
         threadDelay 1_000_000
 
         {-
-        let addNewGiftV2 :: GYTxMonad m => GYTxSkeleton PlutusV2 -> m (GYTxSkeleton PlutusV2)
+        let addNewGiftV2 :: GYTxMonad m => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
             addNewGiftV2 skeleton = do
                 addr <- scriptAddress giftValidatorV2
                 return $ skeleton <> mustHaveOutput GYTxOut
@@ -426,7 +426,7 @@ tests setup = testGroup "gift"
         -- TODO: NonOutputSupplimentaryDatums is thrown by other tests when this test is run.
         -- They fail to consume utxos with (inline) datums.
         -- We need to fix utxosDatums to also return whether the datum was inline.
-        let addNewGiftV2 :: GYTxMonad m => GYTxSkeleton PlutusV2 -> m (GYTxSkeleton PlutusV2)
+        let addNewGiftV2 :: GYTxMonad m => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
             addNewGiftV2 skeleton = do
                 addr <- scriptAddress giftValidatorV2
                 return $ skeleton <> mustHaveOutput GYTxOut
@@ -463,7 +463,7 @@ tests setup = testGroup "gift"
         threadDelay 1_000_000
 
         grabGiftsTx <- ctxRunF ctx User2 $ do
-          s1 <- grabGifts @PlutusV1 giftValidatorV1
+          s1 <- grabGifts  @'PlutusV1 giftValidatorV1
           s2 <- grabGifts treatValidatorV2
           return (s1 <|> s2)
 
@@ -501,15 +501,15 @@ giftCleanup ctx = do
     threadDelay 1_000_000
 
     -- grab existing v2 gifts
-    grabGiftsTx2 <- ctxRunF ctx User1 $ grabGifts @PlutusV2 giftValidatorV2
+    grabGiftsTx2 <- ctxRunF ctx User1 $ grabGifts  @'PlutusV2 giftValidatorV2
     mapM_ (submitTx ctx User1) grabGiftsTx2
 
     -- grab existing v1 gifts
-    grabGiftsTx1 <- ctxRunF ctx User1 $ grabGifts @PlutusV1 giftValidatorV1
+    grabGiftsTx1 <- ctxRunF ctx User1 $ grabGifts  @'PlutusV1 giftValidatorV1
     mapM_ (submitTx ctx User1) grabGiftsTx1
 
     -- grab existing treats
-    grabGiftsTx <- ctxRunF ctx User1 $ grabGifts @PlutusV2 treatValidatorV2
+    grabGiftsTx <- ctxRunF ctx User1 $ grabGifts  @'PlutusV2 treatValidatorV2
     mapM_ (submitTx ctx User1) grabGiftsTx
 
     threadDelay 1_000_000
@@ -540,8 +540,8 @@ grabGifts validator = do
 grabGiftsRef
     :: GYTxMonad m
     => GYTxOutRef
-    -> GYValidator PlutusV2
-    -> m (Maybe (GYTxSkeleton PlutusV2))
+    -> GYValidator 'PlutusV2
+    -> m (Maybe (GYTxSkeleton 'PlutusV2))
 grabGiftsRef ref validator = do
     addr <- scriptAddress validator
     utxo <- utxosAtAddress addr

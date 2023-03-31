@@ -467,8 +467,8 @@ outDatumFromMaestro (Just MaestroDatumOption{..}) = case mdoType of
 scriptFromMaestro :: MaestroScript -> Maybe (Some GYScript)
 scriptFromMaestro MaestroScript{..} = case msType of
   MstNative   -> Nothing
-  MstPlutusV1 -> Some <$> scriptFromCBOR @PlutusV1 msBytes
-  MstPlutusV2 -> Some <$> scriptFromCBOR @PlutusV2 msBytes
+  MstPlutusV1 -> Some <$> scriptFromCBOR  @'PlutusV1 msBytes
+  MstPlutusV2 -> Some <$> scriptFromCBOR  @'PlutusV2 msBytes
 
 transformUtxo :: MaestroUtxo -> Either SomeDeserializeError GYUTxO
 transformUtxo MaestroUtxo {muTxHash, muIndex, muAssets, muAddress, muDatum, muReferenceScript} = do

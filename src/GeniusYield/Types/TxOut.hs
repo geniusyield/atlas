@@ -35,11 +35,11 @@ data GYTxOut (v :: PlutusVersion) = GYTxOut
     { gyTxOutAddress :: !GYAddress
     , gyTxOutValue   :: !GYValue
     , gyTxOutDatum   :: !(Maybe (GYDatum, GYTxOutUseInlineDatum v))  -- ^ The Boolean indicates whether to use inline datums or not. May be overridden by a flag to 'txOutToApi'.
-    , gyTxOutRefS    :: !(Maybe (GYScript PlutusV2))
+    , gyTxOutRefS    :: !(Maybe (GYScript 'PlutusV2))
     } deriving stock (Eq, Show)
 
 data GYTxOutUseInlineDatum (v :: PlutusVersion) where
-    GYTxOutUseInlineDatum     :: GYTxOutUseInlineDatum PlutusV2
+    GYTxOutUseInlineDatum     :: GYTxOutUseInlineDatum 'PlutusV2
     GYTxOutDontUseInlineDatum :: GYTxOutUseInlineDatum v
 
 deriving instance Show (GYTxOutUseInlineDatum v)

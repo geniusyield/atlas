@@ -15,6 +15,7 @@ module GeniusYield.TxBuilder.Class
     , GYTxSkeleton (..)
     , GYTxSkeletonRefIns (..)
     , gyTxSkeletonRefInsToList
+    , gyTxSkeletonRefInsSet
     , RandT
     , lookupDatum'
     , utxoAtTxOutRef'
@@ -61,7 +62,8 @@ module GeniusYield.TxBuilder.Class
     , skeletonToRefScriptsORefs
     ) where
 
-import           Control.Monad.Except         (ExceptT, MonadError (..), liftEither)
+import           Control.Monad.Except         (ExceptT, MonadError (..),
+                                               liftEither)
 import           Control.Monad.Random         (MonadRandom (..), RandT, lift)
 import           Control.Monad.Reader         (ReaderT)
 import           Data.List                    (nubBy)
@@ -247,15 +249,18 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
     } deriving Show
 
 data GYTxSkeletonRefIns :: PlutusVersion -> Type where
-    GYTxSkeletonRefIns :: VersionIsGreaterOrEqual v PlutusV2 => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
+    GYTxSkeletonRefIns :: VersionIsGreaterOrEqual v 'PlutusV2 => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
     GYTxSkeletonNoRefIns :: GYTxSkeletonRefIns v
 
 deriving instance Show (GYTxSkeletonRefIns v)
 deriving instance Eq (GYTxSkeletonRefIns v)
 
 gyTxSkeletonRefInsToList :: GYTxSkeletonRefIns v -> [GYTxOutRef]
-gyTxSkeletonRefInsToList (GYTxSkeletonRefIns xs) = Set.toList xs
-gyTxSkeletonRefInsToList GYTxSkeletonNoRefIns    = []
+gyTxSkeletonRefInsToList = Set.toList . gyTxSkeletonRefInsSet
+
+gyTxSkeletonRefInsSet :: GYTxSkeletonRefIns v -> Set GYTxOutRef
+gyTxSkeletonRefInsSet (GYTxSkeletonRefIns xs) = xs
+gyTxSkeletonRefInsSet GYTxSkeletonNoRefIns    = Set.empty
 
 instance Semigroup (GYTxSkeletonRefIns v) where
     GYTxSkeletonRefIns a <> GYTxSkeletonRefIns b = GYTxSkeletonRefIns (Set.union a b)
@@ -493,7 +498,7 @@ utxoDatumHushed = fmap hush . utxoDatum
 mustHaveInput :: GYTxIn v -> GYTxSkeleton v
 mustHaveInput i = emptyGYTxSkeleton {gytxIns = [i]}
 
-mustHaveRefInput :: VersionIsGreaterOrEqual v PlutusV2 => GYTxOutRef -> GYTxSkeleton v
+mustHaveRefInput :: VersionIsGreaterOrEqual v 'PlutusV2 => GYTxOutRef -> GYTxSkeleton v
 mustHaveRefInput i = emptyGYTxSkeleton { gytxRefIns = GYTxSkeletonRefIns (Set.singleton i) }
 
 mustHaveOutput :: GYTxOut v -> GYTxSkeleton v

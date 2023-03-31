@@ -20,7 +20,7 @@
       <img src="https://img.shields.io/github/license/geniusyield/atlas?style=flat-square&label=Licence" />
     </a>
     <a href="https://github.com/geniusyield/atlas/actions/workflows/build.yml?query=branch%3Amain">
-      <img src="https://img.shields.io/github/actions/workflow/status/geniusyield/atlas/build.yml?style=flat-square&branch=main" />
+      <img src="https://img.shields.io/github/actions/workflow/status/geniusyield/atlas/build.yml?style=flat-square&branch=main&label=Build" />
     </a>
     <a href="./CONTRIBUTING.md">
       <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" />

@@ -555,14 +555,14 @@ maestroProtocolParams env = do
     MaestroProtocolParameters {..} <- runMaestroClient getProtocolParams env >>= handleMaestroError "ProtocolParams"
     pure $ Api.S.ProtocolParameters
         { protocolParamProtocolVersion     = (mpvMajor mppProtocolVersion, mpvMinor mppProtocolVersion)
-        , protocolParamDecentralization    = Nothing -- FIXME: This should be returned by Maestro?
-        , protocolParamExtraPraosEntropy   = Nothing -- Q: Is this unnecessary?
+        , protocolParamDecentralization    = Nothing -- FIXME: protocolParamDecentralization should be returned by Maestro? #38 (https://github.com/geniusyield/atlas/issues/38)
+        , protocolParamExtraPraosEntropy   = Nothing -- FIXME: Is protocolParamExtraPraosEntropy unnecessary?
         , protocolParamMaxBlockHeaderSize  = mppMaxBlockHeaderSize
         , protocolParamMaxBlockBodySize    = mppMaxBlockBodySize
         , protocolParamMaxTxSize           = mppMaxTxSize
         , protocolParamTxFeeFixed          = mppMinFeeConstant
         , protocolParamTxFeePerByte        = mppMinFeeCoefficient
-        , protocolParamMinUTxOValue        = Nothing -- FIXME: This should be returned by Maestro?
+        , protocolParamMinUTxOValue        = Nothing -- FIXME: protocolParamMinUTxOValue should be returned by Maestro?
         , protocolParamStakeAddressDeposit = Api.Lovelace $ toInteger mppStakeKeyDeposit
         , protocolParamStakePoolDeposit    = Api.Lovelace $ toInteger mppPoolDeposit
         , protocolParamMinPoolCost         = Api.Lovelace $ toInteger mppMinPoolCost

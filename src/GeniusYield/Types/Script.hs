@@ -123,8 +123,8 @@ instance GShow GYValidator where
   gshowsPrec = showsPrec
 
 validatorFromPlutus :: forall v. SingPlutusVersionI v => Plutus.Validator -> GYValidator v
-validatorFromPlutus = coerce (scriptFromPlutus @v) -- TODO: generalise
-
+validatorFromPlutus = coerce (scriptFromPlutus @v) -- TODO: generalise #28
+                                                   --       (https://github.com/geniusyield/atlas/issues/28)
 validatorToPlutus :: GYValidator v  -> Plutus.Validator
 validatorToPlutus = coerce scriptToPlutus
 

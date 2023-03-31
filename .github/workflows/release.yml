@@ -11,5 +11,6 @@ permissions:
 jobs:
   release:
     uses: ./.github/workflows/haskell.yml
-  # TODO: Download artifacts
-  # TODO: Publish artifacts as GitHub Release
+  # TODO: Release workflow #19 (https://github.com/geniusyield/atlas/issues/19)
+  #       - Download artifacts
+  #       - Publish artifacts as GitHub Release

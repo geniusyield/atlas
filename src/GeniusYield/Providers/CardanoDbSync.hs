@@ -417,7 +417,7 @@ dbSyncGetEraHistory (Conn pool) =  Pool.withResource pool $ \conn -> do
     case res of
         [PQ.Only network_name]
             | network_name == ("privatenet" :: Text) -> return privatenetEraHistory
-            -- TODO: add testnet and mainnets
+            -- TODO: add testnet and mainnets #35 (https://github.com/geniusyield/atlas/issues/35)
             | otherwise -> throwIO $ CardanoDbSyncException $ "dbSyncGetEraHistory: Unknown network: " ++ show network_name
 
         _ -> throwIO $ CardanoDbSyncException "dbSyncGetEraHistory: zero or multiple SQL results"

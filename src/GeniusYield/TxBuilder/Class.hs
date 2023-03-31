@@ -241,7 +241,7 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
     { gytxIns           :: ![GYTxIn v]
     , gytxOuts          :: ![GYTxOut v]
     , gytxRefIns        :: !(GYTxSkeletonRefIns v)
-    -- TODO: restrict versions of minting policies similarly to validators.
+    -- TODO: restrict versions of minting policies similarly to validators. #34 (https://github.com/geniusyield/atlas/issues/34)
     , gytxMint          :: !(Map (Some GYMintingPolicy) (Map GYTokenName Integer, GYRedeemer))
     , gytxSigs          :: !(Set GYPubKeyHash)
     , gytxInvalidBefore :: !(Maybe GYSlot)

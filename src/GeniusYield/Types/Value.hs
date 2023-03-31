@@ -600,7 +600,8 @@ parseAssetClassCore sep tkParser t = Atto.parseOnly parser (TE.encodeUtf8 t)
 --
 -- TODO: it's unclear whether it's an arbitrary byte string or UTF8 encoded text #32
 -- (which encoded byte form is 32 byte long at most).
--- /We treat it as an arbitrary string/. (https://github.com/geniusyield/atlas/issues/32)
+-- (https://github.com/geniusyield/atlas/issues/32)
+-- /We treat it as an arbitrary string/.
 --
 -- >>> LBS8.putStrLn $ Aeson.encode ("Gold" :: GYTokenName)
 -- "476f6c64"

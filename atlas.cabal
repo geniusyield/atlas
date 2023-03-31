@@ -243,7 +243,15 @@ test-suite atlas-tests
   type:           exitcode-stdio-1.0
   main-is:        atlas-tests.hs
   hs-source-dirs: tests
-  ghc-options:    -threaded -rtsopts
+  ghc-options:    -threaded -rtsopts -Wall
+
+  -- so unfoldings are present even when compiled without optmizations
+  ghc-options:
+    -fno-ignore-interface-pragmas -fno-omit-interface-pragmas
+    -Wno-partial-type-signatures
+
+  -- expose all unfoldings, so plutustx compiler can do its job
+  ghc-options:      -fexpose-all-unfoldings -fobject-code -fplugin-opt PlutusTx.Plugin:defer-errors
   other-modules:
     GeniusYield.Test.CoinSelection
     GeniusYield.Test.Collateral
@@ -252,6 +260,9 @@ test-suite atlas-tests
     GeniusYield.Test.Config
     GeniusYield.Test.GYTxSkeleton
     GeniusYield.Test.GYTxBody
+    GeniusYield.Test.OnChain.GuessRefInputDatum
+    GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
+    GeniusYield.Test.RefInput
   build-depends:
     , aeson
     , base
@@ -262,8 +273,11 @@ test-suite atlas-tests
     , filepath
     , atlas
     , MonadRandom
+    , mtl
     , ouroboros-consensus
+    , plutus-ledger-api
     , plutus-simple-model
+    , plutus-tx
     , QuickCheck
     , quickcheck-instances
     , some

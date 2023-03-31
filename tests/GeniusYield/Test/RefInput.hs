@@ -1,5 +1,13 @@
 -- Test to signify correct functionality of reference inputs implementation.
 -- TODO: Atlas currently doesn't support referring to the uninlined datum of reference input. But if that support is added, tests can be written utilising it here.
+{-|
+Module      : GeniusYield.Test.RefInput
+Copyright   : (c) 2023 GYELD GMBH
+License     : Apache 2.0
+Maintainer  : support@geniusyield.com
+Stability   : develop
+
+-}
 module GeniusYield.Test.RefInput
     ( refInputTests
     ) where

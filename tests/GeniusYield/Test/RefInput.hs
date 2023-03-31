@@ -73,7 +73,7 @@ refInputTrace toInline actual guess fees Wallets{..} = do
 
 tryRefInputConsume :: Wallets -> Run ()
 tryRefInputConsume Wallets{..} = do
-  -- Approach: Create a new output with 60% of total ada. Mark this UTxO as reference input and try sending 50% of this original balance. Since coin balancer can't consume this UTxO, it won't be able to build for it.
+  -- Approach: Create a new output with 60% of total ada. Mark this UTxO as reference input and try sending this same 60%, or any amount greater than 40% of this original balance. Since coin balancer can't consume this UTxO, it won't be able to build for it.
   void $ runWallet w1 $ do
     walletBalance <- balance w1
     let walletLovelaceBalance = fst $ valueSplitAda walletBalance

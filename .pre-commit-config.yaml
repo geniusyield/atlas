@@ -3,7 +3,14 @@ repos:
     rev: v4.4.0
     hooks:
     -   id: check-yaml
-    -   id: no-commit-to-branch
+-   repo: local
+    hooks:
+    -   id: no-commit-to-main
+        name: no-commit-to-main
+        description: Reject commits to main branch (but not on CI)
+        entry: bash ./no-commit-to-main.sh
+        always_run: true
+        language: system
 -   repo: https://github.com/geniusyield/atlas
     rev: 467bb60894cc381ec7aa3eba118aebf58325ffd3
     hooks:

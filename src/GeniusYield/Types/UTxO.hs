@@ -84,7 +84,7 @@ data GYUTxO = GYUTxO
     , utxoAddress   :: !GYAddress
     , utxoValue     :: !GYValue
     , utxoOutDatum  :: !GYOutDatum
-    , utxoRefScript :: !(Maybe (Some GYScript)) -- TODO: change to GYScriptHash? but  then we won't be able to convert faithfully back to Api.UTxO
+    , utxoRefScript :: !(Maybe (Some GYScript)) -- TODO: change to GYScriptHash? #31, but then we won't be able to convert faithfully back to Api.UTxO (https://github.com/geniusyield/atlas/issues/31)
     } deriving stock (Eq, Show)
 
 -- | A set of unspent transaction outputs.

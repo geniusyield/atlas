@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 -- Test to signify correct functionality of reference inputs implementation.
 -- TODO: Atlas currently doesn't support referring to the uninlined datum of reference input. But if that support is added, tests can be written utilising it here.
 {-|
@@ -18,6 +19,7 @@ import           Test.Tasty                                           (TestTree,
                                                                        testGroup)
 
 import           GeniusYield.Imports
+import           GeniusYield.Test.GYTxBody                            (mockTxId)
 import           GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
 import           GeniusYield.Test.Utils
 import           GeniusYield.TxBuilder
@@ -28,10 +30,9 @@ gyGuessRefInputDatumValidator = validatorFromPlutus guessRefInputDatumValidator
 
 refInputTests :: TestTree
 refInputTests = testGroup "Reference Input"
-    [
-      testRun "Inlined datum" $ refInputTrace True 5 5 332976
+    [ testRun "Inlined datum" $ refInputTrace True 5 5 332976
     , testRun "Inlined datum - Wrong guess" $ mustFail . refInputTrace True 5 4 332976
-    , testRun "Reference input must not be consumed" $ mustFail . tryRefInputConsume
+    , testRun "Reference input must not be consumed" tryRefInputConsume
     ]
 
 guessRefInputRun :: GYTxOutRef -> GYTxOutRef -> Integer -> GYTxMonadRun ()
@@ -85,5 +86,11 @@ tryRefInputConsume Wallets{..} = do
     desiredOutputRef <- case utxoRef <$> find (\GYUTxO{ utxoValue } -> utxoValue == lovelaceToSendValue) bodyUtxos' of
           Nothing  -> fail "Shouldn't happen: Couldn't find the desired UTxO"
           Just ref -> pure ref
-    void $ sendSkeleton (mustHaveRefInput @'PlutusV2 desiredOutputRef <> mustHaveOutput  (mkGYTxOutNoDatum (walletAddress w1) lovelaceToSendValue))
-
+    sendSkeleton (mustHaveRefInput @'PlutusV2 desiredOutputRef <> mustHaveOutput  (mkGYTxOutNoDatum (walletAddress w1) lovelaceToSendValue))
+      `catchError` (
+        \case
+          GYApplicationException e -> do
+            liftRun $ logInfo $ printf "Successfully caught expected exception %s" (show e)
+            pure mockTxId
+          e -> fail $ printf "Unexpected exception %s" (show e)
+        )

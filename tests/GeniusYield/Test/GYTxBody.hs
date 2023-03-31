@@ -1,55 +1,49 @@
 module GeniusYield.Test.GYTxBody
     ( gyTxBodyTests
+    , mockTxId
     ) where
 
 import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api.S
-import qualified Data.Set as Set                      (empty)
-import           Data.Time.Clock.POSIX                ( posixSecondsToUTCTime )
-import           Numeric.Natural                      ( Natural )
-import           Test.Tasty                           ( TestTree, testGroup )
-import           Test.Tasty.HUnit                     ( Assertion, (@?=)
-                                                      , testCase
-                                                      )
+import qualified Data.Set                             as Set (empty)
+import           Data.Time.Clock.POSIX                (posixSecondsToUTCTime)
+import           Numeric.Natural                      (Natural)
+import           Test.Tasty                           (TestTree, testGroup)
+import           Test.Tasty.HUnit                     (Assertion, testCase,
+                                                       (@?=))
 
-import           Plutus.Model.Fork.Ledger.TimeSlot    ( scSlotZeroTime
-                                                      , scSlotLength
-                                                      )
-import           Plutus.Model.Mock.MockConfig         ( defaultSlotConfig )
-import           Plutus.Model.Mock.ProtocolParameters ( PParams(BabbageParams)
-                                                      , defaultBabbageParams
-                                                      )
+import           Plutus.Model.Fork.Ledger.TimeSlot    (scSlotLength,
+                                                       scSlotZeroTime)
+import           Plutus.Model.Mock.MockConfig         (defaultSlotConfig)
+import           Plutus.Model.Mock.ProtocolParameters (PParams (BabbageParams),
+                                                       defaultBabbageParams)
 
-import           GeniusYield.Types.Address      ( GYAddress
-                                                , unsafeAddressFromText
-                                                )
-import           GeniusYield.Types.Tx           ( GYTxId )
-import           GeniusYield.Types.TxOut        ( GYTxOut, mkGYTxOutNoDatum )
-import           GeniusYield.Types.TxOutRef     ( GYTxOutRef
-                                                , txOutRefFromTuple
-                                                )
-import           GeniusYield.Types.SlotConfig   ( gyscSystemStart
-                                                , simpleSlotConfig
-                                                )
-import           GeniusYield.Types.Time         ( timeFromPlutus, timeToPOSIX )
-import           GeniusYield.Types.UTxO         ( GYUTxO(..), GYUTxOs
-                                                , GYOutDatum(GYOutDatumNone)
-                                                , utxosFromList
-                                                )
-import           GeniusYield.Types.Value        ( GYValue, GYTokenName
-                                                , GYAssetClass (..)
-                                                , valueFromLovelace
-                                                , valueFromList, valueSingleton
-                                                )
+import           GeniusYield.Types.Address            (GYAddress,
+                                                       unsafeAddressFromText)
+import           GeniusYield.Types.SlotConfig         (gyscSystemStart,
+                                                       simpleSlotConfig)
+import           GeniusYield.Types.Time               (timeFromPlutus,
+                                                       timeToPOSIX)
+import           GeniusYield.Types.Tx                 (GYTxId)
+import           GeniusYield.Types.TxOut              (GYTxOut,
+                                                       mkGYTxOutNoDatum)
+import           GeniusYield.Types.TxOutRef           (GYTxOutRef,
+                                                       txOutRefFromTuple)
+import           GeniusYield.Types.UTxO               (GYOutDatum (GYOutDatumNone),
+                                                       GYUTxO (..), GYUTxOs,
+                                                       utxosFromList)
+import           GeniusYield.Types.Value              (GYAssetClass (..),
+                                                       GYTokenName, GYValue,
+                                                       valueFromList,
+                                                       valueFromLovelace,
+                                                       valueSingleton)
 
-import           GeniusYield.Transaction        ( GYBuildTxEnv(..)
-                                                , GYCoinSelectionStrategy(..)
-                                                , balanceTxStep
-                                                )
-import           GeniusYield.Transaction.Common ( BalancingError(..)
-                                                , adjustTxOut, minimumUTxO
-                                                )
-import          GeniusYield.Providers.Common    ( mainnetEraHist )
+import           GeniusYield.Providers.Common         (mainnetEraHist)
+import           GeniusYield.Transaction              (GYBuildTxEnv (..),
+                                                       GYCoinSelectionStrategy (..),
+                                                       balanceTxStep)
+import           GeniusYield.Transaction.Common       (BalancingError (..),
+                                                       adjustTxOut, minimumUTxO)
 -------------------------------------------------------------------------------
 -- Tests
 -------------------------------------------------------------------------------

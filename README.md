@@ -11,14 +11,16 @@
       <img src="https://img.shields.io/badge/-Haddock-5E5184?style=flat-square&logo=haskell&logoColor=white" />
     </a>
     <a href="https://cardano.stackexchange.com/questions/tagged/atlas">
-      <img src="https://img.shields.io/stackexchange/cardano/t/atlas?style=flat-square" />
+      <img src="https://img.shields.io/stackexchange/cardano/t/atlas?style=flat-square&label=Cardano%20Atlas%20Questions" />
     </a>
-    <img src="https://img.shields.io/github/commit-activity/m/geniusyield/atlas?style=flat-square" />
+    <a href="https://github.com/geniusyield/atlas/commits/main">
+      <img src="https://img.shields.io/github/commit-activity/m/geniusyield/atlas?style=flat-square&label=Commit%20Activity" />
+    </a>
     <a href="https://github.com/geniusyield/atlas/blob/main/LICENSE">
-      <img src="https://img.shields.io/github/license/geniusyield/atlas?style=flat-square" />
+      <img src="https://img.shields.io/github/license/geniusyield/atlas?style=flat-square&label=Licence" />
     </a>
     <a href="https://github.com/geniusyield/atlas/actions/workflows/build.yml?query=branch%3Amain">
-      <img src="https://img.shields.io/badge/github%20actions-%232671E5.svg?style=flat-square&logo=githubactions&logoColor=white" />
+      <img src="https://img.shields.io/github/actions/workflow/status/geniusyield/atlas/build.yml?style=flat-square&branch=main" />
     </a>
     <a href="./CONTRIBUTING.md">
       <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" />

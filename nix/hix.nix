@@ -13,7 +13,7 @@
   # Tools to include in the development shell
   shell = {
     tools = {
-      cabal = "latest";
+      cabal = "3.8.1.0";
       hlint = "3.4.1";
       haskell-language-server = { version = "1.8.0.0"; index-state = "2022-12-17T00:00:00Z"; };
     };

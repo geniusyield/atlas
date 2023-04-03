@@ -124,5 +124,5 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: DIST_x86_64
+        name: source-distribution-file
         path: ./dist-newstyle/sdist/atlas-0.1.0.0.tar.gz

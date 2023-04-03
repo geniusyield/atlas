@@ -115,6 +115,8 @@ jobs:
       run: |
         export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
         echo "SRC_TGZ: $SRC_TGZ"
+    - name: Generate documentation (cabal haddock)
+      run: cabal haddock --html --hyperlink-source --haddock-options="--use-unicode"
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:

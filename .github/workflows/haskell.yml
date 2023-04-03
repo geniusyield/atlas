@@ -124,5 +124,5 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: SRC_TGZ
-        path: $SRC_TGZ
+        name: DIST_x86_64
+        path: ./dist-newstyle/build/x86_64-linux/ghc-8.10.7/atlas-0.1.0.0/

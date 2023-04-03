@@ -22,7 +22,8 @@ import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api.S
 import qualified Cardano.Ledger.Alonzo.Language       as Ledger
 import qualified Cardano.Ledger.BaseTypes             as Ledger
-import           Cardano.Slotting.Time                (RelativeTime (RelativeTime), mkSlotLength)
+import           Cardano.Slotting.Time                (RelativeTime (RelativeTime),
+                                                       mkSlotLength)
 import           Control.Monad.Except
 import           Control.Monad.Random
 import           Control.Monad.Reader
@@ -141,6 +142,7 @@ instance GYTxQueryMonad GYTxMonadRun where
         mUtxosWithoutRefScripts   <- liftRun $ gets mockUtxos
         mRefScripts <- liftRun $ gets mockRefScripts  -- IMPORTANT: as the fate would have it, our fork because of being old, doesn't contain these inside `mockUtxos` (which is not the case for original)
         let m = mUtxosWithoutRefScripts <> mRefScripts
+        mScripts <- liftRun $ gets mockScripts
         nid <- networkId
         return $ do
             o <- Map.lookup (txOutRefToPlutus ref) m
@@ -150,12 +152,23 @@ instance GYTxQueryMonad GYTxMonadRun where
                     Plutus.NoOutputDatum      -> return GYOutDatumNone
                     Plutus.OutputDatumHash h' -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus h')
                     Plutus.OutputDatum d      -> return $ GYOutDatumInline $ datumFromPlutus d
+            -- We are in `Maybe` monad, and it's valid for the following to return `Nothing` so we wrap our `Nothing` with `return`.
+            s <- case Plutus.txOutReferenceScript o of
+                   Nothing -> return Nothing
+                   Just sh -> case Map.lookup sh mScripts of
+                                Nothing -> return Nothing
+                                Just vs  ->
+                                  if
+                                  | isV1 vs   -> return $ Just (Some $ scriptFromPlutus @'PlutusV1 (versioned'content vs))
+                                  | isV2 vs   -> return $ Just (Some $ scriptFromPlutus @'PlutusV2 (versioned'content vs))
+                                  | otherwise -> return Nothing
+
             return GYUTxO
                 { utxoRef       = ref
                 , utxoAddress   = a
                 , utxoValue     = v
                 , utxoOutDatum  = d
-                , utxoRefScript = Nothing
+                , utxoRefScript = s
                 }
 
     slotConfig = do
@@ -454,3 +467,4 @@ eraHistory = do
             , eraEnd = Ouroboros.EraUnbounded
             , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920}
             }
+

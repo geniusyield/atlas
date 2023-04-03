@@ -52,22 +52,34 @@ instance GYTxQueryMonad GYTxQueryMonadNode where
     networkId = GYTxQueryMonadNode $ \(GYTxNodeEnv nid _ ) ->
         return nid
 
-    lookupDatum h = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+    lookupDatum h = do
+      logMsg mempty GYInfo $ printf "Querying Datum: %s" (show h)
+      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyLookupDatum providers h
 
-    utxosAtAddress addr = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+    utxosAtAddress addr = do
+      logMsg mempty GYInfo $ printf "Querying utxo At Address: %s" addr
+      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyQueryUtxosAtAddress providers addr
 
-    utxosAtAddresses addrs = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+    utxosAtAddresses addrs = do
+      logMsg mempty GYInfo $ printf "Querying utxo At Addresses: \n %s" (show addrs)
+      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyQueryUtxosAtAddresses providers addrs
 
-    utxoRefsAtAddress addr = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+    utxoRefsAtAddress addr = do
+      logMsg mempty GYInfo $ printf "Querying UtxoRefs At Address: %s"  addr
+      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyQueryUtxoRefsAtAddress providers addr
 
-    utxoAtTxOutRef oref = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+    utxoAtTxOutRef oref = do
+      logMsg mempty GYInfo $ printf "Querying Utxos At TxOutRef: %s" oref
+      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyQueryUtxoAtTxOutRef providers oref
 
-    utxosAtTxOutRefs oref = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+    utxosAtTxOutRefs oref = do
+      logMsg mempty GYInfo $ printf "Querying Utxos At TxOutRefs: %s" (show oref)
+      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyQueryUtxosAtTxOutRefs providers oref
 
     slotConfig = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->

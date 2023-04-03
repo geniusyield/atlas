@@ -81,7 +81,7 @@ source-repository-package
 source-repository-package
   type: git
   location: https://github.com/geniusyield/plutus-simple-model
-  tag: 760fd3d7084a2efdb2510804caaf43b27cf5b288
+  tag: 7ba435b3522f56fb1ab5db491b7821b68d7e0682
   --sha256: sha256-rorwvnN8qkaO4/WgtvJVqg7EW09Z6e1bXnfFu0fu/aU=
 
 -- Everything below is essentially copied from cardano-wallet's cabal.project.

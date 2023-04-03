@@ -1,71 +1,54 @@
 {
   description = "atlas";
-  inputs.haskell-nix.url = "github:input-output-hk/haskell.nix?ref=2b68ab788d9c3536c696a1f3a5e5cd0cc25b4b7d";
-  inputs.nixpkgs.follows = "haskell-nix/nixpkgs-unstable";
-  inputs.plutus.url = "github:input-output-hk/plutus?ref=c8d4364d0e639fef4d5b93f7d6c0912d992b54f9"; # used for libsodium-vrf
+inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
+  inputs.nixpkgs.follows = "haskellNix/nixpkgs-unstable";
+  inputs.flake-utils.url = "github:numtide/flake-utils";
 
-  outputs = { self, nixpkgs, haskell-nix, plutus }:
-    let
-      supportedSystems = [ "x86_64-linux" ];
-
-      perSystem = nixpkgs.lib.genAttrs supportedSystems;
-
-      nixpkgsFor = system: import nixpkgs { inherit system; overlays = [ haskell-nix.overlay ]; inherit (haskell-nix) config; };
-
-      projectFor = system:
-        let
-          deferPluginErrors = true;
-          pkgs = nixpkgsFor system;
-
-          project = (nixpkgsFor system).haskell-nix.project' {
-            src = ./.;
-            compiler-nix-name = "ghc8107";
-            projectFileName = "cabal.project";
-            modules = [{
-              packages = {
-                plutus-use-cases.flags.defer-plugin-errors = deferPluginErrors;
-                plutus-ledger.flags.defer-plugin-errors = deferPluginErrors;
-                plutus-contract.flags.defer-plugin-errors = deferPluginErrors;
-                cardano-crypto-praos.components.library.pkgconfig =
-                  nixpkgs.lib.mkForce [ [ (import plutus { inherit system; }).pkgs.libsodium-vrf ] ];
-                cardano-crypto-class.components.library.pkgconfig =
-                  nixpkgs.lib.mkForce [ [ (import plutus { inherit system; }).pkgs.libsodium-vrf ] ];
-              };
-            }];
-            shell = {
-              withHoogle = true;
-
-              nativeBuildInputs = (with pkgs; [
-                cabal-install
-                hlint
-                bashInteractive
-                jq
-                gnumake
-                gnused
-                nodePackages.npm
-                nodePackages.webpack
-                nodePackages.webpack-cli
-              ]);
-
-              tools = {
-                haskell-language-server = { };
-              };
-            };
-          };
-        in project;
-    in
-    {
-      project = perSystem projectFor;
-      flake = perSystem (system: (projectFor system).flake {});
-
-      packages = perSystem (system: self.flake.${system}.packages);
-      apps = perSystem (system: self.flake.${system}.apps);
-      devShell = perSystem (system:
-        let pkgs = nixpkgsFor system;
-            devShell = self.flake.${system}.devShell;
-        in pkgs.lib.overrideDerivation (devShell) (oldAttrs: {
-          buildInputs = pkgs.lib.lists.unique devShell.buildInputs;
-        })
-      );
+  inputs.plutus.url = "github:input-output-hk/plutus?ref=a56c96598b4b25c9e28215214d25189331087244"; # used for libsodium-vrf
+  inputs.CHaP = {
+      url = "github:input-output-hk/cardano-haskell-packages?ref=repo";
+      flake = false;
     };
+  outputs = { self, nixpkgs, flake-utils, haskellNix, plutus, CHaP }:
+    let
+      supportedSystems = [
+        "x86_64-linux"
+      ];
+    in
+      flake-utils.lib.eachSystem supportedSystems (system:
+      let
+        plutusPkgs = (import plutus { inherit system; }).pkgs;
+        overlays = [ haskellNix.overlay
+          (final: prev: {
+            hixProject =
+              final.haskell-nix.hix.project {
+                src = ./.;
+                evalSystem = "x86_64-linux";
+                modules = [{
+                  packages = {
+                    cardano-crypto-praos.components.library.pkgconfig =
+                      nixpkgs.lib.mkForce [ [ plutusPkgs.libsodium-vrf ] ];
+                    cardano-crypto-class.components.library.pkgconfig =
+                      nixpkgs.lib.mkForce [ [ plutusPkgs.libsodium-vrf plutusPkgs.secp256k1 ] ];
+                  };
+                }];
+                inputMap = { "https://input-output-hk.github.io/cardano-haskell-packages" = CHaP; };
+              };
+          })
+        ];
+        pkgs = import nixpkgs { inherit system overlays; inherit (haskellNix) config; };
+        flake = pkgs.hixProject.flake {};
+      in flake // {
+        legacyPackages = pkgs;
+      });
+
+  # --- Flake Local Nix Configuration ----------------------------
+  nixConfig = {
+    # This sets the flake to use the IOG nix cache.
+    # Nix should ask for permission before using it,
+    # but remove it here if you do not want it to.
+    extra-substituters = ["https://cache.iog.io"];
+    extra-trusted-public-keys = ["hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="];
+    allow-import-from-derivation = "true";
+  };
 }

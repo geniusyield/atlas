@@ -121,6 +121,8 @@ jobs:
       uses: actions/upload-pages-artifact@v1.0.8
       with:
         path: ./dist-newstyle/build/x86_64-linux/ghc-8.10.7/atlas-0.1.0.0/doc/html/atlas/
+    - name: Deploy haddock documentation to GitHub Pages (only on main)
+      uses: actions/deploy-pages@v2.0.0
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:

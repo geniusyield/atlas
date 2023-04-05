@@ -7,7 +7,7 @@
     <a href="https://atlas-app.io">
       <img src="https://img.shields.io/badge/-Documentation-blue?style=flat-square&logo=semantic-scholar&logoColor=white" />
     </a>
-    <a href="https://geniusyield.github.io/atlas/">
+    <a href="https://haddock.atlas-app.io/">
       <img src="https://img.shields.io/badge/-Haddock-5E5184?style=flat-square&logo=haskell&logoColor=white" />
     </a>
     <a href="https://cardano.stackexchange.com/questions/tagged/atlas">
@@ -49,7 +49,7 @@ You can find the complete documentation [here](https://atlas-app.io/).
 ⚡ Learn how to leverage Atlas by building a complete end-to-end dApp: [Getting Started](https://atlas-app.io/getting-started).
 
 We welcome the community to help us improve the documentation by opening pull requests in [Atlas Docs](https://github.com/geniusyield/atlas-docs) repository.
-To dive deeper into the Atlas implementation, see its [Haddock](https://geniusyield.github.io/atlas/).
+To dive deeper into the Atlas implementation, see its [Haddock](https://haddock.atlas-app.io/).
 
 
 ## Features

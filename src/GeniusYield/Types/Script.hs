@@ -67,6 +67,7 @@ module GeniusYield.Types.Script (
     scriptFromCBOR,
     scriptFromCBOR',
     scriptToPlutus,
+    scriptFromPlutus,
     someScriptToPlutus,
     scriptApiHash,
     scriptPlutusHash,

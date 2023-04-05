@@ -10,16 +10,18 @@ import           System.Directory                  (doesFileExist)
 import           System.FilePath                   ((</>))
 import           Test.Tasty                        (defaultMain, testGroup)
 import           Test.Tasty.Golden                 (goldenVsString)
-import           Test.Tasty.HUnit                  (assertEqual, testCase, (@=?))
+import           Test.Tasty.HUnit                  (assertEqual, testCase,
+                                                    (@=?))
 
 import           GeniusYield.Examples.Gift
 import           GeniusYield.Test.CoinSelection    (coinSelectionTests)
 import           GeniusYield.Test.Collateral       (collateralTests)
-import           GeniusYield.Test.SlotConfig       (slotConversionTests)
-import           GeniusYield.Test.Providers        (providersTests)
 import           GeniusYield.Test.Config           (configTests)
-import           GeniusYield.Test.GYTxSkeleton     (gyTxSkeletonTests)
 import           GeniusYield.Test.GYTxBody         (gyTxBodyTests)
+import           GeniusYield.Test.GYTxSkeleton     (gyTxSkeletonTests)
+import           GeniusYield.Test.Providers        (providersTests)
+import           GeniusYield.Test.RefInput         (refInputTests)
+import           GeniusYield.Test.SlotConfig       (slotConversionTests)
 import           GeniusYield.Types
 
 -------------------------------------------------------------------------------
@@ -68,6 +70,7 @@ main = do
         , configTests
         , gyTxSkeletonTests
         , gyTxBodyTests
+        , refInputTests
         ]
 
 -------------------------------------------------------------------------------

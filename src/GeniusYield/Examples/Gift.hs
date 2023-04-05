@@ -57,8 +57,8 @@ giftValidatorPlutus :: Plutus.Validator
 giftValidatorPlutus = Plutus.Validator $ Plutus.Script $
     UPLC.Program () (PLC.defaultVersion ()) giftScript'
 
-giftValidatorV1 :: GYValidator PlutusV1
+giftValidatorV1 :: GYValidator 'PlutusV1
 giftValidatorV1 = validatorFromPlutus giftValidatorPlutus
 
-giftValidatorV2 :: GYValidator PlutusV2
+giftValidatorV2 :: GYValidator 'PlutusV2
 giftValidatorV2 = validatorFromPlutus giftValidatorPlutus

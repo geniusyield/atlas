@@ -70,12 +70,12 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral action = d
     collateralUtxo <- utxoAtTxOutRef' collateral
     ownUtxos <- utxosAtAddresses addrs
 
-    let buildEnvWith ownUtxos' = GYBuildTxEnv
+    let buildEnvWith ownUtxos' refIns = GYBuildTxEnv
             { gyBTxEnvSystemStart    = ss
             , gyBTxEnvEraHistory     = eh
             , gyBTxEnvProtocolParams = pp
             , gyBTxEnvPools          = ps
-            , gyBTxEnvOwnUtxos       = utxosRemoveRefScripts $ utxosRemoveTxOutRef collateral ownUtxos'
+            , gyBTxEnvOwnUtxos       = utxosRemoveTxOutRefs refIns $ utxosRemoveRefScripts $ utxosRemoveTxOutRef collateral ownUtxos'
             , gyBTxEnvChangeAddr     = change
             , gyBTxEnvCollateral     = collateralUtxo
             }
@@ -102,7 +102,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral action = d
 
             -- Build the transaction.
             buildUnsignedTxBody
-                (buildEnvWith ownUtxos')
+                (buildEnvWith ownUtxos' (gyTxSkeletonRefInsSet gytxRefIns))
                 cstrat
                 gyTxInsDetailed
                 gytxOuts

@@ -35,16 +35,16 @@ tests setup = testGroup "treat"
 
         threadDelay 1_000_000
 
-        -- this fails as we tell that script is PlutusV1,
+        -- this fails as we tell that script is 'PlutusV1,
         -- but it uses V2 features.
-        assertThrown isTxBodyErrorAutoBalance $ ctxRunF ctx User2 $ grabTreats @PlutusV1 treatValidatorV1
+        assertThrown isTxBodyErrorAutoBalance $ ctxRunF ctx User2 $ grabTreats  @'PlutusV1 treatValidatorV1
 
-    -- this is the same tests as for Gift PlutusV2.
+    -- this is the same tests as for Gift 'PlutusV2.
     , testCaseSteps "plutusV2" $ \info -> withSetup setup info $ \ctx -> do
         let ironAC = ctxIron ctx
 
         -- grab existing treats to cleanup
-        grabTreatsTx <- ctxRunF ctx User1 $ grabTreats @PlutusV2 treatValidatorV2
+        grabTreatsTx <- ctxRunF ctx User1 $ grabTreats  @'PlutusV2 treatValidatorV2
         mapM_ (submitTx ctx User1) grabTreatsTx
 
         balance1 <- ctxQueryBalance ctx User1
@@ -59,7 +59,7 @@ tests setup = testGroup "treat"
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabTreatsTx' <- ctxRunF ctx User2 $ grabTreats @PlutusV2 treatValidatorV2
+        grabTreatsTx' <- ctxRunF ctx User2 $ grabTreats  @'PlutusV2 treatValidatorV2
         mapM_ (submitTx ctx User2) grabTreatsTx'
 
         balance1' <- ctxQueryBalance ctx User1

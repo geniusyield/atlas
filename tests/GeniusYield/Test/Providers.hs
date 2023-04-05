@@ -117,7 +117,7 @@ maestroTests =
                                         , utxoAddress   = mockAddress
                                         , utxoValue     = valueFromList []
                                         , utxoOutDatum  = GYOutDatumNone
-                                        , utxoRefScript = mkSome <$> scriptFromCBOR @PlutusV2 mockScriptCBOR
+                                        , utxoRefScript = mkSome <$> scriptFromCBOR  @'PlutusV2 mockScriptCBOR
                                         }
                 res = transformUtxo $ mockMaestroUtxo [] Nothing (Just mockMaestroScript)
             res @?= expected

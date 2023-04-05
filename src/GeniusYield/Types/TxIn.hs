@@ -14,8 +14,8 @@ module GeniusYield.Types.TxIn (
     txInToApi,
 ) where
 
-import           Data.Maybe                      ( isJust )
-import           Data.GADT.Compare               ( GEq(geq) )
+import           Data.GADT.Compare               (GEq (geq))
+import           Data.Maybe                      (isJust)
 
 import qualified Cardano.Api                     as Api
 import qualified Cardano.Api.Shelley             as Api.S
@@ -53,7 +53,7 @@ data GYInScript (u :: PlutusVersion) where
     GYInScript    :: v `VersionIsGreaterOrEqual` u => GYValidator v -> GYInScript u
 
     -- | Reference inputs can be only used in V2 transactions.
-    GYInReference :: !GYTxOutRef -> !(GYScript PlutusV2) -> GYInScript PlutusV2
+    GYInReference :: !GYTxOutRef -> !(GYScript 'PlutusV2) -> GYInScript 'PlutusV2
 
 -- | Returns the 'PlutusVersion' of the given 'GYInScript'.
 inScriptVersion :: GYInScript v -> PlutusVersion

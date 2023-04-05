@@ -30,7 +30,7 @@ collateralTrace2 ws@Wallets{..} = collateralTraceCore ws 9_000_000 $ \skeleton -
         Nothing  -> Model.logError "transaction failed unexpectedly"
         Just tid -> Model.logInfo $ printf "transaction successfully submitted: %s" tid
 
-collateralTraceCore :: Wallets -> Integer -> (GYTxSkeleton PlutusV2 -> Run ()) -> Run ()
+collateralTraceCore :: Wallets -> Integer -> (GYTxSkeleton 'PlutusV2 -> Run ()) -> Run ()
 collateralTraceCore Wallets{..} diff cont = do
     m <- runWallet w1 $ do
         l <- flip valueAssetClass GYLovelace <$> balance w1 -- how many lovelace does wallet w1 hold?

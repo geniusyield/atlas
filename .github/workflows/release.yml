@@ -18,4 +18,4 @@ jobs:
     - name: Release    
       env:
         ATLAS_VERSION: ${{needs.build.outputs.build}}
-      run: echo "${{ env.ATLAS_VERSION }"
+      run: echo "${{ env.ATLAS_VERSION }}"

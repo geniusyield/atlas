@@ -120,9 +120,9 @@ jobs:
     - name: Upload haddock documentation
       uses: actions/upload-pages-artifact@v1.0.8
       with:
-        path: ./dist-newstyle/build/x86_64-linux/ghc-8.10.7/${{ env.ATLAS_VERSION }}/doc/html/atlas/
+        path: ./dist-newstyle/build/x86_64-linux/ghc-8.10.7/${ATLAS_VERSION}/doc/html/atlas/
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
         name: source-distribution-file
-        path: ./dist-newstyle/sdist/${{ env.ATLAS_VERSION }}.tar.gz
+        path: ./dist-newstyle/sdist/${ATLAS_VERSION}.tar.gz

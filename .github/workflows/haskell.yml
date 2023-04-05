@@ -115,8 +115,14 @@ jobs:
       run: |
         export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
         echo "SRC_TGZ: $SRC_TGZ"
+    - name: Generate documentation (cabal haddock)
+      run: cabal haddock --html --hyperlink-source --haddock-options="--use-unicode"
+    - name: Upload haddock documentation
+      uses: actions/upload-pages-artifact@v1.0.8
+      with:
+        path: ./dist-newstyle/build/x86_64-linux/ghc-8.10.7/atlas-0.1.0.0/doc/html/atlas/
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: SRC_TGZ
-        path: $SRC_TGZ
+        name: source-distribution-file
+        path: ./dist-newstyle/sdist/atlas-0.1.0.0.tar.gz

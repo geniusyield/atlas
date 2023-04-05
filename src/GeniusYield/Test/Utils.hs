@@ -15,12 +15,17 @@ module GeniusYield.Test.Utils
     , Wallets (..)
     , newWallet
     , runWallet
+    , runWallet'
     , walletAddress
     , walletPubKeyHash
     , balance
     , withBalance
     , withWalletBalancesCheck
+    , getBalance
+    , getBalances
+    , runWithWalletBalancesCheck
     , waitUntilSlot
+    , waitNSlotsGYTxMonad
     , findLockedUtxosInBody
     , utxosInBody
     , addRefScript
@@ -28,6 +33,7 @@ module GeniusYield.Test.Utils
     , addRefInput
     , fakeGold, fakeIron
     , afterAllSucceed
+    , feesFromLovelace
     , withMaxQCTests
     , pattern (:=)
     ) where
@@ -154,7 +160,8 @@ data Wallets = Wallets
 
 -- | Gets a GYAddress of a testing wallet.
 walletAddress :: Wallet -> GYAddress
-walletAddress Wallet{..} = addressFromPubKeyHash walletNetworkId $ pubKeyHash $ paymentVerificationKey walletPaymentSigningKey
+walletAddress Wallet{..} = addressFromPubKeyHash walletNetworkId $ pubKeyHash $
+                           paymentVerificationKey walletPaymentSigningKey
 
 instance HasAddress Wallet where
     toAddress = addressToPlutus . walletAddress
@@ -183,6 +190,14 @@ runWallet w@Wallet{..} action = flip evalRandT pureGen $ do
     case m of
         Nothing          -> return Nothing
         Just mcollateral -> asRandRun walletPaymentSigningKey mcollateral action
+
+-- | Version of `runWallet` that fails if `Nothing` is returned by the action.
+runWallet' :: Wallet -> GYTxMonadRun a -> Run a
+runWallet' w action = do
+    ma <- runWallet w action
+    case ma of
+        Nothing  -> fail $ printf "Run wallet action returned Nothing"
+        Just a -> return a
 
 -- | Gets a GYPubKeyHash of a testing wallet.
 walletPubKeyHash :: Wallet -> GYPubKeyHash
@@ -230,10 +245,8 @@ withBalance n a m = do
         change according to the input list.
 
 Notes:
-
 * An empty list means no checks are performed.
 * The 'GYValue' should be negative to check if the Wallet lost those funds.
-
 -}
 withWalletBalancesCheck :: [(Wallet, GYValue)] -> GYTxMonadRun a -> GYTxMonadRun a
 withWalletBalancesCheck [] m            = m
@@ -242,6 +255,46 @@ withWalletBalancesCheck ((w, v) : xs) m = do
     unless (diff == v) $
         fail $ printf "expected balance difference of %s for wallet %s, but the actual difference was %s" v (walletName w) diff
     return b
+
+-- | Given a wallet returns its balance.
+getBalance :: HasCallStack => Wallet -> Run GYValue
+getBalance w = fromJust <$> runWallet w (balance w)
+
+-- | Given a list of wallets returns its balances.
+getBalances :: HasCallStack => [Wallet] -> Run [GYValue]
+getBalances = mapM getBalance
+
+{- | Computes a 'Run' action, checking that the 'Wallet' balances change according
+     to the input list.
+
+Notes:
+* An empty list means no checks are performed.
+* The 'GYValue' should be negative to check if the Wallet lost those funds.
+-}
+runWithWalletBalancesCheck
+    :: HasCallStack
+    => Wallets
+    -> [(Wallets -> Wallet, GYValue)]
+    -> Run a
+    -> Run a
+runWithWalletBalancesCheck ws bsCheck m = do
+    let wsToCheck = map (($ws) . fst) bsCheck
+
+    bs <- getBalances wsToCheck
+    a <- m
+    bs' <- getBalances wsToCheck
+
+    forM_ (zip3 bsCheck bs' bs) $
+        \((w, v),b',b) ->
+            let diff = b' `valueMinus` b
+            in unless (diff == v) $ fail $
+               printf "expected balance difference of %s for wallet %s, but the actual difference was %s"
+                      v (walletName $ w ws) diff
+    return a
+
+-- | Waits N slots.
+waitNSlotsGYTxMonad :: Integer -> GYTxMonadRun ()
+waitNSlotsGYTxMonad = liftRun . waitNSlots . Fork.Slot
 
 -- | Waits until a certain 'GYSlot'.
 -- Fails if the given slot is greater than the current slot.
@@ -316,6 +369,12 @@ resolveDatumFromPlutusOutput :: GYTxQueryMonad m => Plutus2.OutputDatum -> m (Ma
 resolveDatumFromPlutusOutput (Plutus2.OutputDatum d)      = return $ Just $ datumFromPlutus d
 resolveDatumFromPlutusOutput (Plutus2.OutputDatumHash dh) = lookupDatum $ unsafeDatumHashFromPlutus dh
 resolveDatumFromPlutusOutput Plutus2.NoOutputDatum        = return Nothing
+
+{- | Abstraction for explicitly building a Value representing the fees of a
+     transaction.
+-}
+feesFromLovelace :: Integer -> GYValue
+feesFromLovelace = valueFromLovelace
 
 -------------------------------------------------------------------------------
 -- Extras

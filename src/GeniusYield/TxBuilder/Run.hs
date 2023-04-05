@@ -152,16 +152,12 @@ instance GYTxQueryMonad GYTxMonadRun where
                     Plutus.NoOutputDatum      -> return GYOutDatumNone
                     Plutus.OutputDatumHash h' -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus h')
                     Plutus.OutputDatum d      -> return $ GYOutDatumInline $ datumFromPlutus d
-            -- We are in `Maybe` monad, and it's valid for the following to return `Nothing` so we wrap our `Nothing` with `return`.
-            s <- case Plutus.txOutReferenceScript o of
-                   Nothing -> return Nothing
-                   Just sh -> case Map.lookup sh mScripts of
-                                Nothing -> return Nothing
-                                Just vs  ->
-                                  if
-                                  | isV1 vs   -> return $ Just (Some $ scriptFromPlutus @'PlutusV1 (versioned'content vs))
-                                  | isV2 vs   -> return $ Just (Some $ scriptFromPlutus @'PlutusV2 (versioned'content vs))
-                                  | otherwise -> return Nothing
+            let s = do
+                  sh <- Plutus.txOutReferenceScript o
+                  vs <- Map.lookup sh mScripts
+                  if | isV1 vs   -> Just (Some $ scriptFromPlutus @'PlutusV1 (versioned'content vs))
+                     | isV2 vs   -> Just (Some $ scriptFromPlutus @'PlutusV2 (versioned'content vs))
+                     | otherwise -> Nothing
 
             return GYUTxO
                 { utxoRef       = ref

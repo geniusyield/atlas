@@ -13,6 +13,9 @@ jobs:
     uses: ./.github/workflows/haskell.yml
   release:
     runs-on: ubuntu-22.04
+    needs: build
     steps:
     - name: Release    
+      env:
+        ATLAS_VERSION: ${{needs.build.outputs.build}}
       run: echo "$ATLAS_VERSION"

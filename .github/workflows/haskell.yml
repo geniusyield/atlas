@@ -7,9 +7,9 @@ permissions:
 
 jobs:
   build:
-
     runs-on: ubuntu-22.04
-
+    outputs:
+      ATLAS_VERSION: ${{ steps.get_atlas_version.outputs.ATLAS_VERSION }}
     steps:
     - name: Checkout source code
       uses: actions/checkout@v3
@@ -112,10 +112,12 @@ jobs:
     - name: Create source distribution file (cabal)
       run: cabal sdist
     - name: Identify atlas version (cabal)
+      id: get_atlas_version
       run: |
         export ATLAS_VERSION=$(cabal info . | awk '{print $2 ;exit}') ;
         echo "ATLAS_VERSION: $ATLAS_VERSION"
         echo "ATLAS_VERSION=${ATLAS_VERSION}" >> $GITHUB_ENV
+        echo "ATLAS_VERSION=${ATLAS_VERSION}" >> $GITHUB_OUTPUT
     - name: Generate documentation (cabal haddock)
       run: cabal haddock --html --hyperlink-source --haddock-options="--use-unicode"
     - name: Upload haddock documentation

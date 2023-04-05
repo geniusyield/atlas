@@ -12,6 +12,7 @@ jobs:
   build:
     uses: ./.github/workflows/haskell.yml
   release:
+  steps:
   - name: Release
     run: |
      echo "Atlas version: $ATLAS_VERSION"

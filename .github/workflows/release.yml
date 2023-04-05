@@ -15,5 +15,4 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Release    
-      run: |
-       echo "Atlas version: $ATLAS_VERSION"
+      run: echo "$ATLAS_VERSION"

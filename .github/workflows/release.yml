@@ -6,11 +6,18 @@ on:
       - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  release:
+  build:
     uses: ./.github/workflows/haskell.yml
-  # TODO: Release workflow #19 (https://github.com/geniusyield/atlas/issues/19)
-  #       - Download artifacts
-  #       - Publish artifacts as GitHub Release
+  release:
+  - name: Release
+    run: |
+     echo "Atlas version: $ATLAS_VERSION"
+     # export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
+     # gh release create \
+     #   --generate-notes \
+     #   --verify-tag \
+     #   'v1.0.0' \
+     #   './generated_docs/index.html#documentation'

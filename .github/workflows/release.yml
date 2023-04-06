@@ -42,3 +42,9 @@ jobs:
           --draft \
           "${SEMANTIC_VERSION}" \
           "./source-distribution-file.zip#atlas ./github-pages#haddock"
+        unzip source-distribution-file.zip
+        # Upload package candidate to hackage:
+        # cabal upload \
+        #   --username=${{ secrets.HACKAGE_USER }} \
+        #   --password-command=${{ secrets.HACKAGE_PASSWORD }} \
+        # ./${{ env.ATLAS_VERSION }}.tar.gz

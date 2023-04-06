@@ -2,38 +2,41 @@ module GeniusYield.Test.GYTxSkeleton
     ( gyTxSkeletonTests
     ) where
 
-import Data.Set as Set  ( singleton, fromList )
-import Data.Either      ( fromRight )
-import Data.Maybe       ( fromJust )
-import Data.Map as Map  ( Map, singleton, empty, fromList )
-import Data.Some        ( Some, mkSome )
-import Test.Tasty       ( testGroup, TestTree )
-import Test.Tasty.HUnit ( (@?=), testCase )
+import           Data.Either                     (fromRight)
+import           Data.Map                        as Map (Map, empty, fromList,
+                                                         singleton)
+import           Data.Maybe                      (fromJust)
+import           Data.Set                        as Set (fromList, singleton)
+import           Data.Some                       (Some, mkSome)
+import           Test.Tasty                      (TestTree, testGroup)
+import           Test.Tasty.HUnit                (testCase, (@?=))
 
-import GeniusYield.Types.TxOut      ( GYTxOut, mkGYTxOutNoDatum )
-import GeniusYield.Types.Value      ( GYValue, GYTokenName
-                                    , unsafeTokenNameFromHex, valueFromLovelace
-                                    )
-import GeniusYield.Types.Address    ( GYAddress, unsafeAddressFromText )
-import GeniusYield.Types.PubKeyHash ( GYPubKeyHash, pubKeyHashFromPlutus )
-import GeniusYield.Types.Slot       ( GYSlot, slotFromInteger )
-import GeniusYield.Types.Script     ( GYMintingPolicy, scriptFromCBOR, scriptToApi, mintingPolicyFromApi )
-import GeniusYield.Types.Redeemer   ( GYRedeemer, unitRedeemer )
-import GeniusYield.Types.TxIn       ( GYTxIn( GYTxIn
-                                            , gyTxInTxOutRef, gyTxInWitness
-                                            )
-                                    , GYTxInWitness(GYTxInWitnessKey)
-                                    )
-import GeniusYield.Types.TxOutRef   ( GYTxOutRef )
-import GeniusYield.Types.PlutusVersion ( PlutusVersion(PlutusV2) )
+import           GeniusYield.Types.Address       (GYAddress,
+                                                  unsafeAddressFromText)
+import           GeniusYield.Types.PlutusVersion (PlutusVersion (PlutusV2))
+import           GeniusYield.Types.PubKeyHash    (GYPubKeyHash,
+                                                  pubKeyHashFromPlutus)
+import           GeniusYield.Types.Redeemer      (GYRedeemer, unitRedeemer)
+import           GeniusYield.Types.Script        (GYMintingPolicy,
+                                                  mintingPolicyFromApi,
+                                                  scriptFromCBOR, scriptToApi)
+import           GeniusYield.Types.Slot          (GYSlot, slotFromInteger)
+import           GeniusYield.Types.TxIn          (GYTxIn (GYTxIn, gyTxInTxOutRef, gyTxInWitness),
+                                                  GYTxInWitness (GYTxInWitnessKey))
+import           GeniusYield.Types.TxOut         (GYTxOut, mkGYTxOutNoDatum)
+import           GeniusYield.Types.TxOutRef      (GYTxOutRef)
+import           GeniusYield.Types.Value         (GYTokenName, GYValue,
+                                                  unsafeTokenNameFromHex,
+                                                  valueFromLovelace)
 
-import GeniusYield.TxBuilder.Class  ( GYTxSkeleton(..)
-                                    , GYTxSkeletonRefIns(..)
-                                    , mustHaveInput, mustHaveRefInput
-                                    , mustHaveOutput, mustHaveOptionalOutput
-                                    , mustBeSignedBy, isInvalidBefore
-                                    , mustMint, isInvalidAfter
-                                    )
+import           GeniusYield.TxBuilder.Class     (GYTxSkeleton (..),
+                                                  GYTxSkeletonRefIns (..),
+                                                  isInvalidAfter,
+                                                  isInvalidBefore,
+                                                  mustBeSignedBy, mustHaveInput,
+                                                  mustHaveOptionalOutput,
+                                                  mustHaveOutput,
+                                                  mustHaveRefInput, mustMint)
 -------------------------------------------------------------------------------
 -- Tests
 -------------------------------------------------------------------------------
@@ -47,7 +50,7 @@ basicTests =
         [ testCase "mustHaveInput" $
             gytxIns (mustHaveInput mockTxIn) @?= [mockTxIn]
         , testCase "mustHaveReferenceInput" $
-            gytxRefIns (mustHaveRefInput @PlutusV2 mockTxOutRef) @?= GYTxSkeletonRefIns (Set.singleton mockTxOutRef)
+            gytxRefIns (mustHaveRefInput  @'PlutusV2 mockTxOutRef) @?= GYTxSkeletonRefIns (Set.singleton mockTxOutRef)
         , testCase "mustHaveOutput" $
             gytxOuts (mustHaveOutput mockTxOut1) @?= [mockTxOut1]
         , testCase "mustHaveOptionalOutput (Just x)" $
@@ -84,21 +87,21 @@ basicTests =
             [ testCase "Adding two reference inputs - Just/Just" $
                 let skeleton1 = mustHaveRefInput mockTxOutRef
                     skeleton2 = mustHaveRefInput mockTxOutRef1
-                    newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton PlutusV2 in
+                    newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton 'PlutusV2 in
                 gytxRefIns newSkeleton @?= GYTxSkeletonRefIns (Set.fromList [mockTxOutRef, mockTxOutRef1])
             , testCase "Adding two reference inputs - Just/Nothing" $
                 let skeleton1 = mustHaveRefInput mockTxOutRef
                     skeleton2 = mustHaveOptionalOutput Nothing -- This won't have any refInputs
-                    newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton PlutusV2 in
+                    newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton 'PlutusV2 in
                 gytxRefIns newSkeleton @?= GYTxSkeletonRefIns (Set.singleton mockTxOutRef)
             , testCase "Adding two reference inputs - Nothing/Just" $
                 let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have any refInputs
                     skeleton2 = mustHaveRefInput mockTxOutRef
-                    newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton PlutusV2 in
+                    newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton 'PlutusV2 in
                 gytxRefIns newSkeleton @?= GYTxSkeletonRefIns (Set.singleton mockTxOutRef)
             , testCase "Adding two reference inputs - Nothing/Nothing" $
                 let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have any refInputs
-                    newSkeleton = skeleton1 <> skeleton1 :: GYTxSkeleton PlutusV2 in
+                    newSkeleton = skeleton1 <> skeleton1 :: GYTxSkeleton 'PlutusV2 in
                 gytxRefIns newSkeleton @?= GYTxSkeletonNoRefIns
             ]
         , testGroup "Output"
@@ -238,8 +241,8 @@ mockMint' n = Map.singleton (mkSome mockMintingPolicy) (Map.singleton mockTokenN
 mockMintSum :: (Map (Some GYMintingPolicy) (Map GYTokenName Integer, GYRedeemer))
 mockMintSum = Map.singleton (mkSome mockMintingPolicy) (Map.fromList [(mockTokenName, 10), (mockTokenName1, 20)], unitRedeemer)
 
-mockMintingPolicy :: GYMintingPolicy PlutusV2
-mockMintingPolicy = mintingPolicyFromApi $ scriptToApi $ fromJust $ scriptFromCBOR @PlutusV2 "5902a70100003232323232323232323232323232323232223232323232533301253330123371000290000a51153330123017001153330123375e980129d8799fd87a9f581c0312bfe52db5be9f48d9ee30270ba6459b4277c4b6a0a363b9c5f6e4ffd87a80ff003014301337546601c44a6660240022c2a6660286032666601c00a90001199980780ca4000eb4dd58009bab3016301730153754602c0022602c00226004602e0026eb0c050c054c04cdd500109919299980a299980a19805180b001180b000899805180b180b800980b180b8010a5014a22c60286ea8c054c058c058c058c040c050dd500198099baa30183300b300a482038a82860584cc02cc0292080beedb581614bd700b0b0a4c2c6666601844460046eacc05400cdd48011bab3013300e3012375400246666601a44460046eb4c05800cdd480b00090008a40002c602460226ea80114ccc03ccdc3a4000601c00426eb8c04400458c03c004dd51807980818071baa0012232323232323232325333014533301433710004002294454ccc050cdc380100089919299980b180d802099b88375a60300046eb4c060004528180b002180a8020a5014a22a66602866ebc0180144ccc050c02cc058c05c020c02cc058c05c01d288a503012002301100237540046ea8008c044008c040008c038dd500118069baa0022300f300937540024601e6600466e95200233002375000297ae0330023374a6660129452002480012f5c097ae057404644446600e44a666016002200a2a66601a66ebcc030c03c0040184c010c038c03c0044c008c040004004dd48009111980211299980400089128008a99980519baf3009300c00100413005300c00113002300d00100123230022330020020012300223300200200123007300730070015573eaae755cd2ab9e5742ae8922102475900370e90011ba5480001"
+mockMintingPolicy :: GYMintingPolicy 'PlutusV2
+mockMintingPolicy = mintingPolicyFromApi $ scriptToApi $ fromJust $ scriptFromCBOR @'PlutusV2 "5902a70100003232323232323232323232323232323232223232323232533301253330123371000290000a51153330123017001153330123375e980129d8799fd87a9f581c0312bfe52db5be9f48d9ee30270ba6459b4277c4b6a0a363b9c5f6e4ffd87a80ff003014301337546601c44a6660240022c2a6660286032666601c00a90001199980780ca4000eb4dd58009bab3016301730153754602c0022602c00226004602e0026eb0c050c054c04cdd500109919299980a299980a19805180b001180b000899805180b180b800980b180b8010a5014a22c60286ea8c054c058c058c058c040c050dd500198099baa30183300b300a482038a82860584cc02cc0292080beedb581614bd700b0b0a4c2c6666601844460046eacc05400cdd48011bab3013300e3012375400246666601a44460046eb4c05800cdd480b00090008a40002c602460226ea80114ccc03ccdc3a4000601c00426eb8c04400458c03c004dd51807980818071baa0012232323232323232325333014533301433710004002294454ccc050cdc380100089919299980b180d802099b88375a60300046eb4c060004528180b002180a8020a5014a22a66602866ebc0180144ccc050c02cc058c05c020c02cc058c05c01d288a503012002301100237540046ea8008c044008c040008c038dd500118069baa0022300f300937540024601e6600466e95200233002375000297ae0330023374a6660129452002480012f5c097ae057404644446600e44a666016002200a2a66601a66ebcc030c03c0040184c010c038c03c0044c008c040004004dd48009111980211299980400089128008a99980519baf3009300c00100413005300c00113002300d00100123230022330020020012300223300200200123007300730070015573eaae755cd2ab9e5742ae8922102475900370e90011ba5480001"
 
 mockTokenName :: GYTokenName
 mockTokenName = unsafeTokenNameFromHex "abc123"

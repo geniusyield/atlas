@@ -67,6 +67,7 @@ module GeniusYield.Types.Script (
     scriptFromCBOR,
     scriptFromCBOR',
     scriptToPlutus,
+    scriptFromPlutus,
     someScriptToPlutus,
     scriptApiHash,
     scriptPlutusHash,
@@ -421,12 +422,12 @@ someScriptFromReferenceApi Api.S.ReferenceScriptNone = Nothing
 someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra (Api.ScriptInAnyLang (Api.SimpleScriptLanguage _) _)) = Nothing
 someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra (Api.ScriptInAnyLang (Api.PlutusScriptLanguage Api.PlutusScriptV1) (Api.PlutusScript _ x))) = Just (Some y)
   where
-    y :: GYScript PlutusV1
+    y :: GYScript 'PlutusV1
     y = scriptFromApi x
 
 someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra (Api.ScriptInAnyLang (Api.PlutusScriptLanguage Api.PlutusScriptV2) (Api.PlutusScript _ x))) = Just (Some y)
   where
-    y :: GYScript PlutusV2
+    y :: GYScript 'PlutusV2
     y = scriptFromApi x
 
 scriptFromApi :: forall v. SingPlutusVersionI v => Api.PlutusScript (PlutusVersionToApi v) -> GYScript v

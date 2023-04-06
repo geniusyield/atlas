@@ -111,18 +111,19 @@ jobs:
       run: cabal check
     - name: Create source distribution file (cabal)
       run: cabal sdist
-    - name: Identify source distribution file (cabal)
+    - name: Identify atlas version (cabal)
       run: |
-        export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
-        echo "SRC_TGZ: $SRC_TGZ"
+        export ATLAS_VERSION=$(cabal info . | awk '{print $2 ;exit}') ;
+        echo "ATLAS_VERSION: $ATLAS_VERSION"
+        echo "ATLAS_VERSION=${ATLAS_VERSION}" >> $GITHUB_ENV
     - name: Generate documentation (cabal haddock)
       run: cabal haddock --html --hyperlink-source --haddock-options="--use-unicode"
     - name: Upload haddock documentation
       uses: actions/upload-pages-artifact@v1.0.8
       with:
-        path: ./dist-newstyle/build/x86_64-linux/ghc-8.10.7/atlas-0.1.0.0/doc/html/atlas/
+        path: ./dist-newstyle/build/x86_64-linux/ghc-8.10.7/${{env.ATLAS_VERSION}}/doc/html/atlas/
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
         name: source-distribution-file
-        path: ./dist-newstyle/sdist/atlas-0.1.0.0.tar.gz
+        path: ./dist-newstyle/sdist/${{env.ATLAS_VERSION}}.tar.gz

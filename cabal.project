@@ -69,27 +69,12 @@ source-repository-package
     lib/wai-middleware-logging
     lib/wallet
 
-source-repository-package
-    type: git
-    location: https://github.com/input-output-hk/cardano-addresses
-    tag: 5094fb9d304ed69adedc99513634a00cbf850fca
-    --sha256: 1zhi8kvr2yhn50dm3dwwb1jlm5yl0y6c6hg39cs6abbxqmsj5jlv
-    subdir: 
-        core
-
 -- Using an in house fork as upstream lacks desired capabilities and uses incompatible dependencies.
 source-repository-package
   type: git
   location: https://github.com/geniusyield/plutus-simple-model
-  tag: d710c4c5400ff7072fe89c337c1cdd0128dc5d99
-  --sha256: sha256-dpTAGN4qg1Fu1LjPIJiyEXlLxcHEC/a4sj1zjEvG/Js=
-
--- Using an in house fork as upstream lacks desired capabilities and uses incompatible dependencies.
-source-repository-package
-  type: git
-  location: https://github.com/geniusyield/plutus-simple-model
-  tag: d710c4c5400ff7072fe89c337c1cdd0128dc5d99
-  --sha256: sha256-dpTAGN4qg1Fu1LjPIJiyEXlLxcHEC/a4sj1zjEvG/Js=
+  tag: 7ba435b3522f56fb1ab5db491b7821b68d7e0682
+  --sha256: sha256-rorwvnN8qkaO4/WgtvJVqg7EW09Z6e1bXnfFu0fu/aU=
 
 -- Everything below is essentially copied from cardano-wallet's cabal.project.
 

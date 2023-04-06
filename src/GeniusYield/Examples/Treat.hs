@@ -62,8 +62,8 @@ treatValidatorPlutus :: Plutus.Validator
 treatValidatorPlutus = Plutus.Validator $ Plutus.Script $
     UPLC.Program () (PLC.defaultVersion ()) treatScript'
 
-treatValidatorV1 :: GYValidator PlutusV1
+treatValidatorV1 :: GYValidator 'PlutusV1
 treatValidatorV1 = validatorFromPlutus treatValidatorPlutus
 
-treatValidatorV2 :: GYValidator PlutusV2
+treatValidatorV2 :: GYValidator 'PlutusV2
 treatValidatorV2 = validatorFromPlutus treatValidatorPlutus

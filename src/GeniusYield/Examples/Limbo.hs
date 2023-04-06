@@ -65,10 +65,10 @@ limboValidatorPlutus :: Plutus.Validator
 limboValidatorPlutus = Plutus.Validator $ Plutus.Script $
     UPLC.Program () (PLC.defaultVersion ()) limboScript'
 
-limboValidatorV1 :: GYValidator PlutusV1
+limboValidatorV1 :: GYValidator 'PlutusV1
 limboValidatorV1 = validatorFromPlutus limboValidatorPlutus
 
-limboValidatorV2 :: GYValidator PlutusV2
+limboValidatorV2 :: GYValidator 'PlutusV2
 limboValidatorV2 = validatorFromPlutus limboValidatorPlutus
 
 -------------------------------------------------------------------------------
@@ -95,7 +95,7 @@ getRefInfos = do
 -- First it checks whether there is an UTxO already with a script.
 -- Only if there aren't the new transaction skeleton is constructed.
 --
-addRefScript :: GYTxMonad m => GYScript PlutusV2 -> m (Either GYTxOutRef (GYTxSkeleton v))
+addRefScript :: GYTxMonad m => GYScript 'PlutusV2 -> m (Either GYTxOutRef (GYTxSkeleton v))
 addRefScript sc = do
     addr <- scriptAddress limboValidatorV2
     utxo <- utxosAtAddress addr
@@ -109,7 +109,7 @@ addRefScript sc = do
 
 -- | Create UTxO with a reference script.
 --
-addRefScript' :: GYTxMonad m => GYScript PlutusV2 -> m (GYTxSkeleton v)
+addRefScript' :: GYTxMonad m => GYScript 'PlutusV2 -> m (GYTxSkeleton v)
 addRefScript' sc = do
     addr <- scriptAddress limboValidatorV2
     return $ mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just sc }

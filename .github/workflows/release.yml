@@ -1,9 +1,6 @@
 name: Release
 
-on:
-  push:
-    tags:
-      - "v*"
+on: workflow_dispatch
 
 permissions:
   contents: write
@@ -15,7 +12,26 @@ jobs:
     runs-on: ubuntu-22.04
     needs: build
     steps:
-    - name: Release    
+    - uses: actions/download-artifact@v3
+      with:
+        name: source-distribution-file
+        path: ./source-distribution-file.zip
+    - uses: actions/download-artifact@v3
+      with:
+        name: github-pages
+        path: ./haddock.zip
+    - name: Release
       env:
         ATLAS_VERSION: ${{needs.build.outputs.ATLAS_VERSION}}
-      run: echo "${{ env.ATLAS_VERSION }}"
+      run: |
+        export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
+        echo "${{ env.ATLAS_VERSION }}"
+        SEMANTIC_VERSION=v${ATLAS_VERSION/#atlas-}
+        git tag ${SEMANTIC_VERSION}
+        git push origin ${SEMANTIC_VERSION}
+        gh release create \
+          --generate-notes \
+          --verify-tag \
+          --draft \
+          "{{ env.ATLAS_VERSION }}" \
+          "./source-distribution-file.zip#atlas ./github-pages#haddock"

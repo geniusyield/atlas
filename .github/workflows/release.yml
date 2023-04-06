@@ -21,12 +21,12 @@ jobs:
       name: Download source distribution file
       with:
         name: source-distribution-file
-        path: ./
+        path: ./artifacts
     - uses: actions/download-artifact@v3
       name: Download haddock
       with:
         name: github-pages
-        path: ./
+        path: ./artifacts
     - name: Create release draft (GitHub)
       env:
         ATLAS_VERSION: ${{needs.build.outputs.ATLAS_VERSION}}
@@ -45,7 +45,7 @@ jobs:
           --verify-tag \
           --draft \
           "${SEMANTIC_VERSION}" \
-          "./${{ env.ATLAS_VERSION }}.tar.gz#atlas"
+          "./artifacts/${{ env.ATLAS_VERSION }}.tar.gz#${{ env.ATLAS_VERSION }}"
         echo "::notice::Succesfully created release draft ${SEMANTIC_VERSION}."
         #unzip source-distribution-file.zip
         # Upload package candidate to hackage:

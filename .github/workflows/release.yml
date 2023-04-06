@@ -18,38 +18,27 @@ jobs:
     - name: Checkout source code
       uses: actions/checkout@v3
     - uses: actions/download-artifact@v3
-      name: Download source distribution file
+      name: Download source distribution file artifact
       with:
         name: source-distribution-file
-        path: ./artifacts
-    - uses: actions/download-artifact@v3
-      name: Download haddock
-      with:
-        name: github-pages
         path: ./artifacts
     - name: Create release draft (GitHub)
       env:
         ATLAS_VERSION: ${{needs.build.outputs.ATLAS_VERSION}}
       run: |
         export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
-        echo "${{ env.ATLAS_VERSION }}"
         SEMANTIC_VERSION=v${ATLAS_VERSION/#atlas-}
         TAGS=$(git describe --tags)
+        GIT_REVISION=$(git rev-parse HEAD)
+        echo "ATLAS_VERSION: ${{ env.ATLAS_VERSION }}"
         echo "SEMANTIC_VERSION: $SEMANTIC_VERSION"
         echo "TAGS: $TAGS"
+        echo "GIT_REVISION: $GIT_REVISION"
         set -x
-        pwd
-        tree -L 3
         gh release create \
           --generate-notes \
           --verify-tag \
           --draft \
           "${SEMANTIC_VERSION}" \
           "./artifacts/${{ env.ATLAS_VERSION }}.tar.gz#${{ env.ATLAS_VERSION }}"
-        echo "::notice::Succesfully created release draft ${SEMANTIC_VERSION}."
-        #unzip source-distribution-file.zip
-        # Upload package candidate to hackage:
-        # cabal upload \
-        #   --username=${{ secrets.HACKAGE_USER }} \
-        #   --password-command=${{ secrets.HACKAGE_PASSWORD }} \
-        # ./${{ env.ATLAS_VERSION }}.tar.gz
+        echo "::notice::Succesfully created release draft ${SEMANTIC_VERSION}, built from ${GIT_REVISION}. (Uploaded: ${{ env.ATLAS_VERSION }}.tar.gz)"

@@ -40,5 +40,5 @@ jobs:
           --verify-tag \
           --draft \
           "${SEMANTIC_VERSION}" \
-          "./artifacts/atlas-${SEMANTIC_VERSION}.tar.gz#source%20distribution%20file%20(tar.gz))"
+          "./artifacts/${{ env.ATLAS_VERSION }}.tar.gz#source%20distribution%20file%20(tar.gz))"
         echo "::notice::Succesfully created release draft ${SEMANTIC_VERSION}, built from ${GIT_REVISION}. (Uploaded: ${{ env.ATLAS_VERSION }}.tar.gz)"

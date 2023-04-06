@@ -50,6 +50,6 @@ jobs:
           --draft \
           "${SEMANTIC_VERSION}" \
           "./artifacts/${{ env.ATLAS_VERSION }}.tar.gz#Source distribution file (tar.gz)" \
-          "${HADDOCK_FILE}#Haddock (tar)"
+          "./artifacts/${HADDOCK_FILE}#Haddock (tar)"
         echo "::notice::Succesfully created release draft ${SEMANTIC_VERSION} from ${GIT_REVISION}. (Uploaded: ${{ env.ATLAS_VERSION }}.tar.gz)"
           

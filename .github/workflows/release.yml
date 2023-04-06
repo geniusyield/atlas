@@ -40,5 +40,5 @@ jobs:
           --generate-notes \
           --verify-tag \
           --draft \
-          "{{ env.SEMANTIC_VERSION }}" \
+          "${SEMANTIC_VERSION}" \
           "./source-distribution-file.zip#atlas ./github-pages#haddock"

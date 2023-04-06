@@ -38,6 +38,8 @@ jobs:
         echo "SEMANTIC_VERSION: $SEMANTIC_VERSION"
         echo "TAGS: $TAGS"
         set -x
+        pwd
+        tree -L 3
         mv ./atlas ./atlas.zip
         mv ./github-pages ./haddock.zip
         gh release create \

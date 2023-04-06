@@ -183,7 +183,7 @@ constraints:
   -- TH Name shadowing warnings need to be addressed when bumping to 2.13.3.5
   , persistent == 2.13.3.3
 
-  -- Copied from cardano-node's cabal.project:
+  -- Copied from cardano-node's cabal.project (omitting duplicates):
   , HSOpenSSL >= 0.11.7.2
   , algebraic-graphs < 0.7
   , protolude < 0.3.1

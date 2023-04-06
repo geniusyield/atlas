@@ -38,12 +38,14 @@ jobs:
         echo "SEMANTIC_VERSION: $SEMANTIC_VERSION"
         echo "TAGS: $TAGS"
         set -x
+        mv ./atlas ./atlas.zip
+        mv ./github-pages ./haddock.zip
         gh release create \
           --generate-notes \
           --verify-tag \
           --draft \
           "${SEMANTIC_VERSION}" \
-          "./source-distribution-file.zip#atlas ./github-pages#haddock"
+          "./atlas.zip#atlas ./haddock.zip#haddock"
         #unzip source-distribution-file.zip
         # Upload package candidate to hackage:
         # cabal upload \

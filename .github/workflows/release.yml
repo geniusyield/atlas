@@ -18,14 +18,16 @@ jobs:
     - name: Checkout source code
       uses: actions/checkout@v3
     - uses: actions/download-artifact@v3
+      name: Download source distribution file
       with:
         name: source-distribution-file
-        path: ./source-distribution-file.zip
+        path: ./
     - uses: actions/download-artifact@v3
+      name: Download haddock
       with:
         name: github-pages
-        path: ./haddock.zip
-    - name: Release
+        path: ./
+    - name: Create release draft (GitHub)
       env:
         ATLAS_VERSION: ${{needs.build.outputs.ATLAS_VERSION}}
       run: |
@@ -42,7 +44,7 @@ jobs:
           --draft \
           "${SEMANTIC_VERSION}" \
           "./source-distribution-file.zip#atlas ./github-pages#haddock"
-        unzip source-distribution-file.zip
+        #unzip source-distribution-file.zip
         # Upload package candidate to hackage:
         # cabal upload \
         #   --username=${{ secrets.HACKAGE_USER }} \

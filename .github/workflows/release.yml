@@ -22,6 +22,11 @@ jobs:
       with:
         name: source-distribution-file
         path: ./artifacts
+    - uses: actions/download-artifact@v3
+      name: Download haddock artifact
+      with:
+        name: github-pages
+        path: ./artifacts
     - name: Create release draft (GitHub)
       env:
         ATLAS_VERSION: ${{needs.build.outputs.ATLAS_VERSION}}
@@ -36,11 +41,15 @@ jobs:
         echo "TAGS: $TAGS"
         echo "GIT_REVISION: $GIT_REVISION"
         echo "CI_BUILD_TIME: $CI_BUILD_TIME"
+        HADDOCK_FILE=${{ env.ATLAS_VERSION }}-haddock.tar
         set -x
+        mv ./artifacts/artifact.tar ./artifacts/${HADDOCK_FILE}
         gh release create \
           --generate-notes \
           --verify-tag \
           --draft \
           "${SEMANTIC_VERSION}" \
-          "./artifacts/${{ env.ATLAS_VERSION }}.tar.gz#Source distribution file (tar.gz)"
+          "./artifacts/${{ env.ATLAS_VERSION }}.tar.gz#Source distribution file (tar.gz)" \
+          "${HADDOCK_FILE}#Haddock (tar)"
         echo "::notice::Succesfully created release draft ${SEMANTIC_VERSION} from ${GIT_REVISION}. (Uploaded: ${{ env.ATLAS_VERSION }}.tar.gz)"
+          

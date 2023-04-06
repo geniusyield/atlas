@@ -2,11 +2,6 @@ name: Haskell CI
 
 on:
   workflow_call:
-    inputs:
-      RELEASE:
-        description: 'True to create a release.'
-        required: true
-        type: boolean
     outputs:
       ATLAS_VERSION:
         description: "ATLAS_VERSION"

@@ -46,6 +46,7 @@ jobs:
           --draft \
           "${SEMANTIC_VERSION}" \
           "./${{ env.ATLAS_VERSION }}.tar.gz#atlas"
+        echo "::notice::Succesfully created release draft ${SEMANTIC_VERSION}."
         #unzip source-distribution-file.zip
         # Upload package candidate to hackage:
         # cabal upload \

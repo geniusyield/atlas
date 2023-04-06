@@ -30,10 +30,12 @@ jobs:
         SEMANTIC_VERSION=v${ATLAS_VERSION/#atlas-}
         TAGS=$(git describe --tags)
         GIT_REVISION=$(git rev-parse HEAD)
+        CI_BUILD_TIME=$(date --iso-8601=seconds --utc)
         echo "ATLAS_VERSION: ${{ env.ATLAS_VERSION }}"
         echo "SEMANTIC_VERSION: $SEMANTIC_VERSION"
         echo "TAGS: $TAGS"
         echo "GIT_REVISION: $GIT_REVISION"
+        echo "CI_BUILD_TIME: $CI_BUILD_TIME"
         set -x
         gh release create \
           --generate-notes \
@@ -41,4 +43,4 @@ jobs:
           --draft \
           "${SEMANTIC_VERSION}" \
           "./artifacts/${{ env.ATLAS_VERSION }}.tar.gz#Source distribution file (tar.gz)"
-        echo "::notice::Succesfully created release draft ${SEMANTIC_VERSION}, built from ${GIT_REVISION}. (Uploaded: ${{ env.ATLAS_VERSION }}.tar.gz)"
+        echo "::notice::Succesfully created release draft ${SEMANTIC_VERSION} from ${GIT_REVISION}. (Uploaded: ${{ env.ATLAS_VERSION }}.tar.gz)"

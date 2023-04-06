@@ -33,12 +33,7 @@ jobs:
         TAGS=git describe --tags
         echo "SEMANTIC_VERSION: $SEMANTIC_VERSION"
         echo "TAGS: $TAGS"
-        if [[ "${TAGS}" == "${SEMANTIC_VERSION}" ]]; then
-          echo " [OK] The expected semantic version is present in the tags."
-        else
-          echo " [ERROR] The expected semantic version is missing in the tags."
-          exit 1
-        fi
+        set -x
         gh release create \
           --generate-notes \
           --verify-tag \

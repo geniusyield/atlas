@@ -1,6 +1,9 @@
 name: Release
 
-on: workflow_dispatch
+on:
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -27,8 +30,15 @@ jobs:
         export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
         echo "${{ env.ATLAS_VERSION }}"
         SEMANTIC_VERSION=v${ATLAS_VERSION/#atlas-}
-        git tag ${SEMANTIC_VERSION}
-        git push origin ${SEMANTIC_VERSION}
+        TAGS=git describe --tags
+        echo "SEMANTIC_VERSION: $SEMANTIC_VERSION"
+        echo "TAGS: $TAGS"
+        if [[ "${TAGS}" == "${SEMANTIC_VERSION}" ]]; then
+          echo " [OK] The expected semantic version is present in the tags."
+        else
+          echo " [ERROR] The expected semantic version is missing in the tags."
+          exit 1
+        fi
         gh release create \
           --generate-notes \
           --verify-tag \

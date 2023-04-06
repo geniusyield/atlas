@@ -40,14 +40,12 @@ jobs:
         set -x
         pwd
         tree -L 3
-        mv ./atlas ./atlas.zip
-        mv ./github-pages ./haddock.zip
         gh release create \
           --generate-notes \
           --verify-tag \
           --draft \
           "${SEMANTIC_VERSION}" \
-          "./atlas.zip#atlas ./haddock.zip#haddock"
+          "./${{ env.ATLAS_VERSION }}.tar.gz#atlas"
         #unzip source-distribution-file.zip
         # Upload package candidate to hackage:
         # cabal upload \

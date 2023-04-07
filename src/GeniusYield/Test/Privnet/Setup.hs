@@ -71,13 +71,13 @@ makeSetup' DbSyncOpts {..} privnetPath = do
     paths <- initPaths privnetPath
 
     -- read user address
-    user1addr <- addressFromBech32 <$> urlPieceFromFile (pathUserAddr $ pathUser1 paths)
-    debug $ printf "user1addr = %s\n" user1addr
+    userFaddr <- addressFromBech32 <$> urlPieceFromFile (pathUserAddr $ pathUserF paths)
+    debug $ printf "userFaddr = %s\n" userFaddr
 
-    user1skey <- readPaymentSigningKey $ pathUserSKey $ pathUser1 paths
-    debug $ printf "user1skey = %s\n" (show user1skey)
-    debug $ printf "user1vkey = %s\n" (show $ paymentVerificationKey user1skey)
-    debug $ printf "user1pkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey user1skey)
+    userFskey <- readPaymentSigningKey $ pathUserSKey $ pathUserF paths
+    debug $ printf "userFskey = %s\n" (show userFskey)
+    debug $ printf "userFvkey = %s\n" (show $ paymentVerificationKey userFskey)
+    debug $ printf "userFpkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey userFskey)
 
     -- Generate user 2, 3
     (user2skey, user2addr) <- generateUser $ pathUser2 paths
@@ -109,8 +109,8 @@ makeSetup' DbSyncOpts {..} privnetPath = do
     dbSync <- traverse openDbSyncConn dbSyncConnInfo
 
     -- select a collateral oref
-    user1coll <- getCollateral (pathUser1 paths) info user1addr
-    debug $ printf "user1coll = %s\n" user1coll
+    userFcoll <- getCollateral (pathUserF paths) info userFaddr
+    debug $ printf "userFcoll = %s\n" userFcoll
 
     let localLookupDatum :: GYLookupDatum
         localLookupDatum = case dbSync of
@@ -134,9 +134,9 @@ makeSetup' DbSyncOpts {..} privnetPath = do
             , ctxInfo            = info
             , ctxLCI             = lci
             , ctxDbSync          = dbSync
-            , ctxUserFunder      = User user1skey user1addr user1coll
-            , ctxUser2           = User user2skey user2addr user1coll -- collateral is temporarily wrong
-            , ctxUser3           = User user3skey user3addr user1coll -- collateral is temporarily wrong
+            , ctxUserFunder      = User userFskey userFaddr userFcoll
+            , ctxUser2           = User user2skey user2addr userFcoll -- collateral is temporarily wrong
+            , ctxUser3           = User user3skey user3addr userFcoll -- collateral is temporarily wrong
             , ctxGold            = GYLovelace -- temporarily
             , ctxIron            = GYLovelace -- temporarily
             , ctxLog             = noLogging
@@ -156,7 +156,7 @@ makeSetup' DbSyncOpts {..} privnetPath = do
         giveAda ctx0 user3addr
 
         -- we also give ada to itself to create some small utxos
-        giveAda ctx0 user1addr
+        giveAda ctx0 userFaddr
 
     -- user 2 and 3 collaterals
     user2coll <- getCollateral (pathUser2 paths) info user2addr

@@ -64,7 +64,7 @@ data Ctx = Ctx
     , ctxInfo        :: !(Api.LocalNodeConnectInfo Api.CardanoMode)
     , ctxLCI         :: !LCIClient
     , ctxDbSync      :: !(Maybe CardanoDbSyncConn)
-    , ctxUser1       :: !User
+    , ctxUserFunder  :: !User
     , ctxUser2       :: !User
     , ctxUser3       :: !User
     , ctxGold        :: !GYAssetClass  -- ^ asset used in tests

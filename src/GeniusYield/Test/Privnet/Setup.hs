@@ -134,7 +134,7 @@ makeSetup' DbSyncOpts {..} privnetPath = do
             , ctxInfo            = info
             , ctxLCI             = lci
             , ctxDbSync          = dbSync
-            , ctxUser1           = User user1skey user1addr user1coll
+            , ctxUserFunder      = User user1skey user1addr user1coll
             , ctxUser2           = User user2skey user2addr user1coll -- collateral is temporarily wrong
             , ctxUser3           = User user3skey user3addr user1coll -- collateral is temporarily wrong
             , ctxGold            = GYLovelace -- temporarily
@@ -145,12 +145,12 @@ makeSetup' DbSyncOpts {..} privnetPath = do
             , ctxGetParams       = localGetParams
             }
 
-    user2balance <- ctxRunC ctx0 (ctxUser1 ctx0) $ queryBalance user2addr
+    user2balance <- ctxRunC ctx0 (ctxUserFunder ctx0) $ queryBalance user2addr
     when (isEmptyValue user2balance) $ do
         debug $ printf "User2 balance is empty, giving some ada\n"
         giveAda ctx0 user2addr
 
-    user3balance <- ctxRunC ctx0 (ctxUser1 ctx0) $ queryBalance user3addr
+    user3balance <- ctxRunC ctx0 (ctxUserFunder ctx0) $ queryBalance user3addr
     when (isEmptyValue user3balance) $ do
         debug $ printf "User3 balance is empty, giving some ada\n"
         giveAda ctx0 user3addr
@@ -251,16 +251,16 @@ runAddressKeyGen skeyPath = do
 
 giveAda :: Ctx -> GYAddress -> IO ()
 giveAda ctx addr = do
-    txBody <- ctxRunI ctx (ctxUser1 ctx) $ return $ mconcat $ replicate 5 $
+    txBody <- ctxRunI ctx (ctxUserFunder ctx) $ return $ mconcat $ replicate 5 $
         mustHaveOutput $ mkGYTxOutNoDatum addr (valueFromLovelace 1_000_000_000)
-    void $ submitTx ctx (ctxUser1 ctx) txBody
+    void $ submitTx ctx (ctxUserFunder ctx) txBody
 
 giveTokens :: Ctx -> GYAddress -> IO ()
 giveTokens ctx addr = do
-    txBody <- ctxRunI ctx (ctxUser1 ctx) $ return $
+    txBody <- ctxRunI ctx (ctxUserFunder ctx) $ return $
         mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxGold ctx) 1_000_000)) <>
         mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxIron ctx) 1_000_000))
-    void $ submitTx ctx (ctxUser1 ctx) txBody
+    void $ submitTx ctx (ctxUserFunder ctx) txBody
 
 -------------------------------------------------------------------------------
 -- Picking txoutref to be the collateral
@@ -313,9 +313,9 @@ mintTestTokens Paths {pathGeniusYield} ctx tn' = do
 
     new :: IO GYAssetClass
     new = do
-        (ac, txBody) <- ctxRunF ctx (ctxUser1 ctx) $
+        (ac, txBody) <- ctxRunF ctx (ctxUserFunder ctx) $
             GY.TestTokens.mintTestTokens tn 5_000_000
-        void $ submitTx ctx (ctxUser1 ctx) txBody
+        void $ submitTx ctx (ctxUserFunder ctx) txBody
 
         urlPieceToFile path ac
 

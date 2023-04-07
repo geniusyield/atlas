@@ -31,15 +31,15 @@ tests setup = testGroup "oracle"
         let goldAC = ctxGold ctx
 
         -- create output with read oracle script
-        txBodyPlaceOracle <- ctxRunI ctx (ctxUser1 ctx) $ do
+        txBodyPlaceOracle <- ctxRunI ctx (ctxUserFunder ctx) $ do
             addr <- scriptAddress readOracleValidatorV2
             return $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-        void $ submitTx ctx (ctxUser1 ctx) txBodyPlaceOracle
+        void $ submitTx ctx (ctxUserFunder ctx) txBodyPlaceOracle
 
         -- fails: no reference input with datum
-        assertThrown isTxBodyErrorAutoBalance $ ctxRunI ctx (ctxUser1 ctx) $ do
+        assertThrown isTxBodyErrorAutoBalance $ ctxRunI ctx (ctxUserFunder ctx) $ do
             addr <- scriptAddress readOracleValidatorV2
             utxo <- utxosAtAddress addr
             datums <- utxosDatums utxo
@@ -58,29 +58,29 @@ tests setup = testGroup "oracle"
         let goldAC = ctxGold ctx
 
         -- address
-        giftValidatorV2Addr <- ctxRunC ctx (ctxUser1 ctx) $
+        giftValidatorV2Addr <- ctxRunC ctx (ctxUserFunder ctx) $
             scriptAddress giftValidatorV2
 
         -- create output with input
-        txBodyPlaceDatum <- ctxRunI ctx (ctxUser1 ctx) $ do
+        txBodyPlaceDatum <- ctxRunI ctx (ctxUserFunder ctx) $ do
             return $ mconcat
                 [ mustHaveOutput $ mkGYTxOut giftValidatorV2Addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                     & gyTxOutDatumL .~ GYTxOutUseInlineDatum
                 ]
-        void $ submitTx ctx (ctxUser1 ctx) txBodyPlaceDatum
+        void $ submitTx ctx (ctxUserFunder ctx) txBodyPlaceDatum
 
         -- get datum ref.
         datumRef <- findOutput giftValidatorV2Addr txBodyPlaceDatum
 
         -- create output with read oracle script
-        txBodyPlaceOracle <- ctxRunI ctx (ctxUser1 ctx) $ do
+        txBodyPlaceOracle <- ctxRunI ctx (ctxUserFunder ctx) $ do
             addr <- scriptAddress readOracleValidatorV2
             return $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-        void $ submitTx ctx (ctxUser1 ctx) txBodyPlaceOracle
+        void $ submitTx ctx (ctxUserFunder ctx) txBodyPlaceOracle
 
-        txBodyConsume <- ctxRunI ctx (ctxUser1 ctx) $ do
+        txBodyConsume <- ctxRunI ctx (ctxUserFunder ctx) $ do
             addr <- scriptAddress readOracleValidatorV2
             utxo <- utxosAtAddress addr
             datums <- utxosDatums utxo
@@ -97,5 +97,5 @@ tests setup = testGroup "oracle"
                 [ mustHaveRefInput datumRef
                 ] :: GYTxSkeleton 'PlutusV2)
 
-        void $ submitTx ctx (ctxUser1 ctx) txBodyConsume
+        void $ submitTx ctx (ctxUserFunder ctx) txBodyConsume
     ]

@@ -26,44 +26,44 @@ tests setup = testGroup "treat"
     [ testCaseSteps "plutusV1" $ \info -> withSetup setup info $ \ctx -> do
         let goldAC = ctxGold ctx
 
-        txBodyPlace <- ctxRunI ctx User1 $ do
+        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress treatValidatorV1
             return $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-        void $ submitTx ctx User1 txBodyPlace
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
 
         threadDelay 1_000_000
 
         -- this fails as we tell that script is 'PlutusV1,
         -- but it uses V2 features.
-        assertThrown isTxBodyErrorAutoBalance $ ctxRunF ctx User2 $ grabTreats  @'PlutusV1 treatValidatorV1
+        assertThrown isTxBodyErrorAutoBalance $ ctxRunF ctx (ctxUser2 ctx) $ grabTreats  @'PlutusV1 treatValidatorV1
 
     -- this is the same tests as for Gift 'PlutusV2.
     , testCaseSteps "plutusV2" $ \info -> withSetup setup info $ \ctx -> do
         let ironAC = ctxIron ctx
 
         -- grab existing treats to cleanup
-        grabTreatsTx <- ctxRunF ctx User1 $ grabTreats  @'PlutusV2 treatValidatorV2
-        mapM_ (submitTx ctx User1) grabTreatsTx
+        grabTreatsTx <- ctxRunF ctx (ctxUser1 ctx) $ grabTreats  @'PlutusV2 treatValidatorV2
+        mapM_ (submitTx ctx (ctxUser1 ctx)) grabTreatsTx
 
-        balance1 <- ctxQueryBalance ctx User1
-        balance2 <- ctxQueryBalance ctx User2
+        balance1 <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2 <- ctxQueryBalance ctx (ctxUser2 ctx)
 
-        txBodyPlace <- ctxRunI ctx User1 $ do
+        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress treatValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-        void $ submitTx ctx User1 txBodyPlace
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabTreatsTx' <- ctxRunF ctx User2 $ grabTreats  @'PlutusV2 treatValidatorV2
-        mapM_ (submitTx ctx User2) grabTreatsTx'
+        grabTreatsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabTreats  @'PlutusV2 treatValidatorV2
+        mapM_ (submitTx ctx (ctxUser2 ctx)) grabTreatsTx'
 
-        balance1' <- ctxQueryBalance ctx User1
-        balance2' <- ctxQueryBalance ctx User2
+        balance1' <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
 
         let diff1 = valueMinus balance1' balance1
         let diff2 = valueMinus balance2' balance2

@@ -47,9 +47,9 @@ assertThrown p action = do
 {- Asserts if the user funds change as expected.
    The `fees` argument is an estimation for the transaction fees.
 -}
-assertUserFunds :: Integer -> Ctx -> UserIdx -> GYValue -> IO ()
-assertUserFunds fees ctx uid expectedValue = do
-    currentValue <- ctxQueryBalance ctx uid
+assertUserFunds :: Integer -> Ctx -> User -> GYValue -> IO ()
+assertUserFunds fees ctx u expectedValue = do
+    currentValue <- ctxQueryBalance ctx u
     let (cLovelace, cAssets) = valueSplitAda currentValue
         (eLovelace, eAssets) = valueSplitAda expectedValue
     assertBool (unwords ["The non-Ada token didn't change as expected",

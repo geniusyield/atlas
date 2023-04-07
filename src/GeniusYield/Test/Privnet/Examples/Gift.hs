@@ -33,24 +33,24 @@ tests setup = testGroup "gift"
         giftCleanup ctx
         let goldAC = ctxGold ctx
 
-        balance1 <- ctxQueryBalance ctx User1
-        balance2 <- ctxQueryBalance ctx User2
+        balance1 <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2 <- ctxQueryBalance ctx (ctxUser2 ctx)
 
-        txBodyPlace <- ctxRunI ctx User1 $ do
+        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV1
             return $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-        void $ submitTx ctx User1 txBodyPlace
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTx' <- ctxRunF ctx User2 $ grabGifts  @'PlutusV1 giftValidatorV1
-        mapM_ (submitTx ctx User2) grabGiftsTx'
+        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts  @'PlutusV1 giftValidatorV1
+        mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx'
 
-        balance1' <- ctxQueryBalance ctx User1
-        balance2' <- ctxQueryBalance ctx User2
+        balance1' <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
 
         let diff1 = valueMinus balance1' balance1
         let diff2 = valueMinus balance2' balance2
@@ -68,23 +68,23 @@ tests setup = testGroup "gift"
 
         let ironAC = ctxIron ctx
 
-        balance1 <- ctxQueryBalance ctx User1
-        balance2 <- ctxQueryBalance ctx User2
+        balance1 <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2 <- ctxQueryBalance ctx (ctxUser2 ctx)
 
-        txBodyPlace <- ctxRunI ctx User1 $ do
+        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-        void $ submitTx ctx User1 txBodyPlace
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTx' <- ctxRunF ctx User2 $ grabGifts  @'PlutusV1 giftValidatorV2
-        mapM_ (submitTx ctx User2) grabGiftsTx'
+        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts  @'PlutusV1 giftValidatorV2
+        mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx'
 
-        balance1' <- ctxQueryBalance ctx User1
-        balance2' <- ctxQueryBalance ctx User2
+        balance1' <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
 
         let diff1 = valueMinus balance1' balance1
         let diff2 = valueMinus balance2' balance2
@@ -101,24 +101,24 @@ tests setup = testGroup "gift"
         giftCleanup ctx
         let ironAC = ctxIron ctx
 
-        balance1 <- ctxQueryBalance ctx User1
-        balance2 <- ctxQueryBalance ctx User2
+        balance1 <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2 <- ctxQueryBalance ctx (ctxUser2 ctx)
 
-        txBodyPlace <- ctxRunI ctx User1 $ do
+        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
                 & gyTxOutDatumL .~ GYTxOutUseInlineDatum
 
-        void $ submitTx ctx User1 txBodyPlace
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTx' <- ctxRunF ctx User2 $ grabGifts  @'PlutusV1 giftValidatorV2
-        mapM_ (submitTx ctx User2) grabGiftsTx'
+        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts  @'PlutusV1 giftValidatorV2
+        mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx'
 
-        balance1' <- ctxQueryBalance ctx User1
-        balance2' <- ctxQueryBalance ctx User2
+        balance1' <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
 
         let diff1 = valueMinus balance1' balance1
         let diff2 = valueMinus balance2' balance2
@@ -136,18 +136,18 @@ tests setup = testGroup "gift"
 
         ----------- Create a new user and fund it
         let ironAC = ctxIron ctx
-        newUser <- newTempUserCtx ctx User1 (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25)
-        ----------- User1 submits some gifts.
-        txBodyPlace <- ctxRunI ctx User1 $ do
+        newUser <- newTempUserCtx ctx (ctxUser1 ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25)
+        ----------- (ctxUser1 ctx) submits some gifts.
+        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-        void $ submitTx ctx User1 txBodyPlace
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
         ---------- New user tries to grab it, since interacting with script, needs to give collateral
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTxBody <- __ctxRunF ctx newUser $ grabGifts  @'PlutusV1 giftValidatorV2
+        grabGiftsTxBody <- ctxRunF ctx newUser $ grabGifts  @'PlutusV1 giftValidatorV2
         grabGiftsTxBody' <- case grabGiftsTxBody of
           Nothing   -> assertFailure "Unable to build tx"
           Just body -> return body
@@ -157,12 +157,12 @@ tests setup = testGroup "gift"
         info $ printf "Total collateral: %s" (show totalCollateral)
         assertBool "Return collateral does not exist" $ returnCollateralOutput /= Api.TxReturnCollateralNone
         assertBool "Total collateral does not exist" $ totalCollateral /= 0
-        void $ __submitTx ctx newUser grabGiftsTxBody'
+        void $ submitTx ctx newUser grabGiftsTxBody'
 
     , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup setup info $ \ctx -> do
         giftCleanup ctx
 
-        txBodyRefScript <- ctxRunI ctx User1 $ addRefScript' (validatorToScript giftValidatorV2)
+        txBodyRefScript <- ctxRunI ctx (ctxUser1 ctx) $ addRefScript' (validatorToScript giftValidatorV2)
 
         ref <- do
           let refs = findRefScriptsInBody txBodyRefScript
@@ -170,7 +170,7 @@ tests setup = testGroup "gift"
               Just ref -> return ref
               Nothing  -> fail "Shouldn't happen: no ref in body"
 
-          void $ submitTx ctx User1 txBodyRefScript
+          void $ submitTx ctx (ctxUser1 ctx) txBodyRefScript
           return ref
 
         info $ "Reference at " ++ show ref
@@ -179,7 +179,7 @@ tests setup = testGroup "gift"
         threadDelay 1_000_000
 
         -- mUtxo <- gyQueryUtxoAtTxOutRef' (ctxQueryUtxos ctx) ref  -- another way
-        mUtxo <- ctxRunC ctx User1 $ utxoAtTxOutRef ref
+        mUtxo <- ctxRunC ctx (ctxUser1 ctx) $ utxoAtTxOutRef ref
         case mUtxo of
           Just utxo -> maybe (assertFailure "No Reference Script exists in the added UTxO.") (\s -> if s == Some (validatorToScript giftValidatorV2) then info "Script matched, able to read reference script from UTxO." else assertFailure "Mismatch.") (utxoRefScript utxo)
           Nothing -> assertFailure "Couldn't find the UTxO containing added Reference Script."
@@ -188,15 +188,15 @@ tests setup = testGroup "gift"
         giftCleanup ctx
         let ironAC = ctxIron ctx
 
-        balance1 <- ctxQueryBalance ctx User1
-        balance2 <- ctxQueryBalance ctx User2
+        balance1 <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2 <- ctxQueryBalance ctx (ctxUser2 ctx)
 
         -- in this test we create an output with reference script
 
         -- this creates utxo which looks like
         --
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
-        txBodyRefScript <- ctxRunF ctx User1 $ addRefScript (validatorToScript giftValidatorV2)
+        txBodyRefScript <- ctxRunF ctx (ctxUser1 ctx) $ addRefScript (validatorToScript giftValidatorV2)
 
         ref <- case txBodyRefScript of
             Left ref   -> return ref
@@ -206,29 +206,29 @@ tests setup = testGroup "gift"
                     Just ref -> return ref
                     Nothing  -> fail "Shouldn't happen: no ref in body"
 
-                void $ submitTx ctx User1 body
+                void $ submitTx ctx (ctxUser1 ctx) body
                 return ref
 
         info $ "Reference at " ++ show ref
 
         -- put some gifts
-        txBodyPlace <- ctxRunI ctx User1 $ do
+        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-        void $ submitTx ctx User1 txBodyPlace
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
         -- NOTE: TxValidationErrorInMode (ShelleyTxValidationError ShelleyBasedEraBabbage (ApplyTxError [UtxowFailure (FromAlonzoUtxowFail (WrappedShelleyEraFailure (ExtraneousScriptWitnessesUTXOW
         -- Apparently we MUST NOT include the script if there is a utxo input with that script. Even if we consume that utxo.
-        grabGiftsTx' <- ctxRunF ctx User2 $ grabGiftsRef ref giftValidatorV2
-        mapM_ (submitTx ctx User2) grabGiftsTx'
+        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGiftsRef ref giftValidatorV2
+        mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx'
 
         -- Check final balance
-        balance1' <- ctxQueryBalance ctx User1
-        balance2' <- ctxQueryBalance ctx User2
+        balance1' <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
 
         let diff1 = valueMinus balance1' balance1
         let diff2 = valueMinus balance2' balance2
@@ -247,15 +247,15 @@ tests setup = testGroup "gift"
         giftCleanup ctx
         let ironAC = ctxIron ctx
 
-        balance1 <- ctxQueryBalance ctx User1
-        balance2 <- ctxQueryBalance ctx User2
+        balance1 <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2 <- ctxQueryBalance ctx (ctxUser2 ctx)
 
         -- in this test we create an output with reference script
 
         -- this creates utxo which looks like
         --
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
-        txBodyRefScript <- ctxRunF ctx User1 $ addRefScript (validatorToScript giftValidatorV2)
+        txBodyRefScript <- ctxRunF ctx (ctxUser1 ctx) $ addRefScript (validatorToScript giftValidatorV2)
 
         ref <- case txBodyRefScript of
             Left ref   -> return ref
@@ -265,34 +265,34 @@ tests setup = testGroup "gift"
                     Just ref -> return ref
                     Nothing  -> fail "Shouldn't happen: no ref in body"
 
-                void $ submitTx ctx User1 body
+                void $ submitTx ctx (ctxUser1 ctx) body
                 return ref
 
         info $ "Reference at " ++ show ref
 
         -- put some gifts
-        txBodyPlace <- ctxRunI ctx User1 $ do
+        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-        void $ submitTx ctx User1 txBodyPlace
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
         -- NOTE: TxValidationErrorInMode (ShelleyTxValidationError ShelleyBasedEraBabbage (ApplyTxError [UtxowFailure (FromAlonzoUtxowFail (WrappedShelleyEraFailure (ExtraneousScriptWitnessesUTXOW
         -- Apparently we MUST NOT include the script if there is a utxo input with that script. Even if we consume that utxo.
-        grabGiftsTx' <- ctxRunF ctx User2 $ do
+        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ do
             -- We spend the gifts and give the transaction (unused) reference input
             -- we need to use 'PlutusV2 here.
             s1 <- grabGifts  @'PlutusV2 giftValidatorV2
             return (s1 <|> Just (mustHaveRefInput ref))
 
-        mapM_ (submitTx ctx User2) grabGiftsTx'
+        mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx'
 
         -- Check final balance
-        balance1' <- ctxQueryBalance ctx User1
-        balance2' <- ctxQueryBalance ctx User2
+        balance1' <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
 
         let diff1 = valueMinus balance1' balance1
         let diff2 = valueMinus balance2' balance2
@@ -317,7 +317,7 @@ tests setup = testGroup "gift"
         -- this creates utxo which looks like
         --
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
-        txBodyRefScript <- ctxRunF ctx User1 $ addRefScript (validatorToScript giftValidatorV2)
+        txBodyRefScript <- ctxRunF ctx (ctxUser1 ctx) $ addRefScript (validatorToScript giftValidatorV2)
 
         ref <- case txBodyRefScript of
             Left ref   -> return ref
@@ -327,32 +327,32 @@ tests setup = testGroup "gift"
                     Just ref -> return ref
                     Nothing  -> fail "Shouldn't happen: no ref in body"
 
-                void $ submitTx ctx User1 body
+                void $ submitTx ctx (ctxUser1 ctx) body
                 return ref
 
         info $ "Reference at " ++ show ref
 
         -- put some V2 gifts
-        txBodyPlaceV2 <- ctxRunI ctx User1 $ do
+        txBodyPlaceV2 <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-        void $ submitTx ctx User1 txBodyPlaceV2
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlaceV2
 
         info "Put V2 gifts"
 
         -- put some V1 gifts
-        txBodyPlaceV1 <- ctxRunI ctx User1 $ do
+        txBodyPlaceV1 <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV1
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-        void $ submitTx ctx User1 txBodyPlaceV1
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlaceV1
 
         info "Put V1 gifts"
 
         -- Try to consume V1 and V2 gifts in the same transaction
         {- Doesn't compile.
-        assertThrown isTxBodyErrorAutoBalance $ ctxRunF ctx User2 $ do
+        assertThrown isTxBodyErrorAutoBalance $ ctxRunF ctx (ctxUser2 ctx) $ do
             sV2 <- grabGiftsRef ref giftValidatorV2
             sV1 <- grabGifts giftValidatorV1
             return (liftA2 (<>) sV2 sV1)
@@ -366,11 +366,11 @@ tests setup = testGroup "gift"
         let ironAC = ctxIron ctx
 
         -- place a gift, plutus version V1
-        txBodyPlace <- ctxRunI ctx User1 $ do
+        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV1
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-        void $ submitTx ctx User1 txBodyPlace
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -389,7 +389,7 @@ tests setup = testGroup "gift"
 
         -- this doesnt' work. Mixing V1 scripts with V2 features
         {- Doesn't compile.
-        assertThrown isTxBodyErrorAutoBalance $ ctxRunF ctx User2 $ grabGifts giftValidatorV1 >>= traverse addNewGiftV2
+        assertThrown isTxBodyErrorAutoBalance $ ctxRunF ctx (ctxUser2 ctx) $ grabGifts giftValidatorV1 >>= traverse addNewGiftV2
         -}
 
         -- wait a tiny bit.
@@ -413,11 +413,11 @@ tests setup = testGroup "gift"
         let ironAC = ctxIron ctx
 
         -- place a gift, plutus version V1
-        txBodyPlace <- ctxRunI ctx User1 $ do
+        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-        void $ submitTx ctx User1 txBodyPlace
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -435,8 +435,8 @@ tests setup = testGroup "gift"
                     , gyTxOutRefS    = Nothing
                     }
 
-        grabGiftsTx' <- ctxRunF ctx User2 $ grabGifts giftValidatorV2 >>= traverse addNewGiftV2
-        mapM_ (submitTx ctx User2) grabGiftsTx'
+        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts giftValidatorV2 >>= traverse addNewGiftV2
+        mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx'
 
     , testCaseSteps "inlinedatum-v1v2" $ \info -> withSetup setup info $ \ctx -> do
         -- in this test we try to consume v1 and v2 script outputs in the same transaction.
@@ -445,28 +445,28 @@ tests setup = testGroup "gift"
         -- This seems to be fine, so we can *consume* inline-datum outputs.
         let ironAC = ctxIron ctx
 
-        txBodyPlace1 <- ctxRunI ctx User1 $ do
+        txBodyPlace1 <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV1
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-        void $ submitTx ctx User1 txBodyPlace1
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace1
 
-        txBodyPlace2 <- ctxRunI ctx User1 $ do
+        txBodyPlace2 <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress treatValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
                 & gyTxOutDatumL .~ GYTxOutUseInlineDatum
 
-        void $ submitTx ctx User1 txBodyPlace2
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace2
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTx <- ctxRunF ctx User2 $ do
+        grabGiftsTx <- ctxRunF ctx (ctxUser2 ctx) $ do
           s1 <- grabGifts  @'PlutusV1 giftValidatorV1
           s2 <- grabGifts treatValidatorV2
           return (s1 <|> s2)
 
-        mapM_ (submitTx ctx User2) grabGiftsTx
+        mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx
 
     , testCaseSteps "inlinedatum-in-v1" $ \info -> withSetup setup info $ \_ctx -> do
         -- in this test we try to consume v1 script output which has inline datums
@@ -477,21 +477,21 @@ tests setup = testGroup "gift"
         {-
         let ironAC = ctxIron ctx
 
-        txBodyPlace1 <- ctxRunI ctx User1 $ do
+        txBodyPlace1 <- ctxRunI ctx (ctxUser1 ctx) $ do
             addr <- scriptAddress giftValidatorV1
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
                 & gyTxOutDatumL .~ True
 
-        void $ submitTx ctx User1 txBodyPlace1
+        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace1
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        assertThrown isTxBodyErrorAutoBalance $ ctxRunF ctx User2 $ grabGifts giftValidatorV1
+        assertThrown isTxBodyErrorAutoBalance $ ctxRunF ctx (ctxUser2 ctx) $ grabGifts giftValidatorV1
 
-        grabGiftsTx <- ctxRunF ctx User2 $ grabGifts giftValidatorV1
+        grabGiftsTx <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts giftValidatorV1
 
-        mapM_ (submitTx ctx User2) grabGiftsTx
+        mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx
         -}
     ]
 
@@ -500,16 +500,16 @@ giftCleanup ctx = do
     threadDelay 1_000_000
 
     -- grab existing v2 gifts
-    grabGiftsTx2 <- ctxRunF ctx User1 $ grabGifts  @'PlutusV2 giftValidatorV2
-    mapM_ (submitTx ctx User1) grabGiftsTx2
+    grabGiftsTx2 <- ctxRunF ctx (ctxUser1 ctx) $ grabGifts  @'PlutusV2 giftValidatorV2
+    mapM_ (submitTx ctx (ctxUser1 ctx)) grabGiftsTx2
 
     -- grab existing v1 gifts
-    grabGiftsTx1 <- ctxRunF ctx User1 $ grabGifts  @'PlutusV1 giftValidatorV1
-    mapM_ (submitTx ctx User1) grabGiftsTx1
+    grabGiftsTx1 <- ctxRunF ctx (ctxUser1 ctx) $ grabGifts  @'PlutusV1 giftValidatorV1
+    mapM_ (submitTx ctx (ctxUser1 ctx)) grabGiftsTx1
 
     -- grab existing treats
-    grabGiftsTx <- ctxRunF ctx User1 $ grabGifts  @'PlutusV2 treatValidatorV2
-    mapM_ (submitTx ctx User1) grabGiftsTx
+    grabGiftsTx <- ctxRunF ctx (ctxUser1 ctx) $ grabGifts  @'PlutusV2 treatValidatorV2
+    mapM_ (submitTx ctx (ctxUser1 ctx)) grabGiftsTx
 
     threadDelay 1_000_000
 

@@ -63,7 +63,7 @@ closeSetup :: Setup -> IO ()
 closeSetup (Setup close _) = close
 
 debug :: String -> IO ()
--- change me to debug setup code.
+-- FIXME: change me to debug setup code.
 --debug = putStrLn
 debug _ = return ()
 

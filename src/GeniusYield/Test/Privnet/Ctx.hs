@@ -65,6 +65,7 @@ data Ctx = Ctx
     , ctxLCI         :: !LCIClient
     , ctxDbSync      :: !(Maybe CardanoDbSyncConn)
     , ctxUserFunder  :: !User
+    -- TODO: Make the following a length indexed vector.
     , ctxUser2       :: !User
     , ctxUser3       :: !User
     , ctxUser4       :: !User

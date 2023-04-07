@@ -67,6 +67,12 @@ data Ctx = Ctx
     , ctxUserFunder  :: !User
     , ctxUser2       :: !User
     , ctxUser3       :: !User
+    , ctxUser4       :: !User
+    , ctxUser5       :: !User
+    , ctxUser6       :: !User
+    , ctxUser7       :: !User
+    , ctxUser8       :: !User
+    , ctxUser9       :: !User
     , ctxGold        :: !GYAssetClass  -- ^ asset used in tests
     , ctxIron        :: !GYAssetClass  -- ^ asset used in tests
     , ctxLog         :: !GYLog

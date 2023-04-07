@@ -21,6 +21,8 @@ import           System.FilePath                      ((</>))
 
 import qualified Cardano.Api                          as Api
 
+import qualified Data.Vector.Fixed                    as V
+
 import qualified GeniusYield.Api.TestTokens           as GY.TestTokens
 import           GeniusYield.Imports
 import           GeniusYield.Providers.CardanoDbSync
@@ -79,18 +81,16 @@ makeSetup' DbSyncOpts {..} privnetPath = do
     debug $ printf "userFvkey = %s\n" (show $ paymentVerificationKey userFskey)
     debug $ printf "userFpkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey userFskey)
 
-    -- Generate user 2, 3
-    (user2skey, user2addr) <- generateUser $ pathUser2 paths
-    debug $ printf "user2addr = %s\n" user2addr
-    debug $ printf "user2skey = %s\n" (show user2skey)
-    debug $ printf "user2vkey = %s\n" (show $ paymentVerificationKey user2skey)
-    debug $ printf "user2pkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey user2skey)
-
-    (user3skey, user3addr) <- generateUser $ pathUser3 paths
-    debug $ printf "user3addr = %s\n" user3addr
-    debug $ printf "user3skey = %s\n" (show user3skey)
-    debug $ printf "user3vkey = %s\n" (show $ paymentVerificationKey user3skey)
-    debug $ printf "user3pkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey user3skey)
+    -- Generate user 2 .. 9
+    userSkeyAddr <- forM (pathUsers paths) generateUser
+    V.imapM_ (
+      \i (userIskey, userIaddr) -> do
+        debug $ printf "user = %s\n" (show $ i + 2)
+        debug $ printf "user addr = %s\n" userIaddr
+        debug $ printf "user skey = %s\n" (show userIskey)
+        debug $ printf "user vkey = %s\n" (show $ paymentVerificationKey userIskey)
+        debug $ printf "user pkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey userIskey)
+      ) userSkeyAddr
 
     -- Further down we need local node connection
     let info :: Api.LocalNodeConnectInfo Api.CardanoMode
@@ -135,8 +135,15 @@ makeSetup' DbSyncOpts {..} privnetPath = do
             , ctxLCI             = lci
             , ctxDbSync          = dbSync
             , ctxUserFunder      = User userFskey userFaddr userFcoll
-            , ctxUser2           = User user2skey user2addr userFcoll -- collateral is temporarily wrong
-            , ctxUser3           = User user3skey user3addr userFcoll -- collateral is temporarily wrong
+            -- collateral is temporarily wrong
+            , ctxUser2           = uncurry User (V.index userSkeyAddr (Proxy @0)) userFcoll
+            , ctxUser3           = uncurry User (V.index userSkeyAddr (Proxy @1)) userFcoll
+            , ctxUser4           = uncurry User (V.index userSkeyAddr (Proxy @2)) userFcoll
+            , ctxUser5           = uncurry User (V.index userSkeyAddr (Proxy @3)) userFcoll
+            , ctxUser6           = uncurry User (V.index userSkeyAddr (Proxy @4)) userFcoll
+            , ctxUser7           = uncurry User (V.index userSkeyAddr (Proxy @5)) userFcoll
+            , ctxUser8           = uncurry User (V.index userSkeyAddr (Proxy @6)) userFcoll
+            , ctxUser9           = uncurry User (V.index userSkeyAddr (Proxy @7)) userFcoll
             , ctxGold            = GYLovelace -- temporarily
             , ctxIron            = GYLovelace -- temporarily
             , ctxLog             = noLogging
@@ -145,24 +152,22 @@ makeSetup' DbSyncOpts {..} privnetPath = do
             , ctxGetParams       = localGetParams
             }
 
-    user2balance <- ctxRunC ctx0 (ctxUserFunder ctx0) $ queryBalance user2addr
-    when (isEmptyValue user2balance) $ do
-        debug $ printf "User2 balance is empty, giving some ada\n"
-        giveAda ctx0 user2addr
+    userBalances <- V.imapM
+      (\i (_, userIaddr) -> do
+        userIbalance <- ctxRunC ctx0 (ctxUserFunder ctx0) $ queryBalance userIaddr
+        when (isEmptyValue userIbalance) $ do
+            debug $ printf "User %s balance is empty, giving some ada\n" (show $ i + 2)
+            giveAda ctx0 userIaddr
+            when (i == 0) (giveAda ctx0 userFaddr) -- we also give ada to itself to create some small utxos
+        ctxRunC ctx0 (ctxUserFunder ctx0) $ queryBalance userIaddr
+      ) userSkeyAddr
 
-    user3balance <- ctxRunC ctx0 (ctxUserFunder ctx0) $ queryBalance user3addr
-    when (isEmptyValue user3balance) $ do
-        debug $ printf "User3 balance is empty, giving some ada\n"
-        giveAda ctx0 user3addr
-
-        -- we also give ada to itself to create some small utxos
-        giveAda ctx0 userFaddr
-
-    -- user 2 and 3 collaterals
-    user2coll <- getCollateral (pathUser2 paths) info user2addr
-    debug $ printf "user2coll = %s\n" user2coll
-    user3coll <- getCollateral (pathUser3 paths) info user3addr
-    debug $ printf "user3coll = %s\n" user3coll
+    -- collaterals
+    userColls <- V.imapM
+                   (\i (_, userIaddr) -> do
+                     getCollateral (pathUsers paths V.! i) info userIaddr
+                   ) userSkeyAddr
+    V.imapM_ (\i coll -> debug $ printf "user%scoll = %s\n" (show $ i + 2) coll) userColls
 
     -- mint test tokens
     goldAC <- mintTestTokens paths ctx0 "GOLD"
@@ -176,17 +181,23 @@ makeSetup' DbSyncOpts {..} privnetPath = do
             { ctxGold = goldAC
             , ctxIron = ironAC
 
-            , ctxUser2     = User user2skey user2addr user2coll
-            , ctxUser3     = User user3skey user3addr user3coll
+            , ctxUser2           = uncurry User (V.index userSkeyAddr (Proxy @0)) (V.index userColls (Proxy @0))
+            , ctxUser3           = uncurry User (V.index userSkeyAddr (Proxy @1)) (V.index userColls (Proxy @1))
+            , ctxUser4           = uncurry User (V.index userSkeyAddr (Proxy @2)) (V.index userColls (Proxy @2))
+            , ctxUser5           = uncurry User (V.index userSkeyAddr (Proxy @3)) (V.index userColls (Proxy @3))
+            , ctxUser6           = uncurry User (V.index userSkeyAddr (Proxy @4)) (V.index userColls (Proxy @4))
+            , ctxUser7           = uncurry User (V.index userSkeyAddr (Proxy @5)) (V.index userColls (Proxy @5))
+            , ctxUser8           = uncurry User (V.index userSkeyAddr (Proxy @6)) (V.index userColls (Proxy @6))
+            , ctxUser9           = uncurry User (V.index userSkeyAddr (Proxy @7)) (V.index userColls (Proxy @7))
             }
 
     -- distribute tokens
-    when (isEmptyValue $ snd $ valueSplitAda user2balance) $ do
-        debug $ printf "User2 has no tokens, giving some\n"
-        giveTokens ctx user2addr
-    when (isEmptyValue $ snd $ valueSplitAda user3balance) $ do
-        debug $ printf "User3 has no tokens, giving some\n"
-        giveTokens ctx user3addr
+    V.imapM_
+      (\i userIbalance -> do
+        when (isEmptyValue $ snd $ valueSplitAda userIbalance) $ do
+          debug $ printf "User%s has no tokens, giving some\n" (show $ i + 2)
+          giveTokens ctx (snd $ userSkeyAddr V.! i)
+      ) userBalances
 
     return $ Setup
         (closeLCIClient lci)
@@ -314,7 +325,7 @@ mintTestTokens Paths {pathGeniusYield} ctx tn' = do
     new :: IO GYAssetClass
     new = do
         (ac, txBody) <- ctxRunF ctx (ctxUserFunder ctx) $
-            GY.TestTokens.mintTestTokens tn 5_000_000
+            GY.TestTokens.mintTestTokens tn 10_000_000
         void $ submitTx ctx (ctxUserFunder ctx) txBody
 
         urlPieceToFile path ac

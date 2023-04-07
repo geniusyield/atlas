@@ -12,10 +12,13 @@ module GeniusYield.Test.Privnet.Paths (
     initPaths,
 ) where
 
-import           System.Exit         (exitFailure)
-import           System.FilePath     ((</>))
+import           System.Exit             (exitFailure)
+import           System.FilePath         ((</>))
 
-import qualified System.Directory    as Dir
+import qualified System.Directory        as Dir
+
+import qualified Data.Vector.Fixed       as V
+import qualified Data.Vector.Fixed.Boxed as VB
 
 import           GeniusYield.Imports
 
@@ -23,14 +26,7 @@ data Paths = Paths
     { pathNodeSocket  :: !FilePath
     , pathGeniusYield :: !FilePath
     , pathUserF       :: !UserPaths
-    , pathUser2       :: !UserPaths
-    , pathUser3       :: !UserPaths
-    , pathUser4       :: !UserPaths
-    , pathUser5       :: !UserPaths
-    , pathUser6       :: !UserPaths
-    , pathUser7       :: !UserPaths
-    , pathUser8       :: !UserPaths
-    , pathUser9       :: !UserPaths
+    , pathUsers       :: !(VB.Vec 8 UserPaths)
     }
   deriving Show
 
@@ -58,47 +54,14 @@ mkPaths privnetPath = Paths
         , pathUserSKey = pathGY </> "userF.skey"
         , pathUserColl = pathGY </> "userF.collateral"
         }
-    -- TODO: Seems unclean to manually put entries for all 9 users, could use vector/map etc.
-    , pathUser2       = UserPaths
-        { pathUserAddr = pathGY </> "user2.addr"
-        , pathUserSKey = pathGY </> "user2.skey"
-        , pathUserColl = pathGY </> "user2.collateral"
-        }
-    , pathUser3       = UserPaths
-        { pathUserAddr = pathGY </> "user3.addr"
-        , pathUserSKey = pathGY </> "user3.skey"
-        , pathUserColl = pathGY </> "user3.collateral"
-        }
-    , pathUser4       = UserPaths
-        { pathUserAddr = pathGY </> "user4.addr"
-        , pathUserSKey = pathGY </> "user4.skey"
-        , pathUserColl = pathGY </> "user4.collateral"
-        }
-    , pathUser5       = UserPaths
-        { pathUserAddr = pathGY </> "user5.addr"
-        , pathUserSKey = pathGY </> "user5.skey"
-        , pathUserColl = pathGY </> "user5.collateral"
-        }
-    , pathUser6       = UserPaths
-        { pathUserAddr = pathGY </> "user6.addr"
-        , pathUserSKey = pathGY </> "user6.skey"
-        , pathUserColl = pathGY </> "user6.collateral"
-        }
-    , pathUser7       = UserPaths
-        { pathUserAddr = pathGY </> "user7.addr"
-        , pathUserSKey = pathGY </> "user7.skey"
-        , pathUserColl = pathGY </> "user7.collateral"
-        }
-    , pathUser8       = UserPaths
-        { pathUserAddr = pathGY </> "user8.addr"
-        , pathUserSKey = pathGY </> "user8.skey"
-        , pathUserColl = pathGY </> "user8.collateral"
-        }
-    , pathUser9       = UserPaths
-        { pathUserAddr = pathGY </> "user9.addr"
-        , pathUserSKey = pathGY </> "user9.skey"
-        , pathUserColl = pathGY </> "user9.collateral"
-        }
+    , pathUsers =
+        fmap
+          (\i -> UserPaths {
+            pathUserAddr = pathGY </> printf "user%s.addr" (show i)
+          , pathUserSKey = pathGY </> printf "user%s.skey" (show i)
+          , pathUserColl = pathGY </> printf "user%s.collateral" (show i)
+          })
+          (V.fromList [2 :: Integer .. 9])
     }
   where
     pathGY = privnetPath </> "geniusyield"

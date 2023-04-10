@@ -468,7 +468,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
             body
             changeAddrApi
             Nothing
-    -- Is there a simple utility to modify in obtained `BalancedTxBody` so that we can avoid another call to `makeTransactionBodyAutoBalance`?.
+    -- Is there a simple utility to modify in obtained `BalancedTxBody` so that we can avoid another call to `makeTransactionBodyAutoBalance`?. Note that updating the collaterals would not lead to increase in fees as previous values were upperbound.
     -- Could avoid another call to `makeTransactionBodyAutoBalance` in case `collaterals` is empty.
     let bodyCorrectColl = if collaterals == mempty then body else
           let

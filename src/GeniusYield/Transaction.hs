@@ -17,7 +17,7 @@ Inputs:
 Additionally:
 
     * Set of additional UTxOs which can be spent
-    * Collateral UTxO which shouldn't be spent - TODO: May remove holy status of collaterals.
+    * Collateral UTxO which shouldn't be spent - TODO: Improve wording here after complete setup of not requiring reserved collateral.
     * Change address
 
 The algorithm should produce sets of inputs and outputs

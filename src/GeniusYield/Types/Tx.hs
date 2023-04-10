@@ -25,14 +25,28 @@ module GeniusYield.Types.Tx
     , txIdToApi
     , txIdFromApi
     , txIdFromPlutus
+      -- * Transaction Witness Set
+    , GYTxWitness
+    , txWitFromHexBS
+    , txWitFromHex
+    , txWitFromApi
+    , txWitToApi
+    , txWitToKeyWitnessApi
 ) where
 
 import qualified Cardano.Api                  as Api
+import qualified Cardano.Api.Shelley          as Api.S
+import qualified Cardano.Binary               as CBOR
+import qualified Cardano.Ledger.Crypto        as Crypto
+import qualified Cardano.Ledger.Shelley       as Shelley
+import qualified Cardano.Ledger.Shelley.Tx    as Shelley
 import           Control.Lens                 ((&), (?~))
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.ByteString              as BS
 import qualified Data.ByteString.Base16       as BS16
 import qualified Data.ByteString.Char8        as BS8
+import qualified Data.ByteString.Lazy         as LBS
+import           Data.Set                     as Set
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as T
@@ -195,3 +209,43 @@ txIdFromApi = coerce
 
 txIdFromPlutus :: Plutus.TxId -> Maybe GYTxId
 txIdFromPlutus (Plutus.TxId (Plutus.BuiltinByteString bs)) = txIdFromApi <$> Api.deserialiseFromRawBytes Api.AsTxId bs
+
+newtype GYTxWitness = GYTxWitness (Shelley.WitnessSetHKD Identity (Shelley.ShelleyEra Crypto.StandardCrypto))  -- Is the choice of `ShelleyEra StandardCrypto` here appropriate? It works nonetheless.
+
+instance Swagger.ToSchema GYTxWitness where
+    declareNamedSchema _ = pure $ Swagger.named "GYTxWitness" $ mempty
+                         & Swagger.type_ ?~ Swagger.SwaggerString
+
+instance Printf.PrintfArg GYTxWitness where
+    formatArg (GYTxWitness txWit) = Printf.formatArg (show txWit)
+
+instance Aeson.FromJSON GYTxWitness where
+  parseJSON = Aeson.withText "GYTxWitness" $ \t -> do
+    case txWitFromHexBS $ TE.encodeUtf8 t of
+      Left err    -> fail $ "Not a GYTxWitness: " ++ err
+      Right txWit -> return txWit
+
+instance Web.FromHttpApiData GYTxWitness where
+  parseUrlPiece t = first (T.pack . ("Not a tx witness, error: " ++)) $ txWitFromHexBS $ TE.encodeUtf8 t
+
+txWitFromHexBS :: BS.ByteString -> Either String GYTxWitness
+txWitFromHexBS bs = do
+  bs' <- BS16.decode bs
+  txWit <- first show $ CBOR.decodeAnnotator "Reading transaction witness set" CBOR.fromCBOR (LBS.fromStrict bs')
+  return (GYTxWitness txWit)
+
+txWitFromHex :: String -> Maybe GYTxWitness
+txWitFromHex s = rightToMaybe $ txWitFromHexBS $ BS8.pack s
+
+txWitFromApi :: Shelley.WitnessSetHKD Identity (Shelley.ShelleyEra Crypto.StandardCrypto) -> GYTxWitness
+txWitFromApi = coerce
+
+txWitToApi :: GYTxWitness -> Shelley.WitnessSetHKD Identity (Shelley.ShelleyEra Crypto.StandardCrypto)
+txWitToApi = coerce
+
+-- >>> let txWitCbor = "a100818258206400a17ee58ce12a54c6edb7b964f0eb217e00dac75f2a47eccb6eedd02809a4584048bfa2dbf21514cafd1425b0072c67dd09cce82f5688169cff4761ca47e6557371ecc1ccbadde231dee179cf17d9dac29a61ac64ff9ef2dbd94968ec26301801"
+-- >>> txWitToKeyWitnessApi <$> txWitFromHex "a100818258206400a17ee58ce12a54c6edb7b964f0eb217e00dac75f2a47eccb6eedd02809a4584048bfa2dbf21514cafd1425b0072c67dd09cce82f5688169cff4761ca47e6557371ecc1ccbadde231dee179cf17d9dac29a61ac64ff9ef2dbd94968ec26301801"
+-- Just [ShelleyKeyWitness ShelleyBasedEraBabbage (WitVKey' {wvkKey' = VKey (VerKeyEd25519DSIGN "6400a17ee58ce12a54c6edb7b964f0eb217e00dac75f2a47eccb6eedd02809a4"), wvkSig' = SignedDSIGN (SigEd25519DSIGN "48bfa2dbf21514cafd1425b0072c67dd09cce82f5688169cff4761ca47e6557371ecc1ccbadde231dee179cf17d9dac29a61ac64ff9ef2dbd94968ec26301801"), wvkKeyHash = KeyHash "f24712bd05f058c6dca5df794f6afbffa8392076e7cb9fda9f508d7a", wvkBytes = "\130X d\NUL\161~\229\140\225*T\198\237\183\185d\240\235!~\NUL\218\199_*G\236\203n\237\208(\t\164X@H\191\162\219\242\NAK\DC4\202\253\DC4%\176\a,g\221\t\204\232/V\136\SYN\156\255Ga\202G\230Usq\236\193\204\186\221\226\&1\222\225y\207\ETB\217\218\194\154a\172d\255\158\242\219\217Ih\236&0\CAN\SOH"})]
+
+txWitToKeyWitnessApi :: GYTxWitness -> [Api.S.KeyWitness Api.S.BabbageEra]
+txWitToKeyWitnessApi = fmap (Api.S.ShelleyKeyWitness Api.ShelleyBasedEraBabbage) . Set.toList . Shelley.addrWits . txWitToApi

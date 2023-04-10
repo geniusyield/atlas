@@ -60,7 +60,7 @@ txBodyToApi = coerce
 signTx :: ToShelleyWitnessSigningKey a =>  GYTxBody -> [a] -> GYTx
 signTx (GYTxBody txBody) skeys = txFromApi $ Api.signShelleyTransaction txBody $ map toShelleyWitnessSigningKey skeys
 
--- | Make a signed transaction given the transaction body & list of key witnesses
+-- | Make a signed transaction given the transaction body & list of key witnesses.
 makeSignedTransaction :: GYTxWitness -> GYTxBody -> GYTx
 makeSignedTransaction txWit (GYTxBody txBody) = txFromApi $ Api.makeSignedTransaction (txWitToKeyWitnessApi txWit) txBody
 

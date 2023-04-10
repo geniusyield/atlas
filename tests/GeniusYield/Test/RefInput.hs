@@ -30,8 +30,8 @@ gyGuessRefInputDatumValidator = validatorFromPlutus guessRefInputDatumValidator
 
 refInputTests :: TestTree
 refInputTests = testGroup "Reference Input"
-    [ testRun "Inlined datum" $ refInputTrace True 5 5 332976
-    , testRun "Inlined datum - Wrong guess" $ mustFail . refInputTrace True 5 4 332976
+    [ testRun "Inlined datum" $ refInputTrace True 5 5 332800
+    , testRun "Inlined datum - Wrong guess" $ mustFail . refInputTrace True 5 4 332800
     , testRun "Reference input must not be consumed" tryRefInputConsume
     ]
 

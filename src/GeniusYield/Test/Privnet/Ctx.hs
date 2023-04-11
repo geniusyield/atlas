@@ -64,8 +64,8 @@ data Ctx = Ctx
     , ctxInfo        :: !(Api.LocalNodeConnectInfo Api.CardanoMode)
     , ctxLCI         :: !LCIClient
     , ctxDbSync      :: !(Maybe CardanoDbSyncConn)
-    , ctxUserFunder  :: !User
-    -- TODO: Make the following a length indexed vector.
+    , ctxUserF       :: !User  -- Funder. All other users begin with same status of funds.
+    -- Make the following a length indexed vector?
     , ctxUser2       :: !User
     , ctxUser3       :: !User
     , ctxUser4       :: !User

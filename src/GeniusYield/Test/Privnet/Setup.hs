@@ -64,7 +64,7 @@ closeSetup (Setup close _) = close
 
 debug :: String -> IO ()
 -- FIXME: change me to debug setup code.
---debug = putStrLn
+-- debug = putStrLn
 debug _ = return ()
 
 makeSetup' :: DbSyncOpts -> FilePath -> IO Setup
@@ -83,9 +83,10 @@ makeSetup' DbSyncOpts {..} privnetPath = do
 
     -- Generate user 2 .. 9
     userSkeyAddr <- forM (pathUsers paths) generateUser
+    let getUserIdx (i :: Int) = i + 2
     V.imapM_ (
       \i (userIskey, userIaddr) -> do
-        debug $ printf "user = %s\n" (show $ i + 2)
+        debug $ printf "user = %s\n" (show $ getUserIdx i)
         debug $ printf "user addr = %s\n" userIaddr
         debug $ printf "user skey = %s\n" (show userIskey)
         debug $ printf "user vkey = %s\n" (show $ paymentVerificationKey userIskey)
@@ -156,7 +157,7 @@ makeSetup' DbSyncOpts {..} privnetPath = do
       (\i (_, userIaddr) -> do
         userIbalance <- ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
         when (isEmptyValue userIbalance) $ do
-            debug $ printf "User %s balance is empty, giving some ada\n" (show $ i + 2)
+            debug $ printf "User %s balance is empty, giving some ada\n" (show $ getUserIdx i)
             giveAda ctx0 userIaddr
             when (i == 0) (giveAda ctx0 userFaddr) -- we also give ada to itself to create some small utxos
         ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
@@ -167,7 +168,7 @@ makeSetup' DbSyncOpts {..} privnetPath = do
                    (\i (_, userIaddr) -> do
                      getCollateral (pathUsers paths V.! i) info userIaddr
                    ) userSkeyAddr
-    V.imapM_ (\i coll -> debug $ printf "user%scoll = %s\n" (show $ i + 2) coll) userColls
+    V.imapM_ (\i coll -> debug $ printf "user%scoll = %s\n" (show $ getUserIdx i) coll) userColls
 
     -- mint test tokens
     goldAC <- mintTestTokens paths ctx0 "GOLD"
@@ -195,7 +196,7 @@ makeSetup' DbSyncOpts {..} privnetPath = do
     V.imapM_
       (\i userIbalance -> do
         when (isEmptyValue $ snd $ valueSplitAda userIbalance) $ do
-          debug $ printf "User%s has no tokens, giving some\n" (show $ i + 2)
+          debug $ printf "User%s has no tokens, giving some\n" (show $ getUserIdx i)
           giveTokens ctx (snd $ userSkeyAddr V.! i)
       ) userBalances
 

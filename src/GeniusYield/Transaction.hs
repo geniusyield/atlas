@@ -121,6 +121,8 @@ data BuildTxException
     -- ^ Execution units required is higher than the maximum as specified by protocol params.
     | BuildTxSizeTooBig
     -- ^ Transaction size is higher than the maximum as specified by protocol params.
+    | BuildTxCollateralShortFall !Natural
+    -- ^ Lovelaces shortfall (in collateral inputs) for collateral requirement.
   deriving stock    Show
   deriving anyclass (Exception, IsGYApiError)
 
@@ -281,6 +283,10 @@ balanceTxStep
     isScriptWitness GYTxInWitnessKey      = False
     isScriptWitness GYTxInWitnessScript{} = True
 
+-- Impossible to throw error. Would have been nice if `Cardano.Api` also exposed constructors of GADT `TxTotalAndReturnCollateralSupportedInEra era` (though it is done in later version, and thus can modify below line then). Now, even type of this `GADT` isn't exported, thus can't annotate type below.
+-- retColSup :: Api.TxTotalAndReturnCollateralSupportedInEra Api.BabbageEra
+retColSup = fromJust $ Api.totalAndReturnCollateralSupportedInEra Api.BabbageEra
+
 finalizeGYBalancedTx :: GYBuildTxEnv -> Bool -> GYBalancedTx v -> Either BuildTxException GYTxBody
 finalizeGYBalancedTx
     GYBuildTxEnv
@@ -397,11 +403,6 @@ finalizeGYBalancedTx
             | (Some p, r) <- xs
             ]
 
-    -- Impossible to throw error. Would have been nice if `Cardano.Api` also exposed constructors of GADT `TxTotalAndReturnCollateralSupportedInEra era` (though it is done in later version, and thus can modify below line then). Now, even type of this `GADT` isn't exported, thus can't annotate type below.
-    --
-    -- retColSup :: Api.TxTotalAndReturnCollateralSupportedInEra Api.BabbageEra
-    retColSup = fromJust $ Api.totalAndReturnCollateralSupportedInEra Api.BabbageEra
-
     (dummyTotCol :: Api.TxTotalCollateral Api.BabbageEra, dummyRetCol :: Api.TxReturnCollateral Api.CtxTx Api.BabbageEra) =
       if mempty == collaterals then
         (Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)
@@ -457,6 +458,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
         } <- maybeToRight BuildTxMissingMaxExUnitsParam $ Api.S.protocolParamMaxTxExUnits pp
     let maxTxSize = Api.S.protocolParamMaxTxSize pp
         changeAddrApi :: Api.S.AddressInEra Api.S.BabbageEra = addressToApi' changeAddr
+
     -- First we obtain the calculated fees to correct for our collaterals.
     Api.BalancedTxBody _ _ (Api.Lovelace feeOld) <- first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
             Api.BabbageEraInCardanoMode
@@ -468,25 +470,30 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
             body
             changeAddrApi
             Nothing
-    -- We should call `makeTransactionBodyAutoBalance` again with updated values of collaterals so as to get slightly lower fees estimate.
-    -- Could avoid another call to `makeTransactionBodyAutoBalance` in case `collaterals` is empty.
-    let bodyCorrectColl = if collaterals == mempty then body else
-          let
-            collateralTotalValue :: GYValue = foldMapUTxOs utxoValue collaterals
-            collateralTotalLovelace :: Integer = fst $ valueSplitAda collateralTotalValue
-            balanceNeeded :: Integer = ceiling $ (feeOld * toInteger (fromJust $ Api.S.protocolParamCollateralPercent pp)) % 100
-            -- retColSup :: Api.TxTotalAndReturnCollateralSupportedInEra Api.BabbageEra
-            retColSup = fromJust $ Api.totalAndReturnCollateralSupportedInEra Api.BabbageEra
-            (txColl, collRet) =
-              if collateralTotalLovelace >= balanceNeeded then
-                (
-                  Api.TxTotalCollateral retColSup (Api.Lovelace balanceNeeded)
-                , Api.TxReturnCollateral retColSup $ txOutToApi True $ GYTxOut changeAddr (collateralTotalValue `valueMinus` valueFromLovelace (collateralTotalLovelace - balanceNeeded)) Nothing Nothing
 
-                )
-              else (Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)
-          in
-            body {Api.txTotalCollateral = txColl, Api.txReturnCollateral = collRet}
+    -- We should call `makeTransactionBodyAutoBalance` again with updated values of collaterals so as to get slightly lower fees estimate.
+    -- Could have avoided another call to `makeTransactionBodyAutoBalance` in case `collaterals` is empty though.
+    bodyCorrectColl <- if collaterals == mempty then return body else
+
+      let
+
+        collateralTotalValue :: GYValue = foldMapUTxOs utxoValue collaterals
+        collateralTotalLovelace :: Integer = fst $ valueSplitAda collateralTotalValue
+        balanceNeeded :: Integer = ceiling $ (feeOld * toInteger (fromJust $ Api.S.protocolParamCollateralPercent pp)) % 100
+
+      in do
+
+        (txColl, collRet) <-
+          if collateralTotalLovelace >= balanceNeeded then return
+            (
+              Api.TxTotalCollateral retColSup (Api.Lovelace balanceNeeded)
+            , Api.TxReturnCollateral retColSup $ txOutToApi True $ GYTxOut changeAddr (collateralTotalValue `valueMinus` valueFromLovelace balanceNeeded) Nothing Nothing
+
+            )
+          else Left $ BuildTxCollateralShortFall (fromInteger $ balanceNeeded - collateralTotalLovelace) -- In this case `makeTransactionBodyAutoBalance` doesn't return an error but instead returns `(Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)`
+
+        return body {Api.txTotalCollateral = txColl, Api.txReturnCollateral = collRet}
+
     Api.BalancedTxBody txBody _ _ <- first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
             Api.BabbageEraInCardanoMode
             ss

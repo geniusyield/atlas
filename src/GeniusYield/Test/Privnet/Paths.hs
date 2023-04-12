@@ -12,19 +12,21 @@ module GeniusYield.Test.Privnet.Paths (
     initPaths,
 ) where
 
-import           System.FilePath  ((</>))
-import           System.Exit      (exitFailure)
+import           System.Exit             (exitFailure)
+import           System.FilePath         ((</>))
 
-import qualified System.Directory as Dir
+import qualified System.Directory        as Dir
 
-import GeniusYield.Imports
+import qualified Data.Vector.Fixed       as V
+import qualified Data.Vector.Fixed.Boxed as VB
+
+import           GeniusYield.Imports
 
 data Paths = Paths
-    { pathNodeSocket  :: FilePath
-    , pathGeniusYield :: FilePath
-    , pathUser1       :: UserPaths
-    , pathUser2       :: UserPaths
-    , pathUser3       :: UserPaths
+    { pathNodeSocket  :: !FilePath
+    , pathGeniusYield :: !FilePath
+    , pathUserF       :: !UserPaths
+    , pathUsers       :: !(VB.Vec 8 UserPaths)
     }
   deriving Show
 
@@ -36,42 +38,48 @@ data UserPaths = UserPaths
   deriving Show
 
 initPaths :: FilePath -> IO Paths
-initPaths fp = do
-    checkPaths paths
+initPaths privnetPath = do
+    checkPaths privnetPath paths
     return paths
   where
-    paths = mkPaths fp
+    paths = mkPaths privnetPath
 
 mkPaths :: FilePath -> Paths
 mkPaths privnetPath = Paths
     { pathNodeSocket  = privnetPath </> "node-spo1" </> "node.sock"
     , pathGeniusYield = pathGY
-    , pathUser1       = UserPaths
-        { pathUserAddr = privnetPath </> "addresses" </> "user1.addr"
-        , pathUserSKey = privnetPath </> "addresses" </> "user1.skey"
-        , pathUserColl = pathGY </> "user1.collateral"
+    -- Funder
+    , pathUserF  = UserPaths
+        { pathUserAddr = pathGY </> "userF.addr"
+        , pathUserSKey = pathGY </> "userF.skey"
+        , pathUserColl = pathGY </> "userF.collateral"
         }
-    , pathUser2       = UserPaths
-        { pathUserAddr = pathGY </> "user2.addr"
-        , pathUserSKey = pathGY </> "user2.skey"
-        , pathUserColl = pathGY </> "user2.collateral"
-        }
-    , pathUser3       = UserPaths
-        { pathUserAddr = pathGY </> "user3.addr"
-        , pathUserSKey = pathGY </> "user3.skey"
-        , pathUserColl = pathGY </> "user3.collateral"
-        }
+    , pathUsers =
+        fmap
+          (\i -> UserPaths {
+            pathUserAddr = pathGY </> printf "user%s.addr" (show i)
+          , pathUserSKey = pathGY </> printf "user%s.skey" (show i)
+          , pathUserColl = pathGY </> printf "user%s.collateral" (show i)
+          })
+          (V.fromList [2 :: Integer .. 9])
     }
   where
     pathGY = privnetPath </> "geniusyield"
 
-checkPaths :: Paths -> IO ()
-checkPaths Paths {..} = do
+checkPaths :: FilePath -> Paths -> IO ()
+checkPaths privnetPath Paths {..} = do
     checkFile pathNodeSocket
-    checkFile $ pathUserAddr pathUser1
-    checkFile $ pathUserSKey pathUser1
+    let originalUserAddrFP = privnetPath </> "addresses" </> "user1.addr"
+        originalUserSKeyFP = privnetPath </> "addresses" </> "user1.skey"
+    checkFile originalUserAddrFP
+    checkFile originalUserSKeyFP
     Dir.createDirectoryIfMissing False pathGeniusYield
     checkDir pathGeniusYield
+    -- if already present due to previous ran of privnet test, replacing is fine.
+    Dir.copyFile originalUserAddrFP (pathUserAddr pathUserF)
+    Dir.copyFile originalUserSKeyFP (pathUserSKey pathUserF)
+    checkFile $ pathUserAddr pathUserF
+    checkFile $ pathUserSKey pathUserF
   where
     checkFile p = do
         -- printf "INFO: checkFile %s\n" p

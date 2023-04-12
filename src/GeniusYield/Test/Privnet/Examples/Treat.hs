@@ -26,12 +26,12 @@ tests setup = testGroup "treat"
     [ testCaseSteps "plutusV1" $ \info -> withSetup setup info $ \ctx -> do
         let goldAC = ctxGold ctx
 
-        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
+        txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
             addr <- scriptAddress treatValidatorV1
             return $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
+        void $ submitTx ctx (ctxUserF ctx) txBodyPlace
 
         threadDelay 1_000_000
 
@@ -44,17 +44,17 @@ tests setup = testGroup "treat"
         let ironAC = ctxIron ctx
 
         -- grab existing treats to cleanup
-        grabTreatsTx <- ctxRunF ctx (ctxUser1 ctx) $ grabTreats  @'PlutusV2 treatValidatorV2
-        mapM_ (submitTx ctx (ctxUser1 ctx)) grabTreatsTx
+        grabTreatsTx <- ctxRunF ctx (ctxUserF ctx) $ grabTreats  @'PlutusV2 treatValidatorV2
+        mapM_ (submitTx ctx (ctxUserF ctx)) grabTreatsTx
 
-        balance1 <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance1 <- ctxQueryBalance ctx (ctxUserF ctx)
         balance2 <- ctxQueryBalance ctx (ctxUser2 ctx)
 
-        txBodyPlace <- ctxRunI ctx (ctxUser1 ctx) $ do
+        txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
             addr <- scriptAddress treatValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-        void $ submitTx ctx (ctxUser1 ctx) txBodyPlace
+        void $ submitTx ctx (ctxUserF ctx) txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -62,7 +62,7 @@ tests setup = testGroup "treat"
         grabTreatsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabTreats  @'PlutusV2 treatValidatorV2
         mapM_ (submitTx ctx (ctxUser2 ctx)) grabTreatsTx'
 
-        balance1' <- ctxQueryBalance ctx (ctxUser1 ctx)
+        balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
         balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
 
         let diff1 = valueMinus balance1' balance1

@@ -11,6 +11,7 @@ module GeniusYield.Test.Privnet.Ctx (
     Ctx (..),
     -- * User
     User (..),
+    ctxUsers,
     userPkh,
     userVKey,
     -- * Operations
@@ -64,8 +65,7 @@ data Ctx = Ctx
     , ctxInfo        :: !(Api.LocalNodeConnectInfo Api.CardanoMode)
     , ctxLCI         :: !LCIClient
     , ctxDbSync      :: !(Maybe CardanoDbSyncConn)
-    , ctxUserF       :: !User  -- Funder. All other users begin with same status of funds.
-    -- Make the following a length indexed vector?
+    , ctxUserF       :: !User  -- ^ Funder. All other users begin with same status of funds.
     , ctxUser2       :: !User
     , ctxUser3       :: !User
     , ctxUser4       :: !User
@@ -81,6 +81,10 @@ data Ctx = Ctx
     , ctxQueryUtxos  :: !GYQueryUTxO
     , ctxGetParams   :: !GYGetParameters
     }
+
+-- | List of context sibling users - all of which begin with same balance.
+ctxUsers :: Ctx -> [User]
+ctxUsers ctx = ($ ctx) <$> [ctxUser2, ctxUser3, ctxUser4, ctxUser5, ctxUser6, ctxUser7, ctxUser8, ctxUser9]
 
 -- | Creates a new user with the given balance. Note that we'll deduct 5 ada from the given fund as a collateral output.
 newTempUserCtx:: Ctx

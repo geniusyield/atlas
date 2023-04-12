@@ -156,6 +156,7 @@ library
     , cardano-ledger-alonzo
     , cardano-ledger-byron
     , cardano-ledger-core
+    , cardano-ledger-shelley
     , cardano-slotting
     , cardano-wallet-primitive
     , cardano-addresses
@@ -165,6 +166,7 @@ library
     , directory
     , either
     , filepath
+    , fixed-vector
     , hashable
     , http-api-data
     , http-client

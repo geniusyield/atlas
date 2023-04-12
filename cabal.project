@@ -183,13 +183,7 @@ constraints:
   -- TH Name shadowing warnings need to be addressed when bumping to 2.13.3.5
   , persistent == 2.13.3.3
 
-  -- Copied from cardano-node's cabal.project:
-  , bimap >= 0.4.0
-  , libsystemd-journal >= 1.4.4
-  , systemd >= 2.3.0
-    -- systemd-2.3.0 requires at least network 3.1.1.0 but it doesn't declare
-    -- that dependency
-  , network >= 3.1.1.0
+  -- Copied from cardano-node's cabal.project (omitting duplicates):
   , HSOpenSSL >= 0.11.7.2
   , algebraic-graphs < 0.7
   , protolude < 0.3.1

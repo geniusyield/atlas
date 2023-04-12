@@ -44,23 +44,15 @@ assertThrown p action = do
   where
     name = show (typeRep (Proxy @e))
 
-{- Asserts if the user funds change as expected.
-   The `fees` argument is an estimation for the transaction fees.
--}
+-- | Asserts if the user funds change as expected. This function subtracts fees from the given expected value.
 assertUserFunds :: Integer -> Ctx -> User -> GYValue -> IO ()
 assertUserFunds fees ctx u expectedValue = do
     currentValue <- ctxQueryBalance ctx u
-    let (cLovelace, cAssets) = valueSplitAda currentValue
-        (eLovelace, eAssets) = valueSplitAda expectedValue
-    assertBool (unwords ["The non-Ada token didn't change as expected",
-                         "\nExpected: ", show eAssets,
-                         "\nCurrent: ", show cAssets])
-               (cAssets == eAssets)
-    assertBool (unwords ["The lovelaces didn't change as expected,",
-                         "\nExpected: ", show eLovelace,
-                         "\nCurrent: ", show cLovelace])
-               ((cLovelace + fees >= eLovelace) &&
-                (cLovelace < eLovelace))
+    let expectedValue' = expectedValue `valueMinus` valueFromLovelace fees
+    assertBool (unwords ["The value didn't change as expected",
+                         "\nExpected: ", show expectedValue',
+                         "\nCurrent: ", show currentValue])
+               (currentValue == expectedValue')
 
 isTxBodyErrorAutoBalance :: BuildTxException -> Bool
 isTxBodyErrorAutoBalance (BuildTxBodyErrorAutoBalance _) = True

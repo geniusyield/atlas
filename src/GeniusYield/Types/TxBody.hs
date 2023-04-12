@@ -15,6 +15,7 @@ module GeniusYield.Types.TxBody (
     -- * Transaction creation
     signTx,
     unsignedTx,
+    makeSignedTransaction,
     -- * Functions
     txBodyFee,
     txBodyFeeValue,
@@ -37,7 +38,8 @@ import qualified Cardano.Api.Shelley         as Api.S
 import qualified Data.Set                    as Set
 
 import           GeniusYield.Imports
-import           GeniusYield.Types.Key.Class (ToShelleyWitnessSigningKey, toShelleyWitnessSigningKey)
+import           GeniusYield.Types.Key.Class (ToShelleyWitnessSigningKey,
+                                              toShelleyWitnessSigningKey)
 import           GeniusYield.Types.Slot
 import           GeniusYield.Types.Tx
 import           GeniusYield.Types.TxOutRef
@@ -57,6 +59,10 @@ txBodyToApi = coerce
 -- | Sign a transaction body with (potentially) multiple keys.
 signTx :: ToShelleyWitnessSigningKey a =>  GYTxBody -> [a] -> GYTx
 signTx (GYTxBody txBody) skeys = txFromApi $ Api.signShelleyTransaction txBody $ map toShelleyWitnessSigningKey skeys
+
+-- | Make a signed transaction given the transaction body & list of key witnesses.
+makeSignedTransaction :: GYTxWitness -> GYTxBody -> GYTx
+makeSignedTransaction txWit (GYTxBody txBody) = txFromApi $ Api.makeSignedTransaction (txWitToKeyWitnessApi txWit) txBody
 
 -- | Create an unsigned transaction from the body.
 unsignedTx :: GYTxBody -> GYTx

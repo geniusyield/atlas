@@ -166,6 +166,7 @@ library
     , directory
     , either
     , filepath
+    , fixed-vector
     , hashable
     , http-api-data
     , http-client

@@ -15,6 +15,7 @@ module GeniusYield.Types.TxBody (
     -- * Transaction creation
     signTx,
     unsignedTx,
+    makeSignedTransaction,
     -- * Functions
     txBodyFee,
     txBodyFeeValue,
@@ -59,6 +60,10 @@ txBodyToApi = coerce
 -- | Sign a transaction body with (potentially) multiple keys.
 signTx :: ToShelleyWitnessSigningKey a =>  GYTxBody -> [a] -> GYTx
 signTx (GYTxBody txBody) skeys = txFromApi $ Api.signShelleyTransaction txBody $ map toShelleyWitnessSigningKey skeys
+
+-- | Make a signed transaction given the transaction body & list of key witnesses.
+makeSignedTransaction :: GYTxWitness -> GYTxBody -> GYTx
+makeSignedTransaction txWit (GYTxBody txBody) = txFromApi $ Api.makeSignedTransaction (txWitToKeyWitnessApi txWit) txBody
 
 -- | Create an unsigned transaction from the body.
 unsignedTx :: GYTxBody -> GYTx

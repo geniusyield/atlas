@@ -403,6 +403,7 @@ finalizeGYBalancedTx
             | (Some p, r) <- xs
             ]
 
+    -- Putting `TxTotalCollateralNone` & `TxReturnCollateralNone` would have them appropriately calculated by `makeTransactionBodyAutoBalance` but then return collateral it generates is only for ada. To support multi-asset collateral input we therefore calculate correct values ourselves and put appropriate entries here to have `makeTransactionBodyAutoBalance` calculate appropriately overestimated fees.
     (dummyTotCol :: Api.TxTotalCollateral Api.BabbageEra, dummyRetCol :: Api.TxReturnCollateral Api.CtxTx Api.BabbageEra) =
       if mempty == collaterals then
         (Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)
@@ -423,7 +424,6 @@ finalizeGYBalancedTx
         collaterals'
         inRefs
         outs'
-        -- Putting `TxTotalCollateralNone` & `TxReturnCollateralNone` would have them appropriately calculated by `makeTransactionBodyAutoBalance` but then return collateral it generates is only for ada. To support multi-asset collateral input we therefore calculate correct values ourselves and put appropriate entries here to calculate appropriately overestimated fees. Our fees estimate is more appropriate as we make use of value in collateral inputs to get bound for these fields.
         dummyTotCol
         dummyRetCol
         fee

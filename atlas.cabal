@@ -301,13 +301,6 @@ test-suite atlas-privnet-tests
 
   build-depends:
     , base
-    , bytestring
-    , cardano-api            ==1.35.4
-    , cassava
-    , containers
-    , directory
     , atlas
-    , random
     , tasty
     , tasty-hunit
-    , transformers

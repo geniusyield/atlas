@@ -157,16 +157,21 @@ tests setup = testGroup "gift"
         grabGiftsTxBody' <- case grabGiftsTxBody of
           Nothing   -> assertFailure "Unable to build tx"
           Just body -> return body
-        let returnCollateralOutput = txBodyCollateralReturnOutput grabGiftsTxBody'
-            totalCollateral = txBodyTotalCollateralLovelace grabGiftsTxBody'
-        info $ printf "Return collateral: %s" (show returnCollateralOutput)
+        retCollOutput@(Api.TxReturnCollateral _ (Api.TxOut retCollAddrApi _ _ _)) <- case txBodyCollateralReturnOutput grabGiftsTxBody' of
+              Api.TxReturnCollateralNone -> fail "Return collateral is not present"
+              retCollOutput' -> return retCollOutput'
+        let totalCollateral = txBodyTotalCollateralLovelace grabGiftsTxBody'
+            retCollValue = txBodyCollateralReturnOutputValue grabGiftsTxBody'
+            retCollAddr = addressFromApi' retCollAddrApi
+        info $ printf "Return collateral: %s" (show retCollOutput)
         info $ printf "Total collateral: %s" (show totalCollateral)
-        assertBool "Return collateral does not exist" $ returnCollateralOutput /= Api.TxReturnCollateralNone
-        assertBool "Total collateral does not exist" $ totalCollateral /= 0
+        assertBool "Return collateral value is zero" $ retCollValue /= mempty
+        assertBool "Total collateral does not exist or value is not positive" $ totalCollateral > 0
+        assertBool "Return collateral at different address" $ retCollAddr == userAddr newUser
         pp <- gyGetProtocolParameters $ ctxProviders ctx
         let colls = txBodyCollateral grabGiftsTxBody'
         colls' <- ctxRunC ctx (ctxUserF ctx) $ utxosAtTxOutRefs (Set.toList colls)
-        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') (txBodyCollateralReturnOutputValue grabGiftsTxBody') (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
+        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
         void $ submitTx ctx newUser grabGiftsTxBody'
 
     , testCaseSteps "Checking Vasil feature of Collateral Return and Total Collateral - Multi-asset collateral" $ \info -> withSetup setup info $ \ctx -> do
@@ -196,16 +201,21 @@ tests setup = testGroup "gift"
         grabGiftsTxBody' <- case grabGiftsTxBody of
           Nothing   -> assertFailure "Unable to build tx"
           Just body -> return body
-        let returnCollateralOutputValue = txBodyCollateralReturnOutputValue grabGiftsTxBody'
-            totalCollateral = txBodyTotalCollateralLovelace grabGiftsTxBody'
-        info $ printf "Return collateral value: %s" (show returnCollateralOutputValue)
+        retCollOutput@(Api.TxReturnCollateral _ (Api.TxOut retCollAddrApi _ _ _)) <- case txBodyCollateralReturnOutput grabGiftsTxBody' of
+              Api.TxReturnCollateralNone -> fail "Return collateral is not present"
+              retCollOutput' -> return retCollOutput'
+        let totalCollateral = txBodyTotalCollateralLovelace grabGiftsTxBody'
+            retCollValue = txBodyCollateralReturnOutputValue grabGiftsTxBody'
+            retCollAddr = addressFromApi' retCollAddrApi
+        info $ printf "Return collateral: %s" (show retCollOutput)
         info $ printf "Total collateral: %s" (show totalCollateral)
-        assertBool "Return collateral does not exist" $ returnCollateralOutputValue /= mempty
-        assertBool "Total collateral does not exist" $ totalCollateral /= 0
+        assertBool "Return collateral value is zero" $  retCollValue /= mempty
+        assertBool "Total collateral does not exist or value is not positive" $ totalCollateral > 0
+        assertBool "Return collateral at different address" $ retCollAddr == userAddr newUser
         pp <- gyGetProtocolParameters $ ctxProviders ctx
         let colls = txBodyCollateral grabGiftsTxBody'
         colls' <- ctxRunC ctx (ctxUserF ctx) $ utxosAtTxOutRefs (Set.toList colls)
-        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') (txBodyCollateralReturnOutputValue grabGiftsTxBody') (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
+        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
         void $ submitTx ctx newUser grabGiftsTxBody'
 
     , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup setup info $ \ctx -> do

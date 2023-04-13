@@ -283,7 +283,7 @@ balanceTxStep
     isScriptWitness GYTxInWitnessKey      = False
     isScriptWitness GYTxInWitnessScript{} = True
 
--- Impossible to throw error. Would have been nice if `Cardano.Api` also exposed constructors of GADT `TxTotalAndReturnCollateralSupportedInEra era` (though it is done in later version, and thus can modify below line then). Now, even type of this `GADT` isn't exported, thus can't annotate type below.
+-- Impossible to throw error (with respect to `fromJust`), to avoid it, it would have been nice if `Cardano.Api` also exposed constructors of GADT `TxTotalAndReturnCollateralSupportedInEra era` (though it is done in later version, and thus can modify below line then). Now, even type of this GADT isn't exported, thus can't annotate type below.
 -- retColSup :: Api.TxTotalAndReturnCollateralSupportedInEra Api.BabbageEra
 retColSup = fromJust $ Api.totalAndReturnCollateralSupportedInEra Api.BabbageEra
 
@@ -403,7 +403,7 @@ finalizeGYBalancedTx
             | (Some p, r) <- xs
             ]
 
-    -- Putting `TxTotalCollateralNone` & `TxReturnCollateralNone` would have them appropriately calculated by `makeTransactionBodyAutoBalance` but then return collateral it generates is only for ada. To support multi-asset collateral input we therefore calculate correct values ourselves and put appropriate entries here to have `makeTransactionBodyAutoBalance` calculate appropriately overestimated fees.
+    -- Putting `TxTotalCollateralNone` & `TxReturnCollateralNone` would have them appropriately calculated by `makeTransactionBodyAutoBalance` but then return collateral it generates is only for ada. To support multi-asset collateral input we therefore calculate correct values ourselves and put appropriate entries here to have `makeTransactionBodyAutoBalance` calculate appropriate overestimated fees.
     (dummyTotCol :: Api.TxTotalCollateral Api.BabbageEra, dummyRetCol :: Api.TxReturnCollateral Api.CtxTx Api.BabbageEra) =
       if mempty == collaterals then
         (Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)
@@ -460,20 +460,20 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
         changeAddrApi :: Api.S.AddressInEra Api.S.BabbageEra = addressToApi' changeAddr
 
     -- First we obtain the calculated fees to correct for our collaterals.
-    Api.BalancedTxBody _ _ (Api.Lovelace feeOld) <- first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
-            Api.BabbageEraInCardanoMode
-            ss
-            eh
-            pp
-            ps
-            utxos
-            body
-            changeAddrApi
-            Nothing
+    bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ (Api.Lovelace feeOld)) <-
+      first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
+        Api.BabbageEraInCardanoMode
+        ss
+        eh
+        pp
+        ps
+        utxos
+        body
+        changeAddrApi
+        Nothing
 
-    -- We should call `makeTransactionBodyAutoBalance` again with updated values of collaterals so as to get slightly lower fees estimate.
-    -- Could have avoided another call to `makeTransactionBodyAutoBalance` in case `collaterals` is empty though.
-    bodyCorrectColl <- if collaterals == mempty then return body else
+    -- We should call `makeTransactionBodyAutoBalance` again with updated values of collaterals so as to get slightly lower fee estimate.
+    Api.BalancedTxBody txBody _ _ <- if collaterals == mempty then return bodyBeforeCollUpdate else
 
       let
 
@@ -492,18 +492,17 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
             )
           else Left $ BuildTxCollateralShortFall (fromInteger $ balanceNeeded - collateralTotalLovelace) -- In this case `makeTransactionBodyAutoBalance` doesn't return an error but instead returns `(Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)`
 
-        return body {Api.txTotalCollateral = txColl, Api.txReturnCollateral = collRet}
+        first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
+          Api.BabbageEraInCardanoMode
+          ss
+          eh
+          pp
+          ps
+          utxos
+          body {Api.txTotalCollateral = txColl, Api.txReturnCollateral = collRet}
+          changeAddrApi
+          Nothing
 
-    Api.BalancedTxBody txBody _ _ <- first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
-            Api.BabbageEraInCardanoMode
-            ss
-            eh
-            pp
-            ps
-            utxos
-            bodyCorrectColl
-            changeAddrApi
-            Nothing
     let Api.S.ShelleyTx _ ltx = Api.Tx txBody []
         -- This sums up the ExUnits for all embedded Plutus Scripts anywhere in the transaction:
         AlonzoScripts.ExUnits

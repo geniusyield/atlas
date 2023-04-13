@@ -608,11 +608,18 @@ grabGiftsRef ref validator = do
         | (oref, (_addr, _value, od)) <- itoList datums
         ]
 
-checkCollateral :: Integral a => GYValue -> GYValue -> Integer -> a -> a -> Bool
+-- | Function to check for consistency of collaterals with respect to ledger laws.
+checkCollateral :: Integral a
+                => GYValue  -- ^ Sum of values present in collateral inputs.
+                -> GYValue  -- ^ Value present in return collateral output.
+                -> Integer  -- ^ Total collateral lovelaces.
+                -> a        -- ^ Transaction fees.
+                -> a        -- ^ Collateral percent (Protocol parameter).
+                -> Bool
 checkCollateral inputValue returnValue totalCollateralLovelace txFee collPer =
      isEmptyValue balanceOther
   && balanceLovelace >= 0
   && totalCollateralLovelace == balanceLovelace
-  && balanceLovelace>= ceiling (txFee * collPer % 100)  -- Api checks via `balanceLovelace * 100 >= txFee * collPer` which IMO works here as `balanceLovelace` is an integer & 100. In general `c >= ceil (a / b)` does not translate into `c * b >= a`.
+  && balanceLovelace>= ceiling (txFee * collPer % 100)  -- Api checks via `balanceLovelace * 100 >= txFee * collPer` which IMO works as `balanceLovelace` is an integer & 100 but in general `c >= ceil (a / b)` is not equivalent to `c * b >= a`.
   && inputValue == returnValue <> valueFromLovelace totalCollateralLovelace
   where (balanceLovelace, balanceOther) = valueSplitAda $ inputValue `valueMinus` returnValue

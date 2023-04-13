@@ -112,6 +112,45 @@ jobs:
         echo "===========================[ RUN DOCSPEC ]==========================="
         ./cabal-docspec
         echo " ============================[ FINISHED ]============================"
+    - name: Run privnet tests
+      run: |
+        echo "===============[ CLONE PRIVNET REPO ]========================="
+        echo " -> Started at $(date --iso-8601=seconds --utc)."
+        git clone https://github.com/geniusyield/cardano-private-testnet-setup.git
+        cd cardano-private-testnet-setup
+        git checkout geniusyield
+        cd ..
+        TESTNET="./cardano-private-testnet-setup"
+        LOGFILE="./logs/privnet.log"
+        echo " TESTNET: $TESTNET"
+        echo " LOGFILE: $LOGFILE"
+        echo " CI RUN : ${CI:=false}"
+        echo "=============================================================="
+        echo " -> Starting private testnet..."
+        echo "========================[START PRIVNET]======================="
+        mkdir -p logs
+        touch $LOGFILE
+        ((cd $TESTNET && ./scripts/automate.sh) | tee $LOGFILE) &
+
+        until [[ $(tail -n 1 $LOGFILE) =~ "Congrats! Your network is ready for use!" ]]
+        do
+            sleep 5
+        done
+
+        echo "================================================================"
+        echo " [OK] Private testnet ready."
+        echo " -> Starting geniusyield-privnet-tests..."
+        echo "=====================[RUN PRIVNET TESTS]========================"
+        GENIUSYIELD_PRIVNET_DIR=$TESTNET/private-testnet cabal run atlas-privnet-tests
+        if [ "$CI" = false ]
+        then
+          echo "========================[KILL PRIVNET]=========================="
+          echo "[INFO] Local, Non-CI run -> Kill the private testnet."
+          trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT
+        fi
+        echo "============================[SUMMARY]==========================="
+        echo " [DONE] Executed: ($(date --iso-8601=seconds --utc))."
+        echo "================================================================"
     - name: Run checks (cabal)
       run: cabal check
     - name: Create source distribution file (cabal)

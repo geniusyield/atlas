@@ -37,6 +37,7 @@ import           Test.Tasty.HUnit                     (assertFailure)
 import qualified Cardano.Api                          as Api
 import           Control.Concurrent                   (threadDelay)
 import qualified Data.Map.Strict                      as Map
+import           Data.Maybe                           (fromJust)
 
 import           GeniusYield.Imports
 import           GeniusYield.Providers.CardanoDbSync
@@ -86,12 +87,13 @@ data Ctx = Ctx
 ctxUsers :: Ctx -> [User]
 ctxUsers ctx = ($ ctx) <$> [ctxUser2, ctxUser3, ctxUser4, ctxUser5, ctxUser6, ctxUser7, ctxUser8, ctxUser9]
 
--- | Creates a new user with the given balance. Note that we'll deduct 5 ada from the given fund as a collateral output.
+-- | Creates a new user with the given balance.
 newTempUserCtx:: Ctx
               -> User            -- ^ User which will fund this new user.
               -> GYValue         -- ^ Describes balance of new user.
+              -> Bool            -- ^ Create collateral output of 5 ada?
               -> IO User
-newTempUserCtx ctx fundUser fundValue = do
+newTempUserCtx ctx fundUser fundValue createCollateral = do
   newSKey <- generatePaymentSigningKey
   let newVKey = paymentVerificationKey newSKey
       newKeyHash = pubKeyHash newVKey
@@ -99,23 +101,27 @@ newTempUserCtx ctx fundUser fundValue = do
       (adaInValue, otherValue) = valueSplitAda fundValue
       collateralLovelace = 5_000_000
       collateralValue = valueFromLovelace collateralLovelace
+
   -- Our balancer would add minimum ada required for other utxo in case of equality
-  if adaInValue < collateralLovelace then fail "Given value for new user has less than 5 ada"
-  else do
-    txBody <- ctxRunI ctx fundUser $ return (
+  when (adaInValue < collateralLovelace) $ fail "Given value for new user has less than 5 ada"
+
+  txBody <- ctxRunI ctx fundUser $ return $
+    if createCollateral then
       mustHaveOutput (mkGYTxOutNoDatum newAddr (otherValue <> (valueFromLovelace adaInValue `valueMinus` collateralValue))) <>
       mustHaveOutput (mkGYTxOutNoDatum newAddr collateralValue)
-      )
-    void $ submitTx ctx fundUser txBody
-    -- wait a tiny bit.
-    threadDelay 1_000_000
-    utxos <- ctxRunC ctx fundUser $ utxosAtAddress newAddr
-    -- I have kept the following logic a bit general for now so that changes above don't affect the following logic.
-    let adaOnlyUtxos = utxosToList $ filterUTxOs (\GYUTxO {utxoValue} -> valueTotalAssets utxoValue == 1 && fst (valueSplitAda utxoValue) >= 5_000_000) utxos
-    if null adaOnlyUtxos then fail "New user doesn't have an ada only UTxO with value geq 5 ada"
     else
-      let _collateralUtxo@GYUTxO {utxoRef = collRef} = minimumBy (compare `on` (\GYUTxO {utxoValue} -> fst (valueSplitAda utxoValue))) adaOnlyUtxos
-      in return $ User {userSKey = newSKey, userAddr = newAddr, userColl = collRef}
+      mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
+
+  void $ submitTx ctx fundUser txBody
+  -- wait a tiny bit.
+  threadDelay 1_000_000
+
+  utxos <- ctxRunC ctx fundUser $ utxosAtAddress newAddr
+  if createCollateral then do
+    (collRef, _) <- ctxRunC ctx fundUser $ getCollateral newAddr (fromInteger collateralLovelace)
+    return $ User {userSKey = newSKey, userAddr = newAddr, userColl = collRef}
+
+  else return $ User {userSKey = newSKey, userAddr = newAddr, userColl = fst $ fromJust $ someTxOutRef utxos}
 
 ctxRunF :: forall t v. Traversable t => Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
 ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr userColl

@@ -290,3 +290,24 @@ test-suite atlas-tests
     , text
     , transformers
     , time
+
+test-suite atlas-privnet-tests
+  import:         common
+  type:           exitcode-stdio-1.0
+  ghc-options:    -threaded -rtsopts
+  hs-source-dirs: tests-privnet
+  main-is:        atlas-privnet-tests.hs
+  other-modules:
+
+  build-depends:
+    , base
+    , bytestring
+    , cardano-api            ==1.35.4
+    , cassava
+    , containers
+    , directory
+    , atlas
+    , random
+    , tasty
+    , tasty-hunit
+    , transformers

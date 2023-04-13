@@ -136,17 +136,47 @@ tests setup = testGroup "gift"
 
         ----------- Create a new user and fund it
         let ironAC = ctxIron ctx
-        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25)
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25) True
         ----------- (ctxUserF ctx) submits some gifts.
         txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
         void $ submitTx ctx (ctxUserF ctx) txBodyPlace
-        ---------- New user tries to grab it, since interacting with script, needs to give collateral
-
         -- wait a tiny bit.
         threadDelay 1_000_000
 
+        ---------- New user tries to grab it, since interacting with script, needs to give collateral
+        grabGiftsTxBody <- ctxRunF ctx newUser $ grabGifts  @'PlutusV1 giftValidatorV2
+        grabGiftsTxBody' <- case grabGiftsTxBody of
+          Nothing   -> assertFailure "Unable to build tx"
+          Just body -> return body
+        let returnCollateralOutput = txBodyCollateralReturnOutput grabGiftsTxBody'
+            totalCollateral = txBodyTotalCollateralLovelace grabGiftsTxBody'
+        info $ printf "Return collateral: %s" (show returnCollateralOutput)
+        info $ printf "Total collateral: %s" (show totalCollateral)
+        assertBool "Return collateral does not exist" $ returnCollateralOutput /= Api.TxReturnCollateralNone
+        assertBool "Total collateral does not exist" $ totalCollateral /= 0
+        void $ submitTx ctx newUser grabGiftsTxBody'
+
+    , testCaseSteps "Checking Vasil feature of Collateral Return and Total Collateral - Multi-asset collateral" $ \info -> withSetup setup info $ \ctx -> do
+        giftCleanup ctx
+
+        ----------- Create a new user and fund it
+        let ironAC = ctxIron ctx
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25) False
+        info $ printf "Newly created user's address %s & chosen collateral ref %s" (show $ userAddr newUser) (show $ userColl newUser)
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+        ----------- (ctxUserF ctx) submits some gifts plus give some other funds to new user so that we have a UTxO besides collateral.
+        txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
+            addr <- scriptAddress giftValidatorV2
+            return $ mustHaveOutput  (mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())) <> mustHaveOutput (mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 15_000_000))
+        void $ submitTx ctx (ctxUserF ctx) txBodyPlace
+        -- wait a tiny bit.
+        threadDelay 1_000_000
+
+        ---------- New user tries to grab it, since interacting with script, needs to give collateral
         grabGiftsTxBody <- ctxRunF ctx newUser $ grabGifts  @'PlutusV1 giftValidatorV2
         grabGiftsTxBody' <- case grabGiftsTxBody of
           Nothing   -> assertFailure "Unable to build tx"

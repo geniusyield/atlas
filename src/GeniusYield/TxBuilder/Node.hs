@@ -18,17 +18,18 @@ module GeniusYield.TxBuilder.Node (
     runGYTxMonadNodeChainingF,
 ) where
 
-import qualified Cardano.Api                  as Api
-import           Control.Monad.IO.Class       (MonadIO (..))
-import qualified Data.ByteString              as BS
-import qualified Data.List.NonEmpty           as NE
-import qualified Data.Set                     as Set
+import qualified Cardano.Api                     as Api
+import           Control.Monad.IO.Class          (MonadIO (..))
+import qualified Data.ByteString                 as BS
+import qualified Data.List.NonEmpty              as NE
+import qualified Data.Set                        as Set
 
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
+import           GeniusYield.TxBuilder.NodeQuery
 import           GeniusYield.Types
 
 -------------------------------------------------------------------------------
@@ -58,7 +59,7 @@ data GYTxNodeEnv = GYTxNodeEnv
     , envProviders     :: !GYProviders
     , envAddrs         :: ![GYAddress]
     , _envChangeAddr   :: !GYAddress
-    , envCollateral    :: !GYTxOutRef
+    , envCollateral    :: !(Maybe GYTxOutRef)  -- ^ If browser wallet sends it's reserved 5-ada-only UTxO then we put it here, otherwise, framework would pick suitable UTxO as collateral and in that case, it would also be free to spend it. For operations with backend wallet, this would be `Nothing` (ideally, shouldn't send collateral as framework can pick it) unless specifically sent a 5-ada-only UTxO.
     , envUsedSomeUTxOs :: !(Set GYTxOutRef)
     }
 
@@ -106,10 +107,10 @@ instance GYTxQueryMonad GYTxMonadNode where
 instance GYTxMonad GYTxMonadNode where
     someUTxO = do
         addrs         <- ownAddresses
-        collateral    <- getCollateral
+        mCollateral   <- getCollateral
         usedSomeUTxOs <- getUsedSomeUTxOs
         utxos         <- traverse utxosAtAddress addrs
-        case someTxOutRef $ utxosRemoveTxOutRefs (Set.insert collateral usedSomeUTxOs) (mconcat utxos) of
+        case someTxOutRef $ utxosRemoveTxOutRefs (maybe usedSomeUTxOs (`Set.insert` usedSomeUTxOs) mCollateral) (mconcat utxos) of
             Just (oref, _) -> return oref
             Nothing        ->  throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs
       where
@@ -136,7 +137,7 @@ runGYTxMonadNode
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> GYTxOutRef                           -- ^ collateral
+    -> Maybe GYTxOutRef                     -- ^ collateral
     -> GYTxMonadNode (GYTxSkeleton v)
     -> IO GYTxBody
 runGYTxMonadNode = coerce (runGYTxMonadNodeF @Identity GYLegacy)
@@ -146,7 +147,7 @@ runGYTxMonadNodeParallel
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> GYTxOutRef
+    -> Maybe GYTxOutRef
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
 runGYTxMonadNodeParallel = coerce (runGYTxMonadNodeParallelF @Identity GYLegacy)
@@ -156,7 +157,7 @@ runGYTxMonadNodeChaining
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> GYTxOutRef
+    -> Maybe GYTxOutRef
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
 runGYTxMonadNodeChaining = coerce (runGYTxMonadNodeChainingF @Identity GYLegacy)
@@ -166,7 +167,7 @@ runGYTxMonadNodeC
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> GYTxOutRef                           -- ^ collateral
+    -> Maybe GYTxOutRef                     -- ^ collateral
     -> GYTxMonadNode a
     -> IO a
 runGYTxMonadNodeC = coerce (runGYTxMonadNodeF @(Const a) GYLegacy)
@@ -186,7 +187,7 @@ runGYTxMonadNodeF
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> GYTxOutRef                           -- ^ collateral
+    -> Maybe GYTxOutRef                     -- ^ collateral
     -> GYTxMonadNode (f (GYTxSkeleton v))
     -> IO (f GYTxBody)
 runGYTxMonadNodeF cstrat nid providers addrs change collateral m = do
@@ -213,7 +214,7 @@ runGYTxMonadNodeParallelF
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> GYTxOutRef
+    -> Maybe GYTxOutRef
     -> GYTxMonadNode [f (GYTxSkeleton v)]
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeParallelF cstrat nid providers addrs change collateral m = do
@@ -233,7 +234,7 @@ runGYTxMonadNodeChainingF :: Traversable f
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> GYTxOutRef
+    -> Maybe GYTxOutRef
     -> GYTxMonadNode [f (GYTxSkeleton v)]
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeChainingF cstrat nid providers addrs change collateral m = do
@@ -266,7 +267,7 @@ runGYTxMonadNodeCore
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> GYTxOutRef
+    -> Maybe GYTxOutRef
     -> GYTxMonadNode [f (GYTxSkeleton v)]
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral action = do
@@ -277,12 +278,18 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
     pp          <- gyGetProtocolParameters providers
     ps          <- gyGetStakePools providers
 
-    e <- unGYTxMonadNode (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral action) GYTxNodeEnv
+    collateralUtxo <- maybe (return Nothing) (\collRef -> Just <$> runGYTxQueryMonadNode nid providers (utxoAtTxOutRef' collRef)) collateral
+
+    -- We mainly need to reserve 5-ada-only UTxO created by browser wallet.
+    let collateral' =
+          (\collUtxo -> if utxoValue collUtxo == valueFromLovelace 5_000_000 then collateral else Nothing) =<< collateralUtxo
+
+    e <- unGYTxMonadNode (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral' action) GYTxNodeEnv
             { envNid           = nid
             , envProviders     = providers
             , envAddrs         = addrs
             ,_envChangeAddr    = change
-            , envCollateral    = collateral
+            , envCollateral    = collateral'
             , envUsedSomeUTxOs = mempty
             }
     case e of

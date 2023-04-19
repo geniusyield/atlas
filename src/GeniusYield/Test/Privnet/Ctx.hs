@@ -124,7 +124,7 @@ newTempUserCtx ctx fundUser fundValue createCollateral = do
   else return $ User {userSKey = newSKey, userAddr = newAddr, userColl = fst $ fromJust $ someTxOutRef utxos}
 
 ctxRunF :: forall t v. Traversable t => Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
-ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr userColl
+ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr (Just userColl)
 
 ctxRunC :: forall a. Ctx -> User -> GYTxMonadNode a -> IO a
 ctxRunC = coerce (ctxRunF @(Const a))

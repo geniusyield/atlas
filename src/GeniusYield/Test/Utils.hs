@@ -174,48 +174,28 @@ newWallet n v = do
     mkp  <- lift $ getUserSignKey pkh
     case mkp of
         Nothing -> fail $ "error creating user with pubkey hash " <> show pkh
-        Just kp -> do
-            let w =  Wallet
+        Just kp -> return $
+                       Wallet
                         { walletPaymentSigningKey = paymentSigningKeyFromLedgerKeyPair kp
                         , walletNetworkId         = nid
                         , walletName              = n
                         }
-            void $ prepareCollateral w
-            return w
 
 -- | Runs a `GYTxMonadRun` action using the given wallet.
 runWallet :: Wallet -> GYTxMonadRun a -> Run (Maybe a)
-runWallet w@Wallet{..} action = flip evalRandT pureGen $ do
-    m <- asRandRun walletPaymentSigningKey Nothing $ fmap fst <$> getCollateral' (walletAddress w) minCollateralLovelace
-    case m of
-        Nothing          -> return Nothing
-        Just mcollateral -> asRandRun walletPaymentSigningKey mcollateral action
+runWallet Wallet{..} action = flip evalRandT pureGen $ asRandRun walletPaymentSigningKey action
 
 -- | Version of `runWallet` that fails if `Nothing` is returned by the action.
 runWallet' :: Wallet -> GYTxMonadRun a -> Run a
 runWallet' w action = do
     ma <- runWallet w action
     case ma of
-        Nothing  -> fail $ printf "Run wallet action returned Nothing"
-        Just a -> return a
+        Nothing -> fail $ printf "Run wallet action returned Nothing"
+        Just a  -> return a
 
 -- | Gets a GYPubKeyHash of a testing wallet.
 walletPubKeyHash :: Wallet -> GYPubKeyHash
 walletPubKeyHash = fromJust . addressToPubKeyHash . walletAddress
-
-minCollateralLovelace :: Natural
-minCollateralLovelace = 5_000_000
-
-prepareCollateral :: Wallet -> RandT StdGen Run (Maybe GYTxOutRef)
-prepareCollateral w@Wallet{..} = asRandRun walletPaymentSigningKey Nothing $ do
-    let pkh  = pubKeyHashToPlutus $ walletPubKeyHash w
-        v    = valueFromLovelace $ toInteger minCollateralLovelace
-        addr = walletAddress w
-    liftRun $ sendValue pkh (valueToPlutus v) pkh
-    utxos <- utxosAtAddress addr
-    case find (\GYUTxO{..} -> utxoValue == v) $ utxosToList utxos of
-        Nothing         -> fail $ "unable to prepare collateral for wallet " <> show w
-        Just GYUTxO{..} -> return utxoRef
 
 {- | Gets the balance from anything that `HasAddress`. The usual case will be a
      testing wallet.

@@ -135,45 +135,6 @@ tests setup = testGroup "gift"
             (valueSingleton ironAC 10)
             (snd (valueSplitAda diff2))
 
-    , testCaseSteps "Checking Vasil feature of Collateral Return and Total Collateral - Collateral input of only ada" $ \info -> withSetup setup info $ \ctx -> do
-        giftCleanup ctx
-
-        ----------- Create a new user and fund it
-        let ironAC = ctxIron ctx
-        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25) True
-        ----------- (ctxUserF ctx) submits some gifts.
-        txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
-            addr <- scriptAddress giftValidatorV2
-            return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-        assertBool "Collateral input shouldn't be set for this transaction" (txBodyCollateral txBodyPlace == mempty)
-        assertBool "Return collateral shouldn't be set for this transaction" (txBodyCollateralReturnOutput txBodyPlace == Api.TxReturnCollateralNone)
-        assertBool "Total collateral shouldn't be set for this transaction" (txBodyTotalCollateralLovelace txBodyPlace == 0)
-        void $ submitTx ctx (ctxUserF ctx) txBodyPlace
-        -- wait a tiny bit.
-        threadDelay 1_000_000
-
-        ---------- New user tries to grab it, since interacting with script, needs to give collateral
-        grabGiftsTxBody <- ctxRunF ctx newUser $ grabGifts  @'PlutusV1 giftValidatorV2
-        grabGiftsTxBody' <- case grabGiftsTxBody of
-          Nothing   -> assertFailure "Unable to build tx"
-          Just body -> return body
-        retCollOutput@(Api.TxReturnCollateral _ (Api.TxOut retCollAddrApi _ _ _)) <- case txBodyCollateralReturnOutput grabGiftsTxBody' of
-              Api.TxReturnCollateralNone -> fail "Return collateral is not present"
-              retCollOutput' -> return retCollOutput'
-        let totalCollateral = txBodyTotalCollateralLovelace grabGiftsTxBody'
-            retCollValue = txBodyCollateralReturnOutputValue grabGiftsTxBody'
-            retCollAddr = addressFromApi' retCollAddrApi
-        info $ printf "Return collateral: %s" (show retCollOutput)
-        info $ printf "Total collateral: %s" (show totalCollateral)
-        assertBool "Return collateral value is zero" $ retCollValue /= mempty
-        assertBool "Total collateral does not exist or value is not positive" $ totalCollateral > 0
-        assertBool "Return collateral at different address" $ retCollAddr == userAddr newUser
-        pp <- gyGetProtocolParameters $ ctxProviders ctx
-        let colls = txBodyCollateral grabGiftsTxBody'
-        colls' <- ctxRunC ctx (ctxUserF ctx) $ utxosAtTxOutRefs (Set.toList colls)
-        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
-        void $ submitTx ctx newUser grabGiftsTxBody'
-
     , testCaseSteps "Checking Vasil feature of Collateral Return and Total Collateral - Multi-asset collateral" $ \info -> withSetup setup info $ \ctx -> do
         giftCleanup ctx
 

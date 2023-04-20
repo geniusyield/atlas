@@ -9,6 +9,7 @@ Stability   : develop
 module GeniusYield.Test.Privnet.Examples.Gift (tests) where
 
 import qualified Cardano.Api                      as Api
+import qualified Cardano.Api.Shelley              as Api.S
 import           Control.Applicative              ((<|>))
 import           Control.Concurrent               (threadDelay)
 import           Control.Lens                     ((&), (.~))
@@ -16,6 +17,9 @@ import           Test.Tasty                       (TestTree, testGroup)
 import           Test.Tasty.HUnit                 (testCaseSteps)
 
 import qualified Data.Map.Strict                  as Map
+import           Data.Maybe                       (fromJust)
+import           Data.Ratio                       ((%))
+import qualified Data.Set                         as Set
 import           GeniusYield.Imports
 import           GeniusYield.Types
 
@@ -136,27 +140,82 @@ tests setup = testGroup "gift"
 
         ----------- Create a new user and fund it
         let ironAC = ctxIron ctx
-        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25)
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25) True
         ----------- (ctxUserF ctx) submits some gifts.
         txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV2
             return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
+        assertBool "Collateral input shouldn't be set for this transaction" (txBodyCollateral txBodyPlace == mempty)
+        assertBool "Return collateral shouldn't be set for this transaction" (txBodyCollateralReturnOutput txBodyPlace == Api.TxReturnCollateralNone)
+        assertBool "Total collateral shouldn't be set for this transaction" (txBodyTotalCollateralLovelace txBodyPlace == 0)
         void $ submitTx ctx (ctxUserF ctx) txBodyPlace
-        ---------- New user tries to grab it, since interacting with script, needs to give collateral
-
         -- wait a tiny bit.
         threadDelay 1_000_000
 
+        ---------- New user tries to grab it, since interacting with script, needs to give collateral
         grabGiftsTxBody <- ctxRunF ctx newUser $ grabGifts  @'PlutusV1 giftValidatorV2
         grabGiftsTxBody' <- case grabGiftsTxBody of
           Nothing   -> assertFailure "Unable to build tx"
           Just body -> return body
-        let returnCollateralOutput = txBodyCollateralReturnOutput grabGiftsTxBody'
-            totalCollateral = txBodyTotalCollateralLovelace grabGiftsTxBody'
-        info $ printf "Return collateral: %s" (show returnCollateralOutput)
+        retCollOutput@(Api.TxReturnCollateral _ (Api.TxOut retCollAddrApi _ _ _)) <- case txBodyCollateralReturnOutput grabGiftsTxBody' of
+              Api.TxReturnCollateralNone -> fail "Return collateral is not present"
+              retCollOutput' -> return retCollOutput'
+        let totalCollateral = txBodyTotalCollateralLovelace grabGiftsTxBody'
+            retCollValue = txBodyCollateralReturnOutputValue grabGiftsTxBody'
+            retCollAddr = addressFromApi' retCollAddrApi
+        info $ printf "Return collateral: %s" (show retCollOutput)
         info $ printf "Total collateral: %s" (show totalCollateral)
-        assertBool "Return collateral does not exist" $ returnCollateralOutput /= Api.TxReturnCollateralNone
-        assertBool "Total collateral does not exist" $ totalCollateral /= 0
+        assertBool "Return collateral value is zero" $ retCollValue /= mempty
+        assertBool "Total collateral does not exist or value is not positive" $ totalCollateral > 0
+        assertBool "Return collateral at different address" $ retCollAddr == userAddr newUser
+        pp <- gyGetProtocolParameters $ ctxProviders ctx
+        let colls = txBodyCollateral grabGiftsTxBody'
+        colls' <- ctxRunC ctx (ctxUserF ctx) $ utxosAtTxOutRefs (Set.toList colls)
+        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
+        void $ submitTx ctx newUser grabGiftsTxBody'
+
+    , testCaseSteps "Checking Vasil feature of Collateral Return and Total Collateral - Multi-asset collateral" $ \info -> withSetup setup info $ \ctx -> do
+        giftCleanup ctx
+
+        ----------- Create a new user and fund it
+        let ironAC = ctxIron ctx
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25) False
+        info $ printf "Newly created user's address %s & chosen collateral ref %s" (show $ userAddr newUser) (show $ userColl newUser)
+        ----------- (ctxUserF ctx) submits some gifts plus give some other funds to new user so that we have a UTxO besides collateral.
+        txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
+            addr <- scriptAddress giftValidatorV2
+            return $ mustHaveOutput  (mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())) <> mustHaveOutput (mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 15_000_000))
+        assertBool "Collateral input shouldn't be set for this transaction" (txBodyCollateral txBodyPlace == mempty)
+        assertBool "Return collateral shouldn't be set for this transaction" (txBodyCollateralReturnOutput txBodyPlace == Api.TxReturnCollateralNone)
+        assertBool "Total collateral shouldn't be set for this transaction" (txBodyTotalCollateralLovelace txBodyPlace == 0)
+        void $ submitTx ctx (ctxUserF ctx) txBodyPlace
+        -- wait a tiny bit.
+        threadDelay 1_000_000
+
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+
+        ---------- New user tries to grab it, since interacting with script, needs to give collateral
+        grabGiftsTxBody <- ctxRunF ctx newUser $ grabGifts  @'PlutusV1 giftValidatorV2
+        grabGiftsTxBody' <- case grabGiftsTxBody of
+          Nothing   -> assertFailure "Unable to build tx"
+          Just body -> return body
+        retCollOutput@(Api.TxReturnCollateral _ (Api.TxOut retCollAddrApi _ _ _)) <- case txBodyCollateralReturnOutput grabGiftsTxBody' of
+              Api.TxReturnCollateralNone -> fail "Return collateral is not present"
+              retCollOutput' -> return retCollOutput'
+        let totalCollateral = txBodyTotalCollateralLovelace grabGiftsTxBody'
+            retCollValue = txBodyCollateralReturnOutputValue grabGiftsTxBody'
+            retCollAddr = addressFromApi' retCollAddrApi
+        info $ printf "Return collateral: %s" (show retCollOutput)
+        info $ printf "Total collateral: %s" (show totalCollateral)
+        assertBool "Return collateral value is zero" $  retCollValue /= mempty
+        assertBool "Total collateral does not exist or value is not positive" $ totalCollateral > 0
+        assertBool "Return collateral at different address" $ retCollAddr == userAddr newUser
+        pp <- gyGetProtocolParameters $ ctxProviders ctx
+        let colls = txBodyCollateral grabGiftsTxBody'
+        colls' <- ctxRunC ctx (ctxUserF ctx) $ utxosAtTxOutRefs (Set.toList colls)
+        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
         void $ submitTx ctx newUser grabGiftsTxBody'
 
     , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup setup info $ \ctx -> do
@@ -558,3 +617,19 @@ grabGiftsRef ref validator = do
             }
         | (oref, (_addr, _value, od)) <- itoList datums
         ]
+
+-- | Function to check for consistency of collaterals with respect to ledger laws.
+checkCollateral :: Integral a
+                => GYValue  -- ^ Sum of values present in collateral inputs.
+                -> GYValue  -- ^ Value present in return collateral output.
+                -> Integer  -- ^ Total collateral lovelaces.
+                -> a        -- ^ Transaction fees.
+                -> a        -- ^ Collateral percent (Protocol parameter).
+                -> Bool
+checkCollateral inputValue returnValue totalCollateralLovelace txFee collPer =
+     isEmptyValue balanceOther
+  && balanceLovelace >= 0
+  && totalCollateralLovelace == balanceLovelace
+  && balanceLovelace>= ceiling (txFee * collPer % 100)  -- Api checks via `balanceLovelace * 100 >= txFee * collPer` which IMO works as `balanceLovelace` is an integer & 100 but in general `c >= ceil (a / b)` is not equivalent to `c * b >= a`.
+  && inputValue == returnValue <> valueFromLovelace totalCollateralLovelace
+  where (balanceLovelace, balanceOther) = valueSplitAda $ inputValue `valueMinus` returnValue

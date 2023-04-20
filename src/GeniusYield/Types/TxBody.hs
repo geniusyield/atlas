@@ -28,6 +28,7 @@ module GeniusYield.Types.TxBody (
     txBodyValidityRange,
     txBodyCollateral,
     txBodyCollateralReturnOutput,
+    txBodyCollateralReturnOutputValue,
     txBodyTotalCollateralLovelace,
     getTxBody,
 ) where
@@ -135,7 +136,7 @@ txBodyCollateral body = case Api.txInsCollateral $ txBodyToApiTxBodyContent body
     Api.TxInsCollateralNone  -> Set.empty
     Api.TxInsCollateral _ xs -> Set.fromList $ txOutRefFromApi <$> xs
 
--- | Returns the lovelace sum of all collateral used in the given 'GYTxBody'.
+-- | Returns the total collateral for the given transaction body.
 txBodyTotalCollateralLovelace :: GYTxBody -> Natural
 txBodyTotalCollateralLovelace body = case Api.txTotalCollateral $ txBodyToApiTxBodyContent body of
     Api.TxTotalCollateralNone -> 0
@@ -145,3 +146,9 @@ txBodyTotalCollateralLovelace body = case Api.txTotalCollateral $ txBodyToApiTxB
 
 txBodyCollateralReturnOutput :: GYTxBody -> Api.TxReturnCollateral Api.CtxTx Api.BabbageEra
 txBodyCollateralReturnOutput body = Api.txReturnCollateral $ txBodyToApiTxBodyContent body
+
+txBodyCollateralReturnOutputValue :: GYTxBody -> GYValue
+txBodyCollateralReturnOutputValue body =
+  case Api.txReturnCollateral $ txBodyToApiTxBodyContent body of
+    Api.TxReturnCollateralNone                   -> mempty
+    Api.TxReturnCollateral _ (Api.TxOut _ v _ _) -> valueFromApi $ Api.txOutValueToValue v

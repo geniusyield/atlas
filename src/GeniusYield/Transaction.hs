@@ -17,7 +17,7 @@ Inputs:
 Additionally:
 
     * Set of additional UTxOs which can be spent
-    * Collateral UTxO which shouldn't be spent
+    * Collateral UTxO which shouldn't be spent - TODO: Improve wording here after complete setup of not requiring reserved collateral.
     * Change address
 
 The algorithm should produce sets of inputs and outputs
@@ -50,8 +50,6 @@ i.e. transaction mints tokens or consumes script outputs.
 
 See 'Api.evaluateTransactionBalance' and 'Api.makeTransactionBodyAutoBalance'
 (this function balances ADA only and doesn't add inputs, i.e. it calculates the ADA change).
-This also means that currently, it is unable to put non-ada tokens as return
-collateral output, so as of now we only support ada only collateral utxo.
 
 -}
 module GeniusYield.Transaction (
@@ -72,9 +70,11 @@ import           Control.Monad.Trans.Except            (runExceptT, throwE)
 import           Data.Foldable                         (for_)
 import           Data.List                             (nub)
 import qualified Data.Map                              as Map
+import           Data.Ratio                            ((%))
 import           GHC.Records                           (getField)
 
 import           Data.Either.Combinators               (maybeToRight)
+import           Data.Maybe                            (fromJust)
 
 import qualified Cardano.Api                           as Api
 import qualified Cardano.Api.Shelley                   as Api.S
@@ -82,12 +82,12 @@ import qualified Cardano.Ledger.Alonzo.Scripts         as AlonzoScripts
 import qualified Cardano.Ledger.Alonzo.Tx              as AlonzoTx
 import           Cardano.Slotting.Time                 (SystemStart)
 
+import           Control.Monad.Random
 import           GeniusYield.HTTP.Errors               (IsGYApiError)
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.CoinSelection
 import           GeniusYield.Transaction.Common
 import           GeniusYield.Types
-import Control.Monad.Random
 
 -- | A container for various network parameters, and user wallet information, used by balancer.
 data GYBuildTxEnv = GYBuildTxEnv
@@ -121,6 +121,8 @@ data BuildTxException
     -- ^ Execution units required is higher than the maximum as specified by protocol params.
     | BuildTxSizeTooBig
     -- ^ Transaction size is higher than the maximum as specified by protocol params.
+    | BuildTxCollateralShortFall !Natural
+    -- ^ Lovelaces shortfall (in collateral inputs) for collateral requirement.
   deriving stock    Show
   deriving anyclass (Exception, IsGYApiError)
 
@@ -281,6 +283,10 @@ balanceTxStep
     isScriptWitness GYTxInWitnessKey      = False
     isScriptWitness GYTxInWitnessScript{} = True
 
+-- Impossible to throw error (with respect to `fromJust`), to avoid it, it would have been nice if `Cardano.Api` also exposed constructors of GADT `TxTotalAndReturnCollateralSupportedInEra era` (though it is done in later version, and thus can modify below line then). Now, even type of this GADT isn't exported, thus can't annotate type below.
+-- retColSup :: Api.TxTotalAndReturnCollateralSupportedInEra Api.BabbageEra
+retColSup = fromJust $ Api.totalAndReturnCollateralSupportedInEra Api.BabbageEra
+
 finalizeGYBalancedTx :: GYBuildTxEnv -> Bool -> GYBalancedTx v -> Either BuildTxException GYTxBody
 finalizeGYBalancedTx
     GYBuildTxEnv
@@ -302,13 +308,14 @@ finalizeGYBalancedTx
         , gybtxRefIns        = utxosRefInputs
         }
     = makeTransactionBodyAutoBalanceWrapper
+        collaterals
         ss
         eh
         pp
         ps
         (utxosToApi utxos)
         body
-        (addressToApi' changeAddr)
+        changeAddr
   where
 
     -- reference scripts
@@ -396,15 +403,29 @@ finalizeGYBalancedTx
             | (Some p, r) <- xs
             ]
 
+    -- Putting `TxTotalCollateralNone` & `TxReturnCollateralNone` would have them appropriately calculated by `makeTransactionBodyAutoBalance` but then return collateral it generates is only for ada. To support multi-asset collateral input we therefore calculate correct values ourselves and put appropriate entries here to have `makeTransactionBodyAutoBalance` calculate appropriate overestimated fees.
+    (dummyTotCol :: Api.TxTotalCollateral Api.BabbageEra, dummyRetCol :: Api.TxReturnCollateral Api.CtxTx Api.BabbageEra) =
+      if mempty == collaterals then
+        (Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)
+      else
+        (
+        -- Total collateral must be <= lovelaces available in collateral inputs.
+          Api.TxTotalCollateral retColSup (Api.Lovelace $ fst $ valueSplitAda collateralTotalValue)
+        -- Return collateral must be <= what is in collateral inputs.
+        , Api.TxReturnCollateral retColSup $ txOutToApi True $ GYTxOut changeAddr collateralTotalValue Nothing Nothing
+        )
+      where
+        collateralTotalValue :: GYValue
+        collateralTotalValue = foldMapUTxOs utxoValue collaterals
+
     body :: Api.TxBodyContent Api.BuildTx Api.BabbageEra
     body = Api.TxBodyContent
         ins'
         collaterals'
         inRefs
         outs'
-        -- Following two will be added appropriately by 'makeTransactionBodyAutoBalance'.
-        Api.TxTotalCollateralNone
-        Api.TxReturnCollateralNone
+        dummyTotCol
+        dummyRetCol
         fee
         (lb', ub')
         Api.TxMetadataNone
@@ -421,30 +442,67 @@ finalizeGYBalancedTx
 
 If not checked, the returned txbody may fail during submission.
 -}
-makeTransactionBodyAutoBalanceWrapper :: SystemStart
+makeTransactionBodyAutoBalanceWrapper :: GYUTxOs
+                                      -> SystemStart
                                       -> Api.S.EraHistory Api.S.CardanoMode
                                       -> Api.S.ProtocolParameters
                                       -> Set Api.S.PoolId
                                       -> Api.S.UTxO Api.S.BabbageEra
                                       -> Api.S.TxBodyContent Api.S.BuildTx Api.S.BabbageEra
-                                      -> Api.S.AddressInEra Api.S.BabbageEra
+                                      -> GYAddress
                                       -> Either BuildTxException GYTxBody
-makeTransactionBodyAutoBalanceWrapper ss eh pp ps utxos body changeAddr = do
+makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeAddr = do
     Api.ExecutionUnits
         { executionSteps  = maxSteps
         , executionMemory = maxMemory
         } <- maybeToRight BuildTxMissingMaxExUnitsParam $ Api.S.protocolParamMaxTxExUnits pp
     let maxTxSize = Api.S.protocolParamMaxTxSize pp
-    Api.BalancedTxBody txBody _ _ <- first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
-            Api.BabbageEraInCardanoMode
-            ss
-            eh
-            pp
-            ps
-            utxos
-            body
-            changeAddr
-            Nothing
+        changeAddrApi :: Api.S.AddressInEra Api.S.BabbageEra = addressToApi' changeAddr
+
+    -- First we obtain the calculated fees to correct for our collaterals.
+    bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ (Api.Lovelace feeOld)) <-
+      first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
+        Api.BabbageEraInCardanoMode
+        ss
+        eh
+        pp
+        ps
+        utxos
+        body
+        changeAddrApi
+        Nothing
+
+    -- We should call `makeTransactionBodyAutoBalance` again with updated values of collaterals so as to get slightly lower fee estimate.
+    Api.BalancedTxBody txBody _ _ <- if collaterals == mempty then return bodyBeforeCollUpdate else
+
+      let
+
+        collateralTotalValue :: GYValue = foldMapUTxOs utxoValue collaterals
+        collateralTotalLovelace :: Integer = fst $ valueSplitAda collateralTotalValue
+        balanceNeeded :: Integer = ceiling $ (feeOld * toInteger (fromJust $ Api.S.protocolParamCollateralPercent pp)) % 100
+
+      in do
+
+        (txColl, collRet) <-
+          if collateralTotalLovelace >= balanceNeeded then return
+            (
+              Api.TxTotalCollateral retColSup (Api.Lovelace balanceNeeded)
+            , Api.TxReturnCollateral retColSup $ txOutToApi True $ GYTxOut changeAddr (collateralTotalValue `valueMinus` valueFromLovelace balanceNeeded) Nothing Nothing
+
+            )
+          else Left $ BuildTxCollateralShortFall (fromInteger $ balanceNeeded - collateralTotalLovelace) -- In this case `makeTransactionBodyAutoBalance` doesn't return an error but instead returns `(Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)`
+
+        first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
+          Api.BabbageEraInCardanoMode
+          ss
+          eh
+          pp
+          ps
+          utxos
+          body {Api.txTotalCollateral = txColl, Api.txReturnCollateral = collRet}
+          changeAddrApi
+          Nothing
+
     let Api.S.ShelleyTx _ ltx = Api.Tx txBody []
         -- This sums up the ExUnits for all embedded Plutus Scripts anywhere in the transaction:
         AlonzoScripts.ExUnits

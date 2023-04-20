@@ -47,6 +47,8 @@ tests setup = testGroup "treat"
         grabTreatsTx <- ctxRunF ctx (ctxUserF ctx) $ grabTreats  @'PlutusV2 treatValidatorV2
         mapM_ (submitTx ctx (ctxUserF ctx)) grabTreatsTx
 
+        threadDelay 1_000_000
+
         balance1 <- ctxQueryBalance ctx (ctxUserF ctx)
         balance2 <- ctxQueryBalance ctx (ctxUser2 ctx)
 
@@ -61,6 +63,9 @@ tests setup = testGroup "treat"
 
         grabTreatsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabTreats  @'PlutusV2 treatValidatorV2
         mapM_ (submitTx ctx (ctxUser2 ctx)) grabTreatsTx'
+
+        -- wait a tiny bit.
+        threadDelay 1_000_000
 
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
         balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)

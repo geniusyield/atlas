@@ -210,6 +210,16 @@ tests setup = testGroup "gift"
         -- Would throw error if unable to build body.
         void $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
+    , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        let newUserValue = valueFromLovelace 4_000_000
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
+
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+        assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 2_000_000)
+
     , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup setup info $ \ctx -> do
         giftCleanup ctx
 

@@ -86,7 +86,7 @@ data Ctx = Ctx
 ctxUsers :: Ctx -> [User]
 ctxUsers ctx = ($ ctx) <$> [ctxUser2, ctxUser3, ctxUser4, ctxUser5, ctxUser6, ctxUser7, ctxUser8, ctxUser9]
 
--- | Creates a new user with the given balance.
+-- | Creates a new user with the given balance. Note that the actual balance which this user get's could be more than what is provided to satisfy minimum ada requirement of a UTxO.
 newTempUserCtx:: Ctx
               -> User            -- ^ User which will fund this new user.
               -> GYValue         -- ^ Describes balance of new user.
@@ -101,9 +101,9 @@ newTempUserCtx ctx fundUser fundValue createCollateral = do
       collateralLovelace = 5_000_000
       collateralValue = valueFromLovelace collateralLovelace
 
-  -- We want this new user to have at least 5 ada.
+  -- We want this new user to have at least 5 ada if we want to create collateral.
   -- Our balancer would add minimum ada required for other utxo in case of equality
-  when (adaInValue < collateralLovelace) $ fail "Given value for new user has less than 5 ada"
+  when (createCollateral && adaInValue < collateralLovelace) $ fail "Given value for new user has less than 5 ada"
 
   txBody <- ctxRunI ctx fundUser $ return $
     if createCollateral then

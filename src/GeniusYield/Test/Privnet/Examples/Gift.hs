@@ -179,12 +179,13 @@ tests setup = testGroup "gift"
 
         ----------- Create a new user and fund it
         let ironAC = ctxIron ctx
+        -- `newUser` just have one UTxO which will be used as collateral.
         newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25) False
-        info $ printf "Newly created user's address %s & chosen collateral ref %s" (show $ userAddr newUser) (show $ userColl newUser)
-        ----------- (ctxUserF ctx) submits some gifts plus give some other funds to new user so that we have a UTxO besides collateral.
+        info $ printf "Newly created user's address %s" (show $ userAddr newUser)
+        ----------- (ctxUserF ctx) submits some gifts
         txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV2
-            return $ mustHaveOutput  (mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())) <> mustHaveOutput (mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 15_000_000))
+            return $ mustHaveOutput  (mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ()))
         assertBool "Collateral input shouldn't be set for this transaction" (txBodyCollateral txBodyPlace == mempty)
         assertBool "Return collateral shouldn't be set for this transaction" (txBodyCollateralReturnOutput txBodyPlace == Api.TxReturnCollateralNone)
         assertBool "Total collateral shouldn't be set for this transaction" (txBodyTotalCollateralLovelace txBodyPlace == 0)

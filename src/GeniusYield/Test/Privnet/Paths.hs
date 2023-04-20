@@ -33,7 +33,6 @@ data Paths = Paths
 data UserPaths = UserPaths
     { pathUserAddr :: !FilePath
     , pathUserSKey :: !FilePath
-    , pathUserColl :: !FilePath
     }
   deriving Show
 
@@ -52,14 +51,12 @@ mkPaths privnetPath = Paths
     , pathUserF  = UserPaths
         { pathUserAddr = pathGY </> "userF.addr"
         , pathUserSKey = pathGY </> "userF.skey"
-        , pathUserColl = pathGY </> "userF.collateral"
         }
     , pathUsers =
         fmap
           (\i -> UserPaths {
             pathUserAddr = pathGY </> printf "user%s.addr" (show i)
           , pathUserSKey = pathGY </> printf "user%s.skey" (show i)
-          , pathUserColl = pathGY </> printf "user%s.collateral" (show i)
           })
           (V.fromList [2 :: Integer .. 9])
     }

@@ -256,7 +256,6 @@ test-suite atlas-tests
   ghc-options:      -fexpose-all-unfoldings -fobject-code -fplugin-opt PlutusTx.Plugin:defer-errors
   other-modules:
     GeniusYield.Test.CoinSelection
-    GeniusYield.Test.Collateral
     GeniusYield.Test.SlotConfig
     GeniusYield.Test.Providers
     GeniusYield.Test.Config

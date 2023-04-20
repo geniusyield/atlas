@@ -18,6 +18,7 @@ module GeniusYield.Test.Privnet.Ctx (
     ctxRunI,
     ctxRunC,
     ctxRunF,
+    ctxRunFWithCollateral,
     ctxCurrentSlot,
     ctxWaitNextSlot,
     ctxWaitUntilSlot,
@@ -116,6 +117,10 @@ newTempUserCtx ctx fundUser fundValue createCollateral = do
 
 ctxRunF :: forall t v. Traversable t => Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
 ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr Nothing
+
+-- | Variant of `ctxRunF` where caller can also give the 5-ada-only UTxO to be used as collateral to perform tests related to collateral behaviour for the browser wallet case. Note that this `GYTxOutRef` should be spendable by `User` and must be 5-ada-only as for any other value, it get's ignored.
+ctxRunFWithCollateral :: forall t v. Traversable t => Ctx -> User -> GYTxOutRef -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
+ctxRunFWithCollateral ctx User {..} coll =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr (Just coll)
 
 ctxRunC :: forall a. Ctx -> User -> GYTxMonadNode a -> IO a
 ctxRunC = coerce (ctxRunF @(Const a))

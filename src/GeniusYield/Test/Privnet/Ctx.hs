@@ -46,6 +46,7 @@ import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
+import           Control.Concurrent                   (threadDelay)
 import qualified GeniusYield.Examples.Limbo           as Limbo
 
 data User = User
@@ -100,7 +101,7 @@ newTempUserCtx ctx fundUser fundValue createCollateral = do
       collateralLovelace = 5_000_000
       collateralValue = valueFromLovelace collateralLovelace
 
-  -- We want this new user to atleast have 5 ada.
+  -- We want this new user to have at least 5 ada.
   -- Our balancer would add minimum ada required for other utxo in case of equality
   when (adaInValue < collateralLovelace) $ fail "Given value for new user has less than 5 ada"
 
@@ -112,6 +113,7 @@ newTempUserCtx ctx fundUser fundValue createCollateral = do
       mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
 
   void $ submitTx ctx fundUser txBody
+  threadDelay 1_000_000
   return $ User {userSKey = newSKey, userAddr = newAddr}
 
 

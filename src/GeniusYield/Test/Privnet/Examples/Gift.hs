@@ -6,6 +6,9 @@ Maintainer  : support@geniusyield.co
 Stability   : develop
 
 -}
+
+{-# LANGUAGE LambdaCase #-}
+
 module GeniusYield.Test.Privnet.Examples.Gift (tests) where
 
 import qualified Cardano.Api                      as Api
@@ -21,6 +24,7 @@ import           Data.Maybe                       (fromJust)
 import           Data.Ratio                       ((%))
 import qualified Data.Set                         as Set
 import           GeniusYield.Imports
+import           GeniusYield.Transaction
 import           GeniusYield.Types
 
 import           GeniusYield.Examples.Gift
@@ -179,6 +183,20 @@ tests setup = testGroup "gift"
         colls' <- ctxRunC ctx (ctxUserF ctx) $ utxosAtTxOutRefs (Set.toList colls)
         assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
         void $ submitTx ctx newUser grabGiftsTxBody'
+
+    , testCaseSteps "Checking if collateral is reserved in case we send an exact 5 ada only UTxO as collateral" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        let ironAC = ctxIron ctx
+            newUserValue = valueFromLovelace 200_000_000 <> valueSingleton ironAC 25
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue True
+
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+        fiveAdaUtxo <- case find (\u -> utxoValue u == valueFromLovelace 5_000_000) (utxosToList newUserUtxos) of
+                         Nothing           -> fail "Couldn't find a 5-ada-only UTxO"
+                         Just fiveAdaUtxo' -> return fiveAdaUtxo'
+        assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
     , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup setup info $ \ctx -> do
         giftCleanup ctx

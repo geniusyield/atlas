@@ -140,7 +140,7 @@ runGYTxMonadNode
     -> Maybe GYTxOutRef                     -- ^ collateral
     -> GYTxMonadNode (GYTxSkeleton v)
     -> IO GYTxBody
-runGYTxMonadNode = coerce (runGYTxMonadNodeF @Identity GYLegacy)
+runGYTxMonadNode = coerce (runGYTxMonadNodeF @Identity GYRandomImproveMultiAsset)
 
 runGYTxMonadNodeParallel
     :: GYNetworkId
@@ -150,7 +150,7 @@ runGYTxMonadNodeParallel
     -> Maybe GYTxOutRef
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
-runGYTxMonadNodeParallel = coerce (runGYTxMonadNodeParallelF @Identity GYLegacy)
+runGYTxMonadNodeParallel = coerce (runGYTxMonadNodeParallelF @Identity GYRandomImproveMultiAsset)
 
 runGYTxMonadNodeChaining
     :: GYNetworkId
@@ -160,7 +160,7 @@ runGYTxMonadNodeChaining
     -> Maybe GYTxOutRef
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
-runGYTxMonadNodeChaining = coerce (runGYTxMonadNodeChainingF @Identity GYLegacy)
+runGYTxMonadNodeChaining = coerce (runGYTxMonadNodeChainingF @Identity GYRandomImproveMultiAsset)
 
 runGYTxMonadNodeC
     :: forall a. GYNetworkId
@@ -170,7 +170,7 @@ runGYTxMonadNodeC
     -> Maybe GYTxOutRef                     -- ^ collateral
     -> GYTxMonadNode a
     -> IO a
-runGYTxMonadNodeC = coerce (runGYTxMonadNodeF @(Const a) GYLegacy)
+runGYTxMonadNodeC = coerce (runGYTxMonadNodeF @(Const a) GYRandomImproveMultiAsset)
 
 {- | The most basic version of 'GYTxMonadNode' interpreter over a generic 'Traversable'.
 

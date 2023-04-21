@@ -185,7 +185,7 @@ tests setup = testGroup "gift"
         assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
         void $ submitTx ctx newUser grabGiftsTxBody'
 
-    , testCaseSteps "Checking if collateral is reserved in case we send an exact 5 ada only UTxO as collateral (simulating browser's case)" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "Checking if collateral is reserved in case we send an exact 5 ada only UTxO as collateral (simulating browser's case) + is collateral spendable if we want?" $ \info -> withSetup setup info $ \ctx -> do
         ----------- Create a new user and fund it
         let ironAC = ctxIron ctx
             newUserValue = valueFromLovelace 200_000_000 <> valueSingleton ironAC 25
@@ -200,17 +200,7 @@ tests setup = testGroup "gift"
         assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) False $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
         -- Should be reserved if we also perform 5 ada check as it satisfies it.
         assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) True $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
-
-    , testCaseSteps "Checking if collateral is spendable if required" $ \info -> withSetup setup info $ \ctx -> do
-        ----------- Create a new user and fund it
-        let ironAC = ctxIron ctx
-            newUserValue = valueFromLovelace 200_000_000 <> valueSingleton ironAC 25
-        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue True
-
-        info $ printf "UTxOs at this new user"
-        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
-        forUTxOs_ newUserUtxos (info . show)
-        -- Would throw error if unable to build body.
+        -- Would have thrown error if unable to build body.
         void $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
     , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error" $ \info -> withSetup setup info $ \ctx -> do
@@ -222,6 +212,23 @@ tests setup = testGroup "gift"
         newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
         forUTxOs_ newUserUtxos (info . show)
         assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 2_000_000)
+
+    , testCaseSteps "Checking if collateral is reserved in case we want it even if it's value is not 5 ada" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 40_000_000) False
+        -- Add another UTxO to be used as collateral.
+        txBody <- ctxRunI ctx (ctxUserF ctx) $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 8_000_000)
+        void $ submitTx ctx (ctxUserF ctx) txBody
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+        eightAdaUtxo <- case find (\u -> utxoValue u == valueFromLovelace 8_000_000) (utxosToList newUserUtxos) of
+                          Nothing -> fail "Couldn't find a 8-ada-only UTxO"
+                          Just u  -> return u
+        let newUserValue = foldlUTxOs' (\a u -> a <> utxoValue u) mempty newUserUtxos
+        assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef eightAdaUtxo) False $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        -- eight ada utxo won't satisfy 5 ada check and thus would be ignored
+        void $ ctxRunFWithCollateral ctx newUser (utxoRef eightAdaUtxo) True $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
     , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup setup info $ \ctx -> do
         giftCleanup ctx

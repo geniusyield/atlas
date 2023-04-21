@@ -98,8 +98,6 @@ newTempUserCtx ctx fundUser fundValue createCollateral = do
       newKeyHash = pubKeyHash newVKey
       newAddr = addressFromPubKeyHash GYPrivnet newKeyHash
       (adaInValue, otherValue) = valueSplitAda fundValue
-      collateralLovelace = 5_000_000
-      collateralValue = valueFromLovelace collateralLovelace
 
   -- We want this new user to have at least 5 ada if we want to create collateral.
   -- Our balancer would add minimum ada required for other utxo in case of equality
@@ -120,9 +118,15 @@ newTempUserCtx ctx fundUser fundValue createCollateral = do
 ctxRunF :: forall t v. Traversable t => Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
 ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr Nothing
 
--- | Variant of `ctxRunF` where caller can also give the 5-ada-only UTxO to be used as collateral to perform tests related to collateral behaviour for the browser wallet case. Note that this `GYTxOutRef` should be spendable by `User` and must be 5-ada-only as for any other value, it get's ignored.
-ctxRunFWithCollateral :: forall t v. Traversable t => Ctx -> User -> GYTxOutRef -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
-ctxRunFWithCollateral ctx User {..} coll =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr (Just coll)
+-- | Variant of `ctxRunF` where caller can also give the UTxO to be used as collateral.
+ctxRunFWithCollateral :: forall t v. Traversable t
+                      => Ctx
+                      -> User
+                      -> GYTxOutRef  -- ^ Reference to UTxO to be used as collateral.
+                      -> Bool        -- ^ To check whether this given collateral UTxO has value of exact 5 ada? If it doesn't have exact 5 ada, it would be ignored.
+                      -> GYTxMonadNode (t (GYTxSkeleton v))
+                      -> IO (t GYTxBody)
+ctxRunFWithCollateral ctx User {..} coll toCheck5Ada =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr $ Just (coll, toCheck5Ada)
 
 ctxRunC :: forall a. Ctx -> User -> GYTxMonadNode a -> IO a
 ctxRunC = coerce (ctxRunF @(Const a))

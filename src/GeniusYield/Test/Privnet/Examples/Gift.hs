@@ -34,6 +34,7 @@ import           GeniusYield.Test.Privnet.Asserts
 import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder.Class
+import           GeniusYield.TxBuilder.Common     (collateralValue)
 
 tests :: IO Setup -> TestTree
 tests setup = testGroup "gift"
@@ -193,10 +194,12 @@ tests setup = testGroup "gift"
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
         forUTxOs_ newUserUtxos (info . show)
-        fiveAdaUtxo <- case find (\u -> utxoValue u == valueFromLovelace 5_000_000) (utxosToList newUserUtxos) of
+        fiveAdaUtxo <- case find (\u -> utxoValue u == collateralValue) (utxosToList newUserUtxos) of
                          Nothing           -> fail "Couldn't find a 5-ada-only UTxO"
                          Just fiveAdaUtxo' -> return fiveAdaUtxo'
-        assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) False $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        -- Should be reserved if we also perform 5 ada check as it satisfies it.
+        assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) True $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
     , testCaseSteps "Checking if collateral is spendable if required" $ \info -> withSetup setup info $ \ctx -> do
         ----------- Create a new user and fund it

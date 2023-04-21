@@ -24,6 +24,7 @@ import qualified Data.ByteString                 as BS
 import qualified Data.List.NonEmpty              as NE
 import qualified Data.Set                        as Set
 
+import           Control.Monad.Trans.Maybe       (MaybeT (MaybeT, runMaybeT))
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder.Class
@@ -59,7 +60,7 @@ data GYTxNodeEnv = GYTxNodeEnv
     , envProviders     :: !GYProviders
     , envAddrs         :: ![GYAddress]
     , _envChangeAddr   :: !GYAddress
-    , envCollateral    :: !(Maybe GYTxOutRef)  -- ^ If browser wallet sends it's reserved 5-ada-only UTxO then we put it here, otherwise, framework would pick suitable UTxO as collateral and in that case, it would also be free to spend it. For operations with backend wallet, this would be `Nothing` (ideally, shouldn't send collateral as framework can pick it) unless specifically sent a 5-ada-only UTxO.
+    , envCollateral    :: !(Maybe GYTxOutRef)
     , envUsedSomeUTxOs :: !(Set GYTxOutRef)
     }
 
@@ -137,7 +138,7 @@ runGYTxMonadNode
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> Maybe GYTxOutRef                     -- ^ collateral
+    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
     -> GYTxMonadNode (GYTxSkeleton v)
     -> IO GYTxBody
 runGYTxMonadNode = coerce (runGYTxMonadNodeF @Identity GYRandomImproveMultiAsset)
@@ -147,7 +148,7 @@ runGYTxMonadNodeParallel
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> Maybe GYTxOutRef
+    -> Maybe (GYTxOutRef, Bool)
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
 runGYTxMonadNodeParallel = coerce (runGYTxMonadNodeParallelF @Identity GYRandomImproveMultiAsset)
@@ -157,7 +158,7 @@ runGYTxMonadNodeChaining
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> Maybe GYTxOutRef
+    -> Maybe (GYTxOutRef, Bool)
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
 runGYTxMonadNodeChaining = coerce (runGYTxMonadNodeChainingF @Identity GYRandomImproveMultiAsset)
@@ -167,7 +168,7 @@ runGYTxMonadNodeC
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> Maybe GYTxOutRef                     -- ^ collateral
+    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
     -> GYTxMonadNode a
     -> IO a
 runGYTxMonadNodeC = coerce (runGYTxMonadNodeF @(Const a) GYRandomImproveMultiAsset)
@@ -187,7 +188,7 @@ runGYTxMonadNodeF
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> Maybe GYTxOutRef                     -- ^ collateral
+    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
     -> GYTxMonadNode (f (GYTxSkeleton v))
     -> IO (f GYTxBody)
 runGYTxMonadNodeF cstrat nid providers addrs change collateral m = do
@@ -214,7 +215,7 @@ runGYTxMonadNodeParallelF
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> Maybe GYTxOutRef
+    -> Maybe (GYTxOutRef, Bool)
     -> GYTxMonadNode [f (GYTxSkeleton v)]
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeParallelF cstrat nid providers addrs change collateral m = do
@@ -234,7 +235,7 @@ runGYTxMonadNodeChainingF :: Traversable f
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> Maybe GYTxOutRef
+    -> Maybe (GYTxOutRef, Bool)
     -> GYTxMonadNode [f (GYTxSkeleton v)]
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeChainingF cstrat nid providers addrs change collateral m = do
@@ -267,7 +268,7 @@ runGYTxMonadNodeCore
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> Maybe GYTxOutRef
+    -> Maybe (GYTxOutRef, Bool)  -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadNode [f (GYTxSkeleton v)]
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral action = do
@@ -278,11 +279,14 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
     pp          <- gyGetProtocolParameters providers
     ps          <- gyGetStakePools providers
 
-    collateralUtxo <- maybe (return Nothing) (\collRef -> Just <$> runGYTxQueryMonadNode nid providers (utxoAtTxOutRef' collRef)) collateral
-
-    -- We mainly need to reserve 5-ada-only UTxO created by browser wallet.
-    let collateral' =
-          (\collUtxo -> if utxoValue collUtxo == valueFromLovelace 5_000_000 then collateral else Nothing) =<< collateralUtxo
+    collateral' <-
+      runMaybeT $ do
+        (collateralRef, toCheck) <- MaybeT $ return collateral
+        if not toCheck then return collateralRef
+        else do
+          collateralUtxo <- liftIO $ runGYTxQueryMonadNode nid providers $ utxoAtTxOutRef' collateralRef
+          if utxoValue collateralUtxo == collateralValue then return collateralRef
+          else MaybeT $ return Nothing
 
     e <- unGYTxMonadNode (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral' action) GYTxNodeEnv
             { envNid           = nid

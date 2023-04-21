@@ -11,6 +11,8 @@ module GeniusYield.TxBuilder.Common
     ( GYTxBuildResult (..)
     , pattern InsufficientFundsErr
     , buildTxCore
+    , collateralLovelace
+    , collateralValue
     ) where
 
 import qualified Cardano.Api                  as Api
@@ -104,7 +106,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
               maybe
                 ( return $
                     find
-                      (\u -> utxoValue u `valueGreaterOrEqual` valueFromLovelace 5_000_000)  -- Keeping it simple.
+                      (\u -> utxoValue u `valueGreaterOrEqual` collateralValue)  -- Keeping it simple.
                       (utxosToList ownUtxos')
 
                 ) (fmap Just . utxoAtTxOutRef') reservedCollateral
@@ -161,3 +163,9 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
 
 pattern InsufficientFundsErr :: GYValue -> BuildTxException
 pattern InsufficientFundsErr v = BuildTxBalancingError (BalancingErrorInsufficientFunds v)
+
+collateralLovelace :: Integer
+collateralLovelace = 5_000_000
+
+collateralValue :: GYValue
+collateralValue = valueFromLovelace collateralLovelace

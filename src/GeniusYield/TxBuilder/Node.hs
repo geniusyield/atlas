@@ -281,7 +281,7 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
 
     collateral' <- obtainCollateral
 
-    e <- unGYTxMonadNode (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral' action) GYTxNodeEnv
+    e <- unGYTxMonadNode (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral' loggedAction) GYTxNodeEnv
             { envNid           = nid
             , envProviders     = providers
             , envAddrs         = addrs
@@ -303,6 +303,12 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
           if utxoValue collateralUtxo == collateralValue then return collateralRef
           else hoistMaybe Nothing
 
+      loggedAction :: GYTxMonadNode [f (GYTxSkeleton v)]
+      loggedAction = action >>= \skeletons -> logSkeletons skeletons
+                     >> return skeletons
+
+      logSkeletons :: [f (GYTxSkeleton v)] -> GYTxMonadNode ()
+      logSkeletons = mapM_ (mapM (logMsg "runGYTxMonadNodeCore" GYDebug . show))
 
 -- | Update own utxo set by removing any utxos used up in the given tx.
 updateOwnUtxosParallel :: GYTxBody -> GYUTxOs -> GYUTxOs

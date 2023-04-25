@@ -24,7 +24,7 @@ import qualified Data.ByteString                 as BS
 import qualified Data.List.NonEmpty              as NE
 import qualified Data.Set                        as Set
 
-import           Control.Monad.Trans.Maybe       (MaybeT (MaybeT, runMaybeT))
+import           Control.Monad.Trans.Maybe       (MaybeT (runMaybeT))
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder.Class
@@ -279,14 +279,7 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
     pp          <- gyGetProtocolParameters providers
     ps          <- gyGetStakePools providers
 
-    collateral' <-
-      runMaybeT $ do
-        (collateralRef, toCheck) <- MaybeT $ return collateral
-        if not toCheck then return collateralRef
-        else do
-          collateralUtxo <- liftIO $ runGYTxQueryMonadNode nid providers $ utxoAtTxOutRef' collateralRef
-          if utxoValue collateralUtxo == collateralValue then return collateralRef
-          else MaybeT $ return Nothing
+    collateral' <- obtainCollateral
 
     e <- unGYTxMonadNode (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral' action) GYTxNodeEnv
             { envNid           = nid
@@ -299,6 +292,17 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
     case e of
         Left err  -> throwIO err
         Right res -> return res
+
+    where
+      obtainCollateral :: IO (Maybe GYTxOutRef)
+      obtainCollateral = runMaybeT $ do
+        (collateralRef, toCheck) <- hoistMaybe collateral
+        if not toCheck then return collateralRef
+        else do
+          collateralUtxo <- liftIO $ runGYTxQueryMonadNode nid providers $ utxoAtTxOutRef' collateralRef
+          if utxoValue collateralUtxo == collateralValue then return collateralRef
+          else hoistMaybe Nothing
+
 
 -- | Update own utxo set by removing any utxos used up in the given tx.
 updateOwnUtxosParallel :: GYTxBody -> GYUTxOs -> GYUTxOs

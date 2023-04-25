@@ -182,9 +182,9 @@ instance GYTxMonad GYTxMonadRun where
     someUTxO = do
         addr        <- ownAddress
         utxos       <- utxosAtAddress addr
-        case uncons $ utxosRefs utxos of
-            Nothing  -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress [addr]
-            Just (ref, _) -> return ref
+        case utxosRefs utxos of
+            []      -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress [addr]
+            ref : _ -> return ref
 
     randSeed = return 42
 

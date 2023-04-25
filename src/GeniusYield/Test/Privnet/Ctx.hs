@@ -46,7 +46,6 @@ import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
-import           Control.Concurrent                   (threadDelay)
 import qualified GeniusYield.Examples.Limbo           as Limbo
 
 data User = User

@@ -111,7 +111,6 @@ newTempUserCtx ctx fundUser fundValue createCollateral = do
       mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
 
   void $ submitTx ctx fundUser txBody
-  threadDelay 1_000_000
   return $ User {userSKey = newSKey, userAddr = newAddr}
 
 

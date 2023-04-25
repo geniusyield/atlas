@@ -6,6 +6,9 @@ Maintainer  : support@geniusyield.co
 Stability   : develop
 
 -}
+
+{-# LANGUAGE LambdaCase #-}
+
 module GeniusYield.Test.Privnet.Examples.Gift (tests) where
 
 import qualified Cardano.Api                      as Api
@@ -21,6 +24,7 @@ import           Data.Maybe                       (fromJust)
 import           Data.Ratio                       ((%))
 import qualified Data.Set                         as Set
 import           GeniusYield.Imports
+import           GeniusYield.Transaction
 import           GeniusYield.Types
 
 import           GeniusYield.Examples.Gift
@@ -30,6 +34,7 @@ import           GeniusYield.Test.Privnet.Asserts
 import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder.Class
+import           GeniusYield.TxBuilder.Common     (collateralValue)
 
 tests :: IO Setup -> TestTree
 tests setup = testGroup "gift"
@@ -135,56 +140,18 @@ tests setup = testGroup "gift"
             (valueSingleton ironAC 10)
             (snd (valueSplitAda diff2))
 
-    , testCaseSteps "Checking Vasil feature of Collateral Return and Total Collateral - Collateral input of only ada" $ \info -> withSetup setup info $ \ctx -> do
-        giftCleanup ctx
-
-        ----------- Create a new user and fund it
-        let ironAC = ctxIron ctx
-        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25) True
-        ----------- (ctxUserF ctx) submits some gifts.
-        txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
-            addr <- scriptAddress giftValidatorV2
-            return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-        assertBool "Collateral input shouldn't be set for this transaction" (txBodyCollateral txBodyPlace == mempty)
-        assertBool "Return collateral shouldn't be set for this transaction" (txBodyCollateralReturnOutput txBodyPlace == Api.TxReturnCollateralNone)
-        assertBool "Total collateral shouldn't be set for this transaction" (txBodyTotalCollateralLovelace txBodyPlace == 0)
-        void $ submitTx ctx (ctxUserF ctx) txBodyPlace
-        -- wait a tiny bit.
-        threadDelay 1_000_000
-
-        ---------- New user tries to grab it, since interacting with script, needs to give collateral
-        grabGiftsTxBody <- ctxRunF ctx newUser $ grabGifts  @'PlutusV1 giftValidatorV2
-        grabGiftsTxBody' <- case grabGiftsTxBody of
-          Nothing   -> assertFailure "Unable to build tx"
-          Just body -> return body
-        retCollOutput@(Api.TxReturnCollateral _ (Api.TxOut retCollAddrApi _ _ _)) <- case txBodyCollateralReturnOutput grabGiftsTxBody' of
-              Api.TxReturnCollateralNone -> fail "Return collateral is not present"
-              retCollOutput' -> return retCollOutput'
-        let totalCollateral = txBodyTotalCollateralLovelace grabGiftsTxBody'
-            retCollValue = txBodyCollateralReturnOutputValue grabGiftsTxBody'
-            retCollAddr = addressFromApi' retCollAddrApi
-        info $ printf "Return collateral: %s" (show retCollOutput)
-        info $ printf "Total collateral: %s" (show totalCollateral)
-        assertBool "Return collateral value is zero" $ retCollValue /= mempty
-        assertBool "Total collateral does not exist or value is not positive" $ totalCollateral > 0
-        assertBool "Return collateral at different address" $ retCollAddr == userAddr newUser
-        pp <- gyGetProtocolParameters $ ctxProviders ctx
-        let colls = txBodyCollateral grabGiftsTxBody'
-        colls' <- ctxRunC ctx (ctxUserF ctx) $ utxosAtTxOutRefs (Set.toList colls)
-        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
-        void $ submitTx ctx newUser grabGiftsTxBody'
-
     , testCaseSteps "Checking Vasil feature of Collateral Return and Total Collateral - Multi-asset collateral" $ \info -> withSetup setup info $ \ctx -> do
         giftCleanup ctx
 
         ----------- Create a new user and fund it
         let ironAC = ctxIron ctx
+        -- `newUser` just have one UTxO which will be used as collateral.
         newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25) False
-        info $ printf "Newly created user's address %s & chosen collateral ref %s" (show $ userAddr newUser) (show $ userColl newUser)
-        ----------- (ctxUserF ctx) submits some gifts plus give some other funds to new user so that we have a UTxO besides collateral.
+        info $ printf "Newly created user's address %s" (show $ userAddr newUser)
+        ----------- (ctxUserF ctx) submits some gifts
         txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV2
-            return $ mustHaveOutput  (mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())) <> mustHaveOutput (mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 15_000_000))
+            return $ mustHaveOutput  (mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ()))
         assertBool "Collateral input shouldn't be set for this transaction" (txBodyCollateral txBodyPlace == mempty)
         assertBool "Return collateral shouldn't be set for this transaction" (txBodyCollateralReturnOutput txBodyPlace == Api.TxReturnCollateralNone)
         assertBool "Total collateral shouldn't be set for this transaction" (txBodyTotalCollateralLovelace txBodyPlace == 0)
@@ -217,6 +184,51 @@ tests setup = testGroup "gift"
         colls' <- ctxRunC ctx (ctxUserF ctx) $ utxosAtTxOutRefs (Set.toList colls)
         assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
         void $ submitTx ctx newUser grabGiftsTxBody'
+
+    , testCaseSteps "Checking if collateral is reserved in case we send an exact 5 ada only UTxO as collateral (simulating browser's case) + is collateral spendable if we want?" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        let ironAC = ctxIron ctx
+            newUserValue = valueFromLovelace 200_000_000 <> valueSingleton ironAC 25
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue True
+
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+        fiveAdaUtxo <- case find (\u -> utxoValue u == collateralValue) (utxosToList newUserUtxos) of
+                         Nothing           -> fail "Couldn't find a 5-ada-only UTxO"
+                         Just fiveAdaUtxo' -> return fiveAdaUtxo'
+        assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) False $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        -- Should be reserved if we also perform 5 ada check as it satisfies it.
+        assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) True $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        -- Would have thrown error if unable to build body.
+        void $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+
+    , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        let newUserValue = valueFromLovelace 4_000_000
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
+
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+        assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 2_000_000)
+
+    , testCaseSteps "Checking if collateral is reserved in case we want it even if it's value is not 5 ada" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 40_000_000) False
+        -- Add another UTxO to be used as collateral.
+        txBody <- ctxRunI ctx (ctxUserF ctx) $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 8_000_000)
+        void $ submitTx ctx (ctxUserF ctx) txBody
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+        eightAdaUtxo <- case find (\u -> utxoValue u == valueFromLovelace 8_000_000) (utxosToList newUserUtxos) of
+                          Nothing -> fail "Couldn't find a 8-ada-only UTxO"
+                          Just u  -> return u
+        let newUserValue = foldlUTxOs' (\a u -> a <> utxoValue u) mempty newUserUtxos
+        assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef eightAdaUtxo) False $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        -- eight ada utxo won't satisfy 5 ada check and thus would be ignored
+        void $ ctxRunFWithCollateral ctx newUser (utxoRef eightAdaUtxo) True $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
     , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup setup info $ \ctx -> do
         giftCleanup ctx

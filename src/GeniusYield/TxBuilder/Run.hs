@@ -54,10 +54,7 @@ import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
 
-data GYTxRunEnv = GYTxRunEnv
-    { runEnvPaymentSigningKey :: !GYPaymentSigningKey
-    , runEnvCollateral        :: !(Maybe GYTxOutRef)
-    }
+newtype GYTxRunEnv = GYTxRunEnv {runEnvPaymentSigningKey :: GYPaymentSigningKey}
 
 newtype GYTxMonadRun a = GYTxMonadRun
     { unGYTxMonadRun :: ExceptT (Either String GYTxMonadException) (ReaderT GYTxRunEnv (RandT StdGen Run)) a
@@ -71,13 +68,11 @@ instance MonadRandom GYTxMonadRun where
     getRandoms  = GYTxMonadRun getRandoms
 
 asRandRun :: GYPaymentSigningKey
-          -> Maybe GYTxOutRef
           -> GYTxMonadRun a
           -> RandT StdGen Run (Maybe a)
-asRandRun skey mcollateral m = do
+asRandRun skey m = do
     e <- runReaderT (runExceptT $ unGYTxMonadRun m) GYTxRunEnv
             { runEnvPaymentSigningKey = skey
-            , runEnvCollateral        = mcollateral
             }
     case e of
         Left (Left err)  -> lift (logError err) >> return Nothing
@@ -86,10 +81,9 @@ asRandRun skey mcollateral m = do
 
 asRun :: StdGen
       -> GYPaymentSigningKey
-      -> Maybe GYTxOutRef
       -> GYTxMonadRun a
       -> Run (Maybe a)
-asRun g skey mcollateral m = evalRandT (asRandRun skey mcollateral m) g
+asRun g skey m = evalRandT (asRandRun skey m) g
 
 ownAddress :: GYTxMonadRun GYAddress
 ownAddress = do
@@ -187,11 +181,10 @@ instance GYTxMonad GYTxMonadRun where
 
     someUTxO = do
         addr        <- ownAddress
-        mcollateral <- asks runEnvCollateral
         utxos       <- utxosAtAddress addr
-        case find (\ref -> mcollateral /= Just ref) $ utxosRefs utxos of
-            Nothing  -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress [addr]
-            Just ref -> return ref
+        case utxosRefs utxos of
+            []      -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress [addr]
+            ref : _ -> return ref
 
     randSeed = return 42
 
@@ -370,18 +363,14 @@ skeletonToTxBody skeleton = do
     ps <- stakePools
 
     addr        <- ownAddress
-    mcollateral <- asks runEnvCollateral
-    case mcollateral of
-        Nothing         -> throwError $ GYNoSuitableCollateralException 0 addr
-        Just collateral -> do
-            e <- buildTxCore ss eh pp ps GYRandomImproveMultiAsset (const id) [addr] addr collateral (return [Identity skeleton])
-            case e of
-                Left err  -> throwAppError err
-                Right res -> case res of
-                    GYTxBuildSuccess (Identity body :| _) -> return body
-                    GYTxBuildFailure v                    -> throwAppError $ InsufficientFundsErr v
-                    GYTxBuildPartialSuccess _ _           -> error "impossible case"
-                    GYTxBuildNoInputs                     -> error "impossible case"
+    e <- buildTxCore ss eh pp ps GYRandomImproveMultiAsset (const id) [addr] addr Nothing (return [Identity skeleton])
+    case e of
+        Left err  -> throwAppError err
+        Right res -> case res of
+            GYTxBuildSuccess (Identity body :| _) -> return body
+            GYTxBuildFailure v                    -> throwAppError $ InsufficientFundsErr v
+            GYTxBuildPartialSuccess _ _           -> error "impossible case"
+            GYTxBuildNoInputs                     -> error "impossible case"
 
 slotConfig' :: GYTxMonadRun (UTCTime, NominalDiffTime)
 slotConfig' = liftRun $ do

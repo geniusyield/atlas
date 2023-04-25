@@ -123,6 +123,8 @@ data BuildTxException
     -- ^ Transaction size is higher than the maximum as specified by protocol params.
     | BuildTxCollateralShortFall !Natural
     -- ^ Lovelaces shortfall (in collateral inputs) for collateral requirement.
+    | BuildTxNoSuitableCollateral
+    -- ^ Couldn't find a UTxO to use as collateral.
   deriving stock    Show
   deriving anyclass (Exception, IsGYApiError)
 

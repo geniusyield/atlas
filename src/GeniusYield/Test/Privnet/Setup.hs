@@ -32,7 +32,7 @@ import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Options
 import           GeniusYield.Test.Privnet.Paths
 import           GeniusYield.Test.Privnet.Utils
-import           GeniusYield.TxBuilder                hiding (getCollateral)
+import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
 -- | Era in which privnet runs.
@@ -109,10 +109,6 @@ makeSetup' DbSyncOpts {..} privnetPath = do
 
     dbSync <- traverse openDbSyncConn dbSyncConnInfo
 
-    -- select a collateral oref
-    userFcoll <- getCollateral (pathUserF paths) info userFaddr
-    debug $ printf "userFcoll = %s\n" userFcoll
-
     let localLookupDatum :: GYLookupDatum
         localLookupDatum = case dbSync of
             Just dbSync' | dbSyncOptsLookupDatum -> dbSyncLookupDatum dbSync'
@@ -135,16 +131,15 @@ makeSetup' DbSyncOpts {..} privnetPath = do
             , ctxInfo            = info
             , ctxLCI             = lci
             , ctxDbSync          = dbSync
-            , ctxUserF           = User userFskey userFaddr userFcoll
-            -- collateral is temporarily wrong
-            , ctxUser2           = uncurry User (V.index userSkeyAddr (Proxy @0)) userFcoll
-            , ctxUser3           = uncurry User (V.index userSkeyAddr (Proxy @1)) userFcoll
-            , ctxUser4           = uncurry User (V.index userSkeyAddr (Proxy @2)) userFcoll
-            , ctxUser5           = uncurry User (V.index userSkeyAddr (Proxy @3)) userFcoll
-            , ctxUser6           = uncurry User (V.index userSkeyAddr (Proxy @4)) userFcoll
-            , ctxUser7           = uncurry User (V.index userSkeyAddr (Proxy @5)) userFcoll
-            , ctxUser8           = uncurry User (V.index userSkeyAddr (Proxy @6)) userFcoll
-            , ctxUser9           = uncurry User (V.index userSkeyAddr (Proxy @7)) userFcoll
+            , ctxUserF           = User userFskey userFaddr
+            , ctxUser2           = uncurry User (V.index userSkeyAddr (Proxy @0))
+            , ctxUser3           = uncurry User (V.index userSkeyAddr (Proxy @1))
+            , ctxUser4           = uncurry User (V.index userSkeyAddr (Proxy @2))
+            , ctxUser5           = uncurry User (V.index userSkeyAddr (Proxy @3))
+            , ctxUser6           = uncurry User (V.index userSkeyAddr (Proxy @4))
+            , ctxUser7           = uncurry User (V.index userSkeyAddr (Proxy @5))
+            , ctxUser8           = uncurry User (V.index userSkeyAddr (Proxy @6))
+            , ctxUser9           = uncurry User (V.index userSkeyAddr (Proxy @7))
             , ctxGold            = GYLovelace -- temporarily
             , ctxIron            = GYLovelace -- temporarily
             , ctxLog             = noLogging
@@ -163,13 +158,6 @@ makeSetup' DbSyncOpts {..} privnetPath = do
         ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
       ) userSkeyAddr
 
-    -- collaterals
-    userColls <- V.imapM
-                   (\i (_, userIaddr) -> do
-                     getCollateral (pathUsers paths V.! i) info userIaddr
-                   ) userSkeyAddr
-    V.imapM_ (\i coll -> debug $ printf "user%scoll = %s\n" (show $ getUserIdx i) coll) userColls
-
     -- mint test tokens
     goldAC <- mintTestTokens paths ctx0 "GOLD"
     debug $ printf "gold = %s\n" goldAC
@@ -181,15 +169,6 @@ makeSetup' DbSyncOpts {..} privnetPath = do
         ctx = ctx0
             { ctxGold = goldAC
             , ctxIron = ironAC
-
-            , ctxUser2           = uncurry User (V.index userSkeyAddr (Proxy @0)) (V.index userColls (Proxy @0))
-            , ctxUser3           = uncurry User (V.index userSkeyAddr (Proxy @1)) (V.index userColls (Proxy @1))
-            , ctxUser4           = uncurry User (V.index userSkeyAddr (Proxy @2)) (V.index userColls (Proxy @2))
-            , ctxUser5           = uncurry User (V.index userSkeyAddr (Proxy @3)) (V.index userColls (Proxy @3))
-            , ctxUser6           = uncurry User (V.index userSkeyAddr (Proxy @4)) (V.index userColls (Proxy @4))
-            , ctxUser7           = uncurry User (V.index userSkeyAddr (Proxy @5)) (V.index userColls (Proxy @5))
-            , ctxUser8           = uncurry User (V.index userSkeyAddr (Proxy @6)) (V.index userColls (Proxy @6))
-            , ctxUser9           = uncurry User (V.index userSkeyAddr (Proxy @7)) (V.index userColls (Proxy @7))
             }
 
     -- distribute tokens
@@ -274,37 +253,6 @@ giveTokens ctx addr = do
         mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxIron ctx) 1_000_000))
     void $ submitTx ctx (ctxUserF ctx) txBody
 
--------------------------------------------------------------------------------
--- Picking txoutref to be the collateral
--------------------------------------------------------------------------------
-
-getCollateral :: UserPaths -> Api.LocalNodeConnectInfo Api.CardanoMode -> GYAddress -> IO GYTxOutRef
-getCollateral UserPaths {pathUserColl} info addr = do
-    userUtxos <- nodeUtxosAtAddress era info addr
-    collateral <- urlPieceFromFileSafe userUtxos
-    case utxosLookup collateral userUtxos of
-        Just coll -> return $ utxoRef coll
-        Nothing   -> new userUtxos
-   where
-    urlPieceFromFileSafe :: GYUTxOs -> IO GYTxOutRef
-    urlPieceFromFileSafe utxos =
-        urlPieceFromFile pathUserColl `catchIOException` const (new utxos)
-
-    new :: GYUTxOs -> IO GYTxOutRef
-    new utxos = do
-        collateral <- getSomeTxOutRef utxos
-        urlPieceToFile pathUserColl collateral
-        return collateral
-
-getSomeTxOutRef :: GYUTxOs -> IO GYTxOutRef
-getSomeTxOutRef utxos = do
-    let onlyAdaUtxos = filterUTxOs isOnlyAdaUtxo utxos
-    case someTxOutRef onlyAdaUtxos of
-        Nothing        -> die "getSomeTxOutRef: empty utxo"
-        Just (oref, _) -> return oref
-  where
-    isOnlyAdaUtxo :: GYUTxO -> Bool
-    isOnlyAdaUtxo utxo = valueTotalAssets (utxoValue utxo) == 1
 -------------------------------------------------------------------------------
 -- minting tokens
 -------------------------------------------------------------------------------

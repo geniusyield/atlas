@@ -18,6 +18,7 @@ module GeniusYield.Test.Privnet.Ctx (
     ctxRunI,
     ctxRunC,
     ctxRunF,
+    ctxRunFWithCollateral,
     ctxCurrentSlot,
     ctxWaitNextSlot,
     ctxWaitUntilSlot,
@@ -35,9 +36,7 @@ module GeniusYield.Test.Privnet.Ctx (
 import           Test.Tasty.HUnit                     (assertFailure)
 
 import qualified Cardano.Api                          as Api
-import           Control.Concurrent                   (threadDelay)
 import qualified Data.Map.Strict                      as Map
-import           Data.Maybe                           (fromJust)
 
 import           GeniusYield.Imports
 import           GeniusYield.Providers.CardanoDbSync
@@ -52,7 +51,6 @@ import qualified GeniusYield.Examples.Limbo           as Limbo
 data User = User
     { userSKey :: !GYPaymentSigningKey
     , userAddr :: !GYAddress
-    , userColl :: !GYTxOutRef
     }
 
 userVKey :: User -> GYPaymentVerificationKey
@@ -87,7 +85,7 @@ data Ctx = Ctx
 ctxUsers :: Ctx -> [User]
 ctxUsers ctx = ($ ctx) <$> [ctxUser2, ctxUser3, ctxUser4, ctxUser5, ctxUser6, ctxUser7, ctxUser8, ctxUser9]
 
--- | Creates a new user with the given balance.
+-- | Creates a new user with the given balance. Note that the actual balance which this user get's could be more than what is provided to satisfy minimum ada requirement of a UTxO.
 newTempUserCtx:: Ctx
               -> User            -- ^ User which will fund this new user.
               -> GYValue         -- ^ Describes balance of new user.
@@ -99,11 +97,10 @@ newTempUserCtx ctx fundUser fundValue createCollateral = do
       newKeyHash = pubKeyHash newVKey
       newAddr = addressFromPubKeyHash GYPrivnet newKeyHash
       (adaInValue, otherValue) = valueSplitAda fundValue
-      collateralLovelace = 5_000_000
-      collateralValue = valueFromLovelace collateralLovelace
 
+  -- We want this new user to have at least 5 ada if we want to create collateral.
   -- Our balancer would add minimum ada required for other utxo in case of equality
-  when (adaInValue < collateralLovelace) $ fail "Given value for new user has less than 5 ada"
+  when (createCollateral && adaInValue < collateralLovelace) $ fail "Given value for new user has less than 5 ada"
 
   txBody <- ctxRunI ctx fundUser $ return $
     if createCollateral then
@@ -113,18 +110,21 @@ newTempUserCtx ctx fundUser fundValue createCollateral = do
       mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
 
   void $ submitTx ctx fundUser txBody
-  -- wait a tiny bit.
-  threadDelay 1_000_000
+  return $ User {userSKey = newSKey, userAddr = newAddr}
 
-  utxos <- ctxRunC ctx fundUser $ utxosAtAddress newAddr
-  if createCollateral then do
-    (collRef, _) <- ctxRunC ctx fundUser $ getCollateral newAddr (fromInteger collateralLovelace)
-    return $ User {userSKey = newSKey, userAddr = newAddr, userColl = collRef}
-
-  else return $ User {userSKey = newSKey, userAddr = newAddr, userColl = fst $ fromJust $ someTxOutRef utxos}
 
 ctxRunF :: forall t v. Traversable t => Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
-ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr userColl
+ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr Nothing
+
+-- | Variant of `ctxRunF` where caller can also give the UTxO to be used as collateral.
+ctxRunFWithCollateral :: forall t v. Traversable t
+                      => Ctx
+                      -> User
+                      -> GYTxOutRef  -- ^ Reference to UTxO to be used as collateral.
+                      -> Bool        -- ^ To check whether this given collateral UTxO has value of exact 5 ada? If it doesn't have exact 5 ada, it would be ignored.
+                      -> GYTxMonadNode (t (GYTxSkeleton v))
+                      -> IO (t GYTxBody)
+ctxRunFWithCollateral ctx User {..} coll toCheck5Ada =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr $ Just (coll, toCheck5Ada)
 
 ctxRunC :: forall a. Ctx -> User -> GYTxMonadNode a -> IO a
 ctxRunC = coerce (ctxRunF @(Const a))

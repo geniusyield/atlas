@@ -15,7 +15,6 @@ import           Test.Tasty.HUnit                  (assertEqual, testCase,
 
 import           GeniusYield.Examples.Gift
 import           GeniusYield.Test.CoinSelection    (coinSelectionTests)
-import           GeniusYield.Test.Collateral       (collateralTests)
 import           GeniusYield.Test.Config           (configTests)
 import           GeniusYield.Test.GYTxBody         (gyTxBodyTests)
 import           GeniusYield.Test.GYTxSkeleton     (gyTxSkeletonTests)
@@ -65,7 +64,6 @@ main = do
             ]
         , slotConversionTests
         , coinSelectionTests
-        , collateralTests
         , providersTests
         , configTests
         , gyTxSkeletonTests

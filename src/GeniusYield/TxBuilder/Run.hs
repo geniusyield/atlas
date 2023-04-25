@@ -28,7 +28,7 @@ import           Control.Monad.Except
 import           Control.Monad.Random
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Data.List                            (uncons, (\\))
+import           Data.List                            ((\\))
 import           Data.List.NonEmpty                   (NonEmpty (..))
 import qualified Data.Map.Strict                      as Map
 import qualified Data.Set                             as Set

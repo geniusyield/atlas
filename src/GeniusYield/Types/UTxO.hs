@@ -11,6 +11,9 @@ module GeniusYield.Types.UTxO (
     utxoFromApi,
     utxoFromApi',
     utxoToPlutus,
+    utxoHasInlineDatum,
+    utxoHasReferenceScript,
+    utxoTranslatableToV1,
     GYUTxOs,
     utxosSize,
     utxosFromApi,
@@ -161,6 +164,18 @@ utxoToPlutus GYUTxO{..} = Plutus.TxOut
     , Plutus.txOutDatum           = outDatumToPlutus utxoOutDatum
     , Plutus.txOutReferenceScript = (\(Some s) -> scriptPlutusHash s) <$> utxoRefScript
     }
+
+-- | Whether the UTxO has it's datum inlined?
+utxoHasInlineDatum :: GYUTxO -> Bool
+utxoHasInlineDatum  = isInlineDatum . utxoOutDatum
+
+-- | Whether the UTxO has script to refer?
+utxoHasReferenceScript :: GYUTxO -> Bool
+utxoHasReferenceScript = isJust . utxoRefScript
+
+-- | Is a UTxO translatable to language PlutusV1 output?
+utxoTranslatableToV1 :: GYUTxO -> Bool
+utxoTranslatableToV1 u = not (utxoHasReferenceScript u) && not (utxoHasInlineDatum u)
 
 -- | Number of UTxOs within given 'GYUTxOs'.
 utxosSize :: GYUTxOs -> Int

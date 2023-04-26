@@ -106,14 +106,21 @@ instance GYTxQueryMonad GYTxMonadNode where
 --            state so randSeed returns different seeds if called multiple times.
 --            (https://github.com/geniusyield/atlas/issues/30)
 instance GYTxMonad GYTxMonadNode where
-    someUTxO = do
+    someUTxO lang = do
         addrs         <- ownAddresses
         mCollateral   <- getCollateral
         usedSomeUTxOs <- getUsedSomeUTxOs
         utxos         <- traverse utxosAtAddress addrs
-        case someTxOutRef $ utxosRemoveTxOutRefs (maybe usedSomeUTxOs (`Set.insert` usedSomeUTxOs) mCollateral) (mconcat utxos) of
-            Just (oref, _) -> return oref
-            Nothing        ->  throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs
+        let utxosToConsider = utxosRemoveTxOutRefs (maybe usedSomeUTxOs (`Set.insert` usedSomeUTxOs) mCollateral) (mconcat utxos)
+        case lang of
+          PlutusV2 ->
+            case someTxOutRef utxosToConsider  of
+                Just (oref, _) -> return oref
+                Nothing        -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs
+          PlutusV1 ->
+            case find utxoTranslatableToV1 $ utxosToList utxosToConsider of
+              Just u  -> return $ utxoRef u
+              Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
       where
         getCollateral    = GYTxMonadNode $ return . envCollateral
         ownAddresses     = GYTxMonadNode $ return . envAddrs

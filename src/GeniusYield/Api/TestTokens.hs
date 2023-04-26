@@ -11,8 +11,8 @@ module GeniusYield.Api.TestTokens (
 ) where
 
 import           GeniusYield.Scripts.TestToken
-import           GeniusYield.Types
 import           GeniusYield.TxBuilder
+import           GeniusYield.Types
 
 mintTestTokens :: GYTxMonad m
                => GYTokenName
@@ -20,7 +20,7 @@ mintTestTokens :: GYTxMonad m
                -> m (GYAssetClass, GYTxSkeleton 'PlutusV2)
 mintTestTokens tn amt = do
     -- utxo to base token of.
-    utxo <- someUTxO
+    utxo <- someUTxO PlutusV1
 
     let amt'   = toInteger (max 1 amt) -- mint at least 1 token.
         policy = testTokenPolicy amt' (tokenNameToPlutus tn) utxo

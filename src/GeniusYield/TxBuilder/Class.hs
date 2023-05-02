@@ -19,6 +19,7 @@ module GeniusYield.TxBuilder.Class
     , RandT
     , lookupDatum'
     , utxoAtTxOutRef'
+    , someUTxOWithoutRefScript
     , slotToBeginTime
     , slotToEndTime
     , enclosingSlotFromTime
@@ -135,6 +136,9 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
 -- | Class of monads for querying monads as a user.
 class GYTxQueryMonad m => GYTxMonad m where
 
+    -- | Get your own address(es).
+    ownAddresses :: m [GYAddress]
+
     -- | Get available UTxOs that can be operated upon.
     availableUTxOs :: m GYUTxOs
 
@@ -158,6 +162,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (RandT g m) where
+    ownAddresses = lift ownAddresses
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
     randSeed = lift randSeed
@@ -174,6 +179,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ReaderT g m) where
+    ownAddresses = lift ownAddresses
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
     randSeed = lift randSeed
@@ -190,6 +196,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ExceptT GYTxMonadException m) where
+    ownAddresses = lift ownAddresses
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
     randSeed = lift randSeed
@@ -204,6 +211,16 @@ utxoAtTxOutRef' ref = utxoAtTxOutRef ref
     >>= maybe
         (throwError . GYQueryUTxOException $ GYNoUtxoAtRef ref)
         pure
+
+-- | Returns some UTxO present in wallet which doesn't have reference script.
+someUTxOWithoutRefScript :: GYTxMonad m => m GYTxOutRef
+someUTxOWithoutRefScript = do
+  utxosToConsider <- utxosRemoveRefScripts <$> availableUTxOs
+  addrs           <- ownAddresses
+  case someTxOutRef utxosToConsider of
+    Just (oref, _) -> return oref
+    Nothing        -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Possible to put better error message here?
+
 
 -------------------------------------------------------------------------------
 -- Slot <-> Time conversion functions within the monad

@@ -134,6 +134,10 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
 
 -- | Class of monads for querying monads as a user.
 class GYTxQueryMonad m => GYTxMonad m where
+
+    -- | Get available UTxOs that can be operated upon.
+    availableUTxOs :: m GYUTxOs
+
     -- | Return some unspend transaction output translatable to the given language corresponding to the script in question.
     --
     -- /Note:/ may or may not return the same value
@@ -154,6 +158,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (RandT g m) where
+    availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
     randSeed = lift randSeed
 
@@ -169,6 +174,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ReaderT g m) where
+    availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
     randSeed = lift randSeed
 
@@ -184,6 +190,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ExceptT GYTxMonadException m) where
+    availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
     randSeed = lift randSeed
 

@@ -179,9 +179,13 @@ instance GYTxQueryMonad GYTxMonadRun where
 
 instance GYTxMonad GYTxMonadRun where
 
+    availableUTxOs = do
+        addr        <- ownAddress
+        utxosAtAddress addr
+
     someUTxO lang = do
         addr        <- ownAddress
-        utxos       <- utxosAtAddress addr
+        utxos       <- availableUTxOs
         case lang of
           PlutusV2 ->
             case someTxOutRef utxos of

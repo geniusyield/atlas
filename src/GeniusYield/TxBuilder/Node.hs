@@ -308,7 +308,7 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
                      >> return skeletons
 
       logSkeletons :: [f (GYTxSkeleton v)] -> GYTxMonadNode ()
-      logSkeletons = mapM_ (mapM (logMsg "runGYTxMonadNodeCore" GYDebug . show))
+      logSkeletons = mapM_ (mapM_ (logMsg "runGYTxMonadNodeCore" GYDebug . show))
 
 -- | Update own utxo set by removing any utxos used up in the given tx.
 updateOwnUtxosParallel :: GYTxBody -> GYUTxOs -> GYUTxOs

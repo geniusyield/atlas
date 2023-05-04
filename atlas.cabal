@@ -139,57 +139,57 @@ library
 
   other-modules:   GeniusYield.Utils
   build-depends:
-    , aeson                  ^>=2.0.2
+    , aeson                  ^>=2.0.2.0
     , async                  ^>=2.2.4
-    , attoparsec             ^>=0.13.2
+    , attoparsec             ^>=0.13.2.5
     , base                   ^>=4.14.1.0
-    , base16-bytestring      ^>=1.0.2
-    , bytestring             ^>=0.10.12
-    , cache                  ^>=0.1.3
-    , cassava                ^>=0.5.3
-    , cborg                  ^>=0.2.8
-    , containers             ^>=0.6.5
+    , base16-bytestring      ^>=1.0.2.0
+    , bytestring             ^>=0.10.12.0
+    , cache                  ^>=0.1.3.0
+    , cassava                ^>=0.5.3.0
+    , cborg                  ^>=0.2.8.0
+    , containers             ^>=0.6.5.1
     , deriving-aeson         ^>=0.2.8
-    , directory              ^>=1.3.6
+    , directory              ^>=1.3.6.0
     , either                 ^>=5.0.2
-    , filepath               ^>=1.4.2
+    , filepath               ^>=1.4.2.1
     -- TODO: Version 1.2.1.1 of @fixed-vector@ has an important bug fix, need to upgrade to it.
     , fixed-vector           ^>=1.2.1.0
-    , hashable               ^>=1.3.5
+    , hashable               ^>=1.3.5.0
     , http-api-data          ^>=0.4.3
-    , http-client            ^>=0.7.13
-    , http-client-tls        ^>=0.3.6
-    , http-media             ^>=0.8.0
+    , http-client            ^>=0.7.13.1
+    , http-client-tls        ^>=0.3.6.1
+    , http-media             ^>=0.8.0.0
     , http-types             ^>=0.12.3
     , indexed-traversable    ^>=0.1.2
-    , katip                  ^>=0.8.6.0
+    , katip                  ^>=0.8.7.2
     , lens                   ^>=5.0.1
     , MonadRandom            ^>=0.5.3
     , mtl                    ^>=2.2.2
-    , network-uri            ^>=2.6.4
+    , network-uri            ^>=2.6.4.1
     , postgresql-simple      ^>=0.6.4
-    , postgresql-simple-url  ^>=0.2.1
-    , raven-haskell          ^>=0.1.4
-    , resource-pool          ^>=0.2.3
-    , scientific             ^>=0.3.7
-    , serialise              ^>=0.2.6
+    , postgresql-simple-url  ^>=0.2.1.0
+    , raven-haskell          ^>=0.1.4.1
+    , resource-pool          ^>=0.2.3.2
+    , scientific             ^>=0.3.7.0
+    , serialise              ^>=0.2.6.0
     , servant                ^>=0.19
     , servant-client         ^>=0.19
     , servant-client-core    ^>=0.19
     , some                   ^>=1.0.2
-    , sop-core               ^>=0.5.0
-    , stm                    ^>=2.5.0
+    , sop-core               ^>=0.5.0.2
+    , stm                    ^>=2.5.0.1
     , swagger2               ^>=2.8.4
-    , tagged                 ^>=0.8.6
-    , tasty                  ^>=1.4.2
-    , tasty-hunit            ^>=0.10.0
+    , tagged                 ^>=0.8.6.1
+    , tasty                  ^>=1.4.2.3
+    , tasty-hunit            ^>=0.10.0.3
     , tasty-quickcheck       ^>=0.10.2
-    , template-haskell       ^>=2.16.0
-    , text                   ^>=1.2.4
+    , template-haskell       ^>=2.16.0.0
+    , text                   ^>=1.2.4.1
     , time                   ^>=1.9.3
-    , transformers           ^>=0.5.6
-    , unordered-containers   ^>=0.2.19
-    , vector                 ^>=0.12.3
+    , transformers           ^>=0.5.6.2
+    , unordered-containers   ^>=0.2.19.1
+    , vector                 ^>=0.12.3.1
     , witherable             ^>=0.4.2
 
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
@@ -242,7 +242,7 @@ library framework-onchain-plutustx
     GeniusYield.OnChain.TestToken
     GeniusYield.OnChain.TestToken.Compiled
 
-  build-depends:    base
+  build-depends:    base     ^>=4.14.1.0
 
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
   build-depends:
@@ -306,9 +306,9 @@ test-suite atlas-tests
 
   -- Additional dependencies.
   build-depends:
-    , QuickCheck
-    , quickcheck-instances
-    , tasty-golden
+    , QuickCheck             ^>=2.14.2
+    , quickcheck-instances   ^>=0.3.28
+    , tasty-golden           ^>=2.3.5
 
 test-suite atlas-privnet-tests
   import:         common

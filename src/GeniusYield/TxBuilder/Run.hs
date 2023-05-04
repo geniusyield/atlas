@@ -179,18 +179,24 @@ instance GYTxQueryMonad GYTxMonadRun where
 
 instance GYTxMonad GYTxMonadRun where
 
+    ownAddresses = singleton <$> ownAddress
+
+    availableUTxOs = do
+        addrs <- ownAddresses
+        utxosAtAddresses addrs
+
     someUTxO lang = do
-        addr        <- ownAddress
-        utxos       <- utxosAtAddress addr
+        addrs <- ownAddresses
+        utxos <- availableUTxOs
         case lang of
           PlutusV2 ->
             case someTxOutRef utxos of
-                Nothing       -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress [addr]
+                Nothing       -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress addrs
                 Just (ref, _) -> return ref
           PlutusV1 ->
             case find utxoTranslatableToV1 $ utxosToList utxos of
               Just u  -> return $ utxoRef u
-              Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress [addr]  -- TODO: Better error message here?
+              Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
 
     randSeed = return 42
 

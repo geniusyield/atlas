@@ -106,12 +106,22 @@ instance GYTxQueryMonad GYTxMonadNode where
 --            state so randSeed returns different seeds if called multiple times.
 --            (https://github.com/geniusyield/atlas/issues/30)
 instance GYTxMonad GYTxMonadNode where
-    someUTxO lang = do
+
+    ownAddresses = GYTxMonadNode $ return . envAddrs
+
+    availableUTxOs = do
         addrs         <- ownAddresses
         mCollateral   <- getCollateral
         usedSomeUTxOs <- getUsedSomeUTxOs
         utxos         <- traverse utxosAtAddress addrs
-        let utxosToConsider = utxosRemoveTxOutRefs (maybe usedSomeUTxOs (`Set.insert` usedSomeUTxOs) mCollateral) (mconcat utxos)
+        return $ utxosRemoveTxOutRefs (maybe usedSomeUTxOs (`Set.insert` usedSomeUTxOs) mCollateral) (mconcat utxos)
+      where
+        getCollateral    = GYTxMonadNode $ return . envCollateral
+        getUsedSomeUTxOs = GYTxMonadNode $ return . envUsedSomeUTxOs
+
+    someUTxO lang = do
+        addrs           <- ownAddresses
+        utxosToConsider <- availableUTxOs
         case lang of
           PlutusV2 ->
             case someTxOutRef utxosToConsider  of
@@ -121,18 +131,12 @@ instance GYTxMonad GYTxMonadNode where
             case find utxoTranslatableToV1 $ utxosToList utxosToConsider of
               Just u  -> return $ utxoRef u
               Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
-      where
-        getCollateral    = GYTxMonadNode $ return . envCollateral
-        ownAddresses     = GYTxMonadNode $ return . envAddrs
-        getUsedSomeUTxOs = GYTxMonadNode $ return . envUsedSomeUTxOs
 
     -- inject non-determinism from own-address
     -- thus different users will get different random seeds.
     randSeed = foldl' (\ m w -> 256 * m + fromIntegral w) 0
                . concatMap (BS.unpack . Api.serialiseToRawBytes . addressToApi)
                <$> ownAddresses
-      where
-        ownAddresses = GYTxMonadNode $ return . envAddrs
 
 instance MonadRandom GYTxMonadNode where
   getRandomR  = GYTxMonadNode . const . getRandomR

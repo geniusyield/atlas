@@ -55,6 +55,7 @@ import qualified Data.Map.Strict            as Map
 import qualified Plutus.V2.Ledger.Tx        as Plutus
 import qualified Text.Printf                as Printf
 
+import           Data.Maybe                 (isNothing)
 import           GeniusYield.Types.Address
 import           GeniusYield.Types.Datum
 import           GeniusYield.Types.Script
@@ -194,7 +195,7 @@ utxosRemoveTxOutRefs orefs (GYUTxOs m) = GYUTxOs $ Map.withoutKeys m orefs
 
 -- | Remove UTxOs containing reference scripts inside them from 'GYUTxOs'.
 utxosRemoveRefScripts :: GYUTxOs -> GYUTxOs
-utxosRemoveRefScripts (GYUTxOs m) = GYUTxOs $ Map.filter (\(_, _, _, maybeRefScript) -> case maybeRefScript of Nothing -> True; Just _ -> False) m
+utxosRemoveRefScripts = filterUTxOs $ isNothing . utxoRefScript
 
 -- | Lookup a UTxO given a ref.
 utxosLookup :: GYTxOutRef -> GYUTxOs -> Maybe GYUTxO

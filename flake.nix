@@ -23,7 +23,7 @@ inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
             hixProject =
               final.haskell-nix.hix.project {
                 src = ./.;
-                evalSystem = "x86_64-linux";
+                evalSystem = system;
                 modules = [{
                   packages = {
                     cardano-crypto-praos.components.library.pkgconfig =

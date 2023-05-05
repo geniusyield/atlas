@@ -12,7 +12,7 @@ inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
   outputs = { self, nixpkgs, flake-utils, haskellNix, plutus, CHaP }:
     let
       supportedSystems = [
-        "x86_64-linux"
+        "x86_64-linux"	"x86_64-darwin"	"aarch64-darwin"
       ];
     in
       flake-utils.lib.eachSystem supportedSystems (system:
@@ -23,7 +23,7 @@ inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
             hixProject =
               final.haskell-nix.hix.project {
                 src = ./.;
-                evalSystem = "x86_64-linux";
+                evalSystem = system;
                 modules = [{
                   packages = {
                     cardano-crypto-praos.components.library.pkgconfig =

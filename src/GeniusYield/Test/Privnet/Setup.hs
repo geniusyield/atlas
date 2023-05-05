@@ -21,6 +21,8 @@ import           System.FilePath                      ((</>))
 
 import qualified Cardano.Api                          as Api
 
+import qualified Data.Vector.Fixed                    as V
+
 import qualified GeniusYield.Api.TestTokens           as GY.TestTokens
 import           GeniusYield.Imports
 import           GeniusYield.Providers.CardanoDbSync
@@ -30,7 +32,7 @@ import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Options
 import           GeniusYield.Test.Privnet.Paths
 import           GeniusYield.Test.Privnet.Utils
-import           GeniusYield.TxBuilder                hiding (getCollateral)
+import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
 -- | Era in which privnet runs.
@@ -61,8 +63,8 @@ closeSetup :: Setup -> IO ()
 closeSetup (Setup close _) = close
 
 debug :: String -> IO ()
--- change me to debug setup code.
---debug = putStrLn
+-- FIXME: change me to debug setup code.
+-- debug = putStrLn
 debug _ = return ()
 
 makeSetup' :: DbSyncOpts -> FilePath -> IO Setup
@@ -71,26 +73,25 @@ makeSetup' DbSyncOpts {..} privnetPath = do
     paths <- initPaths privnetPath
 
     -- read user address
-    user1addr <- addressFromBech32 <$> urlPieceFromFile (pathUserAddr $ pathUser1 paths)
-    debug $ printf "user1addr = %s\n" user1addr
+    userFaddr <- addressFromBech32 <$> urlPieceFromFile (pathUserAddr $ pathUserF paths)
+    debug $ printf "userFaddr = %s\n" userFaddr
 
-    user1skey <- readPaymentSigningKey $ pathUserSKey $ pathUser1 paths
-    debug $ printf "user1skey = %s\n" (show user1skey)
-    debug $ printf "user1vkey = %s\n" (show $ paymentVerificationKey user1skey)
-    debug $ printf "user1pkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey user1skey)
+    userFskey <- readPaymentSigningKey $ pathUserSKey $ pathUserF paths
+    debug $ printf "userFskey = %s\n" (show userFskey)
+    debug $ printf "userFvkey = %s\n" (show $ paymentVerificationKey userFskey)
+    debug $ printf "userFpkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey userFskey)
 
-    -- Generate user 2, 3
-    (user2skey, user2addr) <- generateUser $ pathUser2 paths
-    debug $ printf "user2addr = %s\n" user2addr
-    debug $ printf "user2skey = %s\n" (show user2skey)
-    debug $ printf "user2vkey = %s\n" (show $ paymentVerificationKey user2skey)
-    debug $ printf "user2pkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey user2skey)
-
-    (user3skey, user3addr) <- generateUser $ pathUser3 paths
-    debug $ printf "user3addr = %s\n" user3addr
-    debug $ printf "user3skey = %s\n" (show user3skey)
-    debug $ printf "user3vkey = %s\n" (show $ paymentVerificationKey user3skey)
-    debug $ printf "user3pkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey user3skey)
+    -- Generate user 2 .. 9
+    userSkeyAddr <- forM (pathUsers paths) generateUser
+    let getUserIdx (i :: Int) = i + 2
+    V.imapM_ (
+      \i (userIskey, userIaddr) -> do
+        debug $ printf "user = %s\n" (show $ getUserIdx i)
+        debug $ printf "user addr = %s\n" userIaddr
+        debug $ printf "user skey = %s\n" (show userIskey)
+        debug $ printf "user vkey = %s\n" (show $ paymentVerificationKey userIskey)
+        debug $ printf "user pkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey userIskey)
+      ) userSkeyAddr
 
     -- Further down we need local node connection
     let info :: Api.LocalNodeConnectInfo Api.CardanoMode
@@ -107,10 +108,6 @@ makeSetup' DbSyncOpts {..} privnetPath = do
     lci <- newLCIClient info []
 
     dbSync <- traverse openDbSyncConn dbSyncConnInfo
-
-    -- select a collateral oref
-    user1coll <- getCollateral (pathUser1 paths) info user1addr
-    debug $ printf "user1coll = %s\n" user1coll
 
     let localLookupDatum :: GYLookupDatum
         localLookupDatum = case dbSync of
@@ -134,9 +131,15 @@ makeSetup' DbSyncOpts {..} privnetPath = do
             , ctxInfo            = info
             , ctxLCI             = lci
             , ctxDbSync          = dbSync
-            , ctxUser1           = User user1skey user1addr user1coll
-            , ctxUser2           = User user2skey user2addr user1coll -- collateral is temporarily wrong
-            , ctxUser3           = User user3skey user3addr user1coll -- collateral is temporarily wrong
+            , ctxUserF           = User userFskey userFaddr
+            , ctxUser2           = uncurry User (V.index userSkeyAddr (Proxy @0))
+            , ctxUser3           = uncurry User (V.index userSkeyAddr (Proxy @1))
+            , ctxUser4           = uncurry User (V.index userSkeyAddr (Proxy @2))
+            , ctxUser5           = uncurry User (V.index userSkeyAddr (Proxy @3))
+            , ctxUser6           = uncurry User (V.index userSkeyAddr (Proxy @4))
+            , ctxUser7           = uncurry User (V.index userSkeyAddr (Proxy @5))
+            , ctxUser8           = uncurry User (V.index userSkeyAddr (Proxy @6))
+            , ctxUser9           = uncurry User (V.index userSkeyAddr (Proxy @7))
             , ctxGold            = GYLovelace -- temporarily
             , ctxIron            = GYLovelace -- temporarily
             , ctxLog             = noLogging
@@ -145,24 +148,15 @@ makeSetup' DbSyncOpts {..} privnetPath = do
             , ctxGetParams       = localGetParams
             }
 
-    user2balance <- ctxRunC ctx0 User1 $ queryBalance user2addr
-    when (isEmptyValue user2balance) $ do
-        debug $ printf "User2 balance is empty, giving some ada\n"
-        giveAda ctx0 user2addr
-
-    user3balance <- ctxRunC ctx0 User1 $ queryBalance user3addr
-    when (isEmptyValue user3balance) $ do
-        debug $ printf "User3 balance is empty, giving some ada\n"
-        giveAda ctx0 user3addr
-
-        -- we also give ada to itself to create some small utxos
-        giveAda ctx0 user1addr
-
-    -- user 2 and 3 collaterals
-    user2coll <- getCollateral (pathUser2 paths) info user2addr
-    debug $ printf "user2coll = %s\n" user2coll
-    user3coll <- getCollateral (pathUser3 paths) info user3addr
-    debug $ printf "user3coll = %s\n" user3coll
+    userBalances <- V.imapM
+      (\i (_, userIaddr) -> do
+        userIbalance <- ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
+        when (isEmptyValue userIbalance) $ do
+            debug $ printf "User %s balance is empty, giving some ada\n" (show $ getUserIdx i)
+            giveAda ctx0 userIaddr
+            when (i == 0) (giveAda ctx0 userFaddr) -- we also give ada to itself to create some small utxos
+        ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
+      ) userSkeyAddr
 
     -- mint test tokens
     goldAC <- mintTestTokens paths ctx0 "GOLD"
@@ -175,18 +169,15 @@ makeSetup' DbSyncOpts {..} privnetPath = do
         ctx = ctx0
             { ctxGold = goldAC
             , ctxIron = ironAC
-
-            , ctxUser2     = User user2skey user2addr user2coll
-            , ctxUser3     = User user3skey user3addr user3coll
             }
 
     -- distribute tokens
-    when (isEmptyValue $ snd $ valueSplitAda user2balance) $ do
-        debug $ printf "User2 has no tokens, giving some\n"
-        giveTokens ctx user2addr
-    when (isEmptyValue $ snd $ valueSplitAda user3balance) $ do
-        debug $ printf "User3 has no tokens, giving some\n"
-        giveTokens ctx user3addr
+    V.imapM_
+      (\i userIbalance -> do
+        when (isEmptyValue $ snd $ valueSplitAda userIbalance) $ do
+          debug $ printf "User%s has no tokens, giving some\n" (show $ getUserIdx i)
+          giveTokens ctx (snd $ userSkeyAddr V.! i)
+      ) userBalances
 
     return $ Setup
         (closeLCIClient lci)
@@ -251,48 +242,17 @@ runAddressKeyGen skeyPath = do
 
 giveAda :: Ctx -> GYAddress -> IO ()
 giveAda ctx addr = do
-    txBody <- ctxRunI ctx User1 $ return $ mconcat $ replicate 5 $
+    txBody <- ctxRunI ctx (ctxUserF ctx) $ return $ mconcat $ replicate 5 $
         mustHaveOutput $ mkGYTxOutNoDatum addr (valueFromLovelace 1_000_000_000)
-    void $ submitTx ctx User1 txBody
+    void $ submitTx ctx (ctxUserF ctx) txBody
 
 giveTokens :: Ctx -> GYAddress -> IO ()
 giveTokens ctx addr = do
-    txBody <- ctxRunI ctx User1 $ return $
+    txBody <- ctxRunI ctx (ctxUserF ctx) $ return $
         mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxGold ctx) 1_000_000)) <>
         mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxIron ctx) 1_000_000))
-    void $ submitTx ctx User1 txBody
+    void $ submitTx ctx (ctxUserF ctx) txBody
 
--------------------------------------------------------------------------------
--- Picking txoutref to be the collateral
--------------------------------------------------------------------------------
-
-getCollateral :: UserPaths -> Api.LocalNodeConnectInfo Api.CardanoMode -> GYAddress -> IO GYTxOutRef
-getCollateral UserPaths {pathUserColl} info addr = do
-    userUtxos <- nodeUtxosAtAddress era info addr
-    collateral <- urlPieceFromFileSafe userUtxos
-    case utxosLookup collateral userUtxos of
-        Just coll -> return $ utxoRef coll
-        Nothing   -> new userUtxos
-   where
-    urlPieceFromFileSafe :: GYUTxOs -> IO GYTxOutRef
-    urlPieceFromFileSafe utxos =
-        urlPieceFromFile pathUserColl `catchIOException` const (new utxos)
-
-    new :: GYUTxOs -> IO GYTxOutRef
-    new utxos = do
-        collateral <- getSomeTxOutRef utxos
-        urlPieceToFile pathUserColl collateral
-        return collateral
-
-getSomeTxOutRef :: GYUTxOs -> IO GYTxOutRef
-getSomeTxOutRef utxos = do
-    let onlyAdaUtxos = filterUTxOs isOnlyAdaUtxo utxos
-    case someTxOutRef onlyAdaUtxos of
-        Nothing        -> die "getSomeTxOutRef: empty utxo"
-        Just (oref, _) -> return oref
-  where
-    isOnlyAdaUtxo :: GYUTxO -> Bool
-    isOnlyAdaUtxo utxo = valueTotalAssets (utxoValue utxo) == 1
 -------------------------------------------------------------------------------
 -- minting tokens
 -------------------------------------------------------------------------------
@@ -313,9 +273,9 @@ mintTestTokens Paths {pathGeniusYield} ctx tn' = do
 
     new :: IO GYAssetClass
     new = do
-        (ac, txBody) <- ctxRunF ctx User1 $
-            GY.TestTokens.mintTestTokens tn 5_000_000
-        void $ submitTx ctx User1 txBody
+        (ac, txBody) <- ctxRunF ctx (ctxUserF ctx) $
+            GY.TestTokens.mintTestTokens tn 10_000_000
+        void $ submitTx ctx (ctxUserF ctx) txBody
 
         urlPieceToFile path ac
 

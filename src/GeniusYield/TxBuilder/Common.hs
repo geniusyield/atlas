@@ -11,6 +11,8 @@ module GeniusYield.TxBuilder.Common
     ( GYTxBuildResult (..)
     , pattern InsufficientFundsErr
     , buildTxCore
+    , collateralLovelace
+    , collateralValue
     ) where
 
 import qualified Cardano.Api                  as Api
@@ -62,20 +64,19 @@ buildTxCore
     -> (GYTxBody -> GYUTxOs -> GYUTxOs)
     -> [GYAddress]
     -> GYAddress
-    -> GYTxOutRef
+    -> Maybe GYTxOutRef  -- ^ Is `Nothing` if there was no 5 ada collateral returned by browser wallet.
     -> m [f (GYTxSkeleton v)]
     -> m (Either BuildTxException (GYTxBuildResult f))
-buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral action = do
+buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral action = do
     fbodies <- action
-    collateralUtxo <- utxoAtTxOutRef' collateral
     ownUtxos <- utxosAtAddresses addrs
 
-    let buildEnvWith ownUtxos' refIns = GYBuildTxEnv
+    let buildEnvWith ownUtxos' refIns collateralUtxo = GYBuildTxEnv
             { gyBTxEnvSystemStart    = ss
             , gyBTxEnvEraHistory     = eh
             , gyBTxEnvProtocolParams = pp
             , gyBTxEnvPools          = ps
-            , gyBTxEnvOwnUtxos       = utxosRemoveTxOutRefs refIns $ utxosRemoveRefScripts $ utxosRemoveTxOutRef collateral ownUtxos'
+            , gyBTxEnvOwnUtxos       = utxosRemoveTxOutRefs refIns $ utxosRemoveRefScripts $ maybe ownUtxos' (`utxosRemoveTxOutRef` ownUtxos') reservedCollateral
             , gyBTxEnvChangeAddr     = change
             , gyBTxEnvCollateral     = collateralUtxo
             }
@@ -100,27 +101,40 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral action = d
 
             refInsUtxos <- utxosAtTxOutRefs $ gyTxSkeletonRefInsToList gytxRefIns
 
-            -- Build the transaction.
-            buildUnsignedTxBody
-                (buildEnvWith ownUtxos' (gyTxSkeletonRefInsSet gytxRefIns))
-                cstrat
-                gyTxInsDetailed
-                gytxOuts
-                refInsUtxos
-                gytxMint'
-                gytxInvalidBefore
-                gytxInvalidAfter
-                gytxSigs
+            -- This operation is `O(n)` where `n` denotes the number of UTxOs in `ownUtxos'`.
+            mCollateralUtxo <-
+              maybe
+                ( return $
+                    find
+                      (\u -> utxoValue u `valueGreaterOrEqual` collateralValue)  -- Keeping it simple.
+                      (utxosToList ownUtxos')
+
+                ) (fmap Just . utxoAtTxOutRef') reservedCollateral
+
+            case mCollateralUtxo of
+              Nothing -> return (Left BuildTxNoSuitableCollateral)
+              Just collateralUtxo ->
+                -- Build the transaction.
+                buildUnsignedTxBody
+                    (buildEnvWith ownUtxos' (gyTxSkeletonRefInsSet gytxRefIns) collateralUtxo)
+                    cstrat
+                    gyTxInsDetailed
+                    gytxOuts
+                    refInsUtxos
+                    gytxMint'
+                    gytxInvalidBefore
+                    gytxInvalidAfter
+                    gytxSigs
 
         go :: GYUTxOs -> GYTxBuildResult f -> [f (GYTxSkeleton v)] -> m (Either BuildTxException  (GYTxBuildResult f))
         go _         acc []           = pure $ Right acc
-        go ownUtxos' acc (fbody:rest) = do
+        go ownUtxos' acc (fbody : rest) = do
             res <- sequence <$> traverse (helper ownUtxos') fbody
             case res of
                 {- Not enough funds for this transaction
                 We assume it's not worth continuing with the next transactions (which is often the case) -}
                 Left (InsufficientFundsErr v) -> pure $ Right $ updateBuildRes (Left v) acc
-                -- Any other exception is fatal.
+                -- Any other exception is fatal. TODO: To think more on whether collateral error can be handled here.
                 Left err                      -> pure $ Left err
                 Right fres                    -> do
                     -- Update the available utxos set by user supplied function.
@@ -149,3 +163,9 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral action = d
 
 pattern InsufficientFundsErr :: GYValue -> BuildTxException
 pattern InsufficientFundsErr v = BuildTxBalancingError (BalancingErrorInsufficientFunds v)
+
+collateralLovelace :: Integer
+collateralLovelace = 5_000_000
+
+collateralValue :: GYValue
+collateralValue = valueFromLovelace collateralLovelace

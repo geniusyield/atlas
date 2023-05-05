@@ -19,6 +19,7 @@ module GeniusYield.TxBuilder.Class
     , RandT
     , lookupDatum'
     , utxoAtTxOutRef'
+    , someUTxOWithoutRefScript
     , slotToBeginTime
     , slotToEndTime
     , enclosingSlotFromTime
@@ -134,10 +135,17 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
 
 -- | Class of monads for querying monads as a user.
 class GYTxQueryMonad m => GYTxMonad m where
-    -- | Return some unspend transaction output
+
+    -- | Get your own address(es).
+    ownAddresses :: m [GYAddress]
+
+    -- | Get available UTxOs that can be operated upon.
+    availableUTxOs :: m GYUTxOs
+
+    -- | Return some unspend transaction output translatable to the given language corresponding to the script in question.
     --
     -- /Note:/ may or may not return the same value
-    someUTxO :: m GYTxOutRef
+    someUTxO :: PlutusVersion -> m GYTxOutRef
 
     -- | A seed to inject non-determinism.
     randSeed :: m Int
@@ -154,7 +162,9 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (RandT g m) where
-    someUTxO = lift someUTxO
+    ownAddresses = lift ownAddresses
+    availableUTxOs = lift availableUTxOs
+    someUTxO = lift . someUTxO
     randSeed = lift randSeed
 
 instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
@@ -169,7 +179,9 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ReaderT g m) where
-    someUTxO = lift someUTxO
+    ownAddresses = lift ownAddresses
+    availableUTxOs = lift availableUTxOs
+    someUTxO = lift . someUTxO
     randSeed = lift randSeed
 
 instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
@@ -184,7 +196,9 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ExceptT GYTxMonadException m) where
-    someUTxO = lift someUTxO
+    ownAddresses = lift ownAddresses
+    availableUTxOs = lift availableUTxOs
+    someUTxO = lift . someUTxO
     randSeed = lift randSeed
 
 -- | A version of 'lookupDatum' that raises 'GYNoDatumForHash' if the datum is not found.
@@ -197,6 +211,16 @@ utxoAtTxOutRef' ref = utxoAtTxOutRef ref
     >>= maybe
         (throwError . GYQueryUTxOException $ GYNoUtxoAtRef ref)
         pure
+
+-- | Returns some UTxO present in wallet which doesn't have reference script.
+someUTxOWithoutRefScript :: GYTxMonad m => m GYTxOutRef
+someUTxOWithoutRefScript = do
+  utxosToConsider <- utxosRemoveRefScripts <$> availableUTxOs
+  addrs           <- ownAddresses
+  case someTxOutRef utxosToConsider of
+    Just (oref, _) -> return oref
+    Nothing        -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Possible to put better error message here?
+
 
 -------------------------------------------------------------------------------
 -- Slot <-> Time conversion functions within the monad

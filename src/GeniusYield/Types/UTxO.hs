@@ -11,6 +11,9 @@ module GeniusYield.Types.UTxO (
     utxoFromApi,
     utxoFromApi',
     utxoToPlutus,
+    utxoHasInlineDatum,
+    utxoHasReferenceScript,
+    utxoTranslatableToV1,
     GYUTxOs,
     utxosSize,
     utxosFromApi,
@@ -52,6 +55,7 @@ import qualified Data.Map.Strict            as Map
 import qualified Plutus.V2.Ledger.Tx        as Plutus
 import qualified Text.Printf                as Printf
 
+import           Data.Maybe                 (isNothing)
 import           GeniusYield.Types.Address
 import           GeniusYield.Types.Datum
 import           GeniusYield.Types.Script
@@ -162,6 +166,18 @@ utxoToPlutus GYUTxO{..} = Plutus.TxOut
     , Plutus.txOutReferenceScript = (\(Some s) -> scriptPlutusHash s) <$> utxoRefScript
     }
 
+-- | Whether the UTxO has it's datum inlined?
+utxoHasInlineDatum :: GYUTxO -> Bool
+utxoHasInlineDatum  = isInlineDatum . utxoOutDatum
+
+-- | Whether the UTxO has script to refer?
+utxoHasReferenceScript :: GYUTxO -> Bool
+utxoHasReferenceScript = isJust . utxoRefScript
+
+-- | Is a UTxO translatable to language PlutusV1 output?
+utxoTranslatableToV1 :: GYUTxO -> Bool
+utxoTranslatableToV1 u = not (utxoHasReferenceScript u) && not (utxoHasInlineDatum u)
+
 -- | Number of UTxOs within given 'GYUTxOs'.
 utxosSize :: GYUTxOs -> Int
 utxosSize (GYUTxOs m) = Map.size m
@@ -179,7 +195,7 @@ utxosRemoveTxOutRefs orefs (GYUTxOs m) = GYUTxOs $ Map.withoutKeys m orefs
 
 -- | Remove UTxOs containing reference scripts inside them from 'GYUTxOs'.
 utxosRemoveRefScripts :: GYUTxOs -> GYUTxOs
-utxosRemoveRefScripts (GYUTxOs m) = GYUTxOs $ Map.filter (\(_, _, _, maybeRefScript) -> case maybeRefScript of Nothing -> True; Just _ -> False) m
+utxosRemoveRefScripts = filterUTxOs $ isNothing . utxoRefScript
 
 -- | Lookup a UTxO given a ref.
 utxosLookup :: GYTxOutRef -> GYUTxOs -> Maybe GYUTxO

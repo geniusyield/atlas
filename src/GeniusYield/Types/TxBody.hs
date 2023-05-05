@@ -15,6 +15,7 @@ module GeniusYield.Types.TxBody (
     -- * Transaction creation
     signTx,
     unsignedTx,
+    makeSignedTransaction,
     -- * Functions
     txBodyFee,
     txBodyFeeValue,
@@ -27,6 +28,7 @@ module GeniusYield.Types.TxBody (
     txBodyValidityRange,
     txBodyCollateral,
     txBodyCollateralReturnOutput,
+    txBodyCollateralReturnOutputValue,
     txBodyTotalCollateralLovelace,
     getTxBody,
 ) where
@@ -37,7 +39,8 @@ import qualified Cardano.Api.Shelley         as Api.S
 import qualified Data.Set                    as Set
 
 import           GeniusYield.Imports
-import           GeniusYield.Types.Key.Class (ToShelleyWitnessSigningKey, toShelleyWitnessSigningKey)
+import           GeniusYield.Types.Key.Class (ToShelleyWitnessSigningKey,
+                                              toShelleyWitnessSigningKey)
 import           GeniusYield.Types.Slot
 import           GeniusYield.Types.Tx
 import           GeniusYield.Types.TxOutRef
@@ -57,6 +60,10 @@ txBodyToApi = coerce
 -- | Sign a transaction body with (potentially) multiple keys.
 signTx :: ToShelleyWitnessSigningKey a =>  GYTxBody -> [a] -> GYTx
 signTx (GYTxBody txBody) skeys = txFromApi $ Api.signShelleyTransaction txBody $ map toShelleyWitnessSigningKey skeys
+
+-- | Make a signed transaction given the transaction body & list of key witnesses.
+makeSignedTransaction :: GYTxWitness -> GYTxBody -> GYTx
+makeSignedTransaction txWit (GYTxBody txBody) = txFromApi $ Api.makeSignedTransaction (txWitToKeyWitnessApi txWit) txBody
 
 -- | Create an unsigned transaction from the body.
 unsignedTx :: GYTxBody -> GYTx
@@ -129,7 +136,7 @@ txBodyCollateral body = case Api.txInsCollateral $ txBodyToApiTxBodyContent body
     Api.TxInsCollateralNone  -> Set.empty
     Api.TxInsCollateral _ xs -> Set.fromList $ txOutRefFromApi <$> xs
 
--- | Returns the lovelace sum of all collateral used in the given 'GYTxBody'.
+-- | Returns the total collateral for the given transaction body.
 txBodyTotalCollateralLovelace :: GYTxBody -> Natural
 txBodyTotalCollateralLovelace body = case Api.txTotalCollateral $ txBodyToApiTxBodyContent body of
     Api.TxTotalCollateralNone -> 0
@@ -139,3 +146,9 @@ txBodyTotalCollateralLovelace body = case Api.txTotalCollateral $ txBodyToApiTxB
 
 txBodyCollateralReturnOutput :: GYTxBody -> Api.TxReturnCollateral Api.CtxTx Api.BabbageEra
 txBodyCollateralReturnOutput body = Api.txReturnCollateral $ txBodyToApiTxBodyContent body
+
+txBodyCollateralReturnOutputValue :: GYTxBody -> GYValue
+txBodyCollateralReturnOutputValue body =
+  case Api.txReturnCollateral $ txBodyToApiTxBodyContent body of
+    Api.TxReturnCollateralNone                   -> mempty
+    Api.TxReturnCollateral _ (Api.TxOut _ v _ _) -> valueFromApi $ Api.txOutValueToValue v

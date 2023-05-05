@@ -64,7 +64,7 @@ Avoid code duplication between on-chain and off-chain code, interoperate with ad
 Query ledger state information from [Maestro](https://www.gomaestro.org/dapp-platform), a local node or [Cardano DB Sync](https://github.com/input-output-hk/cardano-db-sync). You can also build and contribute your own data provider!
 
 ### Test extensively
-Use Atlas' test harness to write realistic [unit tests](./getting-started/unit-tests) that correspond to on-chain behavior, and execute [integration tests](./getting-started/integration-tests) against cardano node in a private network.
+Use Atlas' test harness to write realistic [unit tests](https://atlas-app.io/getting-started/unit-tests) that correspond to on-chain behavior, and execute [integration tests](https://atlas-app.io/getting-started/integration-tests) against cardano node in a private network.
 
 ### Stay up to date
 Benefit from Cardano's latest innovations such as **Reference Inputs**, **Inline Datums** and **Reference Scripts**.

@@ -18,17 +18,19 @@ module GeniusYield.TxBuilder.Node (
     runGYTxMonadNodeChainingF,
 ) where
 
-import qualified Cardano.Api                  as Api
-import           Control.Monad.IO.Class       (MonadIO (..))
-import qualified Data.ByteString              as BS
-import qualified Data.List.NonEmpty           as NE
-import qualified Data.Set                     as Set
+import qualified Cardano.Api                     as Api
+import           Control.Monad.IO.Class          (MonadIO (..))
+import qualified Data.ByteString                 as BS
+import qualified Data.List.NonEmpty              as NE
+import qualified Data.Set                        as Set
 
+import           Control.Monad.Trans.Maybe       (MaybeT (runMaybeT))
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
+import           GeniusYield.TxBuilder.NodeQuery
 import           GeniusYield.Types
 
 -------------------------------------------------------------------------------
@@ -58,7 +60,7 @@ data GYTxNodeEnv = GYTxNodeEnv
     , envProviders     :: !GYProviders
     , envAddrs         :: ![GYAddress]
     , _envChangeAddr   :: !GYAddress
-    , envCollateral    :: !GYTxOutRef
+    , envCollateral    :: !(Maybe GYTxOutRef)
     , envUsedSomeUTxOs :: !(Set GYTxOutRef)
     }
 
@@ -104,26 +106,37 @@ instance GYTxQueryMonad GYTxMonadNode where
 --            state so randSeed returns different seeds if called multiple times.
 --            (https://github.com/geniusyield/atlas/issues/30)
 instance GYTxMonad GYTxMonadNode where
-    someUTxO = do
+
+    ownAddresses = GYTxMonadNode $ return . envAddrs
+
+    availableUTxOs = do
         addrs         <- ownAddresses
-        collateral    <- getCollateral
+        mCollateral   <- getCollateral
         usedSomeUTxOs <- getUsedSomeUTxOs
         utxos         <- traverse utxosAtAddress addrs
-        case someTxOutRef $ utxosRemoveTxOutRefs (Set.insert collateral usedSomeUTxOs) (mconcat utxos) of
-            Just (oref, _) -> return oref
-            Nothing        ->  throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs
+        return $ utxosRemoveTxOutRefs (maybe usedSomeUTxOs (`Set.insert` usedSomeUTxOs) mCollateral) (mconcat utxos)
       where
         getCollateral    = GYTxMonadNode $ return . envCollateral
-        ownAddresses     = GYTxMonadNode $ return . envAddrs
         getUsedSomeUTxOs = GYTxMonadNode $ return . envUsedSomeUTxOs
+
+    someUTxO lang = do
+        addrs           <- ownAddresses
+        utxosToConsider <- availableUTxOs
+        case lang of
+          PlutusV2 ->
+            case someTxOutRef utxosToConsider  of
+                Just (oref, _) -> return oref
+                Nothing        -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs
+          PlutusV1 ->
+            case find utxoTranslatableToV1 $ utxosToList utxosToConsider of
+              Just u  -> return $ utxoRef u
+              Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
 
     -- inject non-determinism from own-address
     -- thus different users will get different random seeds.
     randSeed = foldl' (\ m w -> 256 * m + fromIntegral w) 0
                . concatMap (BS.unpack . Api.serialiseToRawBytes . addressToApi)
                <$> ownAddresses
-      where
-        ownAddresses = GYTxMonadNode $ return . envAddrs
 
 instance MonadRandom GYTxMonadNode where
   getRandomR  = GYTxMonadNode . const . getRandomR
@@ -136,40 +149,40 @@ runGYTxMonadNode
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> GYTxOutRef                           -- ^ collateral
+    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
     -> GYTxMonadNode (GYTxSkeleton v)
     -> IO GYTxBody
-runGYTxMonadNode = coerce (runGYTxMonadNodeF @Identity GYLegacy)
+runGYTxMonadNode = coerce (runGYTxMonadNodeF @Identity GYRandomImproveMultiAsset)
 
 runGYTxMonadNodeParallel
     :: GYNetworkId
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> GYTxOutRef
+    -> Maybe (GYTxOutRef, Bool)
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
-runGYTxMonadNodeParallel = coerce (runGYTxMonadNodeParallelF @Identity GYLegacy)
+runGYTxMonadNodeParallel = coerce (runGYTxMonadNodeParallelF @Identity GYRandomImproveMultiAsset)
 
 runGYTxMonadNodeChaining
     :: GYNetworkId
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> GYTxOutRef
+    -> Maybe (GYTxOutRef, Bool)
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
-runGYTxMonadNodeChaining = coerce (runGYTxMonadNodeChainingF @Identity GYLegacy)
+runGYTxMonadNodeChaining = coerce (runGYTxMonadNodeChainingF @Identity GYRandomImproveMultiAsset)
 
 runGYTxMonadNodeC
     :: forall a. GYNetworkId
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> GYTxOutRef                           -- ^ collateral
+    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
     -> GYTxMonadNode a
     -> IO a
-runGYTxMonadNodeC = coerce (runGYTxMonadNodeF @(Const a) GYLegacy)
+runGYTxMonadNodeC = coerce (runGYTxMonadNodeF @(Const a) GYRandomImproveMultiAsset)
 
 {- | The most basic version of 'GYTxMonadNode' interpreter over a generic 'Traversable'.
 
@@ -186,7 +199,7 @@ runGYTxMonadNodeF
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> GYTxOutRef                           -- ^ collateral
+    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
     -> GYTxMonadNode (f (GYTxSkeleton v))
     -> IO (f GYTxBody)
 runGYTxMonadNodeF cstrat nid providers addrs change collateral m = do
@@ -213,7 +226,7 @@ runGYTxMonadNodeParallelF
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> GYTxOutRef
+    -> Maybe (GYTxOutRef, Bool)
     -> GYTxMonadNode [f (GYTxSkeleton v)]
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeParallelF cstrat nid providers addrs change collateral m = do
@@ -233,7 +246,7 @@ runGYTxMonadNodeChainingF :: Traversable f
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> GYTxOutRef
+    -> Maybe (GYTxOutRef, Bool)
     -> GYTxMonadNode [f (GYTxSkeleton v)]
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeChainingF cstrat nid providers addrs change collateral m = do
@@ -266,7 +279,7 @@ runGYTxMonadNodeCore
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> GYTxOutRef
+    -> Maybe (GYTxOutRef, Bool)  -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadNode [f (GYTxSkeleton v)]
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral action = do
@@ -277,17 +290,36 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
     pp          <- gyGetProtocolParameters providers
     ps          <- gyGetStakePools providers
 
-    e <- unGYTxMonadNode (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral action) GYTxNodeEnv
+    collateral' <- obtainCollateral
+
+    e <- unGYTxMonadNode (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral' loggedAction) GYTxNodeEnv
             { envNid           = nid
             , envProviders     = providers
             , envAddrs         = addrs
             ,_envChangeAddr    = change
-            , envCollateral    = collateral
+            , envCollateral    = collateral'
             , envUsedSomeUTxOs = mempty
             }
     case e of
         Left err  -> throwIO err
         Right res -> return res
+
+    where
+      obtainCollateral :: IO (Maybe GYTxOutRef)
+      obtainCollateral = runMaybeT $ do
+        (collateralRef, toCheck) <- hoistMaybe collateral
+        if not toCheck then return collateralRef
+        else do
+          collateralUtxo <- liftIO $ runGYTxQueryMonadNode nid providers $ utxoAtTxOutRef' collateralRef
+          if utxoValue collateralUtxo == collateralValue then return collateralRef
+          else hoistMaybe Nothing
+
+      loggedAction :: GYTxMonadNode [f (GYTxSkeleton v)]
+      loggedAction = action >>= \skeletons -> logSkeletons skeletons
+                     >> return skeletons
+
+      logSkeletons :: [f (GYTxSkeleton v)] -> GYTxMonadNode ()
+      logSkeletons = mapM_ (mapM_ (logMsg "runGYTxMonadNodeCore" GYDebug . show))
 
 -- | Update own utxo set by removing any utxos used up in the given tx.
 updateOwnUtxosParallel :: GYTxBody -> GYUTxOs -> GYUTxOs

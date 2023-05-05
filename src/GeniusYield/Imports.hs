@@ -15,11 +15,14 @@ module GeniusYield.Imports (
     decodeUtf8Lenient,
     lazyDecodeUtf8Lenient,
     hush,
+    hoistMaybe,
+    singleton
 ) where
 
 import           Control.Applicative        as X (liftA2)
 import           Control.Exception          as X (Exception, catch, throwIO)
-import           Control.Monad              as X (ap, foldM, forM, forM_, guard, join, unless, when)
+import           Control.Monad              as X (ap, foldM, forM, forM_, guard,
+                                                  join, unless, when)
 import           Data.Aeson                 as X (FromJSON (..), ToJSON (..))
 import           Data.Bifunctor             as X (bimap, first, second)
 import           Data.Char                  as X (isAlphaNum, isHexDigit)
@@ -49,9 +52,11 @@ import           GHC.Generics               as X (Generic)
 import           GHC.Stack                  as X (CallStack, HasCallStack)
 import           Numeric.Natural            as X (Natural)
 import           Text.Printf                as X (PrintfArg (..), printf)
-import           Witherable                 as X (catMaybes, iwither, mapMaybe, wither)
+import           Witherable                 as X (catMaybes, iwither, mapMaybe,
+                                                  wither)
 
 -- Not re-exported.
+import           Control.Monad.Trans.Maybe  (MaybeT (MaybeT))
 import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Lazy       as LBS
 import           Data.Monoid                (First (..))
@@ -96,3 +101,15 @@ decodeUtf8Lenient = TE.decodeUtf8With lenientDecode
 -- | Convert a 'Either' into a 'Maybe', using the 'Right' as 'Just' and silencing the 'Left' val as 'Nothing'.
 hush :: Either e a -> Maybe a
 hush = either (const Nothing) Just
+
+-- | Convert a 'Maybe' computation to 'MaybeT'.
+--
+-- __NOTE:__ This is also defined (& exported) in @transformers-0.6.0.0@, so should be removed once we upgrade to it.
+hoistMaybe :: (Applicative m) => Maybe b -> MaybeT m b
+hoistMaybe = MaybeT . pure
+
+-- | Produce singleton list.
+--
+-- __NOTE:__ This is also defined (& exported) in @base-0.15.0.0@, so should be removed once we upgrade to it.
+singleton :: a -> [a]
+singleton x = [x]

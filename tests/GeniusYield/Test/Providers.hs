@@ -2,20 +2,23 @@ module GeniusYield.Test.Providers
     ( providersTests
     ) where
 
-import           Data.Aeson as Aeson (decode)
+import           Data.Aeson as Aeson (decode, encode, decodeStrict)
+import           Data.ByteString.Lazy as BS (readFile, writeFile, toStrict)
 import           Data.String         (fromString)
 import qualified Data.Text as Text   (Text, unpack)
-import           Data.Maybe          (fromJust)
+import           Data.Maybe          (fromJust, fromMaybe)
 import           Data.Some (mkSome)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
 import GeniusYield.Types.Address (unsafeAddressFromText, GYAddress)
-import GeniusYield.Types.UTxO (GYUTxO(..), GYOutDatum(..))
+import GeniusYield.Types.UTxO (GYUTxO(..), GYOutDatum(..), utxosToApi, utxosFromList)
 import GeniusYield.Types.Value (GYAssetClass (GYLovelace, GYToken), valueFromLovelace, valueFromList)
 import GeniusYield.Types.Datum (datumHashFromHex, datumFromApi')
 import GeniusYield.Types.TxOutRef ( GYTxOutRef )
 import GeniusYield.Types.Script (scriptFromCBOR)
+import GeniusYield.Types.Providers (gyQueryUtxosAtAddress', gyQueryUtxosAtTxOutRefs',
+                                    gyQueryUtxoAtTxOutRef')
 
 import GeniusYield.Providers.Common  (SomeDeserializeError (..))
 import GeniusYield.Providers.Maestro ( MaestroUtxo(..), MaestroAsset(..)
@@ -25,16 +28,22 @@ import GeniusYield.Providers.Maestro ( MaestroUtxo(..), MaestroAsset(..)
                                      , ScriptDataDetailed(..)
                                      , MaestroScript(..)
                                      , MaestroScriptType(..)
-                                     , transformUtxo)
+                                     , transformUtxo, newMaestroApiEnv, maestroQueryUtxo)
 import qualified Cardano.Api as Api
 import GeniusYield.Types (PlutusVersion(PlutusV2))
+import Test.Tasty.Golden.Advanced (goldenTest)
 
 providersTests :: TestTree
 providersTests = testGroup "Providers" [ testGroup "Maestro" maestroTests ]
 
 maestroTests :: [TestTree]
 maestroTests =
-    [ testGroup "MaestroUtxo to GYUTxO translation"
+    [ testGroup "Maestro Provider"
+        [ goldenTest "UtxosAtAddress" getUTxOsAtAddress (getFileUTxOs "tests/mockUtxos/utxoAtAddress.json") compareUTxOs (updateGolden "tests/mockUtxos/utxoAtAddress.json")
+        , goldenTest "UtxoAtRef" (getUTxOAtRef mockQueryTxOutRef) (getFileUTxOs "tests/mockUtxos/utxoAtRef.json") compareUTxOs (updateGolden "tests/mockUtxos/utxoAtRef.json")
+        , goldenTest "UtxosAtRefs" (getUTxOsAtRefs [mockQueryTxOutRef]) (getFileUTxOs "tests/mockUtxos/utxoAtRef.json") compareUTxOs (updateGolden "tests/mockUtxos/utxoAtRef.json")
+        ]
+    , testGroup "MaestroUtxo to GYUTxO translation"
         [ testCase "Invalid Address" $ do
             let expected = Left DeserializeErrorAddress
                 res = transformUtxo $ MaestroUtxo
@@ -123,11 +132,65 @@ maestroTests =
             res @?= expected
         ]
     ]
--------------------------------------------------------------------------------
+  where
+    getUTxOsAtAddress :: IO (Api.UTxO Api.BabbageEra)
+    getUTxOsAtAddress = do
+        maestroEnv <- newMaestroApiEnv maestroUrl maestroToken
+        let queryUtxo = maestroQueryUtxo maestroEnv
+        utxos <- gyQueryUtxosAtAddress' queryUtxo mockQueryAddress
+        return $ utxosToApi utxos
+
+    getUTxOAtRef :: GYTxOutRef -> IO (Api.UTxO Api.BabbageEra)
+    getUTxOAtRef ref = do
+        maestroEnv <- newMaestroApiEnv maestroUrl maestroToken
+        let queryUtxo = maestroQueryUtxo maestroEnv
+        utxo <- gyQueryUtxoAtTxOutRef' queryUtxo ref
+        return $ utxosToApi $ utxosFromList [fromJust utxo]
+
+    getUTxOsAtRefs :: [GYTxOutRef] -> IO (Api.UTxO Api.BabbageEra)
+    getUTxOsAtRefs refs = do
+        maestroEnv <- newMaestroApiEnv maestroUrl maestroToken
+        let queryUtxo = maestroQueryUtxo maestroEnv
+        utxos <- gyQueryUtxosAtTxOutRefs' queryUtxo refs
+        return $ utxosToApi utxos
+
+    getFileUTxOs :: String -> IO (Api.UTxO Api.BabbageEra)
+    getFileUTxOs fileName = do
+        json <- BS.readFile fileName
+        let utxos = fromMaybe (utxosToApi $ utxosFromList []) (Aeson.decodeStrict (toStrict json))
+        return utxos
+
+    compareUTxOs :: Api.UTxO Api.BabbageEra -> Api.UTxO Api.BabbageEra -> IO (Maybe String)
+    compareUTxOs utxo1 utxo2 = return $ if utxo1 == utxo2 then Nothing else Just "The UTxOs are different"
+
+    updateGolden :: String -> Api.UTxO Api.BabbageEra -> IO ()
+    updateGolden name utxos = BS.writeFile name (Aeson.encode utxos)
+
+-------------------------------------------
 -- Mock Values
 -------------------------------------------------------------------------------
+maestroUrl :: String
+maestroUrl = "https://preprod.gomaestro-api.org/"
 
-mockMaestroUtxo :: [MaestroAsset] -> Maybe MaestroDatumOption -> Maybe MaestroScript ->MaestroUtxo
+maestroToken :: Text.Text
+maestroToken = ""
+
+mockQueryAddressB32 :: Text.Text
+mockQueryAddressB32 = "addr_test1qp3fx29hm39xvyeer3v5xalcpmye7078vz09uylzuvxgqy0ma9xfzua4lag9wwgwk059k07f3kf46cjvx5ldmknqh7xmockQuery5pu4"
+
+mockQueryAddress :: GYAddress
+mockQueryAddress = unsafeAddressFromText mockQueryAddressB32
+
+mockQueryTxOutRef :: GYTxOutRef
+mockQueryTxOutRef = fromString $ concat [Text.unpack mockQueryTxId, "#", show mockQueryTxIx]
+
+mockQueryTxId :: Text.Text
+mockQueryTxId = "45e7172a4ff66f6e6236ca910182ac4e391f8b8a7cb8c22a26c489981dd7a0b9"
+
+mockQueryTxIx :: Word
+mockQueryTxIx = 0
+
+mockMaestroUtxo :: [MaestroAsset] -> Maybe MaestroDatumOption -> Maybe MaestroScript -> MaestroUtxo
 mockMaestroUtxo assets mDat mRefScript = MaestroUtxo
   { muTxHash          = mockTxId
   , muIndex           = mockTxIx

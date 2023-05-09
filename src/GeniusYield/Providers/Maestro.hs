@@ -16,6 +16,7 @@ module GeniusYield.Providers.Maestro
       MaestroUtxo(..)
     , MaestroAsset(..)
     , MaestroAssetClass(..)
+    , MaestroApiEnv(..)
     , MaestroDatumOption(..)
     , MaestroDatumOptionType(..)
     , ScriptDataDetailed(..)

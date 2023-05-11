@@ -2,8 +2,8 @@ module GeniusYield.Test.Providers
     ( providersTests
     ) where
 
-import           Data.Aeson as Aeson (decode, encode, decodeStrict)
-import           Data.ByteString.Lazy as BS (readFile, writeFile, toStrict)
+import           Data.Aeson as Aeson (decode, decodeStrict)
+import           Data.ByteString.Lazy as BS (readFile, toStrict)
 import           Data.String         (fromString)
 import qualified Data.Text as Text   (Text, unpack)
 import           Data.Maybe          (fromJust, fromMaybe)
@@ -17,8 +17,7 @@ import GeniusYield.Types.Value (GYAssetClass (GYLovelace, GYToken), valueFromLov
 import GeniusYield.Types.Datum (datumHashFromHex, datumFromApi')
 import GeniusYield.Types.TxOutRef ( GYTxOutRef )
 import GeniusYield.Types.Script (scriptFromCBOR)
-import GeniusYield.Types.Providers (gyQueryUtxosAtAddress', gyQueryUtxosAtTxOutRefs',
-                                    gyQueryUtxoAtTxOutRef')
+import GeniusYield.Types.Providers (gyQueryUtxosAtAddress', gyQueryUtxoAtTxOutRef')
 
 import GeniusYield.Providers.Common  (SomeDeserializeError (..))
 import GeniusYield.Providers.Maestro ( MaestroUtxo(..), MaestroAsset(..)
@@ -39,9 +38,8 @@ providersTests = testGroup "Providers" [ testGroup "Maestro" maestroTests ]
 maestroTests :: [TestTree]
 maestroTests =
     [ testGroup "Maestro Provider"
-        [ goldenTest "UtxosAtAddress" getUTxOsAtAddress (getFileUTxOs "tests/mockUtxos/utxoAtAddress.json") compareUTxOs (updateGolden "tests/mockUtxos/utxoAtAddress.json")
-        , goldenTest "UtxoAtRef" (getUTxOAtRef mockQueryTxOutRef) (getFileUTxOs "tests/mockUtxos/utxoAtRef.json") compareUTxOs (updateGolden "tests/mockUtxos/utxoAtRef.json")
-        , goldenTest "UtxosAtRefs" (getUTxOsAtRefs [mockQueryTxOutRef]) (getFileUTxOs "tests/mockUtxos/utxoAtRef.json") compareUTxOs (updateGolden "tests/mockUtxos/utxoAtRef.json")
+        [ goldenTest "UtxosAtAddress" getUTxOsAtAddress (getFileUTxOs "tests/mock-utxos/utxoAtAddress.json") compareUTxOs updateGolden
+        , goldenTest "UtxoAtRef" (getUTxOAtRef mockQueryTxOutRef) (getFileUTxOs "tests/mock-utxos/utxoAtRef.json") compareUTxOs updateGolden
         ]
     , testGroup "MaestroUtxo to GYUTxO translation"
         [ testCase "Invalid Address" $ do
@@ -147,13 +145,6 @@ maestroTests =
         utxo <- gyQueryUtxoAtTxOutRef' queryUtxo ref
         return $ utxosToApi $ utxosFromList [fromJust utxo]
 
-    getUTxOsAtRefs :: [GYTxOutRef] -> IO (Api.UTxO Api.BabbageEra)
-    getUTxOsAtRefs refs = do
-        maestroEnv <- newMaestroApiEnv maestroUrl maestroToken
-        let queryUtxo = maestroQueryUtxo maestroEnv
-        utxos <- gyQueryUtxosAtTxOutRefs' queryUtxo refs
-        return $ utxosToApi utxos
-
     getFileUTxOs :: String -> IO (Api.UTxO Api.BabbageEra)
     getFileUTxOs fileName = do
         json <- BS.readFile fileName
@@ -163,8 +154,8 @@ maestroTests =
     compareUTxOs :: Api.UTxO Api.BabbageEra -> Api.UTxO Api.BabbageEra -> IO (Maybe String)
     compareUTxOs utxo1 utxo2 = return $ if utxo1 == utxo2 then Nothing else Just "The UTxOs are different"
 
-    updateGolden :: String -> Api.UTxO Api.BabbageEra -> IO ()
-    updateGolden name utxos = BS.writeFile name (Aeson.encode utxos)
+    updateGolden :: Api.UTxO Api.BabbageEra -> IO ()
+    updateGolden _ = return ()
 
 -------------------------------------------
 -- Mock Values

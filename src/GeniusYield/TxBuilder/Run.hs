@@ -77,7 +77,7 @@ walletAddress Wallet{..} = addressFromPubKeyHash walletNetworkId $ pubKeyHash $
 instance HasAddress Wallet where
     toAddress = addressToPlutus . walletAddress
 
-newtype GYTxRunEnv = GYTxRunEnv {runEnvWallet :: Wallet}
+newtype GYTxRunEnv = GYTxRunEnv { runEnvWallet :: Wallet }
 
 type FeesLovelace = Sum Integer
 type MinAdaLovelace = Sum Integer

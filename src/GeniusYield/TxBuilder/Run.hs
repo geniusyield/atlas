@@ -54,6 +54,7 @@ import qualified PlutusTx.Builtins.Internal           as Plutus
 
 import           GeniusYield.Imports
 import           GeniusYield.Transaction              (GYCoinSelectionStrategy (GYRandomImproveMultiAsset))
+import           GeniusYield.Transaction.Common       (minimumUTxO, adjustTxOut)
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
@@ -226,9 +227,9 @@ instance GYTxMonad GYTxMonadRun where
 
     randSeed = return 42
 
--- TODO: Skeleton may be used when trying to figure out for minimum ada deposits.
-updateWalletState :: Wallet -> GYTxSkeleton v -> GYTxBody -> GYTxRunState -> GYTxRunState
-updateWalletState Wallet {..} _skeleton body GYTxRunState {..} = GYTxRunState $ flip (Map.insert walletName) walletExtraLovelace $ fromJust $ Map.lookup walletName walletExtraLovelace <> Just (coerce $ txBodyFee body, mempty)
+-- TODO: Haddock
+updateWalletState :: Wallet -> GYTxSkeleton v -> Api.S.ProtocolParameters -> GYTxBody -> GYTxRunState -> GYTxRunState
+updateWalletState Wallet {..} skeleton pp body GYTxRunState {..} = GYTxRunState $ flip (Map.insert walletName) walletExtraLovelace $ fromJust $ Map.lookup walletName walletExtraLovelace <> Just (coerce $ txBodyFee body, coerce $ flip valueAssetClass GYLovelace $ foldl' (\b o -> b <> gyTxOutValue (adjustTxOut (minimumUTxO True pp) o) `valueMinus` gyTxOutValue o) mempty $ gytxOuts skeleton)
 
 sendSkeleton :: GYTxSkeleton v -> GYTxMonadRun GYTxId
 sendSkeleton skeleton = snd <$> sendSkeleton' skeleton
@@ -238,7 +239,8 @@ sendSkeleton' skeleton = do
     w <- asks runEnvWallet
     let skey = walletPaymentSigningKey w
     body <- skeletonToTxBody skeleton
-    modify (updateWalletState w skeleton body)
+    pp <- protocolParameters
+    modify (updateWalletState w skeleton pp body)
     dumpBody body
 
     let pkh     = pubKeyHashToPlutus $ pubKeyHash $ paymentVerificationKey skey

@@ -226,7 +226,7 @@ withWalletBalancesCheck ((w, v) : xs) m = do
     return b
 
 {- | Computes a 'GYTxMonadRun' action, checking that the 'Wallet' balances
-        change according to the input list. This is a simplified version of `withWalletBalancesCheck` where the input list need not consider lovelaces required for fees & to satify the min ada requirements as these are added automatically.
+        change according to the input list. This is a simplified version of `withWalletBalancesCheck` where the input list need not consider lovelaces required for fees & to satisfy the min ada requirements as these are added automatically. It is therefore recommended to use this function over `withWalletBalancesCheck` to avoid hardcoding the lovelaces required for fees & min ada constraints.
 
 Notes:
 * An empty list means no checks are performed.

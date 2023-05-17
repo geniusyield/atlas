@@ -8,7 +8,10 @@ Stability   : develop
 
 -}
 module GeniusYield.TxBuilder.Run
-    ( GYTxMonadRun
+    ( Wallet (..)
+    , walletAddress
+    , GYTxRunState (..)
+    , GYTxMonadRun
     , asRun
     , asRandRun
     , liftRun
@@ -31,6 +34,8 @@ import           Control.Monad.State
 import           Data.List                            ((\\))
 import           Data.List.NonEmpty                   (NonEmpty (..))
 import qualified Data.Map.Strict                      as Map
+import           Data.Maybe                           (fromJust)
+import           Data.Semigroup                       (Sum (..))
 import qualified Data.Set                             as Set
 import           Data.Time.Clock                      (NominalDiffTime, UTCTime)
 import           Data.Time.Clock.POSIX                (posixSecondsToUTCTime)
@@ -54,12 +59,35 @@ import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
 
-newtype GYTxRunEnv = GYTxRunEnv {runEnvPaymentSigningKey :: GYPaymentSigningKey}
+type WalletName = String
+
+-- | Testing Wallet representation.
+data Wallet = Wallet
+    { walletPaymentSigningKey :: !GYPaymentSigningKey
+    , walletNetworkId         :: !GYNetworkId
+    , walletName              :: !WalletName
+    }
+    deriving (Show, Eq, Ord)
+
+-- | Gets a GYAddress of a testing wallet.
+walletAddress :: Wallet -> GYAddress
+walletAddress Wallet{..} = addressFromPubKeyHash walletNetworkId $ pubKeyHash $
+                           paymentVerificationKey walletPaymentSigningKey
+
+instance HasAddress Wallet where
+    toAddress = addressToPlutus . walletAddress
+
+newtype GYTxRunEnv = GYTxRunEnv {runEnvWallet :: Wallet}
+
+type FeesLovelace = Sum Integer
+type MinAdaLovelace = Sum Integer
+
+newtype GYTxRunState = GYTxRunState { walletExtraLovelace :: Map WalletName (FeesLovelace, MinAdaLovelace) }
 
 newtype GYTxMonadRun a = GYTxMonadRun
-    { unGYTxMonadRun :: ExceptT (Either String GYTxMonadException) (ReaderT GYTxRunEnv (RandT StdGen Run)) a
+    { unGYTxMonadRun :: ExceptT (Either String GYTxMonadException) (StateT GYTxRunState (ReaderT GYTxRunEnv (RandT StdGen Run))) a
     }
-    deriving newtype (Functor, Applicative, Monad, MonadReader GYTxRunEnv)
+    deriving newtype (Functor, Applicative, Monad, MonadReader GYTxRunEnv, MonadState GYTxRunState)
 
 instance MonadRandom GYTxMonadRun where
     getRandomR  = GYTxMonadRun . getRandomR
@@ -67,31 +95,29 @@ instance MonadRandom GYTxMonadRun where
     getRandomRs = GYTxMonadRun . getRandomRs
     getRandoms  = GYTxMonadRun getRandoms
 
-asRandRun :: GYPaymentSigningKey
+asRandRun :: Wallet
           -> GYTxMonadRun a
           -> RandT StdGen Run (Maybe a)
-asRandRun skey m = do
-    e <- runReaderT (runExceptT $ unGYTxMonadRun m) GYTxRunEnv
-            { runEnvPaymentSigningKey = skey
-            }
+asRandRun w m = do
+    e <- runReaderT (evalStateT (runExceptT $ unGYTxMonadRun m) $ GYTxRunState Map.empty) $ GYTxRunEnv w
     case e of
         Left (Left err)  -> lift (logError err) >> return Nothing
         Left (Right err) -> lift (logError (show err)) >> return Nothing
         Right a          -> return $ Just a
 
 asRun :: StdGen
-      -> GYPaymentSigningKey
+      -> Wallet
       -> GYTxMonadRun a
       -> Run (Maybe a)
-asRun g skey m = evalRandT (asRandRun skey m) g
+asRun g w m = evalRandT (asRandRun w m) g
 
 ownAddress :: GYTxMonadRun GYAddress
 ownAddress = do
     nid <- networkId
-    asks $ addressFromPubKeyHash nid . pubKeyHash . paymentVerificationKey . runEnvPaymentSigningKey
+    asks $ addressFromPubKeyHash nid . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
 
 liftRun :: Run a -> GYTxMonadRun a
-liftRun = GYTxMonadRun . lift . lift . lift
+liftRun = GYTxMonadRun . lift . lift . lift . lift
 
 networkIdRun :: Run GYNetworkId
 networkIdRun = do
@@ -200,14 +226,19 @@ instance GYTxMonad GYTxMonadRun where
 
     randSeed = return 42
 
+-- TODO: Skeleton may be used when trying to figure out for minimum ada deposits.
+updateWalletState :: Wallet -> GYTxSkeleton v -> GYTxBody -> GYTxRunState -> GYTxRunState
+updateWalletState Wallet {..} _skeleton body GYTxRunState {..} = GYTxRunState $ flip (Map.insert walletName) walletExtraLovelace $ fromJust $ Map.lookup walletName walletExtraLovelace <> Just (coerce $ txBodyFee body, mempty)
+
 sendSkeleton :: GYTxSkeleton v -> GYTxMonadRun GYTxId
 sendSkeleton skeleton = snd <$> sendSkeleton' skeleton
 
 sendSkeleton' :: GYTxSkeleton v -> GYTxMonadRun (Tx, GYTxId)
 sendSkeleton' skeleton = do
-    skey <- asks runEnvPaymentSigningKey
+    w <- asks runEnvWallet
+    let skey = walletPaymentSigningKey w
     body <- skeletonToTxBody skeleton
-
+    modify (updateWalletState w skeleton body)
     dumpBody body
 
     let pkh     = pubKeyHashToPlutus $ pubKeyHash $ paymentVerificationKey skey

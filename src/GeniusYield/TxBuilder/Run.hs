@@ -34,7 +34,6 @@ import           Control.Monad.State
 import           Data.List                            ((\\))
 import           Data.List.NonEmpty                   (NonEmpty (..))
 import qualified Data.Map.Strict                      as Map
-import           Data.Maybe                           (fromJust)
 import           Data.Semigroup                       (Sum (..))
 import qualified Data.Set                             as Set
 import           Data.Time.Clock                      (NominalDiffTime, UTCTime)
@@ -227,10 +226,6 @@ instance GYTxMonad GYTxMonadRun where
 
     randSeed = return 42
 
--- TODO: Haddock
-updateWalletState :: Wallet -> GYTxSkeleton v -> Api.S.ProtocolParameters -> GYTxBody -> GYTxRunState -> GYTxRunState
-updateWalletState Wallet {..} skeleton pp body GYTxRunState {..} = GYTxRunState $ flip (Map.insert walletName) walletExtraLovelace $ fromJust $ Map.lookup walletName walletExtraLovelace <> Just (coerce $ txBodyFee body, coerce $ flip valueAssetClass GYLovelace $ foldl' (\b o -> b <> gyTxOutValue (adjustTxOut (minimumUTxO True pp) o) `valueMinus` gyTxOutValue o) mempty $ gytxOuts skeleton)
-
 sendSkeleton :: GYTxSkeleton v -> GYTxMonadRun GYTxId
 sendSkeleton skeleton = snd <$> sendSkeleton' skeleton
 
@@ -240,7 +235,7 @@ sendSkeleton' skeleton = do
     let skey = walletPaymentSigningKey w
     body <- skeletonToTxBody skeleton
     pp <- protocolParameters
-    modify (updateWalletState w skeleton pp body)
+    modify (updateWalletState w pp body)
     dumpBody body
 
     let pkh     = pubKeyHashToPlutus $ pubKeyHash $ paymentVerificationKey skey
@@ -272,6 +267,19 @@ sendSkeleton' skeleton = do
             Just tid' -> return (tx5, tid')
 
   where
+
+    -- Updates the wallet state.
+    -- Updates extra lovelace required for fees & minimum ada requirements against the wallet sending this transaction.
+    updateWalletState :: Wallet -> Api.S.ProtocolParameters -> GYTxBody -> GYTxRunState -> GYTxRunState
+    updateWalletState Wallet {..} pp body GYTxRunState {..} = GYTxRunState $ Map.insertWith mappend walletName v walletExtraLovelace
+      where
+        v = ( coerce $ txBodyFee body
+            , coerce $ flip valueAssetClass GYLovelace $ 
+                foldl' 
+                  (\b o -> b <> gyTxOutValue (adjustTxOut (minimumUTxO True pp) o) `valueMinus` gyTxOutValue o) 
+                  mempty $
+                  gytxOuts skeleton
+            )
 
     slot :: GYSlot -> Fork.Slot
     slot = Fork.Slot . slotToInteger

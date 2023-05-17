@@ -225,7 +225,13 @@ withWalletBalancesCheck ((w, v) : xs) m = do
         fail $ printf "expected balance difference of %s for wallet %s, but the actual difference was %s" v (walletName w) diff
     return b
 
--- HADDOCK TODO
+{- | Computes a 'GYTxMonadRun' action, checking that the 'Wallet' balances
+        change according to the input list. This is a simplified version of `withWalletBalancesCheck` where the input list need not consider lovelaces required for fees & to satify the min ada requirements as these are added automatically.
+
+Notes:
+* An empty list means no checks are performed.
+* The 'GYValue' should be negative to check if the Wallet lost those funds.
+-}
 withWalletBalancesCheckSimple :: [(Wallet, GYValue)] -> GYTxMonadRun a -> GYTxMonadRun a
 withWalletBalancesCheckSimple wallValueDiffs m = do
   bs <- mapM (balance . fst) wallValueDiffs

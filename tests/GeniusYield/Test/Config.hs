@@ -1,12 +1,9 @@
 module GeniusYield.Test.Config (
     configTests,
+    coreProviderIO
 ) where
 
-import           Control.Exception    (throwIO)
-import qualified Data.ByteString.Lazy as LBS
 import           System.FilePath
-
-import qualified Data.Aeson           as Aeson
 
 import           Test.Tasty           (TestTree, testGroup)
 import           Test.Tasty.HUnit     (assertBool, testCase)
@@ -24,26 +21,6 @@ configTests = testGroup "Config"
 testParseResult :: (GYCoreProviderInfo -> Bool) -> FilePath -> IO ()
 testParseResult expectation filePath =
     coreProviderIO (mockConfigDir </> filePath) >>= assertBool "parses as expected" . expectation
-
-coreProviderIO :: FilePath -> IO GYCoreProviderInfo
-coreProviderIO filePath = do
-  bs <- LBS.readFile filePath
-  case Aeson.eitherDecode' bs of
-    Left err  -> throwIO $ userError err
-    Right cfg -> pure cfg
-
-isNodeChainIx :: GYCoreProviderInfo -> Bool
-isNodeChainIx GYNodeChainIx{} = True
-isNodeChainIx _               = False
-
-
-isDbSync :: GYCoreProviderInfo -> Bool
-isDbSync GYDbSync{} = True
-isDbSync _          = False
-
-isMaestro :: GYCoreProviderInfo -> Bool
-isMaestro GYMaestro{} = True
-isMaestro _           = False
 
 mockConfigDir :: FilePath
 mockConfigDir = "tests/mock-configs"

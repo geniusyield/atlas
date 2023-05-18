@@ -12,6 +12,11 @@ module GeniusYield.GYConfig
     , GYCoreProviderInfo (..)
     , withCfgProviders
     , coreConfigIO
+    , coreProviderIO
+    , findProviderToken
+    , isNodeChainIx
+    , isMaestro
+    , isDbSync
     ) where
 
 import           Control.Exception                      (SomeException, bracket,
@@ -71,6 +76,34 @@ data GYCoreProviderInfo
   | GYMaestro {cpiMaestroToken :: !(Confidential Text)}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock (Show)
+
+coreProviderIO :: FilePath -> IO GYCoreProviderInfo
+coreProviderIO filePath = do
+  bs <- LBS.readFile filePath
+  case Aeson.eitherDecode' bs of
+    Left err  -> throwIO $ userError err
+    Right cfg -> pure cfg
+
+isNodeChainIx :: GYCoreProviderInfo -> Bool
+isNodeChainIx GYNodeChainIx{} = True
+isNodeChainIx _               = False
+
+
+isDbSync :: GYCoreProviderInfo -> Bool
+isDbSync GYDbSync{} = True
+isDbSync _          = False
+
+isMaestro :: GYCoreProviderInfo -> Bool
+isMaestro GYMaestro{} = True
+isMaestro _           = False
+
+findProviderToken :: String -> IO Text
+findProviderToken configPath = do
+    config <- coreProviderIO configPath
+    let Confidential token = case config of
+            GYMaestro _ -> cpiMaestroToken config
+            _ -> Confidential ""
+    return token
 
 {- |
 The config to initialize the GY framework with.

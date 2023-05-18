@@ -272,11 +272,17 @@ sendSkeleton' skeleton = do
     -- Updates the wallet state.
     -- Updates extra lovelace required for fees & minimum ada requirements against the wallet sending this transaction.
     updateWalletState :: Wallet -> Api.S.ProtocolParameters -> GYTxBody -> GYTxRunState -> GYTxRunState
-    updateWalletState Wallet {..} pp body GYTxRunState {..} = GYTxRunState $ Map.insertWith mappend walletName v walletExtraLovelace
+    updateWalletState w@Wallet {..} pp body GYTxRunState {..} = GYTxRunState $ Map.insertWith mappend walletName v walletExtraLovelace
       where
         v = ( coerce $ txBodyFee body
             , coerce $ flip valueAssetClass GYLovelace $
-                foldMap' (\o -> gyTxOutValue (adjustTxOut (minimumUTxO True pp) o) `valueMinus` gyTxOutValue o) $ gytxOuts skeleton
+                foldMap'
+                  (\o ->
+                    -- If this additional ada is coming back to one's own self, we need not account for it.
+                    if gyTxOutAddress o == walletAddress w then
+                      mempty
+                    else gyTxOutValue (adjustTxOut (minimumUTxO True pp) o) `valueMinus` gyTxOutValue o
+                  ) $ gytxOuts skeleton
             )
 
     slot :: GYSlot -> Fork.Slot

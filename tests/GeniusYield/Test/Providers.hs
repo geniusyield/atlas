@@ -8,16 +8,17 @@ import           Data.String         (fromString)
 import qualified Data.Text as Text   (Text, unpack)
 import           Data.Maybe          (fromJust, fromMaybe)
 import           Data.Some (mkSome)
+import           Data.Set as Set (fromList)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
 import GeniusYield.Types.Address (unsafeAddressFromText, GYAddress)
-import GeniusYield.Types.UTxO (GYUTxO(..), GYOutDatum(..), utxosToApi, utxosFromList)
+import GeniusYield.Types.UTxO (GYUTxO(..), GYOutDatum(..), utxosToApi, utxosFromList, utxosFromApi, utxosRefs)
 import GeniusYield.Types.Value (GYAssetClass (GYLovelace, GYToken), valueFromLovelace, valueFromList)
 import GeniusYield.Types.Datum (datumHashFromHex, datumFromApi')
 import GeniusYield.Types.TxOutRef ( GYTxOutRef )
 import GeniusYield.Types.Script (scriptFromCBOR)
-import GeniusYield.Types.Providers (gyQueryUtxosAtAddress', gyQueryUtxoAtTxOutRef')
+import GeniusYield.Types.Providers (gyQueryUtxosAtAddress', gyQueryUtxosAtAddresses', gyQueryUtxoAtTxOutRef', GYQueryUTxO (gyQueryUtxoRefsAtAddress'))
 
 import GeniusYield.Providers.Common  (SomeDeserializeError (..))
 import GeniusYield.Providers.Maestro ( MaestroUtxo(..), MaestroAsset(..)
@@ -32,14 +33,17 @@ import qualified Cardano.Api as Api
 import GeniusYield.Types (PlutusVersion(PlutusV2))
 import Test.Tasty.Golden.Advanced (goldenTest)
 
-providersTests :: TestTree
-providersTests = testGroup "Providers" [ testGroup "Maestro" maestroTests ]
+providersTests :: Text.Text -> TestTree
+providersTests token = testGroup "Providers" [ testGroup "Maestro" (maestroTests token) ]
 
-maestroTests :: [TestTree]
-maestroTests =
-    [ testGroup "Maestro Provider"
-        [ goldenTest "UtxosAtAddress" getUTxOsAtAddress (getFileUTxOs "tests/mock-utxos/utxoAtAddress.json") compareUTxOs updateGolden
-        , goldenTest "UtxoAtRef" (getUTxOAtRef mockQueryTxOutRef) (getFileUTxOs "tests/mock-utxos/utxoAtRef.json") compareUTxOs updateGolden
+maestroTests :: Text.Text -> [TestTree]
+maestroTests token =
+    [ testGroup "Maestro Provider GYQueryUTxO"
+        [ goldenTestUtxos "UtxosAtAddressSimple" (getUTxOsAtAddress mockQueryAddress token) (getFileUTxOs simpleAddressPath)
+        , goldenTestUtxos "UtxosAtAddressComplex" (getUTxOsAtAddress qA1 token) (getFileUTxOs complexAddressPath)
+        , goldenTestUtxos "UtxosAtAddresses" (getUTxOsAtAddresses [qA1, qA2, qA3] token) (getFileUTxOs utxosAtAddressesPath)
+        , goldenTestUtxos "UtxoAtRef" (getUTxOAtRef mockQueryTxOutRef token) (getFileUTxOs utxoAtRefPath)
+        , goldenTestRefs  "UtxosRefsAtAddress" (getUTxOsRefsAtAddress mockQueryAddress token) (getFileRefs simpleAddressPath)
         ]
     , testGroup "MaestroUtxo to GYUTxO translation"
         [ testCase "Invalid Address" $ do
@@ -131,19 +135,40 @@ maestroTests =
         ]
     ]
   where
-    getUTxOsAtAddress :: IO (Api.UTxO Api.BabbageEra)
-    getUTxOsAtAddress = do
-        maestroEnv <- newMaestroApiEnv maestroUrl maestroToken
+    getUTxOsAtAddress :: GYAddress -> Text.Text -> IO (Api.UTxO Api.BabbageEra)
+    getUTxOsAtAddress addr pToken = do
+        maestroEnv <- newMaestroApiEnv maestroUrl pToken
         let queryUtxo = maestroQueryUtxo maestroEnv
-        utxos <- gyQueryUtxosAtAddress' queryUtxo mockQueryAddress
+        utxos <- gyQueryUtxosAtAddress' queryUtxo addr
         return $ utxosToApi utxos
 
-    getUTxOAtRef :: GYTxOutRef -> IO (Api.UTxO Api.BabbageEra)
-    getUTxOAtRef ref = do
-        maestroEnv <- newMaestroApiEnv maestroUrl maestroToken
+    getUTxOsAtAddresses :: [GYAddress] -> Text.Text -> IO (Api.UTxO Api.BabbageEra)
+    getUTxOsAtAddresses addrs pToken = do
+        maestroEnv <- newMaestroApiEnv maestroUrl pToken
+        let queryUtxo = maestroQueryUtxo maestroEnv
+        utxos <- gyQueryUtxosAtAddresses' queryUtxo addrs
+        return $ utxosToApi utxos
+
+    getUTxOAtRef :: GYTxOutRef -> Text.Text -> IO (Api.UTxO Api.BabbageEra)
+    getUTxOAtRef ref pToken = do
+        maestroEnv <- newMaestroApiEnv maestroUrl pToken
         let queryUtxo = maestroQueryUtxo maestroEnv
         utxo <- gyQueryUtxoAtTxOutRef' queryUtxo ref
         return $ utxosToApi $ utxosFromList [fromJust utxo]
+
+    getUTxOsRefsAtAddress :: GYAddress -> Text.Text -> IO [GYTxOutRef]
+    getUTxOsRefsAtAddress addr pToken = do
+        maestroEnv <- newMaestroApiEnv maestroUrl pToken
+        let queryUtxo = maestroQueryUtxo maestroEnv
+        gyQueryUtxoRefsAtAddress' queryUtxo addr
+
+
+    getFileRefs :: String -> IO [GYTxOutRef]
+    getFileRefs fileName = do
+        json <- BS.readFile fileName
+        let utxos = fromMaybe (utxosToApi $ utxosFromList []) (Aeson.decodeStrict (toStrict json))
+            refs = utxosRefs $ utxosFromApi utxos
+        return refs
 
     getFileUTxOs :: String -> IO (Api.UTxO Api.BabbageEra)
     getFileUTxOs fileName = do
@@ -154,23 +179,25 @@ maestroTests =
     compareUTxOs :: Api.UTxO Api.BabbageEra -> Api.UTxO Api.BabbageEra -> IO (Maybe String)
     compareUTxOs utxo1 utxo2 = return $ if utxo1 == utxo2 then Nothing else Just "The UTxOs are different"
 
-    updateGolden :: Api.UTxO Api.BabbageEra -> IO ()
+    compareRefs :: [GYTxOutRef] -> [GYTxOutRef] -> IO (Maybe String)
+    compareRefs refs1 refs2 = return $ if Set.fromList refs1 == Set.fromList refs2 then Nothing else Just "The Refs are different"
+
+    updateGolden :: a -> IO ()
     updateGolden _ = return ()
+
+    goldenTestUtxos :: TestName -> IO (Api.UTxO Api.BabbageEra) -> IO (Api.UTxO Api.BabbageEra) -> TestTree
+    goldenTestUtxos name queryData getFileData =
+        goldenTest name queryData getFileData compareUTxOs updateGolden
+
+    goldenTestRefs :: TestName -> IO [GYTxOutRef] -> IO [GYTxOutRef] -> TestTree
+    goldenTestRefs name queryData getFileData =
+        goldenTest name queryData getFileData compareRefs updateGolden
 
 -------------------------------------------
 -- Mock Values
 -------------------------------------------------------------------------------
 maestroUrl :: String
 maestroUrl = "https://preprod.gomaestro-api.org/"
-
-maestroToken :: Text.Text
-maestroToken = ""
-
-mockQueryAddressB32 :: Text.Text
-mockQueryAddressB32 = "addr_test1qp3fx29hm39xvyeer3v5xalcpmye7078vz09uylzuvxgqy0ma9xfzua4lag9wwgwk059k07f3kf46cjvx5ldmknqh7xmockQuery5pu4"
-
-mockQueryAddress :: GYAddress
-mockQueryAddress = unsafeAddressFromText mockQueryAddressB32
 
 mockQueryTxOutRef :: GYTxOutRef
 mockQueryTxOutRef = fromString $ concat [Text.unpack mockQueryTxId, "#", show mockQueryTxIx]
@@ -265,3 +292,34 @@ mockScriptCBOR = "5910fe01000033232323232323232323232323232332232323232223223232
 
 scriptDataFromDetailed :: ScriptDataDetailed -> Api.ScriptData
 scriptDataFromDetailed (ScriptDataDetailed d) = d
+
+-------------------------------------------------------------------------------
+-- Test Addresses
+-------------------------------------------------------------------------------
+mockQueryAddress :: GYAddress
+mockQueryAddress = unsafeAddressFromText "addr_test1qp3fx29hm39xvyeer3v5xalcpmye7078vz09uylzuvxgqy0ma9xfzua4lag9wwgwk059k07f3kf46cjvx5ldmknqh7xqmg5pu4"
+
+qA1 :: GYAddress
+qA1 = unsafeAddressFromText "addr_test1qz4rmz7gvmtmgrygr72ahuh52zr42ejzlefnptgeex3g0pr9973t5mlxtywqarjaghv2x8vvpnkpyln0d263jqd4vhfs868tfp"
+
+qA2 :: GYAddress
+qA2 = unsafeAddressFromText "addr_test1qrp2pg3g6tk7umgqepeasxnzvcsuen879mrsmtm2czhaxgn9973t5mlxtywqarjaghv2x8vvpnkpyln0d263jqd4vhfskgun9e"
+
+qA3 :: GYAddress
+qA3 = unsafeAddressFromText "addr_test1qp04dl7vvvqlvveqd4gr23z726n5ly8srr0ecg375pfhjht9973t5mlxtywqarjaghv2x8vvpnkpyln0d263jqd4vhfs60knu3"
+
+------------------------------------------------------------------------------
+-- GoldenTests FilePaths
+------------------------------------------------------------------------------
+
+simpleAddressPath :: String
+simpleAddressPath = "tests/mock-utxos/utxosAddrSimple.json"
+
+complexAddressPath :: String
+complexAddressPath = "tests/mock-utxos/utxosAddrComplex.json"
+
+utxosAtAddressesPath :: String
+utxosAtAddressesPath = "tests/mock-utxos/utxosAddresses.json"
+
+utxoAtRefPath :: String
+utxoAtRefPath = "tests/mock-utxos/utxoAtRef.json"

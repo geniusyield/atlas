@@ -31,6 +31,7 @@ import           Control.Monad.Except
 import           Control.Monad.Random
 import           Control.Monad.Reader
 import           Control.Monad.State
+import           Data.Foldable                        (foldMap')
 import           Data.List                            ((\\))
 import           Data.List.NonEmpty                   (NonEmpty (..))
 import qualified Data.Map.Strict                      as Map
@@ -53,7 +54,7 @@ import qualified PlutusTx.Builtins.Internal           as Plutus
 
 import           GeniusYield.Imports
 import           GeniusYield.Transaction              (GYCoinSelectionStrategy (GYRandomImproveMultiAsset))
-import           GeniusYield.Transaction.Common       (minimumUTxO, adjustTxOut)
+import           GeniusYield.Transaction.Common       (adjustTxOut, minimumUTxO)
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
@@ -274,11 +275,8 @@ sendSkeleton' skeleton = do
     updateWalletState Wallet {..} pp body GYTxRunState {..} = GYTxRunState $ Map.insertWith mappend walletName v walletExtraLovelace
       where
         v = ( coerce $ txBodyFee body
-            , coerce $ flip valueAssetClass GYLovelace $ 
-                foldl' 
-                  (\b o -> b <> gyTxOutValue (adjustTxOut (minimumUTxO True pp) o) `valueMinus` gyTxOutValue o) 
-                  mempty $
-                  gytxOuts skeleton
+            , coerce $ flip valueAssetClass GYLovelace $
+                foldMap' (\o -> gyTxOutValue (adjustTxOut (minimumUTxO True pp) o) `valueMinus` gyTxOutValue o) $ gytxOuts skeleton
             )
 
     slot :: GYSlot -> Fork.Slot

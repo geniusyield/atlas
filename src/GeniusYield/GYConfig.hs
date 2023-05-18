@@ -100,10 +100,9 @@ isMaestro _           = False
 findProviderToken :: String -> IO Text
 findProviderToken configPath = do
     config <- coreProviderIO configPath
-    let Confidential token = case config of
-            GYMaestro _ -> cpiMaestroToken config
-            _ -> Confidential ""
-    return token
+    case config of
+        GYMaestro (Confidential token) -> return token
+        _ -> throwIO $ userError "Missing Maestro Token"
 
 {- |
 The config to initialize the GY framework with.

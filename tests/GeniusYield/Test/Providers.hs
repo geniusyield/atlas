@@ -7,8 +7,9 @@ import           Data.ByteString.Lazy as BS (readFile, toStrict)
 import           Data.String         (fromString)
 import qualified Data.Text as Text   (Text, unpack)
 import           Data.Maybe          (fromJust, fromMaybe)
+import           Data.Map.Strict as Map    (difference)
 import           Data.Some (mkSome)
-import           Data.Set as Set (fromList)
+import qualified Data.Set as Set (fromList, difference)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -28,10 +29,12 @@ import GeniusYield.Providers.Maestro ( MaestroUtxo(..), MaestroAsset(..)
                                      , ScriptDataDetailed(..)
                                      , MaestroScript(..)
                                      , MaestroScriptType(..)
-                                     , transformUtxo, newMaestroApiEnv, maestroQueryUtxo)
+                                     , transformUtxo, newMaestroApiEnv, maestroQueryUtxo
+                                     , networkIdToMaestroUrl)
 import qualified Cardano.Api as Api
-import GeniusYield.Types (PlutusVersion(PlutusV2))
+import GeniusYield.Types (PlutusVersion(PlutusV2), GYNetworkId (GYTestnetPreprod))
 import Test.Tasty.Golden.Advanced (goldenTest)
+import Cardano.Api (UTxO(unUTxO))
 
 providersTests :: Text.Text -> TestTree
 providersTests token = testGroup "Providers" [ testGroup "Maestro" (maestroTests token) ]
@@ -39,11 +42,11 @@ providersTests token = testGroup "Providers" [ testGroup "Maestro" (maestroTests
 maestroTests :: Text.Text -> [TestTree]
 maestroTests token =
     [ testGroup "Maestro Provider GYQueryUTxO"
-        [ goldenTestUtxos "UtxosAtAddressSimple" (getUTxOsAtAddress mockQueryAddress token) (getFileUTxOs simpleAddressPath)
-        , goldenTestUtxos "UtxosAtAddressComplex" (getUTxOsAtAddress qA1 token) (getFileUTxOs complexAddressPath)
-        , goldenTestUtxos "UtxosAtAddresses" (getUTxOsAtAddresses [qA1, qA2, qA3] token) (getFileUTxOs utxosAtAddressesPath)
+        [ goldenTestUtxos "UtxosAtAddress Simple" (getUTxOsAtAddress simpleQueryAddress token) (getFileUTxOs simpleAddressPath)
+        , goldenTestUtxos "UtxosAtAddress Complex" (getUTxOsAtAddress queryAddress1 token) (getFileUTxOs complexAddressPath)
+        , goldenTestUtxos "UtxosAtAddresses" (getUTxOsAtAddresses [queryAddress1, queryAddress2, queryAddress3] token) (getFileUTxOs utxosAtAddressesPath)
         , goldenTestUtxos "UtxoAtRef" (getUTxOAtRef mockQueryTxOutRef token) (getFileUTxOs utxoAtRefPath)
-        , goldenTestRefs  "UtxosRefsAtAddress" (getUTxOsRefsAtAddress mockQueryAddress token) (getFileRefs simpleAddressPath)
+        , goldenTestRefs  "UtxosRefsAtAddress" (getUTxOsRefsAtAddress simpleQueryAddress token) (getFileRefs simpleAddressPath)
         ]
     , testGroup "MaestroUtxo to GYUTxO translation"
         [ testCase "Invalid Address" $ do
@@ -135,33 +138,31 @@ maestroTests token =
         ]
     ]
   where
+    getQueryUtxo :: Text.Text -> IO GYQueryUTxO
+    getQueryUtxo pToken = maestroQueryUtxo <$> newMaestroApiEnv maestroUrl pToken
+
     getUTxOsAtAddress :: GYAddress -> Text.Text -> IO (Api.UTxO Api.BabbageEra)
     getUTxOsAtAddress addr pToken = do
-        maestroEnv <- newMaestroApiEnv maestroUrl pToken
-        let queryUtxo = maestroQueryUtxo maestroEnv
+        queryUtxo <- getQueryUtxo pToken
         utxos <- gyQueryUtxosAtAddress' queryUtxo addr
         return $ utxosToApi utxos
 
     getUTxOsAtAddresses :: [GYAddress] -> Text.Text -> IO (Api.UTxO Api.BabbageEra)
     getUTxOsAtAddresses addrs pToken = do
-        maestroEnv <- newMaestroApiEnv maestroUrl pToken
-        let queryUtxo = maestroQueryUtxo maestroEnv
+        queryUtxo <- getQueryUtxo pToken
         utxos <- gyQueryUtxosAtAddresses' queryUtxo addrs
         return $ utxosToApi utxos
 
     getUTxOAtRef :: GYTxOutRef -> Text.Text -> IO (Api.UTxO Api.BabbageEra)
     getUTxOAtRef ref pToken = do
-        maestroEnv <- newMaestroApiEnv maestroUrl pToken
-        let queryUtxo = maestroQueryUtxo maestroEnv
+        queryUtxo <- getQueryUtxo pToken
         utxo <- gyQueryUtxoAtTxOutRef' queryUtxo ref
         return $ utxosToApi $ utxosFromList [fromJust utxo]
 
     getUTxOsRefsAtAddress :: GYAddress -> Text.Text -> IO [GYTxOutRef]
     getUTxOsRefsAtAddress addr pToken = do
-        maestroEnv <- newMaestroApiEnv maestroUrl pToken
-        let queryUtxo = maestroQueryUtxo maestroEnv
+        queryUtxo <- getQueryUtxo pToken
         gyQueryUtxoRefsAtAddress' queryUtxo addr
-
 
     getFileRefs :: String -> IO [GYTxOutRef]
     getFileRefs fileName = do
@@ -177,10 +178,18 @@ maestroTests token =
         return utxos
 
     compareUTxOs :: Api.UTxO Api.BabbageEra -> Api.UTxO Api.BabbageEra -> IO (Maybe String)
-    compareUTxOs utxo1 utxo2 = return $ if utxo1 == utxo2 then Nothing else Just "The UTxOs are different"
+    compareUTxOs utxosQuery utxosFile =
+        return $ if utxosQuery == utxosFile
+            then Nothing
+            else Just $ show (Map.difference (unUTxO utxosFile) (unUTxO utxosQuery))
 
     compareRefs :: [GYTxOutRef] -> [GYTxOutRef] -> IO (Maybe String)
-    compareRefs refs1 refs2 = return $ if Set.fromList refs1 == Set.fromList refs2 then Nothing else Just "The Refs are different"
+    compareRefs refsQuery refsFile = do
+        let refSetQuery = Set.fromList refsQuery
+            refSetFile = Set.fromList refsFile
+        return $ if refSetQuery == refSetFile
+            then Nothing
+            else Just $ show (Set.difference refSetFile refSetQuery)
 
     updateGolden :: a -> IO ()
     updateGolden _ = return ()
@@ -193,11 +202,11 @@ maestroTests token =
     goldenTestRefs name queryData getFileData =
         goldenTest name queryData getFileData compareRefs updateGolden
 
--------------------------------------------
+-------------------------------------------------------------------------------
 -- Mock Values
 -------------------------------------------------------------------------------
 maestroUrl :: String
-maestroUrl = "https://preprod.gomaestro-api.org/"
+maestroUrl = networkIdToMaestroUrl GYTestnetPreprod
 
 mockQueryTxOutRef :: GYTxOutRef
 mockQueryTxOutRef = fromString $ concat [Text.unpack mockQueryTxId, "#", show mockQueryTxIx]
@@ -296,17 +305,17 @@ scriptDataFromDetailed (ScriptDataDetailed d) = d
 -------------------------------------------------------------------------------
 -- Test Addresses
 -------------------------------------------------------------------------------
-mockQueryAddress :: GYAddress
-mockQueryAddress = unsafeAddressFromText "addr_test1qp3fx29hm39xvyeer3v5xalcpmye7078vz09uylzuvxgqy0ma9xfzua4lag9wwgwk059k07f3kf46cjvx5ldmknqh7xqmg5pu4"
+simpleQueryAddress :: GYAddress
+simpleQueryAddress = unsafeAddressFromText "addr_test1qp3fx29hm39xvyeer3v5xalcpmye7078vz09uylzuvxgqy0ma9xfzua4lag9wwgwk059k07f3kf46cjvx5ldmknqh7xqmg5pu4"
 
-qA1 :: GYAddress
-qA1 = unsafeAddressFromText "addr_test1qz4rmz7gvmtmgrygr72ahuh52zr42ejzlefnptgeex3g0pr9973t5mlxtywqarjaghv2x8vvpnkpyln0d263jqd4vhfs868tfp"
+queryAddress1 :: GYAddress
+queryAddress1 = unsafeAddressFromText "addr_test1qz4rmz7gvmtmgrygr72ahuh52zr42ejzlefnptgeex3g0pr9973t5mlxtywqarjaghv2x8vvpnkpyln0d263jqd4vhfs868tfp"
 
-qA2 :: GYAddress
-qA2 = unsafeAddressFromText "addr_test1qrp2pg3g6tk7umgqepeasxnzvcsuen879mrsmtm2czhaxgn9973t5mlxtywqarjaghv2x8vvpnkpyln0d263jqd4vhfskgun9e"
+queryAddress2 :: GYAddress
+queryAddress2 = unsafeAddressFromText "addr_test1qrp2pg3g6tk7umgqepeasxnzvcsuen879mrsmtm2czhaxgn9973t5mlxtywqarjaghv2x8vvpnkpyln0d263jqd4vhfskgun9e"
 
-qA3 :: GYAddress
-qA3 = unsafeAddressFromText "addr_test1qp04dl7vvvqlvveqd4gr23z726n5ly8srr0ecg375pfhjht9973t5mlxtywqarjaghv2x8vvpnkpyln0d263jqd4vhfs60knu3"
+queryAddress3 :: GYAddress
+queryAddress3 = unsafeAddressFromText "addr_test1qp04dl7vvvqlvveqd4gr23z726n5ly8srr0ecg375pfhjht9973t5mlxtywqarjaghv2x8vvpnkpyln0d263jqd4vhfs60knu3"
 
 ------------------------------------------------------------------------------
 -- GoldenTests FilePaths

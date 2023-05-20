@@ -21,6 +21,7 @@ module GeniusYield.Test.Utils
     , balance
     , withBalance
     , withWalletBalancesCheck
+    , withWalletBalancesCheckSimple
     , getBalance
     , getBalances
     , runWithWalletBalancesCheck
@@ -39,8 +40,11 @@ module GeniusYield.Test.Utils
     ) where
 
 import           Control.Monad.Random
+import           Control.Monad.State
 import           Data.List                     (findIndex)
+import qualified Data.Map.Strict               as Map
 import           Data.Maybe                    (fromJust)
+import           Data.Semigroup                (Sum (..))
 import           Data.Typeable
 import           Plutus.Model                  hiding (currentSlot)
 import qualified Plutus.Model.Fork.Ledger.Slot as Fork
@@ -137,13 +141,6 @@ testRun name run = do
                       <*> newWallet "w8" w
                       <*> newWallet "w9" w
 
--- | Testing Wallet representation.
-data Wallet = Wallet
-    { walletPaymentSigningKey :: !GYPaymentSigningKey
-    , walletNetworkId         :: !GYNetworkId
-    , walletName              :: !String
-    }
-    deriving (Show, Eq, Ord)
 
 -- | Available wallets.
 data Wallets = Wallets
@@ -157,14 +154,6 @@ data Wallets = Wallets
     , w8 :: !Wallet
     , w9 :: !Wallet
     } deriving (Show, Eq, Ord)
-
--- | Gets a GYAddress of a testing wallet.
-walletAddress :: Wallet -> GYAddress
-walletAddress Wallet{..} = addressFromPubKeyHash walletNetworkId $ pubKeyHash $
-                           paymentVerificationKey walletPaymentSigningKey
-
-instance HasAddress Wallet where
-    toAddress = addressToPlutus . walletAddress
 
 -- | Given a name and an initial fund, create a testing wallet.
 newWallet :: String -> GYValue -> RandT StdGen Run Wallet
@@ -183,7 +172,7 @@ newWallet n v = do
 
 -- | Runs a `GYTxMonadRun` action using the given wallet.
 runWallet :: Wallet -> GYTxMonadRun a -> Run (Maybe a)
-runWallet Wallet{..} action = flip evalRandT pureGen $ asRandRun walletPaymentSigningKey action
+runWallet w action = flip evalRandT pureGen $ asRandRun w action
 
 -- | Version of `runWallet` that fails if `Nothing` is returned by the action.
 runWallet' :: Wallet -> GYTxMonadRun a -> Run a
@@ -236,6 +225,30 @@ withWalletBalancesCheck ((w, v) : xs) m = do
         fail $ printf "expected balance difference of %s for wallet %s, but the actual difference was %s" v (walletName w) diff
     return b
 
+{- | Computes a 'GYTxMonadRun' action, checking that the 'Wallet' balances
+        change according to the input list. This is a simplified version of `withWalletBalancesCheck` where the input list need not consider lovelaces required for fees & to satisfy the min ada requirements as these are added automatically. It is therefore recommended to use this function over `withWalletBalancesCheck` to avoid hardcoding the lovelaces required for fees & min ada constraints.
+
+Notes:
+* An empty list means no checks are performed.
+* The 'GYValue' should be negative to check if the Wallet lost those funds.
+-}
+withWalletBalancesCheckSimple :: [(Wallet, GYValue)] -> GYTxMonadRun a -> GYTxMonadRun a
+withWalletBalancesCheckSimple wallValueDiffs m = do
+  bs <- mapM (balance . fst) wallValueDiffs
+  a <- m
+  walletExtraLovelaceMap <- gets walletExtraLovelace
+  bs' <- mapM (balance . fst) wallValueDiffs
+
+  forM_ (zip3 wallValueDiffs bs' bs) $
+    \((w, v), b', b) ->
+      let newBalance = case Map.lookup (walletName w) walletExtraLovelaceMap of
+            Nothing -> b'
+            Just (extraLovelaceForFees, extraLovelaceForMinAda) -> b' <> valueFromLovelace (coerce $ extraLovelaceForFees <> extraLovelaceForMinAda)
+          diff = newBalance `valueMinus` b
+        in unless (diff == v) $ fail $
+            printf "Wallet: %s. Old balance: %s. New balance: %s. New balance after adding extra lovelaces %s. Expected balance difference of %s, but the actual difference was %s" (walletName w) b b' newBalance v diff 
+  return a
+
 -- | Given a wallet returns its balance.
 getBalance :: HasCallStack => Wallet -> Run GYValue
 getBalance w = fromJust <$> runWallet w (balance w)
@@ -258,14 +271,14 @@ runWithWalletBalancesCheck
     -> Run a
     -> Run a
 runWithWalletBalancesCheck ws bsCheck m = do
-    let wsToCheck = map (($ws) . fst) bsCheck
+    let wsToCheck = map (($ ws) . fst) bsCheck
 
     bs <- getBalances wsToCheck
     a <- m
     bs' <- getBalances wsToCheck
 
     forM_ (zip3 bsCheck bs' bs) $
-        \((w, v),b',b) ->
+        \((w, v), b', b) ->
             let diff = b' `valueMinus` b
             in unless (diff == v) $ fail $
                printf "expected balance difference of %s for wallet %s, but the actual difference was %s"

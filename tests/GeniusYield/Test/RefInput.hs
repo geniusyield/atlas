@@ -30,8 +30,8 @@ gyGuessRefInputDatumValidator = validatorFromPlutus guessRefInputDatumValidator
 
 refInputTests :: TestTree
 refInputTests = testGroup "Reference Input"
-    [ testRun "Inlined datum" $ refInputTrace True 5 5 336672
-    , testRun "Inlined datum - Wrong guess" $ mustFail . refInputTrace True 5 4 336672
+    [ testRun "Inlined datum" $ refInputTrace True 5 5
+    , testRun "Inlined datum - Wrong guess" $ mustFail . refInputTrace True 5 4
     , testRun "Reference input must not be consumed" tryRefInputConsume
     ]
 
@@ -49,8 +49,8 @@ guessRefInputRun refInputORef consumeRef guess = do
         mustHaveRefInput refInputORef
   void $ sendSkeleton skeleton
 
-refInputTrace :: Bool -> Integer -> Integer -> Integer -> Wallets -> Run ()
-refInputTrace toInline actual guess fees Wallets{..} = do
+refInputTrace :: Bool -> Integer -> Integer -> Wallets -> Run ()
+refInputTrace toInline actual guess Wallets{..} = do
   let myGuess :: Integer = guess
       outValue :: GYValue = valueFromLovelace 20_000_000
   mMOref <- runWallet w1 $ addRefInput toInline (walletAddress w9) (datumFromPlutusData (RefInputDatum actual))
@@ -58,7 +58,7 @@ refInputTrace toInline actual guess fees Wallets{..} = do
     Nothing -> fail "Unable to create utxo to reference"
     Just Nothing -> fail "Couldn't find index for reference utxo in outputs"
     Just (Just refInputORef) ->
-      void $ runWallet w1 $ do
+      void $ runWallet w1 $ withWalletBalancesCheckSimple [w1 := valueFromLovelace 0] $ do
         liftRun $ logInfo $ printf "Reference input ORef %s" refInputORef
         addr <- scriptAddress gyGuessRefInputDatumValidator
         (Tx _ plutusTxBody, txId) <- sendSkeleton' (mustHaveOutput $ mkGYTxOut addr outValue (datumFromPlutusData ()))
@@ -68,8 +68,7 @@ refInputTrace toInline actual guess fees Wallets{..} = do
           [oref']        -> return oref'
           _non_singleton -> fail "expected exactly one reference"
         liftRun $ logInfo $ printf "Locked ORef %s" oref
-        withWalletBalancesCheck [w1 := outValue <> valueNegate (valueFromLovelace fees)] $ do
-          guessRefInputRun refInputORef oref myGuess
+        guessRefInputRun refInputORef oref myGuess
 
 tryRefInputConsume :: Wallets -> Run ()
 tryRefInputConsume Wallets{..} = do

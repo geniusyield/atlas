@@ -89,12 +89,8 @@ simpleScriptAPIv2 = validatorToApi giftValidatorV2
 -- not the package.
 findPackageRoot :: IO FilePath
 findPackageRoot = do
-    here <- doesFileExist "atlas.cabal"
+    here <- doesFileExist "atlas-cardano.cabal"
     if here
     then return "."
-    else do
-        up <- doesFileExist "geniusyield-framework-subtr/atlas.cabal"
-        if up
-        then return "geniusyield-framework-subtr"
-        else fail "Cannot find package root"
+    else fail "Cannot find package root"
 

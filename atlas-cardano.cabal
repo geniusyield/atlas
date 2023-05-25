@@ -15,6 +15,7 @@ category:           Blockchain, Cardano, Framework
 homepage:           https://github.com/geniusyield/atlas#readme
 bug-reports:        https://github.com/geniusyield/atlas/issues
 extra-source-files: README.md
+tested-with:        GHC == 8.10.7
 
 source-repository head
   type:     git

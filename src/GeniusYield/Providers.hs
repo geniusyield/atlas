@@ -32,8 +32,7 @@ simpleProviders :: GYEra                -- ^ Era in which local node operates
                 -> IO GYProviders
 simpleProviders era nid nodeSocket mKey logging = do
     let info  = networkIdToLocalNodeConnectInfo nid nodeSocket
-        maestroUrl = networkIdToMaestroUrl nid
-    mEnv <- newMaestroApiEnv maestroUrl mKey
+    mEnv <- X.networkIdToMaestroEnv mKey nid
 
     return GYProviders
       { gyLookupDatum   = maestroLookupDatum mEnv

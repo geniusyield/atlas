@@ -83,7 +83,6 @@ library
     GeniusYield.Providers.Katip
     GeniusYield.Providers.LiteChainIndex
     GeniusYield.Providers.Maestro
-    GeniusYield.Providers.MaestroSDK
     GeniusYield.Providers.Node
     GeniusYield.Providers.Sentry
     GeniusYield.Providers.SubmitApi
@@ -151,7 +150,6 @@ library
     , cassava                ^>=0.5.3.0
     , cborg                  ^>=0.2.8.0
     , containers             ^>=0.6.5.1
-    , deriving-aeson         ^>=0.2.8
     , directory              ^>=1.3.6.0
     , either                 ^>=5.0.2
     , filepath               ^>=1.4.2.1
@@ -297,6 +295,7 @@ test-suite atlas-tests
     , containers
     , directory
     , filepath
+    , maestro-sdk
     , MonadRandom
     , mtl
     , ouroboros-consensus

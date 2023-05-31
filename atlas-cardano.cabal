@@ -1,6 +1,6 @@
 cabal-version:      2.4
-name:               atlas
-version:            0.2.0
+name:               atlas-cardano
+version:            0.3.0
 synopsis:           Application backend for Plutus smart contracts on Cardano
 description:
   Atlas is an all-in-one, Haskell-native application backend for writing off-chain code for on-chain Plutus smart contracts.
@@ -15,6 +15,7 @@ category:           Blockchain, Cardano, Framework
 homepage:           https://github.com/geniusyield/atlas#readme
 bug-reports:        https://github.com/geniusyield/atlas/issues
 extra-source-files: README.md
+tested-with:        GHC == 8.10.7
 
 source-repository head
   type:     git
@@ -288,7 +289,7 @@ test-suite atlas-tests
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
     , aeson
-    , atlas
+    , atlas-cardano
     , base
     , bytestring
     , cardano-api
@@ -327,7 +328,7 @@ test-suite atlas-privnet-tests
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
-    , atlas
+    , atlas-cardano
     , base
     , tasty
     , tasty-hunit

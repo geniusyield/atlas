@@ -83,6 +83,7 @@ library
     GeniusYield.Providers.Katip
     GeniusYield.Providers.LiteChainIndex
     GeniusYield.Providers.Maestro
+    GeniusYield.Providers.MaestroSDK
     GeniusYield.Providers.Node
     GeniusYield.Providers.Sentry
     GeniusYield.Providers.SubmitApi
@@ -197,6 +198,7 @@ library
   -- Dependencies whose version is fixed by @cabal.project@ file.
   build-depends:
     , blockfrost-client
+    , maestro-sdk
 
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
   build-depends:

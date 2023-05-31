@@ -26,14 +26,12 @@ import           Data.Either.Combinators              (maybeToRight)
 import           Data.Foldable                        (fold)
 import           Data.Functor                         ((<&>))
 import qualified Data.Map.Strict                      as Map
-import           Data.Maybe                           (fromJust)
 import qualified Data.Set                             as Set
 import qualified Data.Text                            as Text
 import qualified Data.Text.Encoding                   as Text
 import qualified Data.Time.Clock.POSIX                as Time
 import qualified Money
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
-import           PlutusTx                             (Data (..), FromData, fromData)
 import qualified PlutusTx.Builtins                    as Plutus
 import qualified Web.HttpApiData                      as Web
 
@@ -56,13 +54,6 @@ handleBlockfrostError locationInfo = either (throwIO . BlpvApiError locationInfo
     silenceHeadersBlockfrostClientError (Blockfrost.ServantClientError e) = Blockfrost.ServantClientError $ silenceHeadersClientError e
     silenceHeadersBlockfrostClientError other                             = other
 
-scriptDataToData :: Api.ScriptData -> Data
-scriptDataToData (Api.ScriptDataConstructor n xs) = Constr n $ scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataMap xs)           = Map [(scriptDataToData x, scriptDataToData y) | (x, y) <- xs]
-scriptDataToData (Api.ScriptDataList xs)          = List $ scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataNumber n)         = I n
-scriptDataToData (Api.ScriptDataBytes bs)         = B bs
-
 lovelacesToInteger :: Blockfrost.Lovelaces -> Integer
 lovelacesToInteger = fromIntegral
 
@@ -80,12 +71,6 @@ amountToValue (Blockfrost.AssetAmount sdiscr) = do
     csAndTkname = Money.someDiscreteCurrency sdiscr
     -- Blockfrost uses no separator between CS and TkName.
     (csPart, tkNamePart) = Text.splitAt 56 csAndTkname
-
-fromJson :: FromData a => LBS.ByteString -> Either SomeDeserializeError a
-fromJson b = do
-    v <- first (DeserializeErrorAeson . Text.pack) $ Aeson.eitherDecode b
-    x <- first DeserializeErrorScriptDataJson $ Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema v
-    pure . fromJust . fromData $ scriptDataToData x
 
 -------------------------------------------------------------------------------
 -- Submit

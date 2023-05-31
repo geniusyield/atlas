@@ -9,6 +9,8 @@ Stability   : develop
 module GeniusYield.Providers.Common (
     SomeDeserializeError (..)
     , newServantClientEnv
+    , scriptDataToData
+    , fromJson
     , parseEraHist
     , babbageProtocolVersion
     , preprodEraHist
@@ -17,30 +19,38 @@ module GeniusYield.Providers.Common (
     , silenceHeadersClientError
 ) where
 
+import qualified Data.Aeson                           as Aeson
+import qualified Data.ByteString.Lazy                 as LBS
+import           Data.Maybe                           (fromJust)
 import           Data.Text                            (Text)
+import qualified Data.Text                            as Text
 import           Numeric.Natural                      (Natural)
 
 import qualified Network.HTTP.Client                  as HttpClient
 import qualified Network.HTTP.Client.TLS              as HttpClientTLS
+import           PlutusTx                             (Data (..), FromData,
+                                                       fromData)
 import qualified Servant.Client                       as Servant
 import qualified Servant.Client.Core                  as Servant
 
 import qualified Cardano.Api                          as Api
 import           Cardano.Slotting.Time                (RelativeTime (RelativeTime),
                                                        mkSlotLength)
+import           Data.Bifunctor                       (first)
 import qualified Ouroboros.Consensus.Cardano.Block    as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
 import           Ouroboros.Consensus.Util.Counting    (NonEmpty (NonEmptyCons, NonEmptyOne))
 
 data SomeDeserializeError
-    = DeserializeErrorBech32 Api.Bech32DecodeError
-    | DeserializeErrorAeson Text
-    | DeserializeErrorAssetClass Text
-    | DeserializeErrorScriptDataJson Api.ScriptDataJsonError
+    = DeserializeErrorBech32 !Api.Bech32DecodeError
+    | DeserializeErrorAeson !Text
+    | DeserializeErrorAssetClass !Text
+    | DeserializeErrorScriptDataJson !Api.ScriptDataJsonError
     -- Api.RawBytesHexError isn't exported; use that if it gets exported
     -- https://github.com/input-output-hk/cardano-node/issues/4579
-    | DeserializeErrorHex Text
+    | DeserializeErrorHex !Text
     | DeserializeErrorAddress
+    | DeserializeErrorImpossibleBranch !Text
     deriving stock (Eq, Show)
 
 {- | Remove request headers info from returned ClientError.
@@ -59,6 +69,19 @@ newServantClientEnv baseUrl = do
         then HttpClient.newManager HttpClientTLS.tlsManagerSettings
         else HttpClient.newManager HttpClient.defaultManagerSettings
     pure $ Servant.mkClientEnv manager url
+
+scriptDataToData :: Api.ScriptData -> Data
+scriptDataToData (Api.ScriptDataConstructor n xs) = Constr n $ scriptDataToData <$> xs
+scriptDataToData (Api.ScriptDataMap xs)           = Map [(scriptDataToData x, scriptDataToData y) | (x, y) <- xs]
+scriptDataToData (Api.ScriptDataList xs)          = List $ scriptDataToData <$> xs
+scriptDataToData (Api.ScriptDataNumber n)         = I n
+scriptDataToData (Api.ScriptDataBytes bs)         = B bs
+
+fromJson :: FromData a => LBS.ByteString -> Either SomeDeserializeError a
+fromJson b = do
+    v <- first (DeserializeErrorAeson . Text.pack) $ Aeson.eitherDecode b
+    x <- first DeserializeErrorScriptDataJson $ Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema v
+    pure . fromJust . fromData $ scriptDataToData x
 
 {- | Convert a regular list of era summaries (a la Ogmios) into a typed EraHistory (a la Ouroboros).
 

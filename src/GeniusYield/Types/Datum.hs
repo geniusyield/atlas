@@ -17,6 +17,8 @@ module GeniusYield.Types.Datum (
     datumFromPlutus',
     datumFromPlutusData,
     hashDatum,
+    scriptDataToData,
+    dataToScriptData,
     -- * Datum hash
     GYDatumHash,
     datumHashFromHex,
@@ -36,7 +38,8 @@ import qualified Data.ByteString.Char8                as BS8
 import           Data.Either.Combinators              (maybeToRight)
 import qualified Data.Text                            as Txt
 import qualified Database.PostgreSQL.Simple           as PQ
-import qualified Database.PostgreSQL.Simple.FromField as PQ (FromField (..), returnError)
+import qualified Database.PostgreSQL.Simple.FromField as PQ (FromField (..),
+                                                             returnError)
 import qualified Database.PostgreSQL.Simple.ToField   as PQ
 import qualified Plutus.V1.Ledger.Api                 as Plutus
 

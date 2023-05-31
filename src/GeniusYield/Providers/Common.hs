@@ -9,7 +9,6 @@ Stability   : develop
 module GeniusYield.Providers.Common (
     SomeDeserializeError (..)
     , newServantClientEnv
-    , scriptDataToData
     , fromJson
     , parseEraHist
     , babbageProtocolVersion
@@ -28,8 +27,7 @@ import           Numeric.Natural                      (Natural)
 
 import qualified Network.HTTP.Client                  as HttpClient
 import qualified Network.HTTP.Client.TLS              as HttpClientTLS
-import           PlutusTx                             (Data (..), FromData,
-                                                       fromData)
+import           PlutusTx                             (FromData, fromData)
 import qualified Servant.Client                       as Servant
 import qualified Servant.Client.Core                  as Servant
 
@@ -37,6 +35,7 @@ import qualified Cardano.Api                          as Api
 import           Cardano.Slotting.Time                (RelativeTime (RelativeTime),
                                                        mkSlotLength)
 import           Data.Bifunctor                       (first)
+import           GeniusYield.Types.Datum              (scriptDataToData)
 import qualified Ouroboros.Consensus.Cardano.Block    as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
 import           Ouroboros.Consensus.Util.Counting    (NonEmpty (NonEmptyCons, NonEmptyOne))
@@ -69,13 +68,6 @@ newServantClientEnv baseUrl = do
         then HttpClient.newManager HttpClientTLS.tlsManagerSettings
         else HttpClient.newManager HttpClient.defaultManagerSettings
     pure $ Servant.mkClientEnv manager url
-
-scriptDataToData :: Api.ScriptData -> Data
-scriptDataToData (Api.ScriptDataConstructor n xs) = Constr n $ scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataMap xs)           = Map [(scriptDataToData x, scriptDataToData y) | (x, y) <- xs]
-scriptDataToData (Api.ScriptDataList xs)          = List $ scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataNumber n)         = I n
-scriptDataToData (Api.ScriptDataBytes bs)         = B bs
 
 fromJson :: FromData a => LBS.ByteString -> Either SomeDeserializeError a
 fromJson b = do

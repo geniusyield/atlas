@@ -53,6 +53,12 @@ jobs:
       uses: pre-commit/action@v3.0.0
       with:
         extra_args: --verbose --all-files
+    - name: Prepare Maestro config file
+      env:
+        MAESTRO_CONFIG: ${{secrets.MAESTRO_CONFIG}}
+      run: |
+          echo "$MAESTRO_CONFIG" >> maestro-config.json
+          sha256sum maestro-config.json --tag
     - name: Setup haskell tooling
       uses: haskell/actions/setup@v2
       with:

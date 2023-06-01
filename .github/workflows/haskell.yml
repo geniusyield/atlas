@@ -57,8 +57,14 @@ jobs:
       env:
         MAESTRO_CONFIG: ${{secrets.MAESTRO_CONFIG}}
       run: |
+          echo "Creating maestro-config.json..."
           echo "$MAESTRO_CONFIG" >> maestro-config.json
-          sha256sum maestro-config.json --tag
+          if [[ -f maestro-config.json ]] ; then
+            echo "[OK] maestro-config.json has been created."
+          else
+            echo "[ERROR] maestro-config.json is missing."
+            exit 1
+          fi
     - name: Setup haskell tooling
       uses: haskell/actions/setup@v2
       with:

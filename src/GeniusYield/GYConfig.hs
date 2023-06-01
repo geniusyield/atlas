@@ -14,7 +14,8 @@ module GeniusYield.GYConfig
     , coreConfigIO
     ) where
 
-import           Control.Exception                      (SomeException, bracket, try)
+import           Control.Exception                      (SomeException, bracket,
+                                                         try)
 import qualified Data.Aeson                             as Aeson
 import           Data.Aeson.TH
 import           Data.Aeson.Types
@@ -28,6 +29,7 @@ import qualified Database.PostgreSQL.Simple.URL         as PQ
 import qualified Cardano.Api                            as Api
 
 import           GeniusYield.Imports
+import qualified GeniusYield.Providers.Blockfrost       as Blockfrost
 import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
 import qualified GeniusYield.Providers.CardanoDbSync    as DbSync
 import qualified GeniusYield.Providers.Katip            as Katip
@@ -59,6 +61,7 @@ In JSON format, this essentially corresponds to:
 = { socketPath: FilePath, maestroToken: string }
 | { cardanoDbSync: PQ.ConnectInfo, cardanoSubmitApiUrl: string }
 | { maestroToken: string }
+| { blockfrostKey: string }
 
 The constructor tags don't need to appear in the JSON.
 -}
@@ -66,6 +69,7 @@ data GYCoreProviderInfo
   = GYNodeChainIx {cpiSocketPath :: !FilePath, cpiMaestroToken :: !(Confidential Text)}
   | GYDbSync {cpiCardanoDbSync :: !PQConnInf, cpiCardanoSubmitApiUrl :: !String}
   | GYMaestro {cpiMaestroToken :: !(Confidential Text)}
+  | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock (Show)
 
 {- |
@@ -131,7 +135,6 @@ withCfgProviders
             , DbSync.dbSyncLookupDatum conn
             , SubmitApi.submitApiSubmitTxDefault submitApiEnv
             )
-
         GYMaestro (Confidential apiToken) -> do
           let maestroUrl = MaestroApi.networkIdToMaestroUrl cfgNetworkId
           maestroApiEnv <- MaestroApi.newMaestroApiEnv maestroUrl apiToken
@@ -148,6 +151,23 @@ withCfgProviders
             , MaestroApi.maestroQueryUtxo maestroApiEnv
             , MaestroApi.maestroLookupDatum maestroApiEnv
             , MaestroApi.maestroSubmitTx maestroApiEnv
+            )
+        GYBlockfrost (Confidential key) -> do
+          -- NOTE: This provider only has proper support for the preprod testnet as of now.
+          let proj = Blockfrost.networkIdToProject cfgNetworkId key
+          blockfrostGetParams <- makeGetParameters
+            (Blockfrost.blockfrostGetCurrentSlot proj)
+            (Blockfrost.blockfrostProtocolParams proj)
+            (Blockfrost.blockfrostSystemStart proj)
+            (Blockfrost.blockfrostEraHistory proj)
+            (Blockfrost.blockfrostStakePools proj)
+          blockfrostSlotActions <- makeSlotActions slotCachingTime $ Blockfrost.blockfrostGetCurrentSlot proj
+          pure
+            ( blockfrostGetParams
+            , blockfrostSlotActions
+            , Blockfrost.blockfrostQueryUtxo proj
+            , Blockfrost.blockfrostLookupDatum proj
+            , Blockfrost.blockfrostSubmitTx proj
             )
 
       bracket (Katip.mkKatipLog ns cfgLogging) logCleanUp $ \gyLog' -> do

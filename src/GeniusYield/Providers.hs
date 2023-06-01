@@ -13,6 +13,7 @@ module GeniusYield.Providers
 
 import           Data.Text                              (Text)
 
+import           GeniusYield.Providers.Blockfrost       as X
 import           GeniusYield.Providers.CachedQueryUTxOs as X
 import           GeniusYield.Providers.CardanoDbSync    as X
 import           GeniusYield.Providers.Katip            as X

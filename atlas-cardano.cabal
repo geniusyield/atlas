@@ -76,6 +76,7 @@ library
     GeniusYield.HTTP.Errors
     GeniusYield.Imports
     GeniusYield.Providers
+    GeniusYield.Providers.Blockfrost
     GeniusYield.Providers.CachedQueryUTxOs
     GeniusYield.Providers.CardanoDbSync
     GeniusYield.Providers.Common
@@ -172,6 +173,7 @@ library
     , postgresql-simple-url  ^>=0.2.1.0
     , raven-haskell          ^>=0.1.4.1
     , resource-pool          ^>=0.2.3.2
+    , safe-money             ^>=0.9.1
     , scientific             ^>=0.3.7.0
     , serialise              ^>=0.2.6.0
     , servant                ^>=0.19
@@ -192,6 +194,10 @@ library
     , unordered-containers   ^>=0.2.19.1
     , vector                 ^>=0.12.3.1
     , witherable             ^>=0.4.2
+
+  -- Dependencies whose version is fixed by @cabal.project@ file.
+  build-depends:
+    , blockfrost-client
 
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
   build-depends:

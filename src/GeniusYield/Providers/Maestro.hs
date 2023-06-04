@@ -241,10 +241,11 @@ maestroUtxosAtTxOutRefs' env refs = do
 -- | Definition of 'GYQueryUTxO' for the Maestro provider.
 maestroQueryUtxo :: Maestro.MaestroEnv -> GYQueryUTxO
 maestroQueryUtxo env = GYQueryUTxO
-  { gyQueryUtxosAtAddresses'  = maestroUtxosAtAddresses env
-  , gyQueryUtxosAtTxOutRefs'  = maestroUtxosAtTxOutRefs env
-  , gyQueryUtxoAtTxOutRef'    = maestroUtxoAtTxOutRef env
-  , gyQueryUtxoRefsAtAddress' = maestroRefsAtAddress env
+  { gyQueryUtxosAtAddresses'           = maestroUtxosAtAddresses env
+  , gyQueryUtxosAtTxOutRefs'           = maestroUtxosAtTxOutRefs env
+  , gyQueryUtxoAtTxOutRef'             = maestroUtxoAtTxOutRef env
+  , gyQueryUtxoRefsAtAddress'          = maestroRefsAtAddress env
+  , gyQueryUtxosAtAddressesWithDatums' = Nothing
   }
 
 -------------------------------------------------------------------------------

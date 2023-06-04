@@ -22,6 +22,7 @@ import           GeniusYield.Providers.Node             as X
 import           GeniusYield.Providers.SubmitApi        as X
 import           GeniusYield.Types
 
+-- TODO: Delete the following `simpleProviders` method?
 -- | Creates simples providers using a local node with Maestro API key.
 --
 simpleProviders :: GYEra                -- ^ Era in which local node operates

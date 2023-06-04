@@ -151,7 +151,6 @@ withCfgProviders
             , MaestroApi.maestroSubmitTx maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do
-          -- NOTE: This provider only has proper support for the preprod testnet as of now.
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
           blockfrostGetParams <- makeGetParameters
             (Blockfrost.blockfrostGetCurrentSlot proj)

@@ -259,15 +259,14 @@ blockfrostProtocolParams proj = do
     let majorProtVers = fromInteger _protocolParamsProtocolMajorVer
     pure $ Api.S.ProtocolParameters
         { protocolParamProtocolVersion     = (majorProtVers, fromInteger _protocolParamsProtocolMinorVer)
-        , protocolParamDecentralization    = Just _protocolParamsDecentralisationParam
-        -- TODO: Blockfrost gives back a 'Maybe Aeson.Value' in extra_entropy. Usable?
-        , protocolParamExtraPraosEntropy   = Nothing
+        , protocolParamDecentralization    = Nothing  -- Also known as `d`, got deprecated in Babbage.
+        , protocolParamExtraPraosEntropy   = Nothing  -- Also known as `extraEntropy`, got deprecated in Babbage.
         , protocolParamMaxBlockHeaderSize  = fromInteger _protocolParamsMaxBlockHeaderSize
         , protocolParamMaxBlockBodySize    = fromInteger _protocolParamsMaxBlockSize
         , protocolParamMaxTxSize           = fromInteger _protocolParamsMaxTxSize
         , protocolParamTxFeeFixed          = fromInteger _protocolParamsMinFeeB
         , protocolParamTxFeePerByte        = fromInteger _protocolParamsMinFeeA
-        , protocolParamMinUTxOValue        = Just . Api.Lovelace $ lovelacesToInteger _protocolParamsMinUtxo
+        , protocolParamMinUTxOValue        = Nothing  -- Deprecated in Alonzo.
         , protocolParamStakeAddressDeposit = Api.Lovelace $ lovelacesToInteger _protocolParamsKeyDeposit
         , protocolParamStakePoolDeposit    = Api.Lovelace $ lovelacesToInteger _protocolParamsPoolDeposit
         , protocolParamMinPoolCost         = Api.Lovelace $ lovelacesToInteger _protocolParamsMinPoolCost
@@ -276,10 +275,11 @@ blockfrostProtocolParams proj = do
         , protocolParamPoolPledgeInfluence = _protocolParamsA0
         , protocolParamMonetaryExpansion   = _protocolParamsRho
         , protocolParamTreasuryCut         = _protocolParamsTau
-        , protocolParamUTxOCostPerWord     = if majorProtVers < babbageProtocolVersion
-                                                -- This is only used for pre-babbage protocols.
-                                                then Just . Api.Lovelace $ lovelacesToInteger _protocolParamsCoinsPerUtxoWord
-                                                else Nothing
+        , protocolParamUTxOCostPerWord     = Nothing  -- Deprecated in Babbage.
+        -- , protocolParamUTxOCostPerWord     = if majorProtVers < babbageProtocolVersion
+        --                                         -- This is only used for pre-babbage protocols.
+        --                                         then Just . Api.Lovelace $ lovelacesToInteger _protocolParamsCoinsPerUtxoWord
+        --                                         else Nothing
         , protocolParamPrices              = Just $ Api.S.ExecutionUnitPrices _protocolParamsPriceStep _protocolParamsPriceMem
         , protocolParamMaxTxExUnits        = Just $ Api.ExecutionUnits (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExSteps) (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExMem)
         , protocolParamMaxBlockExUnits     = Just $ Api.ExecutionUnits (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExSteps) (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExMem)
@@ -287,10 +287,7 @@ blockfrostProtocolParams proj = do
         , protocolParamCollateralPercent   = Just $ fromInteger _protocolParamsCollateralPercent
         , protocolParamMaxCollateralInputs = Just $ fromInteger _protocolParamsMaxCollateralInputs
         , protocolParamCostModels          = toApiCostModel _protocolParamsCostModels
-        , protocolParamUTxOCostPerByte     = if majorProtVers >= babbageProtocolVersion
-                                                -- This is used for babbage and later.
-                                                then Just . Api.Lovelace $ lovelacesToInteger _protocolParamsCoinsPerUtxoSize
-                                                else Nothing
+        , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ lovelacesToInteger _protocolParamsCoinsPerUtxoSize
         }
   where
     toApiCostModel = Map.fromList

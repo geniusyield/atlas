@@ -2,10 +2,8 @@ module Main (main) where
 
 import qualified Cardano.Api                       as Api
 import qualified Cardano.Api.SerialiseTextEnvelope as TextEnv
-import           Data.Bifunctor                    (first)
 import qualified Data.ByteString                   as BS
 import qualified Data.ByteString.Lazy              as LBS
-import           Data.Proxy                        (Proxy (..))
 import           System.Directory                  (doesFileExist)
 import           System.FilePath                   ((</>))
 import           Test.Tasty                        (defaultMain, testGroup)
@@ -14,6 +12,8 @@ import           Test.Tasty.HUnit                  (assertEqual, testCase,
                                                     (@=?))
 
 import           GeniusYield.Examples.Gift
+import           GeniusYield.GYConfig              (coreConfigIO)
+import           GeniusYield.Imports
 import           GeniusYield.Test.CoinSelection    (coinSelectionTests)
 import           GeniusYield.Test.Config           (configTests)
 import           GeniusYield.Test.GYTxBody         (gyTxBodyTests)
@@ -29,6 +29,7 @@ import           GeniusYield.Types
 
 main :: IO ()
 main = do
+    configs <- forM ["maestro-config.json", "blockfrost-config.json"] coreConfigIO
     rootDir <- findPackageRoot
     defaultMain $ testGroup "atlas"
         [ testGroup "serializeToRawBytes"
@@ -64,11 +65,11 @@ main = do
             ]
         , slotConversionTests
         , coinSelectionTests
-        , providersTests
         , configTests
         , gyTxSkeletonTests
         , gyTxBodyTests
         , refInputTests
+        , providersTests configs
         ]
 
 -------------------------------------------------------------------------------

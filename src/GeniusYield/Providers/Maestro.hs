@@ -292,7 +292,7 @@ maestroProtocolParams env = do
                                                 , coerce $ Maestro._costModelsPlutusV1 _protocolParametersCostModels
                                                 )
                                               , ( Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2
-                                                , coerce $ Maestro._costModelsPlutusV1 _protocolParametersCostModels
+                                                , coerce $ Maestro._costModelsPlutusV2 _protocolParametersCostModels
                                                 )
                                               ]
       , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ toInteger _protocolParametersCoinsPerUtxoByte

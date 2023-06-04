@@ -283,6 +283,7 @@ test-suite atlas-tests
     GeniusYield.Test.OnChain.GuessRefInputDatum
     GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
     GeniusYield.Test.Providers
+    GeniusYield.Test.Providers.Mashup
     GeniusYield.Test.RefInput
     GeniusYield.Test.SlotConfig
 

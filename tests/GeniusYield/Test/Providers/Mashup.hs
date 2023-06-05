@@ -37,7 +37,13 @@ providersMashupTests configs =
                 ]
           utxosAtAddresses <- gyQueryUtxosAtAddresses provider myAddrList
           utxosAtAddressesWithDatums <- gyQueryUtxosAtAddressesWithDatums provider myAddrList
-          pure (utxosAtAddresses, Set.fromList utxosAtAddressesWithDatums)
+          let outputRefs =
+                [ "8aba7590148083c96e1ed742defecb6123126bbdb392cef3facb8d968825a983#1"  -- Contains reference script.
+                , "0c72765df71ff3739db11c0165bc71c0f3b0a160acec6f4f1448e523064e927e#0"  -- Contains datum hash.
+                , "4e2341767958f1fd83f2ec536e1001888db938d374fcae1a1e965dc21a05d0c6#0"  -- Contains inline datum.
+                ]
+          utxosAtRefs <- gyQueryUtxosAtTxOutRefs provider outputRefs
+          pure (utxosAtAddresses, Set.fromList utxosAtAddressesWithDatums, utxosAtRefs)
         assertBool "Utxos are not all equal" $ all (== head utxosProviders) (tail utxosProviders)
     ]
 

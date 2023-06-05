@@ -95,7 +95,7 @@ source-repository-package
 source-repository-package
   type: git
   location: https://github.com/maestro-org/haskell-sdk
-  tag: 98c83c06e76b2216d3cca6efd8227b26c485dbd3
+  tag: daf3f3e4007a28a2269590fff924b00ac1ac5a2a
   --sha256: sha256-TODO
 
 -- Everything below is essentially copied from cardano-wallet's cabal.project.

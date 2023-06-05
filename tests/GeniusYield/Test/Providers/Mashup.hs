@@ -2,6 +2,7 @@ module GeniusYield.Test.Providers.Mashup
   ( providersMashupTests
   ) where
 
+import qualified Cardano.Api          as Api
 import           Data.Maybe           (fromJust)
 import           GeniusYield.GYConfig
 import           GeniusYield.Imports
@@ -19,10 +20,10 @@ providersMashupTests configs =
         paramsList <- forM configs $ \config -> withCfgProviders config mempty $ \provider -> do
            protocolParams <- gyGetProtocolParameters provider
            systemStart <- gyGetSystemStart provider
-          --  eraHistory <- gyGetEraHistory provider
+           Api.EraHistory mode interpreter <- gyGetEraHistory provider  -- `mode` here doesn't appear to have `Eq` instance, comparing via it's `Show` instance should be fine.
            stakePools <- gyGetStakePools provider
            slotConfig <- gyGetSlotConfig provider
-           pure (protocolParams, systemStart, stakePools, slotConfig)
+           pure (protocolParams, systemStart, (show mode, interpreter), stakePools, slotConfig)
         assertBool "Parameters are not all equal" $ all (== head paramsList) (tail paramsList)
     ]
 

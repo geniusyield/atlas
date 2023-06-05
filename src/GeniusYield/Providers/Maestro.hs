@@ -125,8 +125,8 @@ datumFromMaestroCBOR d = do
     fromEither = first $ const e
 
 -- | Get datum from JSON representation. Though we don't make use of it.
-datumFromMaestroJSON :: Aeson.Value -> Either SomeDeserializeError GYDatum
-datumFromMaestroJSON datumJson = datumFromPlutus' <$> fromJson @Plutus.BuiltinData (Aeson.encode datumJson)
+_datumFromMaestroJSON :: Aeson.Value -> Either SomeDeserializeError GYDatum
+_datumFromMaestroJSON datumJson = datumFromPlutus' <$> fromJson @Plutus.BuiltinData (Aeson.encode datumJson)
 
 -- | Convert datum present in UTxO to our GY type, `GYOutDatum`.
 outDatumFromMaestro :: Maybe Maestro.DatumOption -> Either SomeDeserializeError GYOutDatum
@@ -350,7 +350,7 @@ maestroEraHistory env = do
 maestroLookupDatum :: Maestro.MaestroEnv -> GYLookupDatum
 maestroLookupDatum env dh = do
   datumMaybe <- handler =<< try (Maestro.getDatumByHash env . Text.pack . show $ datumHashToPlutus dh)
-  sequence $ datumMaybe <&> \(Maestro.Datum _datumBytes datumJson) -> case datumFromMaestroJSON datumJson of  -- FIXME: Check if `datumFromMaestroCBOR datumBytes` also give same result.
+  sequence $ datumMaybe <&> \(Maestro.Datum datumBytes _datumJson) -> case datumFromMaestroCBOR datumBytes of  -- NOTE: `datumFromMaestroJSON datumJson` also gives the same result.
     Left err -> throwIO $ MspvDeserializeFailure locationIdent err
     Right bd -> pure bd
   where

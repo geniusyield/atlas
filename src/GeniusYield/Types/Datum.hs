@@ -52,7 +52,7 @@ import           GeniusYield.Types.Ledger
 -- so this simple type is sufficient.
 --
 newtype GYDatum = GYDatum Plutus.BuiltinData
-    deriving stock (Eq, Show)
+    deriving stock (Eq, Ord, Show)
     deriving newtype (Plutus.ToData, Plutus.FromData)
 
 -- | Convert a 'GYDatum' to 'Api.ScriptData' from Cardano Api

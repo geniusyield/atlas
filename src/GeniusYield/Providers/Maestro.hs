@@ -32,6 +32,7 @@ import qualified Data.ByteString.Base16               as BS16
 import           Data.Either.Combinators              (maybeToRight)
 import           Data.Functor                         ((<&>))
 import qualified Data.Map.Strict                      as M
+import           Data.Maybe                           (fromJust)
 import qualified Data.Set                             as Set
 import qualified Data.Text                            as Text
 import qualified Data.Text.Encoding                   as Text
@@ -176,6 +177,20 @@ utxoFromMaestro Maestro.Utxo {..} = do
       , utxoRefScript = s
       }
 
+-- | Convert Maestro's UTxO (with datum resolved) to our GY types.
+utxoFromMaestroWithDatum :: Maestro.Utxo -> Either SomeDeserializeError (GYUTxO, Maybe GYDatum)
+utxoFromMaestroWithDatum u@Maestro.Utxo {..} = do
+  gyUtxo <- utxoFromMaestro u
+  case utxoOutDatum gyUtxo of
+    GYOutDatumNone -> pure (gyUtxo, Nothing)
+    GYOutDatumInline d -> pure (gyUtxo, Just d)
+    GYOutDatumHash _ ->
+      case Maestro._datumOptionBytes $ fromJust _utxoDatum of
+        Nothing -> pure (gyUtxo, Nothing)
+        Just db -> do
+          d <- datumFromMaestroCBOR db
+          pure (gyUtxo, Just d)
+
 -- | Query UTxOs present at multiple addresses.
 maestroUtxosAtAddresses :: Maestro.MaestroEnv -> [GYAddress] -> IO GYUTxOs
 maestroUtxosAtAddresses env addrs = do
@@ -187,6 +202,20 @@ maestroUtxosAtAddresses env addrs = do
     (throwIO . MspvDeserializeFailure locationIdent)
     pure
     $ utxosFromList <$> traverse utxoFromMaestro addrUtxos
+  where
+    locationIdent = "AddressesUtxo"
+
+-- | Query UTxOs present at multiple addresses with datums.
+maestroUtxosAtAddressesWithDatums :: Maestro.MaestroEnv -> [GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]
+maestroUtxosAtAddressesWithDatums env addrs = do
+  let addrsInText = map addressToText addrs
+  -- Here one would not get `MaestroNotFound` error.
+  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosAtMultiAddresses env (Just True) (Just False)) addrsInText)
+
+  either
+    (throwIO . MspvDeserializeFailure locationIdent)
+    pure
+    $ traverse utxoFromMaestroWithDatum addrUtxos
   where
     locationIdent = "AddressesUtxo"
 
@@ -245,7 +274,7 @@ maestroQueryUtxo env = GYQueryUTxO
   , gyQueryUtxosAtTxOutRefs'           = maestroUtxosAtTxOutRefs env
   , gyQueryUtxoAtTxOutRef'             = maestroUtxoAtTxOutRef env
   , gyQueryUtxoRefsAtAddress'          = maestroRefsAtAddress env
-  , gyQueryUtxosAtAddressesWithDatums' = Nothing
+  , gyQueryUtxosAtAddressesWithDatums' = Just $ maestroUtxosAtAddressesWithDatums env
   }
 
 -------------------------------------------------------------------------------

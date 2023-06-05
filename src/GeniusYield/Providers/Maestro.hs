@@ -233,7 +233,7 @@ maestroUtxosAtTxOutRefs' env refs = do
       pure
       . traverse utxoFromMaestro $ catMaybes res
   where
-    handler Maestro.MaestroNotFound = pure Nothing
+    handler (Maestro.MaestroNotFound _) = pure Nothing
     handler other                   = throwIO other
 
     locationIdent = "UtxoByRefs"
@@ -356,5 +356,5 @@ maestroLookupDatum env dh = do
   where
     locationIdent = "LookupDatum"
     -- This particular error is fine in this case, we can just return 'Nothing'.
-    handler (Left Maestro.MaestroNotFound) = pure Nothing
+    handler (Left (Maestro.MaestroNotFound _)) = pure Nothing
     handler other = handleMaestroError locationIdent $ Just <$> other

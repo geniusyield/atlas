@@ -121,8 +121,9 @@ data BuildTxException
     -- ^ Execution units required is higher than the maximum as specified by protocol params.
     | BuildTxSizeTooBig
     -- ^ Transaction size is higher than the maximum as specified by protocol params.
-    | BuildTxCollateralShortFall !Natural
-    -- ^ Lovelaces shortfall (in collateral inputs) for collateral requirement.
+    | BuildTxCollateralShortFall  -- ^ Shortfall (in collateral inputs) for collateral requirement.
+        !Natural  -- ^ Transaction collateral requirement.
+        !Natural  -- ^ Lovelaces in given collateral UTxO.
     | BuildTxNoSuitableCollateral
     -- ^ Couldn't find a UTxO to use as collateral.
   deriving stock    Show
@@ -492,7 +493,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
             , Api.TxReturnCollateral retColSup $ txOutToApi True $ GYTxOut changeAddr (collateralTotalValue `valueMinus` valueFromLovelace balanceNeeded) Nothing Nothing
 
             )
-          else Left $ BuildTxCollateralShortFall (fromInteger $ balanceNeeded - collateralTotalLovelace) -- In this case `makeTransactionBodyAutoBalance` doesn't return an error but instead returns `(Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)`
+          else Left $ BuildTxCollateralShortFall (fromInteger balanceNeeded) (fromInteger collateralTotalLovelace) -- In this case `makeTransactionBodyAutoBalance` doesn't return an error but instead returns `(Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)`
 
         first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
           Api.BabbageEraInCardanoMode

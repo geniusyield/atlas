@@ -37,6 +37,7 @@ import qualified Web.HttpApiData                      as Web
 
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
+import           GeniusYield.Providers.SubmitApi      (SubmitTxException (..))
 import           GeniusYield.Types
 
 data BlockfrostProviderException
@@ -50,9 +51,10 @@ data BlockfrostProviderException
 
 handleBlockfrostError :: Text -> Either Blockfrost.BlockfrostError a -> IO a
 handleBlockfrostError locationInfo = either (throwIO . BlpvApiError locationInfo . silenceHeadersBlockfrostClientError) pure
-  where
-    silenceHeadersBlockfrostClientError (Blockfrost.ServantClientError e) = Blockfrost.ServantClientError $ silenceHeadersClientError e
-    silenceHeadersBlockfrostClientError other                             = other
+
+silenceHeadersBlockfrostClientError :: Blockfrost.BlockfrostError -> Blockfrost.BlockfrostError
+silenceHeadersBlockfrostClientError (Blockfrost.ServantClientError e) = Blockfrost.ServantClientError $ silenceHeadersClientError e
+silenceHeadersBlockfrostClientError other                             = other
 
 lovelacesToInteger :: Blockfrost.Lovelaces -> Integer
 lovelacesToInteger = fromIntegral
@@ -78,7 +80,7 @@ amountToValue (Blockfrost.AssetAmount sdiscr) = do
 
 blockfrostSubmitTx :: Blockfrost.Project -> GYSubmitTx
 blockfrostSubmitTx proj tx = do
-    txId <- handleBlockfrostError locationIdent <=< Blockfrost.runBlockfrost proj
+    txId <- handleBlockfrostSubmitError <=< Blockfrost.runBlockfrost proj
         . Blockfrost.submitTx
         . Blockfrost.CBORString
         . LBS.fromStrict
@@ -90,6 +92,7 @@ blockfrostSubmitTx proj tx = do
         . txIdFromHexE . Text.unpack $ Blockfrost.unTxHash txId
   where
     locationIdent = "SubmitTx"
+    handleBlockfrostSubmitError = either (throwIO . SubmitTxException . Text.pack . show . silenceHeadersBlockfrostClientError) pure
 
 -------------------------------------------------------------------------------
 -- Slot actions

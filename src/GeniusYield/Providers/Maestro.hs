@@ -40,6 +40,7 @@ import qualified Data.Time                            as Time
 import           Data.Traversable                     (for)
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
+import           GeniusYield.Providers.SubmitApi      (SubmitTxException (..))
 import           GeniusYield.Types
 import qualified Maestro.Client                       as Maestro
 import qualified Maestro.Types                        as Maestro
@@ -67,9 +68,11 @@ data MaestroProviderException
 -- | Utility function to handle Maestro errors, which also removes header (if present) so as to conceal API key.
 handleMaestroError :: Text -> Either Maestro.MaestroError a -> IO a
 handleMaestroError locationInfo = either (throwIO . MspvApiError locationInfo . silenceHeadersMaestroClientError) pure
-  where
-    silenceHeadersMaestroClientError (Maestro.ServantClientError e) = Maestro.ServantClientError $ silenceHeadersClientError e
-    silenceHeadersMaestroClientError other                          = other
+
+-- | Remove headers (if `MaestroError` contains `ClientError`).
+silenceHeadersMaestroClientError :: Maestro.MaestroError -> Maestro.MaestroError
+silenceHeadersMaestroClientError (Maestro.ServantClientError e) = Maestro.ServantClientError $ silenceHeadersClientError e
+silenceHeadersMaestroClientError other                          = other
 
 -------------------------------------------------------------------------------
 -- Submit
@@ -78,13 +81,14 @@ handleMaestroError locationInfo = either (throwIO . MspvApiError locationInfo . 
 -- | Submits a 'GYTx'.
 maestroSubmitTx :: Maestro.MaestroEnv -> GYSubmitTx
 maestroSubmitTx env tx = do
-  txId <- handleMaestroError locationIdent <=< try $ Maestro.submitTx env $ Api.serialiseToCBOR $ txToApi tx
+  txId <- handleMaestroSubmitError <=< try $ Maestro.submitTx env $ Api.serialiseToCBOR $ txToApi tx
   either
     (throwIO . MspvDeserializeFailure locationIdent . DeserializeErrorHex . Text.pack)
     pure
     $ txIdFromHexE $ Text.unpack txId
   where
     locationIdent = "SubmitTx"
+    handleMaestroSubmitError = either (throwIO . SubmitTxException . Text.pack . show . silenceHeadersMaestroClientError) pure
 
 -------------------------------------------------------------------------------
 -- Slot actions

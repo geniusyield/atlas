@@ -191,8 +191,8 @@ maestroTests token =
             then Nothing
             else Just $ show (Set.difference refSetFile refSetQuery)
 
-    updateGolden :: a -> IO ()
-    updateGolden _ = return ()
+    updateGolden :: Show a => a -> IO ()
+    updateGolden = error . show
 
     goldenTestUtxos :: TestName -> IO (Api.UTxO Api.BabbageEra) -> IO (Api.UTxO Api.BabbageEra) -> TestTree
     goldenTestUtxos name queryData getFileData =

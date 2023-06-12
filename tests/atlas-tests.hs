@@ -22,7 +22,7 @@ import           GeniusYield.Test.Providers        (providersTests)
 import           GeniusYield.Test.RefInput         (refInputTests)
 import           GeniusYield.Test.SlotConfig       (slotConversionTests)
 import           GeniusYield.Types
-import           GeniusYield.GYConfig              (findProviderToken)
+import           GeniusYield.GYConfig              (findMaestroToken)
 
 -------------------------------------------------------------------------------
 -- main
@@ -30,7 +30,7 @@ import           GeniusYield.GYConfig              (findProviderToken)
 
 main :: IO ()
 main = do
-    providerToken <- findProviderToken "maestro-config.json"
+    providerToken <- findMaestroToken "maestro-config.json"
     rootDir <- findPackageRoot
     defaultMain $ testGroup "atlas"
         [ testGroup "serializeToRawBytes"
@@ -94,8 +94,4 @@ findPackageRoot = do
     here <- doesFileExist "atlas-cardano.cabal"
     if here
     then return "."
-    else do
-        up <- doesFileExist "geniusyield-framework-subtr/atlas.cabal"
-        if up
-        then return "geniusyield-framework-subtr"
-        else fail "Cannot find package root"
+    else fail "Cannot find package root"

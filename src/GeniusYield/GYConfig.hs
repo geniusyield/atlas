@@ -13,7 +13,7 @@ module GeniusYield.GYConfig
     , withCfgProviders
     , coreConfigIO
     , coreProviderIO
-    , findProviderToken
+    , findMaestroToken
     , isNodeChainIx
     , isMaestro
     , isDbSync
@@ -88,7 +88,6 @@ isNodeChainIx :: GYCoreProviderInfo -> Bool
 isNodeChainIx GYNodeChainIx{} = True
 isNodeChainIx _               = False
 
-
 isDbSync :: GYCoreProviderInfo -> Bool
 isDbSync GYDbSync{} = True
 isDbSync _          = False
@@ -97,8 +96,8 @@ isMaestro :: GYCoreProviderInfo -> Bool
 isMaestro GYMaestro{} = True
 isMaestro _           = False
 
-findProviderToken :: String -> IO Text
-findProviderToken configPath = do
+findMaestroToken :: String -> IO Text
+findMaestroToken configPath = do
     config <- coreProviderIO configPath
     case config of
         GYMaestro (Confidential token) -> return token

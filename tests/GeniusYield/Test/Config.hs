@@ -1,6 +1,5 @@
 module GeniusYield.Test.Config (
-    configTests,
-    coreProviderIO
+    configTests
 ) where
 
 import           System.FilePath

@@ -88,7 +88,7 @@ jobs:
           fi
           pwd
           ls -la
-          stat maestro-config.jso
+          stat maestro-config.json
           stat blockfrost-config.json
           stat preprod-submit-test-wallet.skey
           

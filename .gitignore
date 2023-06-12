@@ -24,3 +24,4 @@ cabal.project.local~
 .DS_Store
 maestro-config.json
 blockfrost-config.json
+*.skey

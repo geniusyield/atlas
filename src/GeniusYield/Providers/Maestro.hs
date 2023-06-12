@@ -83,11 +83,11 @@ maestroSubmitTx :: Maestro.MaestroEnv -> GYSubmitTx
 maestroSubmitTx env tx = do
   txId <- handleMaestroSubmitError <=< try $ Maestro.submitTx env $ Api.serialiseToCBOR $ txToApi tx
   either
-    (throwIO . MspvDeserializeFailure locationIdent . DeserializeErrorHex . Text.pack)
+    (throwIO . MspvDeserializeFailure "SubmitTx" . DeserializeErrorHex . Text.pack)
     pure
     $ txIdFromHexE $ Text.unpack txId
   where
-    locationIdent = "SubmitTx"
+    handleMaestroSubmitError :: Either Maestro.MaestroError a -> IO a
     handleMaestroSubmitError = either (throwIO . SubmitTxException . Text.pack . show . silenceHeadersMaestroClientError) pure
 
 -------------------------------------------------------------------------------

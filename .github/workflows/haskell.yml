@@ -68,8 +68,8 @@ jobs:
             echo "[ERROR] maestro-config.json is missing."
             exit 1
           fi
-          # BLOCKFROST CONFIG ----------------------------------
-          echo "Creating blockfrost-config.json from BLOCKFROST CONFIG env var..."
+          # BLOCKFROST_CONFIG ----------------------------------
+          echo "Creating blockfrost-config.json from BLOCKFROST_CONFIG env var..."
           echo "$CONFIG" >> blockfrost-config.json
           if [[ -f blockfrost-config.json ]] ; then
             echo "[OK] blockfrost-config.json has been created."

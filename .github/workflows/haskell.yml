@@ -66,7 +66,7 @@ jobs:
     - name: Prepare config files
       env:
         MAESTRO_CONFIG: ${{secrets.MAESTRO_CONFIG}}
-        BLOCKFROST_CONFIG: ${{secrets.BLOCKFROST}}
+        BLOCKFROST_CONFIG: ${{secrets.BLOCKFROST_CONFIG}}
         PREPROD_SUBMIT_TEST_WALLET_SKEY: ${{secrets.PREPROD_SUBMIT_TEST_WALLET_SKEY}}
       run: |
           # MAESTRO_CONFIG ----------------------------------
@@ -80,7 +80,7 @@ jobs:
           fi
           # BLOCKFROST_CONFIG ----------------------------------
           echo "Creating blockfrost-config.json from BLOCKFROST_CONFIG env var..."
-          echo "$CONFIG" >> blockfrost-config.json
+          echo "$BLOCKFROST_CONFIG" >> blockfrost-config.json
           if [[ -f blockfrost-config.json ]] ; then
             echo "[OK] blockfrost-config.json has been created."
           else
@@ -96,8 +96,6 @@ jobs:
             echo "[ERROR] preprod-submit-test-wallet.skey is missing."
             exit 1
           fi
-          pwd
-          ls -la
           stat maestro-config.json
           stat blockfrost-config.json
           stat preprod-submit-test-wallet.skey

@@ -66,7 +66,7 @@ jobs:
     - name: Prepare config files
       env:
         MAESTRO_CONFIG: ${{secrets.MAESTRO_CONFIG}}
-        BLOCKFROST-CONFIG: ${{secrets.BLOCKFROST}}
+        BLOCKFROST_CONFIG: ${{secrets.BLOCKFROST}}
         PREPROD_SUBMIT_TEST_WALLET_SKEY: ${{secrets.PREPROD_SUBMIT_TEST_WALLET_SKEY}}
       run: |
           # MAESTRO_CONFIG ----------------------------------

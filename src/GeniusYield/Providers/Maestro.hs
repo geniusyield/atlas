@@ -81,7 +81,7 @@ silenceHeadersMaestroClientError other                          = other
 -- | Submits a 'GYTx'.
 maestroSubmitTx :: Maestro.MaestroEnv -> GYSubmitTx
 maestroSubmitTx env tx = do
-  txId <- handleMaestroSubmitError <=< try $ Maestro.submitTx env $ Api.serialiseToCBOR $ txToApi tx
+  txId <- handleMaestroSubmitError <=< try $ Maestro.submitAndMonitorTx env $ Api.serialiseToCBOR $ txToApi tx
   either
     (throwIO . MspvDeserializeFailure "SubmitTx" . DeserializeErrorHex . Text.pack)
     pure

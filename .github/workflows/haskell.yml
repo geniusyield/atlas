@@ -86,6 +86,12 @@ jobs:
             echo "[ERROR] preprod-submit-test-wallet.skey is missing."
             exit 1
           fi
+          pwd
+          ls -la
+          stat maestro-config.jso
+          stat blockfrost-config.json
+          stat preprod-submit-test-wallet.skey
+          
     - name: Setup haskell tooling
       uses: haskell/actions/setup@v2
       with:

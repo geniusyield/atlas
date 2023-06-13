@@ -98,8 +98,9 @@ isMaestro _           = False
 
 findMaestroToken :: String -> IO Text
 findMaestroToken configPath = do
-    config <- coreProviderIO configPath
-    case config of
+    config <- coreConfigIO configPath
+    let providerInfo = cfgCoreProvider config
+    case providerInfo of
         GYMaestro (Confidential token) -> return token
         _ -> throwIO $ userError "Missing Maestro Token"
 

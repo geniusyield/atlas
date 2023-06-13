@@ -16,8 +16,10 @@ module GeniusYield.Types.Tx
     , txToApi
     , txFromHex
     , txFromHexBS
+    , txFromCBOR
     , txToHex
     , txToHexBS
+    , txToCBOR
       -- * Transaction Id's
     , GYTxId
     , txIdFromHex
@@ -126,10 +128,10 @@ txFromHex s = rightToMaybe $ txFromHexBS $ BS8.pack s
 -- Right (ShelleyTx ShelleyBasedEraBabbage (ValidatedTx {body = TxBodyConstr TxBodyRaw {_spendInputs = fromList [TxIn (TxId {_unTxId = SafeHash "975e4c7f8d7937f8102e500714feb3f014c8766fcf287a11c10c686154fcb275"}) (TxIx 1),TxIn (TxId {_unTxId = SafeHash "c887cba672004607a0f60ab28091d5c24860dbefb92b1a8776272d752846574f"}) (TxIx 0)], _collateralInputs = fromList [TxIn (TxId {_unTxId = SafeHash "7a67cd033169e330c9ae9b8d0ef8b71de9eb74bbc8f3f6be90446dab7d1e8bfd"}) (TxIx 0)], _referenceInputs = fromList [], _outputs = StrictSeq {fromStrict = fromList [Sized {sizedValue = (Addr Testnet (KeyHashObj (KeyHash "fd040c7a10744b79e5c80ec912a05dbdb3009e372b7f4b0f026d16b0")) (StakeRefBase (KeyHashObj (KeyHash "c663651ffc046068455d2994564ba9d4b3e9b458ad8ab5232aebbf40"))),Value 448448472 (fromList []),NoDatum,SNothing), sizedSize = 65},Sized {sizedValue = (Addr Testnet (KeyHashObj (KeyHash "fd040c7a10744b79e5c80ec912a05dbdb3009e372b7f4b0f026d16b0")) (StakeRefBase (KeyHashObj (KeyHash "c663651ffc046068455d2994564ba9d4b3e9b458ad8ab5232aebbf40"))),Value 1551690 (fromList [(PolicyID {policyID = ScriptHash "a6bb5fd825455e7c69bdaa9d3a6dda9bcbe9b570bc79bd55fa50889b"},fromList [(6e69636b656c,4567)]),(PolicyID {policyID = ScriptHash "b17cb47f51d6744ad05fb937a762848ad61674f8aebbaec67be0bb6f"},fromList [(53696c6c69636f6e,600)])]),NoDatum,SNothing), sizedSize = 151}]}, _collateralReturn = SNothing, _totalCollateral = SNothing, _certs = StrictSeq {fromStrict = fromList []}, _wdrls = Wdrl {unWdrl = fromList []}, _txfee = Coin 470844, _vldt = ValidityInterval {invalidBefore = SNothing, invalidHereafter = SNothing}, _update = SNothing, _reqSignerHashes = fromList [], _mint = Value 0 (fromList [(PolicyID {policyID = ScriptHash "b17cb47f51d6744ad05fb937a762848ad61674f8aebbaec67be0bb6f"},fromList [(53696c6c69636f6e,600)])]), _scriptIntegrityHash = SJust (SafeHash "291b4e4c5f189cb896674e02e354028915b11889687c53d9cf4c1c710ff5e4ae"), _adHash = SNothing, _txnetworkid = SNothing}, wits = TxWitnessRaw {_txwitsVKey = fromList [], _txwitsBoot = fromList [], _txscripts = fromList [(ScriptHash "b17cb47f51d6744ad05fb937a762848ad61674f8aebbaec67be0bb6f",PlutusScript PlutusV1 ScriptHash "b17cb47f51d6744ad05fb937a762848ad61674f8aebbaec67be0bb6f")], _txdats = TxDatsRaw (fromList []), _txrdmrs = RedeemersRaw (fromList [(RdmrPtr Mint 0,(DataConstr Constr 0 [],WrapExUnits {unWrapExUnits = ExUnits' {exUnitsMem' = 2045738, exUnitsSteps' = 898247444}}))])}, isValid = IsValid True, auxiliaryData = SNothing}))
 --
 txFromHexBS :: BS.ByteString -> Either String GYTx
-txFromHexBS bs = do
-    bs' <- BS16.decode bs
-    tx  <- first show $ Api.deserialiseFromCBOR (Api.AsTx Api.AsBabbageEra) bs'
-    return (GYTx tx)
+txFromHexBS bs = BS16.decode bs >>= txFromCBOR
+
+txFromCBOR :: BS.ByteString -> Either String GYTx
+txFromCBOR = fmap txFromApi . first show . Api.deserialiseFromCBOR (Api.AsTx Api.AsBabbageEra)
 
 -- |
 --
@@ -137,7 +139,11 @@ txFromHexBS bs = do
 -- True
 --
 txToHexBS :: GYTx -> BS.ByteString
-txToHexBS (GYTx tx) = BS16.encode (Api.serialiseToCBOR tx)
+txToHexBS = BS16.encode . txToCBOR
+
+-- | Get CBOR serialisation of the transaction.
+txToCBOR :: GYTx -> BS.ByteString
+txToCBOR = Api.serialiseToCBOR . txToApi
 
 -- |
 --

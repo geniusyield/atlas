@@ -17,6 +17,10 @@ module GeniusYield.Types.TxBody (
     unsignedTx,
     makeSignedTransaction,
     -- * Functions
+    txBodyFromHex,
+    txBodyFromHexBS,
+    txBodyToHex,
+    txBodyToHexBS,
     txBodyFee,
     txBodyFeeValue,
     txBodyUTxOs,
@@ -36,6 +40,9 @@ module GeniusYield.Types.TxBody (
 
 import qualified Cardano.Api                 as Api
 import qualified Cardano.Api.Shelley         as Api.S
+import qualified Data.ByteString             as BS
+import qualified Data.ByteString.Base16      as BS16
+import qualified Data.ByteString.Char8       as BS8
 import qualified Data.Set                    as Set
 
 import           GeniusYield.Imports
@@ -68,6 +75,24 @@ makeSignedTransaction txWit (GYTxBody txBody) = txFromApi $ Api.makeSignedTransa
 -- | Create an unsigned transaction from the body.
 unsignedTx :: GYTxBody -> GYTx
 unsignedTx (GYTxBody body) = txFromApi (Api.Tx body [])
+
+txBodyFromHex :: String -> Maybe GYTxBody
+txBodyFromHex = rightToMaybe . txBodyFromHexBS . BS8.pack
+
+txBodyFromHexBS :: BS.ByteString -> Either String GYTxBody
+txBodyFromHexBS bs = do
+  bs'    <- BS16.decode bs
+  txBody <- first show $ Api.deserialiseFromCBOR (Api.AsTxBody Api.AsBabbageEra) bs'
+  return $ txBodyFromApi txBody
+
+txBodyToHex :: GYTxBody -> String
+txBodyToHex = BS8.unpack . txBodyToHexBS
+
+txBodyToHexBS :: GYTxBody -> BS.ByteString
+txBodyToHexBS = BS16.encode . txBodyToCBOR
+
+txBodyToCBOR :: GYTxBody -> BS.ByteString
+txBodyToCBOR = Api.serialiseToCBOR . txBodyToApi
 
 -- | Return the fees in lovelace.
 txBodyFee :: GYTxBody -> Integer

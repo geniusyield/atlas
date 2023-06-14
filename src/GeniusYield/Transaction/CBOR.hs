@@ -21,7 +21,6 @@ import           Codec.CBOR.Read        (DeserialiseFailure,
                                          deserialiseFromBytes)
 import           Codec.CBOR.Term        (Term (..), decodeTerm, encodeTerm)
 import           Codec.CBOR.Write       (toStrictByteString)
-import qualified Data.ByteString        as BS
 import qualified Data.ByteString.Base16 as BS16
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Text              as T
@@ -45,7 +44,7 @@ We as of now, only modify @transaction_body@ (terms are as defined in [CDDL](htt
 The modifications done is as follows:-
 
 * @transaction_output@ is put up into @legacy_transaction_output@ format when possible.
-* Wherever map occurs, it's keys are sorted.
+* Wherever map occurs, it's keys are sorted as required by [CIP 21](https://cips.cardano.org/cips/cip21/).
 
 -}
 simplifyTxCbor :: GYTx -> Either CborSimplificationError GYTx
@@ -59,13 +58,14 @@ simplifyTxCbor tx = do
       first (ModifiedTransactionDoesntDeserialise . T.pack)  $ txFromCBOR $ toStrictByteString $ encodeTerm $ TList (txBody' : otherFields)
     _other                       -> Left $ TransactionIsAbsurd "Transaction is defined as list but received otherwise"
 
-{- | Function to modify our CBOR tree according to the given function. If the given function returns `Nothing` it means, it is not applicable to the given `term` and thus we recurse down. Note that the given function must return the same output for the given input which is guaranteed by referential transparency here.
+{- | Function to modify our CBOR tree according to the given function. If the given function returns `Nothing` it means, it is not applicable to the given `term` and thus we recurse down. Note that the given function (say @f@) must satisfy the following property:-
 
-We handle recursive cases first, what is left then are the base cases.
+If @f a = Just b@ then @f b = Just b@.
 -}
 recursiveTermModification :: (Term -> Maybe Term) -> Term -> Term
 recursiveTermModification f term =
   case term of
+    -- We handle recursive cases first, what is left then are the base cases.
     TList termList -> recursiveTermModificationHandler $ TList $ recursiveTermModification f <$> termList
     TListI termList -> recursiveTermModificationHandler $ TListI $ recursiveTermModification f <$> termList
     TMap termPairList -> recursiveTermModificationHandler $ TMap $ bimap (recursiveTermModification f) (recursiveTermModification f) <$> termPairList
@@ -77,32 +77,34 @@ recursiveTermModification f term =
         Nothing -> nothingHandler
         Just termMod -> if term == termMod then nothingHandler else recursiveTermModification f termMod
 
--- recursiveTermModification f term = fromMaybe term (f term)
-
 simplifyTxBodyCbor :: Term -> Either CborSimplificationError Term
 simplifyTxBodyCbor (TMap keyVals) = do
-  -- First we'll simplify the outputs.
-  -- Second, we'll sort keys in any map.
+      -- First we'll simplify the outputs.
   let txBodySimplifiedOutputs = TMap $ findAndSimplifyOutputs keyVals
-  let txBodySortedKeys = recursiveTermModification sortMapKeys txBodySimplifiedOutputs
-      -- txBodyNoSingleList = recursiveTermModification noSingleList txBodySortedKeys  -- FIXME: To implement it?
+      -- Second, we'll sort keys in any map.
+      txBodySortedKeys = recursiveTermModification sortMapKeys txBodySimplifiedOutputs
       txBodyFinal = txBodySortedKeys
   pure txBodyFinal
 
   where
 
+    findAndSimplifyOutputs :: [(Term, Term)] -> [(Term, Term)]
     findAndSimplifyOutputs [] = []
     findAndSimplifyOutputs ((key, value) : remainingKeyVals) =
-      if key == TInt 1 || key == TInt 16 then
-        (key, simplifyOutputs value) : findAndSimplifyOutputs remainingKeyVals
-      else
-        (key, value) : findAndSimplifyOutputs remainingKeyVals
+      (key,
+            if key == TInt 1 then simplifyOutputs value
+            else if key == TInt 16 then simplifyOutput value
+            else value
+      ) : findAndSimplifyOutputs remainingKeyVals
       where
+
+        simplifyOutputs :: Term -> Term
         simplifyOutputs (TList outputs) = TList $ map simplifyOutput outputs
-          where
-            simplifyOutput (TMap [(TInt 0, addr), (TInt 1, amount)]) = TList [addr, amount]
-            simplifyOutput ow = ow  -- FIXME: To handle datum hash case?
-        simplifyOutputs notAList = notAList  -- we can return error here.
+        simplifyOutputs notAList        = notAList  -- We can return error here.
+
+        simplifyOutput :: Term -> Term
+        simplifyOutput (TMap [(TInt 0, addr), (TInt 1, amount)]) = TList [addr, amount]
+        simplifyOutput ow = ow  -- FIXME: To handle datum hash case?
 
     sortMapKeys :: Term -> Maybe Term
     sortMapKeys (TMap keyValsToSort) =
@@ -110,11 +112,6 @@ simplifyTxBodyCbor (TMap keyVals) = do
         Just $ TMap $ sortBy (\(TInt a, _) (TInt b, _) -> compare a b) keyValsToSort
       else Nothing
     sortMapKeys _otherwise     = Nothing
-
-    noSingleList :: Term -> Maybe Term
-    noSingleList (TList [TList a]) = Just $ TList a
-    noSingleList _otherwise        = Nothing
-
 
 simplifyTxBodyCbor _otherwise            = Left $ TransactionIsAbsurd "Transaction body must be of type 'map'"
 

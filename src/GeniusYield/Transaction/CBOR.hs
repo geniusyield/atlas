@@ -28,7 +28,7 @@ import qualified Data.Text.Encoding     as TE
 import           GeniusYield.Imports
 import           GeniusYield.Types
 
--- FIXME: We should make a log before performing this simplification.
+-- TODO: Make a log before performing this simplification.
 
 data CborSimplificationError =
     TransactionDeserialisationError !DeserialiseFailure
@@ -104,13 +104,17 @@ simplifyTxBodyCbor (TMap keyVals) = do
 
         simplifyOutput :: Term -> Term
         simplifyOutput (TMap [(TInt 0, addr), (TInt 1, amount)]) = TList [addr, amount]
-        simplifyOutput ow = ow  -- FIXME: To handle datum hash case?
+        simplifyOutput ow = ow
 
     sortMapKeys :: Term -> Maybe Term
     sortMapKeys (TMap keyValsToSort) =
       if all (\(k, _) -> case k of TInt _ -> True; _ow -> False) keyValsToSort then
-        Just $ TMap $ sortBy (\(TInt a, _) (TInt b, _) -> compare a b) keyValsToSort
+        Just $ TMap $ sortBy sortingFunction keyValsToSort
       else Nothing
+      where
+        sortingFunction :: forall b1 b2. (Term, b1) -> (Term, b2) -> Ordering
+        sortingFunction (TInt a, _) (TInt b, _) = compare a b
+        sortingFunction _ _                     = error "absurd"  -- We verify that all keys are of the form @TInt _@ before calling this function.
     sortMapKeys _otherwise     = Nothing
 
 simplifyTxBodyCbor _otherwise            = Left $ TransactionIsAbsurd "Transaction body must be of type 'map'"

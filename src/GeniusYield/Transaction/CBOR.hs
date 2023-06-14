@@ -28,7 +28,7 @@ import qualified Data.Text.Encoding     as TE
 import           GeniusYield.Imports
 import           GeniusYield.Types
 
--- TODO: Make a log before performing this simplification.
+-- TODO: Make a log before performing this simplification?
 
 data CborSimplificationError =
     TransactionDeserialisationError !DeserialiseFailure
@@ -77,6 +77,7 @@ recursiveTermModification f term =
         Nothing -> nothingHandler
         Just termMod -> if term == termMod then nothingHandler else recursiveTermModification f termMod
 
+-- | See `simplifyTxCbor`.
 simplifyTxBodyCbor :: Term -> Either CborSimplificationError Term
 simplifyTxBodyCbor (TMap keyVals) = do
       -- First we'll simplify the outputs.
@@ -114,7 +115,7 @@ simplifyTxBodyCbor (TMap keyVals) = do
       where
         sortingFunction :: forall b1 b2. (Term, b1) -> (Term, b2) -> Ordering
         sortingFunction (TInt a, _) (TInt b, _) = compare a b
-        sortingFunction _ _                     = error "absurd"  -- We verify that all keys are of the form @TInt _@ before calling this function.
+        sortingFunction _ _                     = error "absurd - sortingFunction"  -- We verify that all keys are of the form @TInt _@ before calling this function.
     sortMapKeys _otherwise     = Nothing
 
 simplifyTxBodyCbor _otherwise            = Left $ TransactionIsAbsurd "Transaction body must be of type 'map'"

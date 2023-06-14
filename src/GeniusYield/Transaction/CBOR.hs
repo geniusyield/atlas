@@ -69,6 +69,7 @@ recursiveTermModification f term =
     TList termList -> recursiveTermModificationHandler $ TList $ recursiveTermModification f <$> termList
     TListI termList -> recursiveTermModificationHandler $ TListI $ recursiveTermModification f <$> termList
     TMap termPairList -> recursiveTermModificationHandler $ TMap $ bimap (recursiveTermModification f) (recursiveTermModification f) <$> termPairList
+    TMapI termPairList -> recursiveTermModificationHandler $ TMapI $ bimap (recursiveTermModification f) (recursiveTermModification f) <$> termPairList
     TTagged word otherTerm -> recursiveTermModificationHandler $ TTagged word $ recursiveTermModification f otherTerm
     _otherwise -> recursiveTermModificationHandler term
   where

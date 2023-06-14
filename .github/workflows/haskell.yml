@@ -145,7 +145,7 @@ jobs:
     - name: Build all targets (cabal)
       run: cabal v2-build --enable-tests --enable-benchmarks all
     - name: Run all tests (cabal)
-      run: cabal v2-test atlas-tests -j1
+      run: cabal v2-test atlas-tests
     - name: Run doctest (docspec)
       run: |
         # Install docspec and run doctests.

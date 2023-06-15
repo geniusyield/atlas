@@ -106,6 +106,7 @@ simplifyTxBodyCbor (TMap keyVals) = do
 
         simplifyOutput :: Term -> Term
         simplifyOutput (TMap [(TInt 0, addr), (TInt 1, amount)]) = TList [addr, amount]
+        simplifyOutput (TMap [(TInt 0, addr), (TInt 1, amount), (TInt 2, TList [TInt 0, datumHash])]) = TList [addr, amount, datumHash]
         simplifyOutput ow = ow
 
     sortMapKeys :: Term -> Maybe Term

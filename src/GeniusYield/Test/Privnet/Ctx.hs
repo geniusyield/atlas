@@ -167,7 +167,7 @@ ctxProviders ctx = GYProviders
 
 submitTx :: Ctx -> User -> GYTxBody -> IO GYTxId
 submitTx ctx@Ctx { ctxInfo } User {..} txBody = do
-    let tx = signTx txBody [userSKey]
+    let tx = signGYTxBody txBody [userSKey]
     -- when optsPrintTxBodies $ printf "Transaction %s\n" (ppShow txBody')
     txId <- nodeSubmitTx ctxInfo tx
     -- printf "Submitted transaction %s\n" (show txId)

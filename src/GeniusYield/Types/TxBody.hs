@@ -13,9 +13,13 @@ module GeniusYield.Types.TxBody (
     txBodyFromApi,
     txBodyToApi,
     -- * Transaction creation
+    signGYTxBody,
     signTx,
     unsignedTx,
     makeSignedTransaction,
+    makeSignedTransaction',
+    appendWitnessGYTx,
+    signGYTx,
     -- * Functions
     txBodyFromHex,
     txBodyFromHexBS,
@@ -66,12 +70,37 @@ txBodyToApi :: GYTxBody -> Api.TxBody Api.BabbageEra
 txBodyToApi = coerce
 
 -- | Sign a transaction body with (potentially) multiple keys.
+signGYTxBody :: ToShelleyWitnessSigningKey a =>  GYTxBody -> [a] -> GYTx
+signGYTxBody = signTx
+
+{-# DEPRECATED signTx "Use signGYTxBody." #-}
 signTx :: ToShelleyWitnessSigningKey a =>  GYTxBody -> [a] -> GYTx
 signTx (GYTxBody txBody) skeys = txFromApi $ Api.signShelleyTransaction txBody $ map toShelleyWitnessSigningKey skeys
 
--- | Make a signed transaction given the transaction body & list of key witnesses.
+-- | Make a signed transaction given the transaction body & list of key witnesses, represented in `GYTxWitness`.
 makeSignedTransaction :: GYTxWitness -> GYTxBody -> GYTx
-makeSignedTransaction txWit (GYTxBody txBody) = txFromApi $ Api.makeSignedTransaction (txWitToKeyWitnessApi txWit) txBody
+makeSignedTransaction txWit txBody = makeSignedTransaction' (txWitToKeyWitnessApi txWit) $ txBodyToApi txBody
+
+-- | Make a signed transaction given the transaction body & list of key witnesses.
+makeSignedTransaction' :: [Api.S.KeyWitness Api.S.BabbageEra] -> Api.TxBody Api.BabbageEra -> GYTx
+makeSignedTransaction' = fmap txFromApi <$> Api.makeSignedTransaction
+
+-- | Add a key witness(s) to a transaction, represented in `GYTxWitness`, which might already have previous key witnesses.
+appendWitnessGYTx :: GYTxWitness -> GYTx -> GYTx
+appendWitnessGYTx = appendWitnessGYTx' . txWitToKeyWitnessApi
+
+-- | Add a key witness(s) to a transaction, which might already have previous key witnesses.
+appendWitnessGYTx' :: [Api.S.KeyWitness Api.S.BabbageEra] -> GYTx -> GYTx
+appendWitnessGYTx' appendKeyWitnessList previousTx =
+  let (txBody, previousKeyWitnessesList) = Api.S.getTxBodyAndWitnesses $ txToApi previousTx
+  in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
+
+-- | Sign a transaction with (potentially) multiple keys and add your witness(s) among previous key witnesses, if any.
+signGYTx :: ToShelleyWitnessSigningKey a =>  GYTx -> [a] -> GYTx
+signGYTx previousTx skeys =  -- Though could have been written in terms of `appendWitnessGYTx'` but that would duplicate work to obtain @txBody@ as it's also required here to get for `appendKeyWitnessList`.
+  let (txBody, previousKeyWitnessesList) = Api.S.getTxBodyAndWitnesses $ txToApi previousTx
+      appendKeyWitnessList = map (Api.makeShelleyKeyWitness txBody . toShelleyWitnessSigningKey) skeys
+  in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
 
 -- | Create an unsigned transaction from the body.
 unsignedTx :: GYTxBody -> GYTx

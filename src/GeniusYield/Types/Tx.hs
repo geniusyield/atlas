@@ -48,7 +48,7 @@ import qualified Data.ByteString              as BS
 import qualified Data.ByteString.Base16       as BS16
 import qualified Data.ByteString.Char8        as BS8
 import qualified Data.ByteString.Lazy         as LBS
-import           Data.Set                     as Set
+import qualified Data.Set                     as Set
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as T

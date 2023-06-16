@@ -17,6 +17,11 @@ module GeniusYield.Types.TxBody (
     unsignedTx,
     makeSignedTransaction,
     -- * Functions
+    txBodyFromHex,
+    txBodyFromHexBS,
+    txBodyFromCBOR,
+    txBodyToHex,
+    txBodyToHexBS,
     txBodyFee,
     txBodyFeeValue,
     txBodyUTxOs,
@@ -36,6 +41,9 @@ module GeniusYield.Types.TxBody (
 
 import qualified Cardano.Api                 as Api
 import qualified Cardano.Api.Shelley         as Api.S
+import qualified Data.ByteString             as BS
+import qualified Data.ByteString.Base16      as BS16
+import qualified Data.ByteString.Char8       as BS8
 import qualified Data.Set                    as Set
 
 import           GeniusYield.Imports
@@ -68,6 +76,30 @@ makeSignedTransaction txWit (GYTxBody txBody) = txFromApi $ Api.makeSignedTransa
 -- | Create an unsigned transaction from the body.
 unsignedTx :: GYTxBody -> GYTx
 unsignedTx (GYTxBody body) = txFromApi (Api.Tx body [])
+
+-- | Get `GYTxBody` from it's /hex/ CBOR encoding given as `String`. Note that the given serialized input is not of form @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyFromHex :: String -> Maybe GYTxBody
+txBodyFromHex = rightToMaybe . txBodyFromHexBS . BS8.pack
+
+-- | Get `GYTxBody` from it's /hex/ CBOR encoding given as `ByteString`. Note that the given serialized input is not of form @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyFromHexBS :: BS.ByteString -> Either String GYTxBody
+txBodyFromHexBS bs = BS16.decode bs >>= txBodyFromCBOR
+
+-- | Get `GYTxBody` from it's CBOR encoding. Note that the given serialized input is not of form @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyFromCBOR :: BS.ByteString -> Either String GYTxBody
+txBodyFromCBOR = fmap txBodyFromApi . first show . Api.deserialiseFromCBOR (Api.AsTxBody Api.AsBabbageEra)
+
+-- | Serialise `GYTxBody` to get hex encoded CBOR string represented as `String`. Obtained result does not correspond to @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyToHex :: GYTxBody -> String
+txBodyToHex = BS8.unpack . txBodyToHexBS
+
+-- | Serialise `GYTxBody` to get hex encoded CBOR string represented as `ByteString`. Obtained result does not correspond to @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyToHexBS :: GYTxBody -> BS.ByteString
+txBodyToHexBS = BS16.encode . txBodyToCBOR
+
+-- | Serialise `GYTxBody` to get CBOR bytestring. Obtained result does not correspond to @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyToCBOR :: GYTxBody -> BS.ByteString
+txBodyToCBOR = Api.serialiseToCBOR . txBodyToApi
 
 -- | Return the fees in lovelace.
 txBodyFee :: GYTxBody -> Integer

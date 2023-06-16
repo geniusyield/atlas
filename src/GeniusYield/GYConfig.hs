@@ -113,8 +113,7 @@ withCfgProviders
         GYNodeChainIx path (Confidential key) -> do
           let info = nodeConnectInfo path cfgNetworkId
               era = networkIdToEra cfgNetworkId
-              maestroUrl = MaestroApi.networkIdToMaestroUrl cfgNetworkId
-          mEnv <- MaestroApi.newMaestroApiEnv maestroUrl key
+          mEnv <- MaestroApi.networkIdToMaestroEnv key cfgNetworkId
           nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetCurrentSlot info
           pure
             ( Node.nodeGetParameters era info
@@ -136,8 +135,7 @@ withCfgProviders
             , SubmitApi.submitApiSubmitTxDefault submitApiEnv
             )
         GYMaestro (Confidential apiToken) -> do
-          let maestroUrl = MaestroApi.networkIdToMaestroUrl cfgNetworkId
-          maestroApiEnv <- MaestroApi.newMaestroApiEnv maestroUrl apiToken
+          maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
           maestroGetParams <- makeGetParameters
             (MaestroApi.maestroGetCurrentSlot maestroApiEnv)
             (MaestroApi.maestroProtocolParams maestroApiEnv)
@@ -153,7 +151,6 @@ withCfgProviders
             , MaestroApi.maestroSubmitTx maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do
-          -- NOTE: This provider only has proper support for the preprod testnet as of now.
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
           blockfrostGetParams <- makeGetParameters
             (Blockfrost.blockfrostGetCurrentSlot proj)

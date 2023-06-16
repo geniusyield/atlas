@@ -117,6 +117,10 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
         f :: GYUTxOs -> GYAddress -> m GYUTxOs
         f utxos addr = (<> utxos) <$> utxosAtAddress addr
 
+    -- | Lookup 'GYUTxOs' at zero or more 'GYAddress' with their datums. This has a default implementation using `utxosAtAddresses` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
+    utxosAtAddressesWithDatums :: [GYAddress] -> m [(GYUTxO, Maybe GYDatum)]
+    utxosAtAddressesWithDatums = gyQueryUtxosAtAddressesWithDatumsDefault utxosAtAddresses lookupDatum
+
     -- | Lookup the `[GYTxOutRef]`s at a `GYAddress`
     utxoRefsAtAddress :: GYAddress -> m [GYTxOutRef]
     utxoRefsAtAddress = fmap (Map.keys . mapUTxOs id) . utxosAtAddress
@@ -156,6 +160,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
     utxosAtAddress = lift . utxosAtAddress
+    utxosAtAddresses = lift . utxosAtAddresses
+    utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     slotConfig = lift slotConfig
     currentSlot = lift currentSlot
@@ -173,6 +179,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
     utxosAtAddress = lift . utxosAtAddress
+    utxosAtAddresses = lift . utxosAtAddresses
+    utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     slotConfig = lift slotConfig
     currentSlot = lift currentSlot
@@ -190,6 +198,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
     utxosAtAddress = lift . utxosAtAddress
+    utxosAtAddresses = lift . utxosAtAddresses
+    utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     slotConfig = lift slotConfig
     currentSlot = lift currentSlot

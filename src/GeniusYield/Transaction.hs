@@ -85,6 +85,7 @@ import           Cardano.Slotting.Time                 (SystemStart)
 import           Control.Monad.Random
 import           GeniusYield.HTTP.Errors               (IsGYApiError)
 import           GeniusYield.Imports
+import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Transaction.CoinSelection
 import           GeniusYield.Transaction.Common
 import           GeniusYield.Types
@@ -125,6 +126,7 @@ data BuildTxException
     -- ^ Lovelaces shortfall (in collateral inputs) for collateral requirement.
     | BuildTxNoSuitableCollateral
     -- ^ Couldn't find a UTxO to use as collateral.
+    | BuildTxCborSimplificationError !CborSimplificationError
   deriving stock    Show
   deriving anyclass (Exception, IsGYApiError)
 
@@ -520,4 +522,4 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
         {- Technically, this doesn't compare with the _final_ tx size, because of signers that will be
         added later. But signing witnesses are only a few bytes, so it's unlikely to be an issue -}
         Left BuildTxSizeTooBig
-    pure $ txBodyFromApi txBody
+    first BuildTxCborSimplificationError $ simplifyGYTxBodyCbor $ txBodyFromApi txBody

@@ -18,6 +18,7 @@ module GeniusYield.TxBuilder.Run
     , ownAddress
     , sendSkeleton
     , sendSkeleton'
+    , sendSkeletonWithWallets
     , networkIdRun
     ) where
 
@@ -227,23 +228,26 @@ instance GYTxMonad GYTxMonadRun where
 
     randSeed = return 42
 
-sendSkeleton :: GYTxSkeleton v -> GYTxMonadRun GYTxId
-sendSkeleton skeleton = snd <$> sendSkeleton' skeleton
+-- Send skeletons with multiple signatures from wallet
+sendSkeletonWithWallets :: GYTxSkeleton v -> [Wallet] -> GYTxMonadRun GYTxId
+sendSkeletonWithWallets skeleton ws = snd <$> sendSkeleton' skeleton ws
 
-sendSkeleton' :: GYTxSkeleton v -> GYTxMonadRun (Tx, GYTxId)
-sendSkeleton' skeleton = do
+sendSkeleton :: GYTxSkeleton v -> GYTxMonadRun GYTxId
+sendSkeleton skeleton = snd <$> sendSkeleton' skeleton  []
+
+
+sendSkeleton' :: GYTxSkeleton v -> [Wallet]  -> GYTxMonadRun (Tx, GYTxId)
+sendSkeleton' skeleton ws = do
     w <- asks runEnvWallet
-    let skey = walletPaymentSigningKey w
+    let sigs = walletSignatures (w:ws)
     body <- skeletonToTxBody skeleton
     pp <- protocolParameters
     modify (updateWalletState w pp body)
     dumpBody body
 
-    let pkh     = pubKeyHashToPlutus $ pubKeyHash $ paymentVerificationKey skey
-        keyPair = paymentSigningKeyToLedgerKeyPair skey
-        tx1     =
+    let tx1     =
             toExtra (mempty
-                { Fork.txSignatures = Map.singleton pkh keyPair
+                { Fork.txSignatures = sigs
                 , Fork.txValidRange       = case txBodyValidityRange body of
                     (Nothing, Nothing) -> Plutus.always
                     (Nothing, Just ub) -> Plutus.to $ slot ub
@@ -268,6 +272,10 @@ sendSkeleton' skeleton = do
             Just tid' -> return (tx5, tid')
 
   where
+    walletSignatures = Map.fromList . map (\w -> (walletPubKeyHash w, walletKeyPair w))
+
+    walletPubKeyHash = pubKeyHashToPlutus . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey
+    walletKeyPair = paymentSigningKeyToLedgerKeyPair . walletPaymentSigningKey
 
     -- Updates the wallet state.
     -- Updates extra lovelace required for fees & minimum ada requirements against the wallet sending this transaction.
@@ -509,4 +517,3 @@ eraHistory = do
             , eraEnd = Ouroboros.EraUnbounded
             , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920}
             }
-

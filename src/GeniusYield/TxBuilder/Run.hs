@@ -272,10 +272,11 @@ sendSkeleton' skeleton ws = do
             Just tid' -> return (tx5, tid')
 
   where
-    walletSignatures = Map.fromList . map (\w -> (walletPubKeyHash w, walletKeyPair w))
+    walletSignatures =
+      let walletPubKeyHash = pubKeyHashToPlutus . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey
+          walletKeyPair = paymentSigningKeyToLedgerKeyPair . walletPaymentSigningKey
+       in Map.fromList . map (\w -> (walletPubKeyHash w, walletKeyPair w))
 
-    walletPubKeyHash = pubKeyHashToPlutus . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey
-    walletKeyPair = paymentSigningKeyToLedgerKeyPair . walletPaymentSigningKey
 
     -- Updates the wallet state.
     -- Updates extra lovelace required for fees & minimum ada requirements against the wallet sending this transaction.

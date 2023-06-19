@@ -118,8 +118,10 @@ data BuildTxException
     | BuildTxBodyErrorAutoBalance !Api.TxBodyErrorAutoBalance
     | BuildTxMissingMaxExUnitsParam
     -- ^ Missing max ex units in protocol params
-    | BuildTxExUnitsTooBig
-    -- ^ Execution units required is higher than the maximum as specified by protocol params.
+    | BuildTxExUnitsTooBig  -- ^ Execution units required is higher than the maximum as specified by protocol params.
+        (Natural, Natural)  -- ^ Tuple of maximum execution steps & memory as given by protocol parameters.
+        (Natural, Natural)  -- ^ Tuple of execution steps & memory as taken by built transaction.
+
     | BuildTxSizeTooBig
     -- ^ Transaction size is higher than the maximum as specified by protocol params.
     | BuildTxCollateralShortFall  -- ^ Shortfall (in collateral inputs) for collateral requirement.
@@ -188,10 +190,10 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers = build
                 {- RandomImprove may end up selecting too many inputs to fit in the transaction.
                 In this case, try with LargestFirst and dial back the extraLovelace param.
                 -}
-                Left BuildTxExUnitsTooBig                                              -> retryIfRandomImprove
+                Left (BuildTxExUnitsTooBig maxUnits currentUnits)                      -> retryIfRandomImprove
                                                                                             stepStrat
                                                                                             n
-                                                                                            BuildTxExUnitsTooBig
+                                                                                            (BuildTxExUnitsTooBig maxUnits currentUnits)
                 Left BuildTxSizeTooBig                                                 -> retryIfRandomImprove
                                                                                             stepStrat
                                                                                             n
@@ -517,7 +519,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
         txSize = getField @"txsize" ltx
     -- See: Cardano.Ledger.Alonzo.Rules.validateExUnitsTooBigUTxO
     unless (steps <= maxSteps && mem <= maxMemory) $
-        Left BuildTxExUnitsTooBig
+        Left $ BuildTxExUnitsTooBig (maxSteps, maxMemory) (steps, mem)
     -- See: Cardano.Ledger.Shelley.Rules.validateMaxTxSizeUTxO
     unless (txSize <= toInteger maxTxSize) $
         {- Technically, this doesn't compare with the _final_ tx size, because of signers that will be

@@ -61,7 +61,7 @@ refInputTrace toInline actual guess Wallets{..} = do
       void $ runWallet w1 $ withWalletBalancesCheckSimple [w1 := valueFromLovelace 0] $ do
         liftRun $ logInfo $ printf "Reference input ORef %s" refInputORef
         addr <- scriptAddress gyGuessRefInputDatumValidator
-        (Tx _ plutusTxBody, txId) <- sendSkeleton' (mustHaveOutput $ mkGYTxOut addr outValue (datumFromPlutusData ()))
+        (Tx _ plutusTxBody, txId) <- sendSkeleton' (mustHaveOutput $ mkGYTxOut addr outValue (datumFromPlutusData ()))  []
         let mOrefIndices = findLockedUtxosInBody (walletNetworkId w1) addr plutusTxBody
         orefIndices <- maybe (fail "Unable to get GYAddress from some Plutus.Address in txBody") return mOrefIndices
         oref        <- case fmap (txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx) orefIndices of
@@ -78,7 +78,7 @@ tryRefInputConsume Wallets{..} = do
     let walletLovelaceBalance = fst $ valueSplitAda walletBalance
         lovelaceToSend = (walletLovelaceBalance `div` 10) * 6  -- send 60% of total ada
         lovelaceToSendValue = valueFromLovelace lovelaceToSend
-    (Tx _ plutusTxBody, txId) <- sendSkeleton' (mustHaveOutput $ mkGYTxOutNoDatum (walletAddress w1) lovelaceToSendValue)
+    (Tx _ plutusTxBody, txId) <- sendSkeleton' (mustHaveOutput $ mkGYTxOutNoDatum (walletAddress w1) lovelaceToSendValue) []
     bodyUtxos <- utxosInBody plutusTxBody txId
     let bodyUtxos' = catMaybes bodyUtxos
     unless (length bodyUtxos == length bodyUtxos') $ fail $ printf "Shouldn't happen: Not all UTxOs reflected, originally %s but got %s and they are %s" (show $ length bodyUtxos) (show $ length bodyUtxos') (show bodyUtxos')

@@ -246,7 +246,7 @@ withWalletBalancesCheckSimple wallValueDiffs m = do
             Just (extraLovelaceForFees, extraLovelaceForMinAda) -> b' <> valueFromLovelace (coerce $ extraLovelaceForFees <> extraLovelaceForMinAda)
           diff = newBalance `valueMinus` b
         in unless (diff == v) $ fail $
-            printf "Wallet: %s. Old balance: %s. New balance: %s. New balance after adding extra lovelaces %s. Expected balance difference of %s, but the actual difference was %s" (walletName w) b b' newBalance v diff 
+            printf "Wallet: %s. Old balance: %s. New balance: %s. New balance after adding extra lovelaces %s. Expected balance difference of %s, but the actual difference was %s" (walletName w) b b' newBalance v diff
   return a
 
 -- | Given a wallet returns its balance.
@@ -324,7 +324,7 @@ utxosInBody Fork.Tx{txOutputs = os} txId = mapM (\i -> utxoAtTxOutRef (txOutRefF
 addRefScript :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadRun (Maybe GYTxOutRef)
 addRefScript addr script = do
     let script' = validatorToScript script
-    (Tx _ txBody, txId) <- sendSkeleton' (mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just script' })
+    (Tx _ txBody, txId) <- sendSkeleton' (mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just script' }) []
     -- now need to find utxo at given address which has the given reference script hm...
     let index = findIndex (\o -> Plutus2.txOutReferenceScript o == Just (scriptPlutusHash script')) (Fork.txOutputs txBody)
     return $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< index
@@ -352,7 +352,7 @@ addRefInput:: Bool       -- ^ Whether to inline this datum?
            -> GYDatum    -- ^ Our datum.
            -> GYTxMonadRun (Maybe GYTxOutRef)
 addRefInput toInline addr dat = do
-  (Tx _ txBody, txId) <- sendSkeleton' (mustHaveOutput $ GYTxOut addr mempty (Just (dat, if toInline then GYTxOutUseInlineDatum else GYTxOutDontUseInlineDatum)) Nothing)
+  (Tx _ txBody, txId) <- sendSkeleton' (mustHaveOutput $ GYTxOut addr mempty (Just (dat, if toInline then GYTxOutUseInlineDatum else GYTxOutDontUseInlineDatum)) Nothing) []
   liftRun $ logInfo $ printf "Added reference input with txId %s" txId
   outputsWithResolvedDatums <- mapM (resolveDatumFromPlutusOutput . Plutus2.txOutDatum ) (Fork.txOutputs txBody)
   let mIndex = findIndex (\d -> Just dat == d) outputsWithResolvedDatums

@@ -13,10 +13,19 @@ module GeniusYield.Types.TxBody (
     txBodyFromApi,
     txBodyToApi,
     -- * Transaction creation
+    signGYTxBody,
     signTx,
     unsignedTx,
     makeSignedTransaction,
+    makeSignedTransaction',
+    appendWitnessGYTx,
+    signGYTx,
     -- * Functions
+    txBodyFromHex,
+    txBodyFromHexBS,
+    txBodyFromCBOR,
+    txBodyToHex,
+    txBodyToHexBS,
     txBodyFee,
     txBodyFeeValue,
     txBodyUTxOs,
@@ -36,6 +45,9 @@ module GeniusYield.Types.TxBody (
 
 import qualified Cardano.Api                 as Api
 import qualified Cardano.Api.Shelley         as Api.S
+import qualified Data.ByteString             as BS
+import qualified Data.ByteString.Base16      as BS16
+import qualified Data.ByteString.Char8       as BS8
 import qualified Data.Set                    as Set
 
 import           GeniusYield.Imports
@@ -58,16 +70,65 @@ txBodyToApi :: GYTxBody -> Api.TxBody Api.BabbageEra
 txBodyToApi = coerce
 
 -- | Sign a transaction body with (potentially) multiple keys.
+signGYTxBody :: ToShelleyWitnessSigningKey a =>  GYTxBody -> [a] -> GYTx
+signGYTxBody = signTx
+
+{-# DEPRECATED signTx "Use signGYTxBody." #-}
 signTx :: ToShelleyWitnessSigningKey a =>  GYTxBody -> [a] -> GYTx
 signTx (GYTxBody txBody) skeys = txFromApi $ Api.signShelleyTransaction txBody $ map toShelleyWitnessSigningKey skeys
 
--- | Make a signed transaction given the transaction body & list of key witnesses.
+-- | Make a signed transaction given the transaction body & list of key witnesses, represented in `GYTxWitness`.
 makeSignedTransaction :: GYTxWitness -> GYTxBody -> GYTx
-makeSignedTransaction txWit (GYTxBody txBody) = txFromApi $ Api.makeSignedTransaction (txWitToKeyWitnessApi txWit) txBody
+makeSignedTransaction txWit txBody = makeSignedTransaction' (txWitToKeyWitnessApi txWit) $ txBodyToApi txBody
+
+-- | Make a signed transaction given the transaction body & list of key witnesses.
+makeSignedTransaction' :: [Api.S.KeyWitness Api.S.BabbageEra] -> Api.TxBody Api.BabbageEra -> GYTx
+makeSignedTransaction' = fmap txFromApi <$> Api.makeSignedTransaction
+
+-- | Add a key witness(s) to a transaction, represented in `GYTxWitness`, which might already have previous key witnesses.
+appendWitnessGYTx :: GYTxWitness -> GYTx -> GYTx
+appendWitnessGYTx = appendWitnessGYTx' . txWitToKeyWitnessApi
+
+-- | Add a key witness(s) to a transaction, which might already have previous key witnesses.
+appendWitnessGYTx' :: [Api.S.KeyWitness Api.S.BabbageEra] -> GYTx -> GYTx
+appendWitnessGYTx' appendKeyWitnessList previousTx =
+  let (txBody, previousKeyWitnessesList) = Api.S.getTxBodyAndWitnesses $ txToApi previousTx
+  in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
+
+-- | Sign a transaction with (potentially) multiple keys and add your witness(s) among previous key witnesses, if any.
+signGYTx :: ToShelleyWitnessSigningKey a =>  GYTx -> [a] -> GYTx
+signGYTx previousTx skeys =  -- Though could have been written in terms of `appendWitnessGYTx'` but that would duplicate work to obtain @txBody@ as it's also required here to get for `appendKeyWitnessList`.
+  let (txBody, previousKeyWitnessesList) = Api.S.getTxBodyAndWitnesses $ txToApi previousTx
+      appendKeyWitnessList = map (Api.makeShelleyKeyWitness txBody . toShelleyWitnessSigningKey) skeys
+  in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
 
 -- | Create an unsigned transaction from the body.
 unsignedTx :: GYTxBody -> GYTx
 unsignedTx (GYTxBody body) = txFromApi (Api.Tx body [])
+
+-- | Get `GYTxBody` from it's /hex/ CBOR encoding given as `String`. Note that the given serialized input is not of form @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyFromHex :: String -> Maybe GYTxBody
+txBodyFromHex = rightToMaybe . txBodyFromHexBS . BS8.pack
+
+-- | Get `GYTxBody` from it's /hex/ CBOR encoding given as `ByteString`. Note that the given serialized input is not of form @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyFromHexBS :: BS.ByteString -> Either String GYTxBody
+txBodyFromHexBS bs = BS16.decode bs >>= txBodyFromCBOR
+
+-- | Get `GYTxBody` from it's CBOR encoding. Note that the given serialized input is not of form @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyFromCBOR :: BS.ByteString -> Either String GYTxBody
+txBodyFromCBOR = fmap txBodyFromApi . first show . Api.deserialiseFromCBOR (Api.AsTxBody Api.AsBabbageEra)
+
+-- | Serialise `GYTxBody` to get hex encoded CBOR string represented as `String`. Obtained result does not correspond to @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyToHex :: GYTxBody -> String
+txBodyToHex = BS8.unpack . txBodyToHexBS
+
+-- | Serialise `GYTxBody` to get hex encoded CBOR string represented as `ByteString`. Obtained result does not correspond to @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyToHexBS :: GYTxBody -> BS.ByteString
+txBodyToHexBS = BS16.encode . txBodyToCBOR
+
+-- | Serialise `GYTxBody` to get CBOR bytestring. Obtained result does not correspond to @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
+txBodyToCBOR :: GYTxBody -> BS.ByteString
+txBodyToCBOR = Api.serialiseToCBOR . txBodyToApi
 
 -- | Return the fees in lovelace.
 txBodyFee :: GYTxBody -> Integer

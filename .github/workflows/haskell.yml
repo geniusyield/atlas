@@ -2,6 +2,16 @@ name: Haskell CI
 
 on:
   workflow_call:
+    secrets:
+      MAESTRO_CONFIG:
+        description: 'Maestro config.'
+        required: true
+      BLOCKFROST_CONFIG:
+        description: 'Blockfrost config.'
+        required: true
+      PREPROD_SUBMIT_TEST_WALLET_SKEY:
+        description: 'Signing key for testing.'
+        required: true
     outputs:
       ATLAS_VERSION:
         description: "ATLAS_VERSION"
@@ -53,11 +63,14 @@ jobs:
       uses: pre-commit/action@v3.0.0
       with:
         extra_args: --verbose --all-files
-    - name: Prepare Maestro config file
+    - name: Prepare config files
       env:
         MAESTRO_CONFIG: ${{secrets.MAESTRO_CONFIG}}
+        BLOCKFROST_CONFIG: ${{secrets.BLOCKFROST_CONFIG}}
+        PREPROD_SUBMIT_TEST_WALLET_SKEY: ${{secrets.PREPROD_SUBMIT_TEST_WALLET_SKEY}}
       run: |
-          echo "Creating maestro-config.json..."
+          # MAESTRO_CONFIG ----------------------------------
+          echo "Creating maestro-config.json from MAESTRO_CONFIG env var..."
           echo "$MAESTRO_CONFIG" >> maestro-config.json
           if [[ -f maestro-config.json ]] ; then
             echo "[OK] maestro-config.json has been created."
@@ -65,6 +78,28 @@ jobs:
             echo "[ERROR] maestro-config.json is missing."
             exit 1
           fi
+          # BLOCKFROST_CONFIG ----------------------------------
+          echo "Creating blockfrost-config.json from BLOCKFROST_CONFIG env var..."
+          echo "$BLOCKFROST_CONFIG" >> blockfrost-config.json
+          if [[ -f blockfrost-config.json ]] ; then
+            echo "[OK] blockfrost-config.json has been created."
+          else
+            echo "[ERROR] blockfrost-config.json is missing."
+            exit 1
+          fi
+          # PREPROD_SUBMIT_TEST_WALLET_SKEY ----------------------------------
+          echo "Creating preprod-submit-test-wallet.skey from PREPROD_SUBMIT_TEST_WALLET_SKEY env var..."
+          echo "$PREPROD_SUBMIT_TEST_WALLET_SKEY" >> preprod-submit-test-wallet.skey
+          if [[ -f preprod-submit-test-wallet.skey ]] ; then
+            echo "[OK] preprod-submit-test-wallet.skey has been created."
+          else
+            echo "[ERROR] preprod-submit-test-wallet.skey is missing."
+            exit 1
+          fi
+          stat maestro-config.json
+          stat blockfrost-config.json
+          stat preprod-submit-test-wallet.skey
+          
     - name: Setup haskell tooling
       uses: haskell/actions/setup@v2
       with:

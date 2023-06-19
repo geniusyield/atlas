@@ -22,3 +22,6 @@ cabal.project.local~
 .HTF/
 .ghc.environment.*
 .DS_Store
+maestro-config.json
+blockfrost-config.json
+*.skey

@@ -29,8 +29,10 @@ module GeniusYield.Types.Providers
     , gyGetSlotConfig
     , makeGetParameters
       -- * Query UTxO
+    , gyQueryUtxosAtAddressesWithDatumsDefault
     , GYQueryUTxO (..)
     , gyQueryUtxosAtAddresses
+    , gyQueryUtxosAtAddressesWithDatums
     , gyQueryUtxosAtAddress'
     , gyQueryUtxosAtAddress
     , gyQueryUtxosAtTxOutRefs
@@ -54,7 +56,8 @@ module GeniusYield.Types.Providers
 import qualified Cardano.Api                       as Api
 import qualified Cardano.Api.Shelley               as Api.S
 import           Cardano.Slotting.Time             (SystemStart)
-import           Control.Concurrent                (MVar, modifyMVar, newMVar, threadDelay)
+import           Control.Concurrent                (MVar, modifyMVar, newMVar,
+                                                    threadDelay)
 import           Control.Monad                     ((<$!>))
 import           Control.Monad.IO.Class            (MonadIO (..))
 import qualified Data.Text                         as Txt
@@ -129,6 +132,12 @@ gyQueryUtxosAtAddress = gyQueryUtxosAtAddress' . gyQueryUTxO
 
 gyQueryUtxosAtAddresses :: GYProviders -> [GYAddress] -> IO  GYUTxOs
 gyQueryUtxosAtAddresses = gyQueryUtxosAtAddresses' . gyQueryUTxO
+
+gyQueryUtxosAtAddressesWithDatums :: GYProviders -> [GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtAddressesWithDatums provider addrs =
+  case gyQueryUtxosAtAddressesWithDatums' $ gyQueryUTxO provider of
+    Nothing -> gyQueryUtxosAtAddressesWithDatumsDefault (gyQueryUtxosAtAddresses provider) (gyLookupDatum provider) addrs
+    Just f  -> f addrs
 
 gyQueryUtxosAtTxOutRefs :: GYProviders -> [GYTxOutRef] -> IO GYUTxOs
 gyQueryUtxosAtTxOutRefs = gyQueryUtxosAtTxOutRefs' . gyQueryUTxO
@@ -331,10 +340,12 @@ makeGetParameters getCurrentSlot getProtParams getSysStart getEraHist getStkPool
 
 -- | How to query utxos?
 data GYQueryUTxO = GYQueryUTxO
-    { gyQueryUtxosAtTxOutRefs'  :: !([GYTxOutRef] -> IO GYUTxOs)
-    , gyQueryUtxoAtTxOutRef'    :: !(GYTxOutRef -> IO (Maybe GYUTxO))
-    , gyQueryUtxoRefsAtAddress' :: !(GYAddress -> IO [GYTxOutRef])
-    , gyQueryUtxosAtAddresses'  :: !([GYAddress] -> IO GYUTxOs)
+    { gyQueryUtxosAtTxOutRefs'           :: !([GYTxOutRef] -> IO GYUTxOs)
+    , gyQueryUtxoAtTxOutRef'             :: !(GYTxOutRef -> IO (Maybe GYUTxO))
+    , gyQueryUtxoRefsAtAddress'          :: !(GYAddress -> IO [GYTxOutRef])
+    , gyQueryUtxosAtAddresses'           :: !([GYAddress] -> IO GYUTxOs)
+    , gyQueryUtxosAtAddressesWithDatums' :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))
+    -- ^ `gyQueryUtxosAtAddressesWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
     }
 
 gyQueryUtxosAtAddress' :: GYQueryUTxO -> GYAddress -> IO GYUTxOs
@@ -349,6 +360,16 @@ gyQueryUtxoAtAddressesDefault :: (GYAddress -> IO GYUTxOs) -> [GYAddress] -> IO 
 gyQueryUtxoAtAddressesDefault queryUtxosAtAddress addrs = do
   utxos <- traverse queryUtxosAtAddress addrs
   pure $ mconcat utxos
+
+-- | Lookup 'GYUTxOs' at zero or more 'GYAddress' with their datums. This is a default implementation using `utxosAtAddresses` and `lookupDatum`.
+gyQueryUtxosAtAddressesWithDatumsDefault :: Monad m => ([GYAddress] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYAddress] -> m [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtAddressesWithDatumsDefault utxosAtAddressesFun lookupDatumFun addrs = do
+  utxosWithoutDatumResolutions <- utxosToList <$> utxosAtAddressesFun addrs
+  forM utxosWithoutDatumResolutions $ \utxo -> do
+    case utxoOutDatum utxo of
+      GYOutDatumNone     -> return (utxo, Nothing)
+      GYOutDatumInline d -> return (utxo, Just d)
+      GYOutDatumHash h   -> (utxo, ) <$> lookupDatumFun h
 
 -------------------------------------------------------------------------------
 -- Logging

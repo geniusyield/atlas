@@ -19,6 +19,7 @@ configTests = testGroup "Config"
     [ testCase "core-local"      $ testParseResult isNodeChainIx "core-local.json"
     , testCase "core-dbsync"     $ testParseResult isDbSync      "core-dbsync.json"
     , testCase "core-maestro"    $ testParseResult isMaestro     "core-maestro.json"
+    , testCase "core-blockfrost" $ testParseResult isBlockfrost  "core-blockfrost.json"
     ]
 
 testParseResult :: (GYCoreProviderInfo -> Bool) -> FilePath -> IO ()
@@ -36,7 +37,6 @@ isNodeChainIx :: GYCoreProviderInfo -> Bool
 isNodeChainIx GYNodeChainIx{} = True
 isNodeChainIx _               = False
 
-
 isDbSync :: GYCoreProviderInfo -> Bool
 isDbSync GYDbSync{} = True
 isDbSync _          = False
@@ -44,6 +44,10 @@ isDbSync _          = False
 isMaestro :: GYCoreProviderInfo -> Bool
 isMaestro GYMaestro{} = True
 isMaestro _           = False
+
+isBlockfrost :: GYCoreProviderInfo -> Bool
+isBlockfrost GYBlockfrost{} = True
+isBlockfrost _              = False
 
 mockConfigDir :: FilePath
 mockConfigDir = "tests/mock-configs"

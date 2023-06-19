@@ -91,6 +91,9 @@ data GYUTxO = GYUTxO
     , utxoRefScript :: !(Maybe (Some GYScript)) -- TODO: change to GYScriptHash? #31, but then we won't be able to convert faithfully back to Api.UTxO (https://github.com/geniusyield/atlas/issues/31)
     } deriving stock (Eq, Show)
 
+instance Ord GYUTxO where
+  u1 `compare` u2 = utxoRef u1 `compare` utxoRef u2
+
 -- | A set of unspent transaction outputs.
 --
 -- Actually a map from unspent transaction outputs to address, value and datum hash.

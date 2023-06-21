@@ -179,7 +179,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers = build
     buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException GYTxBody)
     buildTxLoop stepStrat n
         -- Stop trying with RandomImprove if extra lovelace has hit the pre-determined ceiling.
-        | n >= randImproveExtraLovelaceCeil = buildTxLoop GYLargestFirstMultiAsset n
+        | stepStrat /= GYLargestFirstMultiAsset && n >= randImproveExtraLovelaceCeil = buildTxLoop GYLargestFirstMultiAsset n
         | otherwise = do
             res <- f stepStrat n
             case res of

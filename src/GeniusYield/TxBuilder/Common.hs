@@ -127,13 +127,13 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                     gytxSigs
 
         go :: GYUTxOs -> GYTxBuildResult f -> [f (GYTxSkeleton v)] -> m (Either BuildTxException  (GYTxBuildResult f))
-        go _         acc []           = pure $ Right acc
+        go _         acc []           = pure $ Right $ reverseResult acc
         go ownUtxos' acc (fbody : rest) = do
             res <- sequence <$> traverse (helper ownUtxos') fbody
             case res of
                 {- Not enough funds for this transaction
                 We assume it's not worth continuing with the next transactions (which is often the case) -}
-                Left (InsufficientFundsErr v) -> pure $ Right $ updateBuildRes (Left v) acc
+                Left (InsufficientFundsErr v) -> pure $ Right $ reverseResult $ updateBuildRes (Left v) acc
                 -- Any other exception is fatal. TODO: To think more on whether collateral error can be handled here.
                 Left err                      -> pure $ Left err
                 Right fres                    -> do
@@ -160,6 +160,13 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
     updateBuildRes (Right x) GYTxBuildNoInputs     = GYTxBuildSuccess (x :| [])
     updateBuildRes (Right x) (GYTxBuildSuccess ne) = GYTxBuildSuccess (NE.cons x ne)
     updateBuildRes _ _                             = error "buildTxCore.flippedFoldM.updateBuildRes: absurd"
+
+    -- TODO: Move to @Data.Sequence.NonEmpty@?
+    -- | To reverse the final non-empty list built.
+    reverseResult :: GYTxBuildResult f -> GYTxBuildResult f
+    reverseResult (GYTxBuildSuccess ne) = GYTxBuildSuccess $ NE.reverse ne
+    reverseResult (GYTxBuildPartialSuccess v ne) = GYTxBuildPartialSuccess v $ NE.reverse ne
+    reverseResult anyOther = anyOther
 
 pattern InsufficientFundsErr :: GYValue -> BuildTxException
 pattern InsufficientFundsErr v = BuildTxBalancingError (BalancingErrorInsufficientFunds v)

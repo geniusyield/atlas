@@ -169,13 +169,9 @@ buildUnsignedTxBody :: forall m v.
         -> m (Either BuildTxException GYTxBody)
 buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers = buildTxLoop cstrat extraLovelaceStart
   where
-    -- TODO: decide whether inline datums /can/ be used for this transaction.
-    -- Currently we don't use them ever.
-    useInlineDatums :: Bool
-    useInlineDatums = True -- temporarily True: don't set inlinedDatum flags in GYTxOuts.
 
     step :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
-    step stepStrat = fmap (first BuildTxBalancingError) . balanceTxStep env useInlineDatums mmint insOld outsOld stepStrat
+    step stepStrat = fmap (first BuildTxBalancingError) . balanceTxStep env mmint insOld outsOld stepStrat
 
     buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException GYTxBody)
     buildTxLoop stepStrat n
@@ -215,7 +211,6 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers = build
         pure $ stepRes >>= \(ins, collaterals, outs) ->
             finalizeGYBalancedTx
                 env
-                useInlineDatums
                 GYBalancedTx
                     { gybtxIns           = ins
                     , gybtxCollaterals   = collaterals
@@ -243,7 +238,6 @@ the tx with 'finalizeGYBalancedTx'. If such is the case, 'balanceTxStep' should 
 -}
 balanceTxStep :: (HasCallStack, MonadRandom m)
     => GYBuildTxEnv
-    -> Bool                                                  -- ^ use inline datums
     -> Maybe (GYValue, [(Some GYMintingPolicy, GYRedeemer)]) -- ^ minting
     -> [GYTxInDetailed v]                                    -- ^ transaction inputs
     -> [GYTxOut v]                                           -- ^ transaction outputs
@@ -257,12 +251,11 @@ balanceTxStep
         , gyBTxEnvChangeAddr     = changeAddr
         , gyBTxEnvCollateral     = collateral
         }
-    useInlineDatums
     mmint
     ins
     outs
     cstrat
-    = let adjustedOuts = map (adjustTxOut (minimumUTxO useInlineDatums pp)) outs
+    = let adjustedOuts = map (adjustTxOut (minimumUTxO pp)) outs
           valueMint       = maybe mempty fst mmint
           needsCollateral = valueMint /= mempty || any (isScriptWitness . gyTxInWitness . gyTxInDet) ins
           collaterals
@@ -284,7 +277,7 @@ balanceTxStep
                         fromInteger
                         . flip valueAssetClass GYLovelace
                           . gyTxOutValue
-                            . adjustTxOut (minimumUTxO useInlineDatums pp)
+                            . adjustTxOut (minimumUTxO pp)
                     , maxValueSize    = fromMaybe
                                             (error "protocolParamMaxValueSize missing from protocol params")
                                             $ Api.S.protocolParamMaxValueSize pp
@@ -299,7 +292,7 @@ balanceTxStep
 -- retColSup :: Api.TxTotalAndReturnCollateralSupportedInEra Api.BabbageEra
 retColSup = fromJust $ Api.totalAndReturnCollateralSupportedInEra Api.BabbageEra
 
-finalizeGYBalancedTx :: GYBuildTxEnv -> Bool -> GYBalancedTx v -> Either BuildTxException GYTxBody
+finalizeGYBalancedTx :: GYBuildTxEnv -> GYBalancedTx v -> Either BuildTxException GYTxBody
 finalizeGYBalancedTx
     GYBuildTxEnv
         { gyBTxEnvSystemStart    = ss
@@ -308,7 +301,6 @@ finalizeGYBalancedTx
         , gyBTxEnvPools          = ps
         , gyBTxEnvChangeAddr     = changeAddr
         }
-    useInlineDatums
     GYBalancedTx
         { gybtxIns           = ins
         , gybtxCollaterals   = collaterals
@@ -372,7 +364,7 @@ finalizeGYBalancedTx
     utxos = utxosIn <> utxosRefScripts <> utxosRefInputs <> collaterals
 
     outs' :: [Api.S.TxOut Api.S.CtxTx Api.S.BabbageEra]
-    outs' = txOutToApi useInlineDatums <$> outs
+    outs' = txOutToApi <$> outs
 
     ins' :: [(Api.TxIn, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxTxIn Api.BabbageEra))]
     ins' = [ txInToApi (gyTxInDetInlineDat i) (gyTxInDet i) |  i <- ins ]
@@ -424,7 +416,7 @@ finalizeGYBalancedTx
         -- Total collateral must be <= lovelaces available in collateral inputs.
           Api.TxTotalCollateral retColSup (Api.Lovelace $ fst $ valueSplitAda collateralTotalValue)
         -- Return collateral must be <= what is in collateral inputs.
-        , Api.TxReturnCollateral retColSup $ txOutToApi True $ GYTxOut changeAddr collateralTotalValue Nothing Nothing
+        , Api.TxReturnCollateral retColSup $ txOutToApi $ GYTxOut changeAddr collateralTotalValue Nothing Nothing
         )
       where
         collateralTotalValue :: GYValue
@@ -499,7 +491,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
           if collateralTotalLovelace >= balanceNeeded then return
             (
               Api.TxTotalCollateral retColSup (Api.Lovelace balanceNeeded)
-            , Api.TxReturnCollateral retColSup $ txOutToApi True $ GYTxOut changeAddr (collateralTotalValue `valueMinus` valueFromLovelace balanceNeeded) Nothing Nothing
+            , Api.TxReturnCollateral retColSup $ txOutToApi $ GYTxOut changeAddr (collateralTotalValue `valueMinus` valueFromLovelace balanceNeeded) Nothing Nothing
 
             )
           else Left $ BuildTxCollateralShortFall (fromInteger balanceNeeded) (fromInteger collateralTotalLovelace) -- In this case `makeTransactionBodyAutoBalance` doesn't return an error but instead returns `(Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)`

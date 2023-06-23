@@ -280,7 +280,11 @@ balanceTxStep
                     , changeAddr      = changeAddr
                     , ownUtxos        = ownUtxos
                     , extraLovelace   = extraLovelace
-                    , minimumUTxOF    = minimumUTxO useInlineDatums pp
+                    , minimumUTxOF    =
+                        fromInteger
+                        . flip valueAssetClass GYLovelace
+                          . gyTxOutValue
+                            . adjustTxOut (minimumUTxO useInlineDatums pp)
                     , maxValueSize    = fromMaybe
                                             (error "protocolParamMaxValueSize missing from protocol params")
                                             $ Api.S.protocolParamMaxValueSize pp

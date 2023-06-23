@@ -175,7 +175,7 @@ selectInputs
                         selectionParams
         let inRefs     = S.fromList $ gyTxInTxOutRef . gyTxInDet <$> existingInputs
             changeOuts = map
-                (\(fromTokenBundle -> tokenChange) -> adjustTxOut minimumUTxOF (GYTxOut changeAddr tokenChange Nothing Nothing))
+                (\(fromTokenBundle -> tokenChange) -> GYTxOut changeAddr tokenChange Nothing Nothing)
                 changeGenerated
             foldHelper acc (CBalanceInternal.WalletUTxO {txIn}, _)
                 | fromCWalletTxIn txIn `S.member` inRefs = acc
@@ -194,9 +194,7 @@ selectInputs
                 . tokenBundleSizeAssessor
                 $ CWallet.TxSize maxValueSize
             , computeMinimumAdaQuantity = \addr tkMap -> do
-                {- TODO: This currently doesn't care about datum/ref script, even though they affect costs #24 (https://github.com/geniusyield/atlas/issues/24)
-
-                There should be a mechanism to care for them and get more accurate min ada. -}
+                -- This function is ran for generated change outputs which do not have datum & reference script.
                 CWallet.Coin $ minimumUTxOF GYTxOut
                     { gyTxOutAddress = fromCWalletAddress addr
                     , gyTxOutValue   = fromTokenMap tkMap

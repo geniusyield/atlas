@@ -42,8 +42,7 @@ The algorithm should add additional inputs so all inputs
 have enough value for all (adjusted) outputs.
 
 As usually inputs and outputs don't match equally, the left-over inputs are
-sent to change address. This output should also be adjusted.
-(TODO: is it enough to send only non-ADA there? #22 | https://github.com/geniusyield/atlas/issues/22)
+sent to change address.
 
 Collateral input is needed when scripts are executed,
 i.e. transaction mints tokens or consumes script outputs.

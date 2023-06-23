@@ -122,8 +122,9 @@ data BuildTxException
         (Natural, Natural)  -- ^ Tuple of maximum execution steps & memory as given by protocol parameters.
         (Natural, Natural)  -- ^ Tuple of execution steps & memory as taken by built transaction.
 
-    | BuildTxSizeTooBig
-    -- ^ Transaction size is higher than the maximum as specified by protocol params.
+    | BuildTxSizeTooBig  -- ^ Transaction size is higher than the maximum as specified by protocol params.
+        !Natural  -- ^ Maximum size as specified by protocol parameters.
+        !Natural  -- ^ Size our built transaction took.
     | BuildTxCollateralShortFall  -- ^ Shortfall (in collateral inputs) for collateral requirement.
         !Natural  -- ^ Transaction collateral requirement.
         !Natural  -- ^ Lovelaces in given collateral UTxO.
@@ -194,10 +195,10 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers = build
                                                                                             stepStrat
                                                                                             n
                                                                                             (BuildTxExUnitsTooBig maxUnits currentUnits)
-                Left BuildTxSizeTooBig                                                 -> retryIfRandomImprove
+                Left (BuildTxSizeTooBig maxPossibleSize currentSize)                   -> retryIfRandomImprove
                                                                                             stepStrat
                                                                                             n
-                                                                                            BuildTxSizeTooBig
+                                                                                            (BuildTxSizeTooBig maxPossibleSize currentSize)
                 Right x                                                                -> pure $ Right x
                 {- The most common error here would be:
                 - InsufficientFunds
@@ -516,13 +517,13 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
             { AlonzoScripts.exUnitsSteps = steps
             , AlonzoScripts.exUnitsMem   = mem
             } = AlonzoTx.totExUnits ltx
-        txSize = getField @"txsize" ltx
+        txSize :: Natural = fromInteger $ getField @"txsize" ltx
     -- See: Cardano.Ledger.Alonzo.Rules.validateExUnitsTooBigUTxO
     unless (steps <= maxSteps && mem <= maxMemory) $
         Left $ BuildTxExUnitsTooBig (maxSteps, maxMemory) (steps, mem)
     -- See: Cardano.Ledger.Shelley.Rules.validateMaxTxSizeUTxO
-    unless (txSize <= toInteger maxTxSize) $
+    unless (txSize <= maxTxSize) $
         {- Technically, this doesn't compare with the _final_ tx size, because of signers that will be
         added later. But signing witnesses are only a few bytes, so it's unlikely to be an issue -}
-        Left BuildTxSizeTooBig
+        Left (BuildTxSizeTooBig maxTxSize txSize)
     first BuildTxCborSimplificationError $ simplifyGYTxBodyCbor $ txBodyFromApi txBody

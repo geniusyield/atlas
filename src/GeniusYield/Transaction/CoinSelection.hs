@@ -6,6 +6,7 @@ Maintainer  : support@geniusyield.co
 Stability   : develop
 
 -}
+
 module GeniusYield.Transaction.CoinSelection
     ( GYBalancedTx (..)
     , GYTxInDetailed (..)
@@ -15,12 +16,14 @@ module GeniusYield.Transaction.CoinSelection
     ) where
 
 import           Control.Monad.Random                          (MonadRandom)
-import           Control.Monad.Trans.Except                    (ExceptT (ExceptT), except)
+import           Control.Monad.Trans.Except                    (ExceptT (ExceptT),
+                                                                except)
 import qualified Data.ByteString                               as BS
 import qualified Data.Map                                      as Map
 import qualified Data.Set                                      as S
 import qualified Data.Text                                     as Text
-import           Data.Text.Class                               (ToText (toText), fromText)
+import           Data.Text.Class                               (ToText (toText),
+                                                                fromText)
 
 import qualified Cardano.Api                                   as Api
 import qualified Cardano.Api.Shelley                           as Api.S
@@ -218,7 +221,7 @@ selectInputs
             , extraCoinSource             = CWallet.Coin 0
             , extraCoinSink               = CWallet.Coin 0
             , outputsToCover              = map (bimap toCWalletAddress toTokenBundle) requiredOutputs
-            , utxoAvailable               = CWallet.fromIndexPair (ownUtxosIndex, existingInpsIndex)
+            , utxoAvailable               = CWallet.fromIndexPair (ownUtxosIndex, existingInpsIndex)  -- `fromIndexPair` would actually make first element to be @ownUtxosIndex `UTxOIndex.difference` existingInpsIndex@.
             , selectionStrategy           = case cstrat of
                 GYRandomImproveMultiAsset -> CBalance.SelectionStrategyOptimal
                 _                         -> CBalance.SelectionStrategyMinimal

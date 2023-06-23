@@ -281,7 +281,7 @@ balanceTxStep
                     , extraLovelace   = extraLovelace
                     , minimumUTxOF    = minimumUTxO useInlineDatums pp
                     , maxValueSize    = fromMaybe
-                                            (error "protocolParamMinUTxOValue missing from protocol params")
+                                            (error "protocolParamMaxValueSize missing from protocol params")
                                             $ Api.S.protocolParamMaxValueSize pp
                     }
                 cstrat

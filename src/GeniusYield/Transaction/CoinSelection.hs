@@ -84,7 +84,7 @@ data GYCoinSelectionEnv v = GYCoinSelectionEnv
     , ownUtxos        :: !GYUTxOs
     -- ^ Set of own utxos to select additional inputs from.
     , extraLovelace   :: !Natural
-    -- ^ Extra lovelace to look for on top of outputs (for fee).
+    -- ^ Extra lovelace to look for on top of outputs (for fee & to satisfy minimum ada requirement for change output(s)).
     , minimumUTxOF    :: GYTxOut v -> Natural
     , maxValueSize    :: Natural
     }
@@ -203,10 +203,10 @@ selectInputs
                     , gyTxOutDatum   = Nothing
                     , gyTxOutRefS    = Nothing
                     }
-            {- This field essentially takes care of tx fees.3
+            {- This field essentially takes care of tx fees.
 
             For simplicity, we simply use the extraLovelace parameter, which is specifically
-            designed to account for tx fees, additional min ada requirements in utxos etc.z
+            designed to account for tx fees, additional min ada requirements in utxos etc.
             -}
             , computeMinimumCost = const $ CWallet.Coin extraLovelace
             , computeSelectionLimit = const CBalance.NoLimit

@@ -290,7 +290,7 @@ sendSkeleton' skeleton ws = do
                     -- If this additional ada is coming back to one's own self, we need not account for it.
                     if gyTxOutAddress o == walletAddress w then
                       mempty
-                    else gyTxOutValue (adjustTxOut (minimumUTxO True pp) o) `valueMinus` gyTxOutValue o
+                    else gyTxOutValue (adjustTxOut (minimumUTxO pp) o) `valueMinus` gyTxOutValue o
                   ) $ gytxOuts skeleton
             )
 

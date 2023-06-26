@@ -171,7 +171,7 @@ jobs:
         echo "ATLAS_VERSION=${ATLAS_VERSION}" >> $GITHUB_ENV
         echo "ATLAS_VERSION=${ATLAS_VERSION}" >> $GITHUB_OUTPUT
     - name: Generate documentation (cabal haddock)
-      run: cabal haddock --html --hyperlink-source --haddock-options="--use-unicode"
+      run: cabal haddock --html --hyperlink-source --haddock-options="--use-unicode" --haddock-quickjump
     - name: Upload haddock documentation
       uses: actions/upload-pages-artifact@v1.0.8
       with:

@@ -153,7 +153,7 @@ runGYTxMonadNode
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
+    -> Maybe (GYTxOutRef, Bool)             -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadNode (GYTxSkeleton v)
     -> IO GYTxBody
 runGYTxMonadNode = coerce (runGYTxMonadNodeF @Identity GYRandomImproveMultiAsset)
@@ -163,7 +163,7 @@ runGYTxMonadNodeParallel
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> Maybe (GYTxOutRef, Bool)
+    -> Maybe (GYTxOutRef, Bool)  -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
 runGYTxMonadNodeParallel = coerce (runGYTxMonadNodeParallelF @Identity GYRandomImproveMultiAsset)
@@ -175,7 +175,7 @@ runGYTxMonadNodeParallelWithStrategy
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> Maybe (GYTxOutRef, Bool)
+    -> Maybe (GYTxOutRef, Bool)  -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
 runGYTxMonadNodeParallelWithStrategy strat = coerce (runGYTxMonadNodeParallelF @Identity strat)
@@ -185,7 +185,7 @@ runGYTxMonadNodeChaining
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> Maybe (GYTxOutRef, Bool)
+    -> Maybe (GYTxOutRef, Bool)  -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
 runGYTxMonadNodeChaining = coerce (runGYTxMonadNodeChainingF @Identity GYRandomImproveMultiAsset)
@@ -195,7 +195,7 @@ runGYTxMonadNodeC
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
+    -> Maybe (GYTxOutRef, Bool)             -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadNode a
     -> IO a
 runGYTxMonadNodeC = coerce (runGYTxMonadNodeF @(Const a) GYRandomImproveMultiAsset)
@@ -215,7 +215,7 @@ runGYTxMonadNodeF
     -> GYProviders
     -> [GYAddress]                          -- ^ our addresses
     -> GYAddress                            -- ^ change address
-    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
+    -> Maybe (GYTxOutRef, Bool)             -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadNode (f (GYTxSkeleton v))
     -> IO (f GYTxBody)
 runGYTxMonadNodeF cstrat nid providers addrs change collateral m = do
@@ -242,7 +242,7 @@ runGYTxMonadNodeParallelF
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> Maybe (GYTxOutRef, Bool)
+    -> Maybe (GYTxOutRef, Bool)  -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadNode [f (GYTxSkeleton v)]
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeParallelF cstrat nid providers addrs change collateral m = do
@@ -262,7 +262,7 @@ runGYTxMonadNodeChainingF :: Traversable f
     -> GYProviders
     -> [GYAddress]
     -> GYAddress
-    -> Maybe (GYTxOutRef, Bool)
+    -> Maybe (GYTxOutRef, Bool)  -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadNode [f (GYTxSkeleton v)]
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeChainingF cstrat nid providers addrs change collateral m = do

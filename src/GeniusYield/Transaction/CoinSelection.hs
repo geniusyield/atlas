@@ -7,6 +7,8 @@ Stability   : develop
 
 -}
 
+-- To work on this module, module [@Cardano.CoinSelection.Balance@](https://github.com/cardano-foundation/cardano-wallet/blob/master/lib/coin-selection/lib/Cardano/CoinSelection/Balance.hs) should be understood.
+
 module GeniusYield.Transaction.CoinSelection
     ( GYBalancedTx (..)
     , GYTxInDetailed (..)
@@ -58,13 +60,8 @@ Essentially, they are supposed to work on trusted inputs and outputs. As such, w
 attention in the input and output sites and ensure they are indeed constructed/deconstructed properly.
 -}
 
-{- TODO: Eventually, we ought to use our own types for this. #23 (https://github.com/geniusyield/atlas/issues/23)
-
-One might even be able to make the 'Address' type be something that can unique identify
-a tx output. This would let the compute min ada quantity function figure out whether
-a tx output in the skeleton contains datum/ref scripts just given the 'Address ctx'.
-
-Current blockers:
+{-
+TODO:
 - What should "max length address" be?
 - Can we simply use a stripped down 'GYTxIn' for wallet utxo? maybe just GYTxOutRef even.
 -}
@@ -84,7 +81,7 @@ data GYCoinSelectionEnv v = GYCoinSelectionEnv
     , ownUtxos        :: !GYUTxOs
     -- ^ Set of own utxos to select additional inputs from.
     , extraLovelace   :: !Natural
-    -- ^ Extra lovelace to look for on top of outputs (for fee & to satisfy minimum ada requirement for change output(s)).
+    -- ^ Extra lovelace to look for on top of outputs, mainly for fee and any remaining would be given as change output by @makeTransactionBodyAutoBalance@, thus amount remaining besides fees, should satisfy minimum ada requirement else we would have to increase `extraLovelace` parameter.
     , minimumUTxOF    :: GYTxOut v -> Natural
     , maxValueSize    :: Natural
     }
@@ -95,16 +92,10 @@ data GYCoinSelectionStrategy
     | GYLegacy
     deriving stock (Eq, Show)
 
-{- Is it better to combine minted tokens with existing change, or with a new utxo? -}
-
 {- | Select additional inputs from the set of own utxos given, such that when combined with given existing inputs,
 they cover for all the given outputs, as well as extraLovelace.
 
 Return the list of additional inputs chosen and the change outputs created.
-
-NOTE: This function doesn't necessarily take care of all ada change. Indeed, if any extra ada
-is still in the inputs and doesn't appear in the change outputs selected - it will simply
-be taken care of by 'Api.makeTransactionBodyAutoBalance' called higher in the call hierarchy.
 
 == Invariant ==
 
@@ -203,8 +194,7 @@ selectInputs
                     }
             {- This field essentially takes care of tx fees.
 
-            For simplicity, we simply use the extraLovelace parameter, which is specifically
-            designed to account for tx fees, additional min ada requirements in utxos etc.
+            For simplicity, we simply use the extraLovelace parameter.
             -}
             , computeMinimumCost = const $ CWallet.Coin extraLovelace
             , computeSelectionLimit = const CBalance.NoLimit

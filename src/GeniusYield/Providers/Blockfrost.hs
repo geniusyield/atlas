@@ -26,19 +26,18 @@ import           Data.Either.Combinators              (maybeToRight)
 import           Data.Foldable                        (fold)
 import           Data.Functor                         ((<&>))
 import qualified Data.Map.Strict                      as Map
-import           Data.Maybe                           (fromJust)
 import qualified Data.Set                             as Set
 import qualified Data.Text                            as Text
 import qualified Data.Text.Encoding                   as Text
 import qualified Data.Time.Clock.POSIX                as Time
 import qualified Money
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
-import           PlutusTx                             (Data (..), FromData, fromData)
 import qualified PlutusTx.Builtins                    as Plutus
 import qualified Web.HttpApiData                      as Web
 
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
+import           GeniusYield.Providers.SubmitApi      (SubmitTxException (..))
 import           GeniusYield.Types
 
 data BlockfrostProviderException
@@ -52,16 +51,10 @@ data BlockfrostProviderException
 
 handleBlockfrostError :: Text -> Either Blockfrost.BlockfrostError a -> IO a
 handleBlockfrostError locationInfo = either (throwIO . BlpvApiError locationInfo . silenceHeadersBlockfrostClientError) pure
-  where
-    silenceHeadersBlockfrostClientError (Blockfrost.ServantClientError e) = Blockfrost.ServantClientError $ silenceHeadersClientError e
-    silenceHeadersBlockfrostClientError other                             = other
 
-scriptDataToData :: Api.ScriptData -> Data
-scriptDataToData (Api.ScriptDataConstructor n xs) = Constr n $ scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataMap xs)           = Map [(scriptDataToData x, scriptDataToData y) | (x, y) <- xs]
-scriptDataToData (Api.ScriptDataList xs)          = List $ scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataNumber n)         = I n
-scriptDataToData (Api.ScriptDataBytes bs)         = B bs
+silenceHeadersBlockfrostClientError :: Blockfrost.BlockfrostError -> Blockfrost.BlockfrostError
+silenceHeadersBlockfrostClientError (Blockfrost.ServantClientError e) = Blockfrost.ServantClientError $ silenceHeadersClientError e
+silenceHeadersBlockfrostClientError other                             = other
 
 lovelacesToInteger :: Blockfrost.Lovelaces -> Integer
 lovelacesToInteger = fromIntegral
@@ -81,19 +74,13 @@ amountToValue (Blockfrost.AssetAmount sdiscr) = do
     -- Blockfrost uses no separator between CS and TkName.
     (csPart, tkNamePart) = Text.splitAt 56 csAndTkname
 
-fromJson :: FromData a => LBS.ByteString -> Either SomeDeserializeError a
-fromJson b = do
-    v <- first (DeserializeErrorAeson . Text.pack) $ Aeson.eitherDecode b
-    x <- first DeserializeErrorScriptDataJson $ Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema v
-    pure . fromJust . fromData $ scriptDataToData x
-
 -------------------------------------------------------------------------------
 -- Submit
 -------------------------------------------------------------------------------
 
 blockfrostSubmitTx :: Blockfrost.Project -> GYSubmitTx
 blockfrostSubmitTx proj tx = do
-    txId <- handleBlockfrostError locationIdent <=< Blockfrost.runBlockfrost proj
+    txId <- handleBlockfrostSubmitError <=< Blockfrost.runBlockfrost proj
         . Blockfrost.submitTx
         . Blockfrost.CBORString
         . LBS.fromStrict
@@ -105,6 +92,7 @@ blockfrostSubmitTx proj tx = do
         . txIdFromHexE . Text.unpack $ Blockfrost.unTxHash txId
   where
     locationIdent = "SubmitTx"
+    handleBlockfrostSubmitError = either (throwIO . SubmitTxException . Text.pack . show . silenceHeadersBlockfrostClientError) pure
 
 -------------------------------------------------------------------------------
 -- Slot actions
@@ -133,10 +121,11 @@ blockfrostGetCurrentSlot proj = do
 
 blockfrostQueryUtxo :: Blockfrost.Project -> GYQueryUTxO
 blockfrostQueryUtxo proj = GYQueryUTxO
-    { gyQueryUtxosAtTxOutRefs'  = blockfrostUtxosAtTxOutRefs proj
-    , gyQueryUtxoAtTxOutRef'    = blockfrostUtxosAtTxOutRef proj
-    , gyQueryUtxoRefsAtAddress' = gyQueryUtxoRefsAtAddressDefault $ blockfrostUtxosAtAddress proj
-    , gyQueryUtxosAtAddresses'  = gyQueryUtxoAtAddressesDefault $ blockfrostUtxosAtAddress proj
+    { gyQueryUtxosAtTxOutRefs'           = blockfrostUtxosAtTxOutRefs proj
+    , gyQueryUtxoAtTxOutRef'             = blockfrostUtxosAtTxOutRef proj
+    , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ blockfrostUtxosAtAddress proj
+    , gyQueryUtxosAtAddresses'           = gyQueryUtxoAtAddressesDefault $ blockfrostUtxosAtAddress proj
+    , gyQueryUtxosAtAddressesWithDatums' = Nothing  -- Will use the default implementation.
     }
 
 blockfrostUtxosAtAddress :: Blockfrost.Project -> GYAddress -> IO GYUTxOs
@@ -273,15 +262,14 @@ blockfrostProtocolParams proj = do
     let majorProtVers = fromInteger _protocolParamsProtocolMajorVer
     pure $ Api.S.ProtocolParameters
         { protocolParamProtocolVersion     = (majorProtVers, fromInteger _protocolParamsProtocolMinorVer)
-        , protocolParamDecentralization    = Just _protocolParamsDecentralisationParam
-        -- TODO: Blockfrost gives back a 'Maybe Aeson.Value' in extra_entropy. Usable?
-        , protocolParamExtraPraosEntropy   = Nothing
+        , protocolParamDecentralization    = Nothing  -- Also known as `d`, got deprecated in Babbage.
+        , protocolParamExtraPraosEntropy   = Nothing  -- Also known as `extraEntropy`, got deprecated in Babbage.
         , protocolParamMaxBlockHeaderSize  = fromInteger _protocolParamsMaxBlockHeaderSize
         , protocolParamMaxBlockBodySize    = fromInteger _protocolParamsMaxBlockSize
         , protocolParamMaxTxSize           = fromInteger _protocolParamsMaxTxSize
         , protocolParamTxFeeFixed          = fromInteger _protocolParamsMinFeeB
         , protocolParamTxFeePerByte        = fromInteger _protocolParamsMinFeeA
-        , protocolParamMinUTxOValue        = Just . Api.Lovelace $ lovelacesToInteger _protocolParamsMinUtxo
+        , protocolParamMinUTxOValue        = Nothing  -- Deprecated in Alonzo.
         , protocolParamStakeAddressDeposit = Api.Lovelace $ lovelacesToInteger _protocolParamsKeyDeposit
         , protocolParamStakePoolDeposit    = Api.Lovelace $ lovelacesToInteger _protocolParamsPoolDeposit
         , protocolParamMinPoolCost         = Api.Lovelace $ lovelacesToInteger _protocolParamsMinPoolCost
@@ -290,10 +278,11 @@ blockfrostProtocolParams proj = do
         , protocolParamPoolPledgeInfluence = _protocolParamsA0
         , protocolParamMonetaryExpansion   = _protocolParamsRho
         , protocolParamTreasuryCut         = _protocolParamsTau
-        , protocolParamUTxOCostPerWord     = if majorProtVers < babbageProtocolVersion
-                                                -- This is only used for pre-babbage protocols.
-                                                then Just . Api.Lovelace $ lovelacesToInteger _protocolParamsCoinsPerUtxoWord
-                                                else Nothing
+        , protocolParamUTxOCostPerWord     = Nothing  -- Deprecated in Babbage.
+        -- , protocolParamUTxOCostPerWord     = if majorProtVers < babbageProtocolVersion
+        --                                         -- This is only used for pre-babbage protocols.
+        --                                         then Just . Api.Lovelace $ lovelacesToInteger _protocolParamsCoinsPerUtxoWord
+        --                                         else Nothing
         , protocolParamPrices              = Just $ Api.S.ExecutionUnitPrices _protocolParamsPriceStep _protocolParamsPriceMem
         , protocolParamMaxTxExUnits        = Just $ Api.ExecutionUnits (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExSteps) (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExMem)
         , protocolParamMaxBlockExUnits     = Just $ Api.ExecutionUnits (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExSteps) (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExMem)
@@ -301,10 +290,7 @@ blockfrostProtocolParams proj = do
         , protocolParamCollateralPercent   = Just $ fromInteger _protocolParamsCollateralPercent
         , protocolParamMaxCollateralInputs = Just $ fromInteger _protocolParamsMaxCollateralInputs
         , protocolParamCostModels          = toApiCostModel _protocolParamsCostModels
-        , protocolParamUTxOCostPerByte     = if majorProtVers >= babbageProtocolVersion
-                                                -- This is used for babbage and later.
-                                                then Just . Api.Lovelace $ lovelacesToInteger _protocolParamsCoinsPerUtxoSize
-                                                else Nothing
+        , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ lovelacesToInteger _protocolParamsCoinsPerUtxoSize
         }
   where
     toApiCostModel = Map.fromList

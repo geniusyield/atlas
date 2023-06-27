@@ -37,6 +37,7 @@ cachedQueryUTxO q = GYQueryUTxO
     (cachedUtxoAtTxOutRef q)
     (gyQueryUtxoRefsAtAddressDefault $ cachedUtxosAtAddress q)
     (gyQueryUtxoAtAddressesDefault $ cachedUtxosAtAddress q)
+    Nothing  -- Will use the default implementation.
 
 -------------------------------------------------------------------------------
 -- Queries & caching

@@ -13,9 +13,10 @@ module GeniusYield.GYConfig
     , withCfgProviders
     , coreConfigIO
     , coreProviderIO
-    , findMaestroToken
+    , findMaestroTokenAndNetId
     , isNodeChainIx
     , isMaestro
+    , isBlockfrost
     , isDbSync
     ) where
 
@@ -96,13 +97,20 @@ isMaestro :: GYCoreProviderInfo -> Bool
 isMaestro GYMaestro{} = True
 isMaestro _           = False
 
-findMaestroToken :: String -> IO Text
-findMaestroToken configPath = do
-    config <- coreConfigIO configPath
-    let providerInfo = cfgCoreProvider config
-    case providerInfo of
-        GYMaestro (Confidential token) -> return token
-        _ -> throwIO $ userError "Missing Maestro Token"
+isBlockfrost :: GYCoreProviderInfo -> Bool
+isBlockfrost GYBlockfrost{} = True
+isBlockfrost _              = False
+
+findMaestroTokenAndNetId :: [GYCoreConfig] -> IO (Text, GYNetworkId)
+findMaestroTokenAndNetId configs = do
+    let config = find (isMaestro . cfgCoreProvider) configs
+    case config of
+        Nothing -> throwIO $ userError "Missing Maestro Configuration"
+        Just conf -> do
+            let netId = cfgNetworkId conf
+            case cfgCoreProvider conf of
+              GYMaestro (Confidential token) -> return (token, netId)
+              _ -> throwIO $ userError "Missing Maestro Token"
 
 {- |
 The config to initialize the GY framework with.
@@ -145,8 +153,7 @@ withCfgProviders
         GYNodeChainIx path (Confidential key) -> do
           let info = nodeConnectInfo path cfgNetworkId
               era = networkIdToEra cfgNetworkId
-              maestroUrl = MaestroApi.networkIdToMaestroUrl cfgNetworkId
-          mEnv <- MaestroApi.newMaestroApiEnv maestroUrl key
+          mEnv <- MaestroApi.networkIdToMaestroEnv key cfgNetworkId
           nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetCurrentSlot info
           pure
             ( Node.nodeGetParameters era info
@@ -168,8 +175,7 @@ withCfgProviders
             , SubmitApi.submitApiSubmitTxDefault submitApiEnv
             )
         GYMaestro (Confidential apiToken) -> do
-          let maestroUrl = MaestroApi.networkIdToMaestroUrl cfgNetworkId
-          maestroApiEnv <- MaestroApi.newMaestroApiEnv maestroUrl apiToken
+          maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
           maestroGetParams <- makeGetParameters
             (MaestroApi.maestroGetCurrentSlot maestroApiEnv)
             (MaestroApi.maestroProtocolParams maestroApiEnv)
@@ -185,7 +191,6 @@ withCfgProviders
             , MaestroApi.maestroSubmitTx maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do
-          -- NOTE: This provider only has proper support for the preprod testnet as of now.
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
           blockfrostGetParams <- makeGetParameters
             (Blockfrost.blockfrostGetCurrentSlot proj)

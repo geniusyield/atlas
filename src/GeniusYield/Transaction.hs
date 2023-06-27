@@ -85,6 +85,7 @@ import           Cardano.Slotting.Time                 (SystemStart)
 import           Control.Monad.Random
 import           GeniusYield.HTTP.Errors               (IsGYApiError)
 import           GeniusYield.Imports
+import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Transaction.CoinSelection
 import           GeniusYield.Transaction.Common
 import           GeniusYield.Types
@@ -117,14 +118,19 @@ data BuildTxException
     | BuildTxBodyErrorAutoBalance !Api.TxBodyErrorAutoBalance
     | BuildTxMissingMaxExUnitsParam
     -- ^ Missing max ex units in protocol params
-    | BuildTxExUnitsTooBig
-    -- ^ Execution units required is higher than the maximum as specified by protocol params.
-    | BuildTxSizeTooBig
-    -- ^ Transaction size is higher than the maximum as specified by protocol params.
-    | BuildTxCollateralShortFall !Natural
-    -- ^ Lovelaces shortfall (in collateral inputs) for collateral requirement.
+    | BuildTxExUnitsTooBig  -- ^ Execution units required is higher than the maximum as specified by protocol params.
+        (Natural, Natural)  -- ^ Tuple of maximum execution steps & memory as given by protocol parameters.
+        (Natural, Natural)  -- ^ Tuple of execution steps & memory as taken by built transaction.
+
+    | BuildTxSizeTooBig  -- ^ Transaction size is higher than the maximum as specified by protocol params.
+        !Natural  -- ^ Maximum size as specified by protocol parameters.
+        !Natural  -- ^ Size our built transaction took.
+    | BuildTxCollateralShortFall  -- ^ Shortfall (in collateral inputs) for collateral requirement.
+        !Natural  -- ^ Transaction collateral requirement.
+        !Natural  -- ^ Lovelaces in given collateral UTxO.
     | BuildTxNoSuitableCollateral
     -- ^ Couldn't find a UTxO to use as collateral.
+    | BuildTxCborSimplificationError !CborSimplificationError
   deriving stock    Show
   deriving anyclass (Exception, IsGYApiError)
 
@@ -174,7 +180,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers = build
     buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException GYTxBody)
     buildTxLoop stepStrat n
         -- Stop trying with RandomImprove if extra lovelace has hit the pre-determined ceiling.
-        | n >= randImproveExtraLovelaceCeil = buildTxLoop GYLargestFirstMultiAsset n
+        | stepStrat /= GYLargestFirstMultiAsset && n >= randImproveExtraLovelaceCeil = buildTxLoop GYLargestFirstMultiAsset n
         | otherwise = do
             res <- f stepStrat n
             case res of
@@ -185,14 +191,14 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers = build
                 {- RandomImprove may end up selecting too many inputs to fit in the transaction.
                 In this case, try with LargestFirst and dial back the extraLovelace param.
                 -}
-                Left BuildTxExUnitsTooBig                                              -> retryIfRandomImprove
+                Left (BuildTxExUnitsTooBig maxUnits currentUnits)                      -> retryIfRandomImprove
                                                                                             stepStrat
                                                                                             n
-                                                                                            BuildTxExUnitsTooBig
-                Left BuildTxSizeTooBig                                                 -> retryIfRandomImprove
+                                                                                            (BuildTxExUnitsTooBig maxUnits currentUnits)
+                Left (BuildTxSizeTooBig maxPossibleSize currentSize)                   -> retryIfRandomImprove
                                                                                             stepStrat
                                                                                             n
-                                                                                            BuildTxSizeTooBig
+                                                                                            (BuildTxSizeTooBig maxPossibleSize currentSize)
                 Right x                                                                -> pure $ Right x
                 {- The most common error here would be:
                 - InsufficientFunds
@@ -276,7 +282,7 @@ balanceTxStep
                     , extraLovelace   = extraLovelace
                     , minimumUTxOF    = minimumUTxO useInlineDatums pp
                     , maxValueSize    = fromMaybe
-                                            (error "protocolParamMinUTxOValue missing from protocol params")
+                                            (error "protocolParamMaxValueSize missing from protocol params")
                                             $ Api.S.protocolParamMaxValueSize pp
                     }
                 cstrat
@@ -492,7 +498,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
             , Api.TxReturnCollateral retColSup $ txOutToApi True $ GYTxOut changeAddr (collateralTotalValue `valueMinus` valueFromLovelace balanceNeeded) Nothing Nothing
 
             )
-          else Left $ BuildTxCollateralShortFall (fromInteger $ balanceNeeded - collateralTotalLovelace) -- In this case `makeTransactionBodyAutoBalance` doesn't return an error but instead returns `(Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)`
+          else Left $ BuildTxCollateralShortFall (fromInteger balanceNeeded) (fromInteger collateralTotalLovelace) -- In this case `makeTransactionBodyAutoBalance` doesn't return an error but instead returns `(Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)`
 
         first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
           Api.BabbageEraInCardanoMode
@@ -511,13 +517,13 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
             { AlonzoScripts.exUnitsSteps = steps
             , AlonzoScripts.exUnitsMem   = mem
             } = AlonzoTx.totExUnits ltx
-        txSize = getField @"txsize" ltx
+        txSize :: Natural = fromInteger $ getField @"txsize" ltx
     -- See: Cardano.Ledger.Alonzo.Rules.validateExUnitsTooBigUTxO
     unless (steps <= maxSteps && mem <= maxMemory) $
-        Left BuildTxExUnitsTooBig
+        Left $ BuildTxExUnitsTooBig (maxSteps, maxMemory) (steps, mem)
     -- See: Cardano.Ledger.Shelley.Rules.validateMaxTxSizeUTxO
-    unless (txSize <= toInteger maxTxSize) $
+    unless (txSize <= maxTxSize) $
         {- Technically, this doesn't compare with the _final_ tx size, because of signers that will be
         added later. But signing witnesses are only a few bytes, so it's unlikely to be an issue -}
-        Left BuildTxSizeTooBig
-    pure $ txBodyFromApi txBody
+        Left (BuildTxSizeTooBig maxTxSize txSize)
+    first BuildTxCborSimplificationError $ simplifyGYTxBodyCbor $ txBodyFromApi txBody

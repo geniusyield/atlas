@@ -24,7 +24,8 @@ module GeniusYield.Providers.CardanoDbSync (
     dbSyncGetParameters,
 ) where
 
-import           Cardano.Slotting.Time                          (SystemStart (..), mkSlotLength)
+import           Cardano.Slotting.Time                          (SystemStart (..),
+                                                                 mkSlotLength)
 import           Data.ByteString                                (ByteString)
 import           Data.Maybe                                     (listToMaybe)
 import           Data.SOP.BasicFunctors                         (K (..))
@@ -32,7 +33,8 @@ import           Data.SOP.Strict                                (NP (..))
 import           Data.Scientific                                (Scientific)
 import qualified Data.Text                                      as Txt
 import           Data.Word                                      (Word64)
-import           Type.Reflection                                (Typeable, typeRep)
+import           Type.Reflection                                (Typeable,
+                                                                 typeRep)
 
 import qualified Cardano.Api                                    as Api
 import qualified Cardano.Api.Shelley                            as Api.S
@@ -45,7 +47,9 @@ import qualified Data.Scientific                                as Sci
 import qualified Data.Set                                       as Set
 import qualified Data.Time                                      as Time
 import qualified Database.PostgreSQL.Simple                     as PQ
-import qualified Database.PostgreSQL.Simple.FromField           as PQ (Conversion, FromField (..), returnError)
+import qualified Database.PostgreSQL.Simple.FromField           as PQ (Conversion,
+                                                                       FromField (..),
+                                                                       returnError)
 import qualified Database.PostgreSQL.Simple.Newtypes            as PQ
 import qualified Database.PostgreSQL.Simple.ToField             as PQ
 
@@ -139,10 +143,11 @@ instance FromJSON SD where
 
 dbSyncQueryUtxo :: CardanoDbSyncConn -> GYQueryUTxO
 dbSyncQueryUtxo conn = GYQueryUTxO
-    { gyQueryUtxosAtTxOutRefs'  = dbSyncQueryUtxosAtTxOutRefs conn
-    , gyQueryUtxoAtTxOutRef'    = dbSyncQueryUtxoAtTxOutRef conn
-    , gyQueryUtxoRefsAtAddress' = gyQueryUtxoRefsAtAddressDefault $ dbSyncQueryUtxosAtAddress conn
-    , gyQueryUtxosAtAddresses'  = dbSyncQueryUtxosAtAddresses conn
+    { gyQueryUtxosAtTxOutRefs'           = dbSyncQueryUtxosAtTxOutRefs conn
+    , gyQueryUtxoAtTxOutRef'             = dbSyncQueryUtxoAtTxOutRef conn
+    , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ dbSyncQueryUtxosAtAddress conn
+    , gyQueryUtxosAtAddresses'           = dbSyncQueryUtxosAtAddresses conn
+    , gyQueryUtxosAtAddressesWithDatums' = Nothing  -- Will use the default implementation.
     }
 
 gyDatumFromId :: PQ.Connection -> Integer -> IO (Maybe GYDatum)

@@ -13,6 +13,7 @@ module GeniusYield.TxBuilder.Node (
     runGYTxMonadNodeC,
     runGYTxMonadNodeF,
     runGYTxMonadNodeParallel,
+    runGYTxMonadNodeParallelWithStrategy,
     runGYTxMonadNodeParallelF,
     runGYTxMonadNodeChaining,
     runGYTxMonadNodeChainingF,
@@ -83,6 +84,9 @@ instance GYTxQueryMonad GYTxMonadNode where
 
     utxosAtAddresses addrs = GYTxMonadNode $ \env ->
         gyQueryUtxosAtAddresses (envProviders env) addrs
+
+    utxosAtAddressesWithDatums addrs = GYTxMonadNode $ \env ->
+        gyQueryUtxosAtAddressesWithDatums (envProviders env) addrs
 
     utxoRefsAtAddress addr = GYTxMonadNode $ \env ->
         gyQueryUtxoRefsAtAddress (envProviders env) addr
@@ -163,6 +167,18 @@ runGYTxMonadNodeParallel
     -> GYTxMonadNode [GYTxSkeleton v]
     -> IO (GYTxBuildResult Identity)
 runGYTxMonadNodeParallel = coerce (runGYTxMonadNodeParallelF @Identity GYRandomImproveMultiAsset)
+
+
+runGYTxMonadNodeParallelWithStrategy
+    :: GYCoinSelectionStrategy
+    -> GYNetworkId
+    -> GYProviders
+    -> [GYAddress]
+    -> GYAddress
+    -> Maybe (GYTxOutRef, Bool)
+    -> GYTxMonadNode [GYTxSkeleton v]
+    -> IO (GYTxBuildResult Identity)
+runGYTxMonadNodeParallelWithStrategy strat = coerce (runGYTxMonadNodeParallelF @Identity strat)
 
 runGYTxMonadNodeChaining
     :: GYNetworkId

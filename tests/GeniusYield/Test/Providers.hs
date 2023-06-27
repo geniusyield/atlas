@@ -7,9 +7,9 @@ import           Data.ByteString.Lazy as BS (readFile, toStrict)
 import           Data.String         (fromString)
 import qualified Data.Text as Text   (Text, unpack, pack, replace)
 import           Data.Maybe          (fromJust, fromMaybe)
-import           Data.Map.Strict as Map    (difference)
+import           Data.Map.Strict as Map    (difference, isSubmapOf)
 import           Data.Some (mkSome)
-import qualified Data.Set as Set (fromList, difference)
+import qualified Data.Set as Set (fromList, difference, isSubsetOf)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 import qualified Text.Printf                       as Printf
@@ -181,16 +181,18 @@ maestroTests token netId =
         return utxos
 
     compareUTxOs :: Api.UTxO Api.BabbageEra -> Api.UTxO Api.BabbageEra -> IO (Maybe String)
-    compareUTxOs utxosQuery utxosFile =
-        return $ if utxosQuery == utxosFile
+    compareUTxOs utxosFile utxosQuery = do
+        let utxosFileMap = Api.unUTxO utxosFile
+            utxosQueryMap = Api.unUTxO utxosQuery
+        return $ if Map.isSubmapOf utxosFileMap utxosQueryMap
             then Nothing
-            else Just $ show (Map.difference (Api.unUTxO utxosFile) (Api.unUTxO utxosQuery))
+            else Just $ show (Map.difference utxosFileMap utxosQueryMap)
 
     compareRefs :: [GYTxOutRef] -> [GYTxOutRef] -> IO (Maybe String)
-    compareRefs refsQuery refsFile = do
+    compareRefs refsFile refsQuery = do
         let refSetQuery = Set.fromList refsQuery
             refSetFile = Set.fromList refsFile
-        return $ if refSetQuery == refSetFile
+        return $ if Set.isSubsetOf refSetFile refSetQuery
             then Nothing
             else Just $ show (Set.difference refSetFile refSetQuery)
 

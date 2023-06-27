@@ -220,7 +220,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers = build
                     , gybtxRefIns        = refIns
                     }
 
-    retryIfRandomImprove GYRandomImproveMultiAsset n _ = buildTxLoop GYLargestFirstMultiAsset (n `div` 2)
+    retryIfRandomImprove GYRandomImproveMultiAsset n _ = buildTxLoop GYLargestFirstMultiAsset (if n == extraLovelaceStart then extraLovelaceStart else n `div` 2)
     retryIfRandomImprove _ _ err                       = pure $ Left err
 
 -------------------------------------------------------------------------------

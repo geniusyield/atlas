@@ -186,6 +186,7 @@ selectInputs
                 $ CWallet.TxSize maxValueSize
             , computeMinimumAdaQuantity = \addr tkMap -> do
                 -- This function is ran for generated change outputs which do not have datum & reference script.
+                -- This first parameter can actually be ignored as it will always be @toCWalletAddress changeAddr@.
                 CWallet.Coin $ minimumUTxOF GYTxOut
                     { gyTxOutAddress = fromCWalletAddress addr
                     , gyTxOutValue   = fromTokenMap tkMap
@@ -198,7 +199,7 @@ selectInputs
             -}
             , computeMinimumCost = const $ CWallet.Coin extraLovelace
             , computeSelectionLimit = const CBalance.NoLimit
-            , maximumLengthChangeAddress = maxLengthShelleyAddress
+            , maximumLengthChangeAddress = toCWalletAddress changeAddr  -- Since our change address is fixed.
             , nullAddress = CWallet.Address ""
             , maximumOutputAdaQuantity = CWallet.txOutMaxCoin
             , maximumOutputTokenQuantity = CWallet.txOutMaxTokenQuantity
@@ -217,10 +218,6 @@ selectInputs
     (mintedVal, burnedVal) = valueSplitSign mintValue
     ownUtxosIndex = utxosToUtxoIndex ownUtxos
     existingInpsIndex = txInDetailedToUtxoIndex existingInputs
-
--- TODO: Is this compatible with (de)serialise(To|From)RawBytes?
-maxLengthShelleyAddress :: CWallet.Address
-maxLengthShelleyAddress = CWallet.Address $ BS.replicate 57 0
 
 computeTokenBundleSerializedLengthBytes :: CTokenBundle.TokenBundle -> CWallet.TxSize
 computeTokenBundleSerializedLengthBytes = CWallet.TxSize . safeCast

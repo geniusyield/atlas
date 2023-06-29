@@ -69,10 +69,9 @@ gyTxOutDatumL f (GYTxOut addr v md s) =
     (\md' -> GYTxOut addr v md' s) <$> traverse (traverse f) md
 
 txOutToApi
-    :: Bool     -- ^ 'True' to add inline datum, otherwise use 'Api.TxOutDatumInTx'.
-    -> GYTxOut v
+    :: GYTxOut v
     -> Api.TxOut Api.CtxTx Api.BabbageEra
-txOutToApi inline (GYTxOut addr v md mrs) = Api.TxOut
+txOutToApi (GYTxOut addr v md mrs) = Api.TxOut
     (addressToApi' addr)
     (Api.TxOutValue Api.MultiAssetInBabbageEra $ valueToApi v)
     (mkDatum md)
@@ -81,7 +80,7 @@ txOutToApi inline (GYTxOut addr v md mrs) = Api.TxOut
     mkDatum :: Maybe (GYDatum, GYTxOutUseInlineDatum v) -> Api.TxOutDatum Api.CtxTx Api.BabbageEra
     mkDatum Nothing        = Api.TxOutDatumNone
     mkDatum (Just (d, di))
-        | inline && di'    = Api.TxOutDatumInline Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra d'
+        | di'    = Api.TxOutDatumInline Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra d'
         | otherwise        = Api.TxOutDatumInTx Api.ScriptDataInBabbageEra d'
       where
         d' = datumToApi' d

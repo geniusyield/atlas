@@ -66,16 +66,16 @@ instance Eq BalancingError where
     BalancingErrorInsufficientFunds v1 == BalancingErrorInsufficientFunds v2 = v1 == v2
     BalancingErrorChangeShortFall n1 == BalancingErrorChangeShortFall n2 = n1 == n2
     BalancingErrorEmptyOwnUTxOs == BalancingErrorEmptyOwnUTxOs = True
-    BalancingErrorNonPositiveTxOut out1 == BalancingErrorNonPositiveTxOut out2 = txOutToApi True out1 == txOutToApi True out2
+    BalancingErrorNonPositiveTxOut out1 == BalancingErrorNonPositiveTxOut out2 = txOutToApi out1 == txOutToApi out2
     _ == _ = False
 
 -------------------------------------------------------------------------------
 -- Transaction Utilities
 -------------------------------------------------------------------------------
 
-minimumUTxO :: Bool -> Api.S.ProtocolParameters -> GYTxOut v -> Natural
-minimumUTxO useInlineDatums pp txOut = do
-    case Api.calculateMinimumUTxO Api.ShelleyBasedEraBabbage (txOutToApi useInlineDatums txOut) pp of
+minimumUTxO :: Api.S.ProtocolParameters -> GYTxOut v -> Natural
+minimumUTxO pp txOut = do
+    case Api.calculateMinimumUTxO Api.ShelleyBasedEraBabbage (txOutToApi txOut) pp of
         -- This function can only ever fail if the protocol params doesn't contain the min ada value.
         Left err -> error
             $ "minimumUTxO: Protocol Params missing minimum UTxO value; Original error: " ++ show err

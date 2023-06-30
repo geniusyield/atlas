@@ -25,6 +25,7 @@ import qualified Data.ByteString.Base16 as BS16
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Text              as T
 import qualified Data.Text.Encoding     as TE
+import qualified Data.Text.Lazy         as LT (toStrict)
 import           GeniusYield.Imports
 import           GeniusYield.Types
 
@@ -43,6 +44,7 @@ We as of now, only modify @transaction_body@ (terms are as defined in [CDDL](htt
 
 The modifications done is as follows:-
 
+* All indefinite-length items are made definite.
 * @transaction_output@ is put up into @legacy_transaction_output@ format when possible.
 * Wherever map occurs, it's keys are sorted as required by [CIP 21](https://cips.cardano.org/cips/cip21/).
 
@@ -60,7 +62,7 @@ simplifyTxCbor tx = do
 
 {- | Function to modify our CBOR tree according to the given function. If the given function returns `Nothing` it means, it is not applicable to the given `term` and thus we recurse down. Note that the given function (say @f@) must satisfy the following property:-
 
-If @f a = Just b@ then @f b = Just b@.
+If @f a = Just b@ then @f b = Just b@ /OR/ @f b = Nothing@.
 -}
 recursiveTermModification :: (Term -> Maybe Term) -> Term -> Term
 recursiveTermModification f term =
@@ -80,13 +82,19 @@ recursiveTermModification f term =
 
 -- | See `simplifyTxCbor`.
 simplifyTxBodyCbor :: Term -> Either CborSimplificationError Term
-simplifyTxBodyCbor (TMap keyVals) = do
-      -- First we'll simplify the outputs.
-  let txBodySimplifiedOutputs = TMap $ findAndSimplifyOutputs keyVals
-      -- Second, we'll sort keys in any map.
-      txBodySortedKeys = recursiveTermModification sortMapKeys txBodySimplifiedOutputs
-      txBodyFinal = txBodySortedKeys
-  pure txBodyFinal
+simplifyTxBodyCbor txBody = do
+      -- First, we'll make indefinite-length items, definite.
+  let txBodyDefinite = recursiveTermModification makeTermsDefinite txBody in
+    case txBodyDefinite of
+      TMap keyVals ->
+        let
+            -- Second we'll simplify the outputs.
+            txBodySimplifiedOutputs = TMap $ findAndSimplifyOutputs keyVals
+            -- Third, we'll sort keys in any map.
+            txBodySortedKeys = recursiveTermModification sortMapKeys txBodySimplifiedOutputs
+            txBodyFinal = txBodySortedKeys
+        in pure txBodyFinal
+      _otherwise -> Left $ TransactionIsAbsurd "Transaction body must be of type 'map'"
 
   where
 
@@ -120,7 +128,12 @@ simplifyTxBodyCbor (TMap keyVals) = do
         sortingFunction _ _                     = error "absurd - sortingFunction"  -- We verify that all keys are of the form @TInt _@ before calling this function.
     sortMapKeys _otherwise     = Nothing
 
-simplifyTxBodyCbor _otherwise            = Left $ TransactionIsAbsurd "Transaction body must be of type 'map'"
+    makeTermsDefinite :: Term -> Maybe Term
+    makeTermsDefinite (TBytesI b)     = Just $ TBytes $ LBS.toStrict b
+    makeTermsDefinite (TStringI s)    = Just $ TString $ LT.toStrict s
+    makeTermsDefinite (TListI l)      = Just $ TList l
+    makeTermsDefinite (TMapI keyVals) = Just $ TMap keyVals
+    makeTermsDefinite _otherwise      = Nothing
 
 {- | This `GYTxBody` doesn't represent @transaction_body@ as mentioned in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) specification, it's API's internal type to represent transaction without signing key witnesses. However `GYTx` does represent `transaction` as defined in specification. We therefore obtain `GYTx` and work with it. Here we need an invariant, which is if we receive our simplified `GYTx` transaction, then obtaining `GYTxBody` via `getTxBody` and obtaining `GYTx` back via `unsignedTx` should have the same serialisation.
 -}

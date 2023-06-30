@@ -149,54 +149,54 @@ instance MonadRandom GYTxMonadNode where
   getRandoms  = GYTxMonadNode $ const getRandoms
 
 runGYTxMonadNode
-    :: GYNetworkId
-    -> GYProviders
-    -> [GYAddress]                          -- ^ our addresses
-    -> GYAddress                            -- ^ change address
-    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
-    -> GYTxMonadNode (GYTxSkeleton v)
+    :: GYNetworkId                     -- ^ Network ID.
+    -> GYProviders                     -- ^ Provider.
+    -> [GYAddress]                     -- ^ Addresses belonging to wallet.
+    -> GYAddress                       -- ^ Change address.
+    -> Maybe (GYTxOutRef, Bool)        -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
+    -> GYTxMonadNode (GYTxSkeleton v)  -- ^ Skeleton.
     -> IO GYTxBody
 runGYTxMonadNode = coerce (runGYTxMonadNodeF @Identity GYRandomImproveMultiAsset)
 
 runGYTxMonadNodeParallel
-    :: GYNetworkId
-    -> GYProviders
-    -> [GYAddress]
-    -> GYAddress
-    -> Maybe (GYTxOutRef, Bool)
-    -> GYTxMonadNode [GYTxSkeleton v]
+    :: GYNetworkId                     -- ^ Network ID.
+    -> GYProviders                     -- ^ Provider.
+    -> [GYAddress]                     -- ^ Addresses belonging to wallet.
+    -> GYAddress                       -- ^ Change address.
+    -> Maybe (GYTxOutRef, Bool)        -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
+    -> GYTxMonadNode [GYTxSkeleton v]  -- ^ Skeleton(s).
     -> IO (GYTxBuildResult Identity)
 runGYTxMonadNodeParallel = coerce (runGYTxMonadNodeParallelF @Identity GYRandomImproveMultiAsset)
 
-
 runGYTxMonadNodeParallelWithStrategy
-    :: GYCoinSelectionStrategy
-    -> GYNetworkId
-    -> GYProviders
-    -> [GYAddress]
-    -> GYAddress
-    -> Maybe (GYTxOutRef, Bool)
-    -> GYTxMonadNode [GYTxSkeleton v]
+    :: GYCoinSelectionStrategy         -- ^ Coin selection strategy.
+    -> GYNetworkId                     -- ^ Network ID.
+    -> GYProviders                     -- ^ Provider.
+    -> [GYAddress]                     -- ^ Addresses belonging to wallet.
+    -> GYAddress                       -- ^ Change address.
+    -> Maybe (GYTxOutRef, Bool)        -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
+    -> GYTxMonadNode [GYTxSkeleton v]  -- ^ Skeleton(s).
     -> IO (GYTxBuildResult Identity)
 runGYTxMonadNodeParallelWithStrategy strat = coerce (runGYTxMonadNodeParallelF @Identity strat)
 
 runGYTxMonadNodeChaining
-    :: GYNetworkId
-    -> GYProviders
-    -> [GYAddress]
-    -> GYAddress
-    -> Maybe (GYTxOutRef, Bool)
-    -> GYTxMonadNode [GYTxSkeleton v]
+    :: GYNetworkId                     -- ^ Network ID.
+    -> GYProviders                     -- ^ Provider.
+    -> [GYAddress]                     -- ^ Addresses belonging to wallet.
+    -> GYAddress                       -- ^ Change address.
+    -> Maybe (GYTxOutRef, Bool)        -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
+    -> GYTxMonadNode [GYTxSkeleton v]  -- ^ Skeleton(s).
     -> IO (GYTxBuildResult Identity)
 runGYTxMonadNodeChaining = coerce (runGYTxMonadNodeChainingF @Identity GYRandomImproveMultiAsset)
 
 runGYTxMonadNodeC
-    :: forall a. GYNetworkId
-    -> GYProviders
-    -> [GYAddress]                          -- ^ our addresses
-    -> GYAddress                            -- ^ change address
-    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
-    -> GYTxMonadNode a
+    :: forall a.
+       GYNetworkId               -- ^ Network ID.
+    -> GYProviders               -- ^ Provider.
+    -> [GYAddress]               -- ^ Addresses belonging to wallet.
+    -> GYAddress                 -- ^ Change address.
+    -> Maybe (GYTxOutRef, Bool)  -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
+    -> GYTxMonadNode a           -- ^ When we don't want to build a skeleton.
     -> IO a
 runGYTxMonadNodeC = coerce (runGYTxMonadNodeF @(Const a) GYRandomImproveMultiAsset)
 
@@ -210,13 +210,13 @@ Consider using 'runGYTxMonadNodeParallel' or 'runGYTxMonadNodeChaining' instead.
 -}
 runGYTxMonadNodeF
     :: forall f v. Traversable f
-    => GYCoinSelectionStrategy
-    -> GYNetworkId
-    -> GYProviders
-    -> [GYAddress]                          -- ^ our addresses
-    -> GYAddress                            -- ^ change address
-    -> Maybe (GYTxOutRef, Bool)             -- ^ collateral
-    -> GYTxMonadNode (f (GYTxSkeleton v))
+    => GYCoinSelectionStrategy             -- ^ Coin selection strategy.
+    -> GYNetworkId                         -- ^ Network ID.
+    -> GYProviders                         -- ^ Provider.
+    -> [GYAddress]                         -- ^ Addresses belonging to wallet.
+    -> GYAddress                           -- ^ Change address.
+    -> Maybe (GYTxOutRef, Bool)            -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
+    -> GYTxMonadNode (f (GYTxSkeleton v))  -- ^ Skeleton(s).
     -> IO (f GYTxBody)
 runGYTxMonadNodeF cstrat nid providers addrs change collateral m = do
     x <- runGYTxMonadNodeCore (const id) cstrat nid providers addrs change collateral $ (:[]) <$> m
@@ -237,13 +237,13 @@ This supports failure recovery by utilizing 'GYTxBuildResult'.
 -}
 runGYTxMonadNodeParallelF
     :: Traversable f
-    => GYCoinSelectionStrategy
-    -> GYNetworkId
-    -> GYProviders
-    -> [GYAddress]
-    -> GYAddress
-    -> Maybe (GYTxOutRef, Bool)
-    -> GYTxMonadNode [f (GYTxSkeleton v)]
+    => GYCoinSelectionStrategy             -- ^ Coin selection strategy.
+    -> GYNetworkId                         -- ^ Network ID.
+    -> GYProviders                         -- ^ Provider.
+    -> [GYAddress]                         -- ^ Addresses belonging to wallet.
+    -> GYAddress                           -- ^ Change address.
+    -> Maybe (GYTxOutRef, Bool)            -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
+    -> GYTxMonadNode [f (GYTxSkeleton v)]  -- ^ Skeleton(s).
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeParallelF cstrat nid providers addrs change collateral m = do
     runGYTxMonadNodeCore updateOwnUtxosParallel cstrat nid providers addrs change collateral m
@@ -257,13 +257,13 @@ This supports failure recovery by utilizing 'GYTxBuildResult'.
 **EXPERIMENTAL**
 -}
 runGYTxMonadNodeChainingF :: Traversable f
-    => GYCoinSelectionStrategy
-    -> GYNetworkId
-    -> GYProviders
-    -> [GYAddress]
-    -> GYAddress
-    -> Maybe (GYTxOutRef, Bool)
-    -> GYTxMonadNode [f (GYTxSkeleton v)]
+    => GYCoinSelectionStrategy             -- ^ Coin selection strategy.
+    -> GYNetworkId                         -- ^ Network ID.
+    -> GYProviders                         -- ^ Provider.
+    -> [GYAddress]                         -- ^ Addresses belonging to wallet.
+    -> GYAddress                           -- ^ Change address.
+    -> Maybe (GYTxOutRef, Bool)            -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
+    -> GYTxMonadNode [f (GYTxSkeleton v)]  -- ^ Skeleton(s).
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeChainingF cstrat nid providers addrs change collateral m = do
     runGYTxMonadNodeCore (updateOwnUtxosChaining $ Set.fromList addrs) cstrat nid providers addrs change collateral m
@@ -289,14 +289,14 @@ The function recovers successfully built tx skeletons, in case the list contains
 -}
 runGYTxMonadNodeCore
     :: forall f v. Traversable f
-    => (GYTxBody -> GYUTxOs -> GYUTxOs)
-    -> GYCoinSelectionStrategy
-    -> GYNetworkId
-    -> GYProviders
-    -> [GYAddress]
-    -> GYAddress
-    -> Maybe (GYTxOutRef, Bool)  -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
-    -> GYTxMonadNode [f (GYTxSkeleton v)]
+    => (GYTxBody -> GYUTxOs -> GYUTxOs)    -- ^ Function governing how to update UTxO set when building for multiple skeletons.
+    -> GYCoinSelectionStrategy             -- ^ Coin selection strategy.
+    -> GYNetworkId                         -- ^ Network ID.
+    -> GYProviders                         -- ^ Provider.
+    -> [GYAddress]                         -- ^ Addresses belonging to wallet.
+    -> GYAddress                           -- ^ Change address.
+    -> Maybe (GYTxOutRef, Bool)            -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
+    -> GYTxMonadNode [f (GYTxSkeleton v)]  -- ^ Skeleton(s).
     -> IO (GYTxBuildResult f)
 runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral action = do
 

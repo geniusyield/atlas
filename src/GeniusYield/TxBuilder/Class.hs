@@ -108,6 +108,10 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     utxosAtTxOutRefs :: [GYTxOutRef] -> m GYUTxOs
     utxosAtTxOutRefs orefs = utxosFromList <$> wither utxoAtTxOutRef orefs
 
+    -- | Lookup UTxOs at zero or more 'GYTxOutRef' with their datums. This has a default implementation using `utxosAtTxOutRefs` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
+    utxosAtTxOutRefsWithDatums :: [GYTxOutRef] -> m [(GYUTxO, Maybe GYDatum)]
+    utxosAtTxOutRefsWithDatums = gyQueryUtxosAtTxOutRefsWithDatumsDefault utxosAtTxOutRefs lookupDatum
+
     -- | Lookup 'GYUTxOs' at 'GYAddress'.
     utxosAtAddress :: GYAddress -> m GYUTxOs
     utxosAtAddress = utxosAtAddresses . return
@@ -119,7 +123,7 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
         f :: GYUTxOs -> GYAddress -> m GYUTxOs
         f utxos addr = (<> utxos) <$> utxosAtAddress addr
 
-    -- | Lookup 'GYUTxOs' at zero or more 'GYAddress' with their datums. This has a default implementation using `utxosAtAddresses` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
+    -- | Lookup UTxOs at zero or more 'GYAddress' with their datums. This has a default implementation using `utxosAtAddresses` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
     utxosAtAddressesWithDatums :: [GYAddress] -> m [(GYUTxO, Maybe GYDatum)]
     utxosAtAddressesWithDatums = gyQueryUtxosAtAddressesWithDatumsDefault utxosAtAddresses lookupDatum
 
@@ -161,6 +165,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     lookupDatum = lift . lookupDatum
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
+    utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
     utxosAtAddress = lift . utxosAtAddress
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -180,6 +185,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     lookupDatum = lift . lookupDatum
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
+    utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
     utxosAtAddress = lift . utxosAtAddress
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -199,6 +205,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     lookupDatum = lift . lookupDatum
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
+    utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
     utxosAtAddress = lift . utxosAtAddress
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums

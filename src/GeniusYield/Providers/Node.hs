@@ -70,6 +70,7 @@ nodeSlotActions info = GYSlotActions
 nodeQueryUTxO :: GYEra -> Api.LocalNodeConnectInfo Api.CardanoMode -> GYQueryUTxO
 nodeQueryUTxO era info = GYQueryUTxO
     { gyQueryUtxosAtTxOutRefs'           = nodeUtxosAtTxOutRefs era info
+    , gyQueryUtxosAtTxOutRefsWithDatums' = Nothing  -- Will use the default implementation.
     , gyQueryUtxoAtTxOutRef'             = nodeUtxoAtTxOutRef era info
     , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ nodeUtxosAtAddress era info
     , gyQueryUtxosAtAddresses'           = gyQueryUtxoAtAddressesDefault $ nodeUtxosAtAddress era info

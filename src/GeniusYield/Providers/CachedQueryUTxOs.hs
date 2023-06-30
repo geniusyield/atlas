@@ -34,6 +34,7 @@ makeCachedQueryUTxO query log' = do
 cachedQueryUTxO :: CachedQueryUTxO -> GYQueryUTxO
 cachedQueryUTxO q = GYQueryUTxO
     (cachedUtxosAtTxOutRefs q)
+    Nothing  -- Will use the default implementation.
     (cachedUtxoAtTxOutRef q)
     (gyQueryUtxoRefsAtAddressDefault $ cachedUtxosAtAddress q)
     (gyQueryUtxoAtAddressesDefault $ cachedUtxosAtAddress q)

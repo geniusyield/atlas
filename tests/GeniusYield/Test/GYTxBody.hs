@@ -94,10 +94,10 @@ adjustTxTests =
     ]
   where
     mockAdjust :: GYTxOut v -> GYTxOut v
-    mockAdjust = adjustTxOut (mockMinimumUTxO True)
+    mockAdjust = adjustTxOut mockMinimumUTxO
 
-    mockMinimumUTxO :: Bool -> GYTxOut v -> Natural
-    mockMinimumUTxO b = minimumUTxO b mockProtocolParams
+    mockMinimumUTxO :: GYTxOut v -> Natural
+    mockMinimumUTxO = minimumUTxO mockProtocolParams
 
     lovelacesAdjustedShouldEqual :: Integer -> Integer -> Assertion
     lovelacesAdjustedShouldEqual n m =
@@ -111,7 +111,6 @@ balanceTxStepTests =
     [ testCase "Empty OwnUtxos" $ do
         res <- balanceTxStep
                 (mockBuildTxEnv mempty)
-                True
                 Nothing
                 []
                 []
@@ -121,7 +120,6 @@ balanceTxStepTests =
     , testCase "No collateral needed" $ do
         Right (_, collaterals, _) <- balanceTxStep
                                         (mockBuildTxEnv [valueFromLovelace 10_000_000])
-                                        True
                                         Nothing
                                         []
                                         []
@@ -132,7 +130,6 @@ balanceTxStepTests =
     , testCase "Collateral Needed" $ do
         Right (_, collaterals, _) <- balanceTxStep
                                         (mockBuildTxEnv [valueFromLovelace 10_000_000])
-                                        True
                                         (Just (valueSingleton (mockAsset "A") 100, []))
                                         []
                                         []

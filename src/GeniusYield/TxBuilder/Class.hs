@@ -19,6 +19,7 @@ module GeniusYield.TxBuilder.Class
     , RandT
     , lookupDatum'
     , utxoAtTxOutRef'
+    , utxoAtTxOutRefWithDatum'
     , someUTxOWithoutRefScript
     , slotToBeginTime
     , slotToEndTime
@@ -232,6 +233,13 @@ lookupDatum' h = lookupDatum h >>= maybe (throwError . GYQueryDatumException $ G
 -- | A version of 'utxoAtTxOutRef' that raises 'GYNoUtxoAtRef' if the utxo is not found.
 utxoAtTxOutRef' :: GYTxQueryMonad m => GYTxOutRef -> m GYUTxO
 utxoAtTxOutRef' ref = utxoAtTxOutRef ref
+    >>= maybe
+        (throwError . GYQueryUTxOException $ GYNoUtxoAtRef ref)
+        pure
+
+-- | A version of 'utxoAtTxOutRefWithDatum' that raises 'GYNoUtxoAtRef' if the utxo is not found.
+utxoAtTxOutRefWithDatum' :: GYTxQueryMonad m => GYTxOutRef -> m (GYUTxO, Maybe GYDatum)
+utxoAtTxOutRefWithDatum' ref = utxoAtTxOutRefWithDatum ref
     >>= maybe
         (throwError . GYQueryUTxOException $ GYNoUtxoAtRef ref)
         pure

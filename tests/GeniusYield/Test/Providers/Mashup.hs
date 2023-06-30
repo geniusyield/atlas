@@ -71,7 +71,7 @@ providersMashupTests configs =
               valueToSend     = totalSenderFunds `valueMinus` valueFromLovelace 5_000_000
               -- This way, UTxO distribution in test wallet should remain same.
           txBody <- runGYTxMonadNode nid provider [senderAddress] senderAddress Nothing $ pure $ mustHaveOutput $ mkGYTxOutNoDatum @'PlutusV2 senderAddress valueToSend
-          let signedTxBody = signTx txBody [skey]
+          let signedTxBody = signGYTxBody txBody [skey]
           printf "Signed tx: %s\n" (txToHex signedTxBody)
           tid    <- gySubmitTx signedTxBody
           printf "Submitted tx: %s\n" tid

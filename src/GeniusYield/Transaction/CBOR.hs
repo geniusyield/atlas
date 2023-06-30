@@ -135,7 +135,7 @@ simplifyTxBodyCbor txBody = do
     makeTermsDefinite (TMapI keyVals) = Just $ TMap keyVals
     makeTermsDefinite _otherwise      = Nothing
 
-{- | This `GYTxBody` doesn't represent @transaction_body@ as mentioned in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) specification, it's API's internal type to represent transaction without signing key witnesses. However `GYTx` does represent `transaction` as defined in specification. We therefore obtain `GYTx` and work with it. Here we need an invariant, which is if we receive our simplified `GYTx` transaction, then obtaining `GYTxBody` via `getTxBody` and obtaining `GYTx` back via `unsignedTx` should have the same serialisation.
+{- | This `GYTxBody` doesn't represent @transaction_body@ as mentioned in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) specification, it's API's internal type to represent transaction without signing key witnesses. However `GYTx` does represent `transaction` as defined in specification. We therefore obtain `GYTx` and work with it. Here we need an invariant, which is if we receive our simplified `GYTx` transaction, then obtaining `GYTxBody` via `getTxBody` and obtaining `GYTx` back via `unsignedTx` should have the same serialisation for the modifications to CBOR encoding we do here.
 -}
 simplifyGYTxBodyCbor :: GYTxBody -> Either CborSimplificationError GYTxBody
 simplifyGYTxBodyCbor txBody =

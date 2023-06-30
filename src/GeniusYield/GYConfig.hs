@@ -12,6 +12,12 @@ module GeniusYield.GYConfig
     , GYCoreProviderInfo (..)
     , withCfgProviders
     , coreConfigIO
+    , coreProviderIO
+    , findMaestroTokenAndNetId
+    , isNodeChainIx
+    , isMaestro
+    , isBlockfrost
+    , isDbSync
     ) where
 
 import           Control.Exception                      (SomeException, bracket,
@@ -71,6 +77,40 @@ data GYCoreProviderInfo
   | GYMaestro {cpiMaestroToken :: !(Confidential Text)}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock (Show)
+
+coreProviderIO :: FilePath -> IO GYCoreProviderInfo
+coreProviderIO filePath = do
+  bs <- LBS.readFile filePath
+  case Aeson.eitherDecode' bs of
+    Left err  -> throwIO $ userError err
+    Right cfg -> pure cfg
+
+isNodeChainIx :: GYCoreProviderInfo -> Bool
+isNodeChainIx GYNodeChainIx{} = True
+isNodeChainIx _               = False
+
+isDbSync :: GYCoreProviderInfo -> Bool
+isDbSync GYDbSync{} = True
+isDbSync _          = False
+
+isMaestro :: GYCoreProviderInfo -> Bool
+isMaestro GYMaestro{} = True
+isMaestro _           = False
+
+isBlockfrost :: GYCoreProviderInfo -> Bool
+isBlockfrost GYBlockfrost{} = True
+isBlockfrost _              = False
+
+findMaestroTokenAndNetId :: [GYCoreConfig] -> IO (Text, GYNetworkId)
+findMaestroTokenAndNetId configs = do
+    let config = find (isMaestro . cfgCoreProvider) configs
+    case config of
+        Nothing -> throwIO $ userError "Missing Maestro Configuration"
+        Just conf -> do
+            let netId = cfgNetworkId conf
+            case cfgCoreProvider conf of
+              GYMaestro (Confidential token) -> return (token, netId)
+              _ -> throwIO $ userError "Missing Maestro Token"
 
 {- |
 The config to initialize the GY framework with.

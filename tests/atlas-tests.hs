@@ -12,7 +12,7 @@ import           Test.Tasty.HUnit                  (assertEqual, testCase,
                                                     (@=?))
 
 import           GeniusYield.Examples.Gift
-import           GeniusYield.GYConfig              (coreConfigIO)
+import           GeniusYield.GYConfig              (coreConfigIO, findMaestroTokenAndNetId)
 import           GeniusYield.Imports
 import           GeniusYield.Test.CoinSelection    (coinSelectionTests)
 import           GeniusYield.Test.Config           (configTests)
@@ -30,6 +30,7 @@ import           GeniusYield.Types
 main :: IO ()
 main = do
     configs <- forM ["maestro-config.json", "blockfrost-config.json"] coreConfigIO
+    (providerToken, netId) <- findMaestroTokenAndNetId configs
     rootDir <- findPackageRoot
     defaultMain $ testGroup "atlas"
         [ testGroup "serializeToRawBytes"
@@ -65,11 +66,11 @@ main = do
             ]
         , slotConversionTests
         , coinSelectionTests
+        , providersTests configs providerToken netId
         , configTests
         , gyTxSkeletonTests
         , gyTxBodyTests
         , refInputTests
-        , providersTests configs
         ]
 
 -------------------------------------------------------------------------------
@@ -94,4 +95,3 @@ findPackageRoot = do
     if here
     then return "."
     else fail "Cannot find package root"
-

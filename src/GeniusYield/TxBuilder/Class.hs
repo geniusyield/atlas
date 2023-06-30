@@ -45,8 +45,10 @@ module GeniusYield.TxBuilder.Class
     , pubKeyHashFromPlutus'
     , advanceSlot'
     , utxosDatums
+    , utxosDatumsPure
     , utxoDatum
     , utxoDatumHushed
+    , utxoDatumPureHushed
     , utxoDatum'
     , mustHaveInput
     , mustHaveRefInput
@@ -506,6 +508,10 @@ advanceSlot' s t = maybe
 utxosDatums :: forall m a. (GYTxQueryMonad m, Plutus.FromData a) => GYUTxOs -> m (Map GYTxOutRef (GYAddress, GYValue, a))
 utxosDatums = witherUTxOs utxoDatumHushed
 
+-- | Pure variant of `utxosDatums`.
+utxosDatumsPure :: Plutus.FromData a => [(GYUTxO, Maybe GYDatum)] -> Map GYTxOutRef (GYAddress, GYValue, a)
+utxosDatumsPure = Map.fromList . mapMaybe utxoDatumPureHushed
+
 utxoDatum :: (GYTxQueryMonad m, Plutus.FromData a) => GYUTxO -> m (Either GYQueryDatumError (GYAddress, GYValue, a))
 utxoDatum utxo = case utxoOutDatum utxo of
     GYOutDatumNone -> pure . Left $ GYNoDatumHash utxo
@@ -519,6 +525,14 @@ utxoDatum utxo = case utxoOutDatum utxo of
     datumToRes x = case Plutus.fromBuiltinData $ datumToPlutus' x of
         Nothing -> pure . Left $ GYInvalidDatum x
         Just a  -> pure $ Right (utxoAddress utxo, utxoValue utxo, a)
+
+-- | Obtain original datum representation of an UTxO.
+utxoDatumPureHushed :: Plutus.FromData a => (GYUTxO, Maybe GYDatum) -> Maybe (GYTxOutRef, (GYAddress, GYValue, a))
+utxoDatumPureHushed (_utxo, Nothing) = Nothing
+utxoDatumPureHushed (GYUTxO {..}, Just d) =
+  case Plutus.fromBuiltinData $ datumToPlutus' d of
+    Nothing -> Nothing
+    Just d' -> Just (utxoRef, (utxoAddress, utxoValue, d'))
 
 -- | Version of 'utxoDatum' that throws 'GYTxMonadException'.
 utxoDatum' :: (GYTxQueryMonad m, Plutus.FromData a) => GYUTxO -> m (GYAddress, GYValue, a)

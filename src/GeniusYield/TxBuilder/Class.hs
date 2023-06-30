@@ -72,6 +72,7 @@ import           Control.Monad.Reader         (ReaderT)
 import           Data.List                    (nubBy)
 
 import qualified Data.Map.Strict              as Map
+import           Data.Maybe                   (listToMaybe)
 import qualified Data.Set                     as Set
 import qualified Data.Text                    as Txt
 import qualified Plutus.V1.Ledger.Api         as Plutus
@@ -103,6 +104,10 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
         return $ case utxosToList utxos of
             []       -> Nothing
             utxo : _ -> Just utxo
+
+    -- | Lookup UTxO at 'GYTxOutRef' with an attempt to resolve for datum.
+    utxoAtTxOutRefWithDatum :: GYTxOutRef -> m (Maybe (GYUTxO, Maybe GYDatum))
+    utxoAtTxOutRefWithDatum ref = listToMaybe <$> utxosAtTxOutRefsWithDatums [ref]
 
     -- | Lookup 'GYUTxOs' at multiple 'GYTxOutRef's at once
     utxosAtTxOutRefs :: [GYTxOutRef] -> m GYUTxOs

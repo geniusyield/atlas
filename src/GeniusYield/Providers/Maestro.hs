@@ -207,7 +207,7 @@ maestroUtxosAtAddresses env addrs = do
     pure
     $ utxosFromList <$> traverse utxoFromMaestro addrUtxos
   where
-    locationIdent = "AddressesUtxo"
+    locationIdent = "AddressesUtxos"
 
 -- | Query UTxOs present at multiple addresses with datums.
 maestroUtxosAtAddressesWithDatums :: Maestro.MaestroEnv -> [GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]
@@ -221,7 +221,7 @@ maestroUtxosAtAddressesWithDatums env addrs = do
     pure
     $ traverse utxoFromMaestroWithDatum addrUtxos
   where
-    locationIdent = "AddressesUtxo"
+    locationIdent = "AddressesUtxosWithDatums"
 
 -- | Returns a list containing all 'GYTxOutRef' for a given 'GYAddress'.
 maestroRefsAtAddress :: Maestro.MaestroEnv -> GYAddress -> IO [GYTxOutRef]
@@ -249,9 +249,27 @@ maestroUtxoAtTxOutRef env ref = do
     -- This shouldn't happen.
     _anyOtherFailure -> throwIO $ MspvMultiUtxoPerRef ref
 
--- | Query UTxO in case of multiple output references.
+-- | Query UTxOs in case of multiple `GYTxOutRef`.
 maestroUtxosAtTxOutRefs :: Maestro.MaestroEnv -> [GYTxOutRef] -> IO GYUTxOs
 maestroUtxosAtTxOutRefs env = fmap utxosFromList . maestroUtxosAtTxOutRefs' env
+
+-- | Query UTxOs present at multiple `GYTxOutRef` with datums.
+maestroUtxosAtTxOutRefsWithDatums :: Maestro.MaestroEnv -> [GYTxOutRef] -> IO [(GYUTxO, Maybe GYDatum)]
+maestroUtxosAtTxOutRefsWithDatums env refs = do
+  -- Here we would like the behaviour that if UTxO corresponding to one of the reference is not found, whole call should not fail which is why we have sub exception catching.
+  res <- handleMaestroError locationIdent <=< try $ for refs $ \ref -> do
+      let (Api.serialiseToRawBytesHexText -> txId, utxoIdx) = bimap txIdToApi toInteger $ txOutRefToTuple ref
+      (Just <$> Maestro.txUtxo env (coerce txId) (fromInteger utxoIdx) (Just True) (Just False)) `catch` handler
+
+  either
+      (throwIO . MspvDeserializeFailure locationIdent)
+      pure
+      . traverse utxoFromMaestroWithDatum $ catMaybes res
+  where
+    handler Maestro.MaestroNotFound = pure Nothing
+    handler other                   = throwIO other
+
+    locationIdent = "UtxosByRefsWithDatums"
 
 -- | Query UTxO in case of multiple output references.
 maestroUtxosAtTxOutRefs' :: Maestro.MaestroEnv -> [GYTxOutRef] -> IO [GYUTxO]
@@ -276,6 +294,7 @@ maestroQueryUtxo :: Maestro.MaestroEnv -> GYQueryUTxO
 maestroQueryUtxo env = GYQueryUTxO
   { gyQueryUtxosAtAddresses'           = maestroUtxosAtAddresses env
   , gyQueryUtxosAtTxOutRefs'           = maestroUtxosAtTxOutRefs env
+  , gyQueryUtxosAtTxOutRefsWithDatums' = Just $ maestroUtxosAtTxOutRefsWithDatums env
   , gyQueryUtxoAtTxOutRef'             = maestroUtxoAtTxOutRef env
   , gyQueryUtxoRefsAtAddress'          = maestroRefsAtAddress env
   , gyQueryUtxosAtAddressesWithDatums' = Just $ maestroUtxosAtAddressesWithDatums env

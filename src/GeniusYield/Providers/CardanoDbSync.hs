@@ -144,6 +144,7 @@ instance FromJSON SD where
 dbSyncQueryUtxo :: CardanoDbSyncConn -> GYQueryUTxO
 dbSyncQueryUtxo conn = GYQueryUTxO
     { gyQueryUtxosAtTxOutRefs'           = dbSyncQueryUtxosAtTxOutRefs conn
+    , gyQueryUtxosAtTxOutRefsWithDatums' = Nothing  -- Will use the default implementation.
     , gyQueryUtxoAtTxOutRef'             = dbSyncQueryUtxoAtTxOutRef conn
     , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ dbSyncQueryUtxosAtAddress conn
     , gyQueryUtxosAtAddresses'           = dbSyncQueryUtxosAtAddresses conn

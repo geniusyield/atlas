@@ -122,6 +122,7 @@ blockfrostGetCurrentSlot proj = do
 blockfrostQueryUtxo :: Blockfrost.Project -> GYQueryUTxO
 blockfrostQueryUtxo proj = GYQueryUTxO
     { gyQueryUtxosAtTxOutRefs'           = blockfrostUtxosAtTxOutRefs proj
+    , gyQueryUtxosAtTxOutRefsWithDatums' = Nothing  -- Will use the default implementation.
     , gyQueryUtxoAtTxOutRef'             = blockfrostUtxosAtTxOutRef proj
     , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddresses'           = gyQueryUtxoAtAddressesDefault $ blockfrostUtxosAtAddress proj

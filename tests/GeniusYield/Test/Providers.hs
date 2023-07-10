@@ -20,15 +20,17 @@ import           GeniusYield.Types.Address         (GYAddress,
                                                     unsafeAddressFromText)
 import           GeniusYield.Types.Datum           (datumFromApi',
                                                     datumHashFromHex)
-import           GeniusYield.Types.Script          (scriptFromCBOR, mintingPolicyIdToText)
+import           GeniusYield.Types.Script          (mintingPolicyIdToText,
+                                                    scriptFromCBOR)
 import           GeniusYield.Types.TxOutRef        (GYTxOutRef)
 import           GeniusYield.Types.UTxO            (GYOutDatum (..),
                                                     GYUTxO (..), utxosFromApi,
                                                     utxosFromList, utxosRefs,
                                                     utxosToApi)
 import           GeniusYield.Types.Value           (GYAssetClass (GYLovelace, GYToken),
+                                                    tokenNameToHex,
                                                     valueFromList,
-                                                    valueFromLovelace, tokenNameToHex)
+                                                    valueFromLovelace)
 
 import qualified Cardano.Api                       as Api
 import           GeniusYield.GYConfig
@@ -290,7 +292,7 @@ maestroAssetSingleton GYLovelace n = Maestro.Asset
                                            }
 maestroAssetSingleton (GYToken policyId tokenName) n = Maestro.Asset
                                            { _assetAmount = fromIntegral n
-                                           , _assetUnit = Maestro.UserMintedToken (Maestro.NonAdaNativeToken (coerce $ mintingPolicyIdToText $ policyId) (coerce $ tokenNameToHex $ tokenName))
+                                           , _assetUnit = Maestro.UserMintedToken (Maestro.NonAdaNativeToken (coerce $ mintingPolicyIdToText policyId) (coerce $ tokenNameToHex tokenName))
                                            }
 
 mockAssetA :: GYAssetClass

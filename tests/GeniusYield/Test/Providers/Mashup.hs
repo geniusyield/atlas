@@ -34,9 +34,10 @@ providersMashupTests configs =
     , testCase "Query UTxOs" $ do
 
         utxosProviders <- forM configs $ \config -> withCfgProviders config mempty $ \provider -> do
-          let myAddrList = unsafeAddressFromText <$>
+          let addressWithDatumHashes = "addr_test1wz09gtk5qn8g2lr0qu8hdh9gyjcl396778rz2qphgz4edxs245ja0"  -- This address has lots of UTxOs with datum hashes.
+              myAddrList = unsafeAddressFromText <$>
                 -- TODO: Put more reliable (in sense that UTxOs won't change) addresses here!
-                [ "addr_test1wz09gtk5qn8g2lr0qu8hdh9gyjcl396778rz2qphgz4edxs245ja0"  -- This address has UTxOs with datum hashes.
+                [ addressWithDatumHashes
                 , "addr_test1wpdz7qwyrpsxrwqe0e4yv3knfmy068euhh4k07ac4wp3kfgjhpd7w"  -- This address has UTxOs with inline datums.
                 , "addr_test1qr5zypvu3va5y3q2m8envvd08sj5mams3znp3nh8q6arx4vre0cyeg6lqagujyhvr4ylx5wlgwjs3uyl8z0spz4akxzq6wyfzk"  -- This address has UTxOs with reference scripts.
                 ]
@@ -48,7 +49,8 @@ providersMashupTests configs =
                 , "4e2341767958f1fd83f2ec536e1001888db938d374fcae1a1e965dc21a05d0c6#0"  -- Contains inline datum.
                 ]
           utxosAtRefs <- gyQueryUtxosAtTxOutRefs provider outputRefs
-          pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums', utxosAtRefs)
+          utxoRefsAtAddress' <- gyQueryUtxoRefsAtAddress provider $ unsafeAddressFromText addressWithDatumHashes
+          pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums', utxosAtRefs, Set.fromList utxoRefsAtAddress')
         assertBool "Utxos are not all equal" $ all (== head utxosProviders) (tail utxosProviders)
     , testCase "Checking presence of error message when submitting an invalid transaction" $ do
         let

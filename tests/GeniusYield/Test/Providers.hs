@@ -2,44 +2,50 @@ module GeniusYield.Test.Providers
     ( providersTests
     ) where
 
-import           Data.Aeson as Aeson (decode, decodeStrict, Value)
-import           Data.ByteString.Lazy as BS (readFile, toStrict)
-import           Data.String         (fromString)
-import qualified Data.Text as Text   (Text, unpack, pack, replace)
-import           Data.Maybe          (fromJust, fromMaybe)
-import           Data.Map.Strict as Map    (difference, isSubmapOf)
-import           Data.Some (mkSome)
-import qualified Data.Set as Set (fromList, difference, isSubsetOf)
+import           Data.Aeson                        as Aeson (Value, decode,
+                                                             decodeStrict)
+import           Data.ByteString.Lazy              as BS (readFile, toStrict)
+import           Data.Map.Strict                   as Map (difference,
+                                                           isSubmapOf)
+import           Data.Maybe                        (fromJust)
+import qualified Data.Set                          as Set (difference, fromList,
+                                                           isSubsetOf)
+import           Data.Some                         (mkSome)
+import qualified Data.Text                         as Text (Text, unpack)
 import           Test.Tasty
-import           Test.Tasty.HUnit
-import qualified Text.Printf                       as Printf
 import           Test.Tasty.Golden.Advanced        (goldenTest)
+import           Test.Tasty.HUnit
 
-import           GHC.Natural                       (Natural)
 import           GeniusYield.Types.Address         (GYAddress,
                                                     unsafeAddressFromText)
 import           GeniusYield.Types.Datum           (datumFromApi',
                                                     datumHashFromHex)
-import           GeniusYield.Types.Script          (scriptFromCBOR)
+import           GeniusYield.Types.Script          (scriptFromCBOR, mintingPolicyIdToText)
 import           GeniusYield.Types.TxOutRef        (GYTxOutRef)
 import           GeniusYield.Types.UTxO            (GYOutDatum (..),
-                                                    GYUTxO (..), utxosToApi,
+                                                    GYUTxO (..), utxosFromApi,
                                                     utxosFromList, utxosRefs,
-                                                    utxosFromApi)
+                                                    utxosToApi)
 import           GeniusYield.Types.Value           (GYAssetClass (GYLovelace, GYToken),
                                                     valueFromList,
-                                                    valueFromLovelace)
+                                                    valueFromLovelace, tokenNameToHex)
 
 import qualified Cardano.Api                       as Api
 import           GeniusYield.GYConfig
+import           GeniusYield.Imports
 import           GeniusYield.Providers.Common      (SomeDeserializeError (..))
-import           GeniusYield.Providers.Maestro     (utxoFromMaestro, maestroQueryUtxo,
-                                                    networkIdToMaestroEnv)
+import           GeniusYield.Providers.Maestro     (maestroQueryUtxo,
+                                                    networkIdToMaestroEnv,
+                                                    utxoFromMaestro)
 import           GeniusYield.Test.Providers.Mashup (providersMashupTests)
-import           GeniusYield.Types                 (PlutusVersion (PlutusV2), GYQueryUTxO, GYNetworkId,
-                                                    gyQueryUtxosAtAddress', gyQueryUtxosAtAddresses',
-                                                    gyQueryUtxoAtTxOutRef', gyQueryUtxoRefsAtAddress')
-import qualified Maestro.Types                     as Maestro
+import           GeniusYield.Types                 (GYNetworkId, GYQueryUTxO,
+                                                    PlutusVersion (PlutusV2),
+                                                    gyQueryUtxoAtTxOutRef',
+                                                    gyQueryUtxoRefsAtAddress',
+                                                    gyQueryUtxosAtAddress',
+                                                    gyQueryUtxosAtAddresses')
+import qualified Maestro.Types.V1                  as Maestro
+import           Web.HttpApiData                   (ToHttpApiData (..))
 
 providersTests :: [GYCoreConfig] -> Text.Text -> GYNetworkId -> TestTree
 providersTests configs pToken netId = testGroup "Providers" [ testGroup "Maestro" (maestroTests pToken netId), providersMashupTests configs ]
@@ -56,24 +62,26 @@ maestroTests token netId =
     , testGroup "MaestroUtxo to GYUTxO translation"
         [ testCase "Invalid Address" $ do
             let expected = Left DeserializeErrorAddress
-                res = utxoFromMaestro $ Maestro.Utxo
-                                        { _utxoTxHash          = mockTxId
-                                        , _utxoIndex           = mockTxIx
-                                        , _utxoAssets          = []
-                                        , _utxoAddress         = "invalidaddress"
-                                        , _utxoDatum           = Nothing
-                                        , _utxoReferenceScript = Nothing
+                res = utxoFromMaestro $ Maestro.UtxoWithBytes
+                                        { _utxoWithBytesTxHash          = mockTxId
+                                        , _utxoWithBytesIndex           = mockTxIx
+                                        , _utxoWithBytesAssets          = []
+                                        , _utxoWithBytesAddress         = "invalidaddress"
+                                        , _utxoWithBytesDatum           = Nothing
+                                        , _utxoWithBytesReferenceScript = Nothing
+                                        , _utxoWithBytesTxoutCbor       = Nothing
                                         }
             res @?= expected
         , testCase "Invalid UTxORef" $ do
             let expected = Left (DeserializeErrorHex "GYTxOutRef: Failed reading: takeWhile1")
-                res = utxoFromMaestro $ Maestro.Utxo
-                                        { _utxoTxHash          = "invalidhash"
-                                        , _utxoIndex           = mockTxIx
-                                        , _utxoAssets          = []
-                                        , _utxoAddress         = mockAddressB32
-                                        , _utxoDatum           = Nothing
-                                        , _utxoReferenceScript = Nothing
+                res = utxoFromMaestro $ Maestro.UtxoWithBytes
+                                        { _utxoWithBytesTxHash          = "invalidhash"
+                                        , _utxoWithBytesIndex           = mockTxIx
+                                        , _utxoWithBytesAssets          = []
+                                        , _utxoWithBytesAddress         = mockAddressB32
+                                        , _utxoWithBytesDatum           = Nothing
+                                        , _utxoWithBytesReferenceScript = Nothing
+                                        , _utxoWithBytesTxoutCbor       = Nothing
                                         }
             res @?= expected
         , testCase "Simplest Case" $ do
@@ -211,7 +219,7 @@ maestroTests token netId =
 -- Mock Values
 -------------------------------------------------------------------------------
 mockQueryTxOutRef :: GYTxOutRef
-mockQueryTxOutRef = fromString $ concat [Text.unpack mockQueryTxId, "#", show mockQueryTxIx]
+mockQueryTxOutRef = fromString $ Text.unpack $ toUrlPiece mockQueryTxId <> "#" <> toUrlPiece mockQueryTxIx
 
 mockQueryTxId :: Text.Text
 mockQueryTxId = "45e7172a4ff66f6e6236ca910182ac4e391f8b8a7cb8c22a26c489981dd7a0b9"
@@ -219,30 +227,31 @@ mockQueryTxId = "45e7172a4ff66f6e6236ca910182ac4e391f8b8a7cb8c22a26c489981dd7a0b
 mockQueryTxIx :: Word
 mockQueryTxIx = 0
 
-mockMaestroUtxo :: [Maestro.Asset] -> Maybe Maestro.DatumOption -> Maybe Maestro.Script ->Maestro.Utxo
-mockMaestroUtxo assets mDat mRefScript = Maestro.Utxo
-  { _utxoTxHash          = mockTxId
-  , _utxoIndex           = mockTxIx
-  , _utxoAssets          = assets
-  , _utxoAddress         = mockAddressB32
-  , _utxoDatum           = mDat
-  , _utxoReferenceScript = mRefScript
+mockMaestroUtxo :: [Maestro.Asset] -> Maybe Maestro.DatumOption -> Maybe Maestro.Script -> Maestro.UtxoWithBytes
+mockMaestroUtxo assets mDat mRefScript = Maestro.UtxoWithBytes
+  { _utxoWithBytesTxHash          = mockTxId
+  , _utxoWithBytesIndex           = mockTxIx
+  , _utxoWithBytesAssets          = assets
+  , _utxoWithBytesAddress         = mockAddressB32
+  , _utxoWithBytesDatum           = mDat
+  , _utxoWithBytesReferenceScript = mRefScript
+  , _utxoWithBytesTxoutCbor       = Nothing
   }
 
-mockTxId :: Text.Text
+mockTxId :: Maestro.TxHash
 mockTxId = "4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189"
 
-mockTxIx :: Natural
+mockTxIx :: Maestro.TxIndex
 mockTxIx = 0
 
 mockTxOutRef :: GYTxOutRef
-mockTxOutRef = fromString $ concat [Text.unpack mockTxId, "#", show mockTxIx]
+mockTxOutRef = fromString $ Text.unpack $ toUrlPiece mockTxId <> "#" <> toUrlPiece mockTxIx
 
-mockAddressB32 :: Text.Text
+mockAddressB32 :: Maestro.Bech32StringOf Maestro.Address
 mockAddressB32 = "addr_test1qr30nkfx28r452r3006kytnpvn39zv7c2m5uqt4zrg35mly35pesdyk43wnxk3edkkw74ak56n4zh67reqjhcfp3mm7qtyekt4"
 
 mockAddress :: GYAddress
-mockAddress = unsafeAddressFromText mockAddressB32
+mockAddress = unsafeAddressFromText $ coerce mockAddressB32
 
 maestroDatumHash :: Maestro.DatumOption
 maestroDatumHash = Maestro.DatumOption
@@ -270,13 +279,18 @@ mockScriptDataDetailed :: Aeson.Value
 mockScriptDataDetailed = fromJust $ Aeson.decode "{\"fields\": [{\"fields\": [{\"int\": 48}],\"constructor\": 0}],\"constructor\": 0}"
 
 maestroAssetFromLovelace :: Integer -> Maestro.Asset
-maestroAssetFromLovelace n = Maestro.Asset { _assetQuantity = fromIntegral n
-                                           , _assetUnit = Text.pack $ Printf.printf "%s" GYLovelace
+maestroAssetFromLovelace n = Maestro.Asset { _assetAmount = fromIntegral n
+                                           , _assetUnit = Maestro.Lovelace
                                            }
 
 maestroAssetSingleton :: GYAssetClass -> Integer -> Maestro.Asset
-maestroAssetSingleton ac n = Maestro.Asset { _assetQuantity = fromIntegral n
-                                           , _assetUnit = Text.replace "." "#" $ Text.pack $ Printf.printf "%s" ac
+maestroAssetSingleton GYLovelace n = Maestro.Asset
+                                           { _assetAmount = fromIntegral n
+                                           , _assetUnit = Maestro.Lovelace
+                                           }
+maestroAssetSingleton (GYToken policyId tokenName) n = Maestro.Asset
+                                           { _assetAmount = fromIntegral n
+                                           , _assetUnit = Maestro.UserMintedToken (Maestro.NonAdaNativeToken (coerce $ mintingPolicyIdToText $ policyId) (coerce $ tokenNameToHex $ tokenName))
                                            }
 
 mockAssetA :: GYAssetClass

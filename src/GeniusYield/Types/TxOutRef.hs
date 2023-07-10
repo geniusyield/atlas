@@ -17,6 +17,7 @@ module GeniusYield.Types.TxOutRef (
     -- * Helpers
     showTxOutRef,
     txOutRefToTuple,
+    txOutRefToTuple',
     txOutRefFromTuple,
     -- * CBOR format
     GYTxOutRefCbor (..),
@@ -122,6 +123,9 @@ txOutRefToApi = coerce
 
 txOutRefToTuple :: GYTxOutRef -> (GYTxId, Word)
 txOutRefToTuple (GYTxOutRef (Api.TxIn x (Api.TxIx y))) = (txIdFromApi x, y)
+
+txOutRefToTuple' :: GYTxOutRef -> (Text, Word)
+txOutRefToTuple' (GYTxOutRef (Api.TxIn x (Api.TxIx y))) = (Api.serialiseToRawBytesHexText x, y)
 
 txOutRefFromTuple :: (GYTxId, Word) -> GYTxOutRef
 txOutRefFromTuple (txIdToApi -> x, y) = GYTxOutRef (Api.TxIn x (Api.TxIx y))

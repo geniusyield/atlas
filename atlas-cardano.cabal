@@ -298,6 +298,7 @@ test-suite atlas-tests
     , containers
     , directory
     , filepath
+    , http-api-data
     , maestro-sdk
     , MonadRandom
     , mtl

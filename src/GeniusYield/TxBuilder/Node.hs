@@ -117,8 +117,8 @@ instance GYTxMonad GYTxMonadNode where
         addrs         <- ownAddresses
         mCollateral   <- getCollateral
         usedSomeUTxOs <- getUsedSomeUTxOs
-        utxos         <- traverse utxosAtAddress addrs
-        return $ utxosRemoveTxOutRefs (maybe usedSomeUTxOs (`Set.insert` usedSomeUTxOs) mCollateral) (mconcat utxos)
+        utxos         <- utxosAtAddresses addrs
+        return $ utxosRemoveTxOutRefs (maybe usedSomeUTxOs (`Set.insert` usedSomeUTxOs) mCollateral) utxos
       where
         getCollateral    = GYTxMonadNode $ return . envCollateral
         getUsedSomeUTxOs = GYTxMonadNode $ return . envUsedSomeUTxOs

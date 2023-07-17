@@ -21,6 +21,7 @@ import           Codec.CBOR.Read        (DeserialiseFailure,
                                          deserialiseFromBytes)
 import           Codec.CBOR.Term        (Term (..), decodeTerm, encodeTerm)
 import           Codec.CBOR.Write       (toStrictByteString)
+import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as BS16
 import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Text              as T
@@ -119,13 +120,22 @@ simplifyTxBodyCbor txBody = do
 
     sortMapKeys :: Term -> Maybe Term
     sortMapKeys (TMap keyValsToSort) =
-      if all (\(k, _) -> case k of TInt _ -> True; _ow -> False) keyValsToSort then
+      if allSameType then
         Just $ TMap $ sortBy sortingFunction keyValsToSort
       else Nothing
       where
         sortingFunction :: forall b1 b2. (Term, b1) -> (Term, b2) -> Ordering
-        sortingFunction (TInt a, _) (TInt b, _) = compare a b
-        sortingFunction _ _                     = error "absurd - sortingFunction"  -- We verify that all keys are of the form @TInt _@ before calling this function.
+        sortingFunction (TInt a, _) (TInt b, _)         = compare a b
+        sortingFunction (TInteger a, _) (TInteger b, _) = compare a b
+        sortingFunction (TBytes a, _) (TBytes b, _)     = compare (B.length a) (B.length b) <> compare a b
+        sortingFunction (TString a, _) (TString b, _)   = compare (T.length a) (T.length b) <> compare a b
+        sortingFunction _ _                             = error "absurd - sortingFunction"  -- We verify that all keys are of the same appropriate type before calling this function.
+        allSameType = any ($ keyValsToSort) [isTInt, isTInteger, isTBytes, isTString]
+          where
+            isTInt = all (\(k, _) -> case k of TInt _ -> True; _ow -> False)
+            isTInteger = all (\(k, _) -> case k of TInteger _ -> True; _ow -> False)
+            isTBytes = all (\(k, _) -> case k of TBytes _ -> True; _ow -> False)
+            isTString = all (\(k, _) -> case k of TString _ -> True; _ow -> False)
     sortMapKeys _otherwise     = Nothing
 
     makeTermsDefinite :: Term -> Maybe Term
@@ -141,4 +151,3 @@ simplifyGYTxBodyCbor :: GYTxBody -> Either CborSimplificationError GYTxBody
 simplifyGYTxBodyCbor txBody =
   let tx = unsignedTx txBody
   in getTxBody <$> simplifyTxCbor tx
-

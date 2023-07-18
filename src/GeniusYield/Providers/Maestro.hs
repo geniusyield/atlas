@@ -37,20 +37,20 @@ import qualified Data.Set                             as Set
 import qualified Data.Text                            as Text
 import qualified Data.Text.Encoding                   as Text
 import qualified Data.Time                            as Time
-import           Data.Traversable                     (for)
+import           GHC.Natural                          (wordToNatural)
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
 import           GeniusYield.Providers.SubmitApi      (SubmitTxException (..))
 import           GeniusYield.Types
-import qualified Maestro.Client                       as Maestro
-import qualified Maestro.Types                        as Maestro
+import qualified Maestro.Client.V1                    as Maestro
+import qualified Maestro.Types.V1                     as Maestro
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
 import qualified PlutusTx.Builtins                    as Plutus
 import qualified Web.HttpApiData                      as Web
 
 -- | Convert our representation of Network ID to Maestro's.
-networkIdToMaestroEnv :: Text -> GYNetworkId -> IO Maestro.MaestroEnv
-networkIdToMaestroEnv key nid = Maestro.mkMaestroEnv key $ fromMaybe (error "Only preprod and mainnet networks are supported by Maestro") $ M.lookup nid $ M.fromList [(GYMainnet, Maestro.Mainnet), (GYTestnetPreprod, Maestro.Preprod)]
+networkIdToMaestroEnv :: Text -> GYNetworkId -> IO (Maestro.MaestroEnv 'Maestro.V1)
+networkIdToMaestroEnv key nid = Maestro.mkMaestroEnv @'Maestro.V1 key $ fromMaybe (error "Only preprod and mainnet networks are supported by Maestro") $ M.lookup nid $ M.fromList [(GYMainnet, Maestro.Mainnet), (GYTestnetPreprod, Maestro.Preprod)]
 
 -- | Exceptions.
 data MaestroProviderException
@@ -79,7 +79,7 @@ silenceHeadersMaestroClientError other                          = other
 -------------------------------------------------------------------------------
 
 -- | Submits a 'GYTx'.
-maestroSubmitTx :: Maestro.MaestroEnv -> GYSubmitTx
+maestroSubmitTx :: Maestro.MaestroEnv 'Maestro.V1 -> GYSubmitTx
 maestroSubmitTx env tx = do
   txId <- handleMaestroSubmitError <=< try $ Maestro.submitAndMonitorTx env $ Api.serialiseToCBOR $ txToApi tx
   either
@@ -95,7 +95,7 @@ maestroSubmitTx env tx = do
 -------------------------------------------------------------------------------
 
 -- | Definition of 'GYSlotActions' for the Maestro provider.
-maestroSlotActions :: Maestro.MaestroEnv -> GYSlotActions
+maestroSlotActions :: Maestro.MaestroEnv 'Maestro.V1 -> GYSlotActions
 maestroSlotActions env = GYSlotActions
     { gyGetCurrentSlot'   = x
     , gyWaitForNextBlock' = gyWaitForNextBlockDefault x
@@ -105,9 +105,9 @@ maestroSlotActions env = GYSlotActions
     x = maestroGetCurrentSlot env
 
 -- | Returns the current 'GYSlot'.
-maestroGetCurrentSlot :: Maestro.MaestroEnv -> IO GYSlot
+maestroGetCurrentSlot :: Maestro.MaestroEnv 'Maestro.V1 -> IO GYSlot
 maestroGetCurrentSlot env =
-  try (Maestro.getChainTip env) >>= handleMaestroError "CurrentSlot" <&> slotFromApi . coerce . Maestro._chainTipSlot
+  try (Maestro.getChainTip env) >>= handleMaestroError "CurrentSlot" <&> slotFromApi . coerce . Maestro._chainTipSlot . Maestro.getTimestampedData
 
 -------------------------------------------------------------------------------
 -- Query UTxO
@@ -144,14 +144,15 @@ outDatumFromMaestro (Just Maestro.DatumOption {..}) =
       Just db -> GYOutDatumInline <$> datumFromMaestroCBOR db
 
 -- | Convert Maestro's asset class to our GY type.
-assetClassFromMaestro :: Text -> Either SomeDeserializeError GYAssetClass
-assetClassFromMaestro t = first (DeserializeErrorAssetClass . Text.pack) $ parseAssetClassWithSep '#' t
+assetClassFromMaestro :: Maestro.AssetUnit -> Either SomeDeserializeError GYAssetClass
+assetClassFromMaestro Maestro.Lovelace = pure GYLovelace
+assetClassFromMaestro (Maestro.UserMintedToken (Maestro.NonAdaNativeToken policyId tokenName)) = first (DeserializeErrorAssetClass . Text.pack) $ parseAssetClassWithSep '#' (coerce policyId <> "#" <> coerce tokenName)
 
 -- | Convert Maestro's asset to our GY type.
 valueFromMaestro :: Maestro.Asset -> Either SomeDeserializeError GYValue
 valueFromMaestro Maestro.Asset {..} = do
   asc <- assetClassFromMaestro _assetUnit
-  pure $ valueSingleton asc $ toInteger _assetQuantity
+  pure $ valueSingleton asc $ toInteger _assetAmount
 
 -- | Convert Maestro's script to our GY type.
 scriptFromMaestro :: Maestro.Script -> Either SomeDeserializeError (Maybe (Some GYScript))
@@ -165,13 +166,13 @@ scriptFromMaestro Maestro.Script {..} = case _scriptType of
     Just sb -> pure $ Some <$> scriptFromCBOR  @'PlutusV2 sb
 
 -- | Convert Maestro's UTxO to our GY type.
-utxoFromMaestro :: Maestro.Utxo -> Either SomeDeserializeError GYUTxO
-utxoFromMaestro Maestro.Utxo {..} = do
-  ref <- first DeserializeErrorHex . Web.parseUrlPiece $ _utxoTxHash <> Text.pack ('#' : show _utxoIndex)
-  addr <- maybeToRight DeserializeErrorAddress $ addressFromTextMaybe _utxoAddress
-  d <- outDatumFromMaestro _utxoDatum
-  vs <- mapM valueFromMaestro _utxoAssets
-  s <- maybe (pure Nothing) scriptFromMaestro _utxoReferenceScript
+utxoFromMaestro :: Maestro.IsUtxo a => a -> Either SomeDeserializeError GYUTxO
+utxoFromMaestro utxo = do
+  ref <- first DeserializeErrorHex . Web.parseUrlPiece $ Web.toUrlPiece (Maestro.getTxHash utxo) <> "#" <> Web.toUrlPiece (Maestro.getIndex utxo)
+  addr <- maybeToRight DeserializeErrorAddress $ addressFromTextMaybe $ coerce $ Maestro.getAddress utxo
+  d <- outDatumFromMaestro $ Maestro.getDatum utxo
+  vs <- mapM valueFromMaestro $ Maestro.getAssets utxo
+  s <- maybe (pure Nothing) scriptFromMaestro $ Maestro.getReferenceScript utxo
   pure $
     GYUTxO
       { utxoRef       = ref
@@ -182,25 +183,25 @@ utxoFromMaestro Maestro.Utxo {..} = do
       }
 
 -- | Convert Maestro's UTxO (with datum resolved) to our GY types.
-utxoFromMaestroWithDatum :: Maestro.Utxo -> Either SomeDeserializeError (GYUTxO, Maybe GYDatum)
-utxoFromMaestroWithDatum u@Maestro.Utxo {..} = do
+utxoFromMaestroWithDatum :: Maestro.IsUtxo a => a -> Either SomeDeserializeError (GYUTxO, Maybe GYDatum)
+utxoFromMaestroWithDatum u = do
   gyUtxo <- utxoFromMaestro u
   case utxoOutDatum gyUtxo of
     GYOutDatumNone -> pure (gyUtxo, Nothing)
     GYOutDatumInline d -> pure (gyUtxo, Just d)
     GYOutDatumHash _ ->
-      case Maestro._datumOptionBytes $ fromJust _utxoDatum of
+      case Maestro._datumOptionBytes $ fromJust (Maestro.getDatum u) of
         Nothing -> pure (gyUtxo, Nothing)
         Just db -> do
           d <- datumFromMaestroCBOR db
           pure (gyUtxo, Just d)
 
 -- | Query UTxOs present at multiple addresses.
-maestroUtxosAtAddresses :: Maestro.MaestroEnv -> [GYAddress] -> IO GYUTxOs
+maestroUtxosAtAddresses :: Maestro.MaestroEnv 'Maestro.V1 -> [GYAddress] -> IO GYUTxOs
 maestroUtxosAtAddresses env addrs = do
   let addrsInText = map addressToText addrs
   -- Here one would not get `MaestroNotFound` error.
-  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosAtMultiAddresses env (Just False) (Just False)) addrsInText)
+  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosAtMultiAddresses env (Just False) (Just False)) $ coerce addrsInText)
 
   either
     (throwIO . MspvDeserializeFailure locationIdent)
@@ -210,11 +211,11 @@ maestroUtxosAtAddresses env addrs = do
     locationIdent = "AddressesUtxo"
 
 -- | Query UTxOs present at multiple addresses with datums.
-maestroUtxosAtAddressesWithDatums :: Maestro.MaestroEnv -> [GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]
+maestroUtxosAtAddressesWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> [GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]
 maestroUtxosAtAddressesWithDatums env addrs = do
   let addrsInText = map addressToText addrs
   -- Here one would not get `MaestroNotFound` error.
-  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosAtMultiAddresses env (Just True) (Just False)) addrsInText)
+  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosAtMultiAddresses env (Just True) (Just False)) $ coerce addrsInText)
 
   either
     (throwIO . MspvDeserializeFailure locationIdent)
@@ -224,23 +225,23 @@ maestroUtxosAtAddressesWithDatums env addrs = do
     locationIdent = "AddressesUtxo"
 
 -- | Returns a list containing all 'GYTxOutRef' for a given 'GYAddress'.
-maestroRefsAtAddress :: Maestro.MaestroEnv -> GYAddress -> IO [GYTxOutRef]
+maestroRefsAtAddress :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> IO [GYTxOutRef]
 maestroRefsAtAddress env addr = do
   -- Here one would not get `MaestroNotFound` error.
-  mTxRefs <- handleMaestroError locationIdent <=< try $ Maestro.allPages (Maestro.getRefsAtAddress env (addressToText addr))
+  mTxRefs <- handleMaestroError locationIdent <=< try $ Maestro.allPages (Maestro.getRefsAtAddress env $ coerce (addressToText addr))
   either
       (throwIO . MspvDeserializeFailure locationIdent . DeserializeErrorHex)
       pure
       $ traverse
-          (\Maestro.UtxoRef{..} ->
-              Web.parseUrlPiece $ _utxoRefTxHash <> Text.pack ('#' : show _utxoRefIndex)
+          (\Maestro.OutputReferenceObject {..} ->
+              Web.parseUrlPiece $ Web.toUrlPiece _outputReferenceObjectTxHash <> "#" <> Web.toUrlPiece _outputReferenceObjectIndex
           )
           mTxRefs
   where
     locationIdent = "RefsAtAddress"
 
 -- | Query UTxO present at a output reference.
-maestroUtxoAtTxOutRef :: Maestro.MaestroEnv -> GYTxOutRef -> IO (Maybe GYUTxO)
+maestroUtxoAtTxOutRef :: Maestro.MaestroEnv 'Maestro.V1 -> GYTxOutRef -> IO (Maybe GYUTxO)
 maestroUtxoAtTxOutRef env ref = do
   res <- maestroUtxosAtTxOutRefs' env [ref]
   case res of
@@ -250,29 +251,34 @@ maestroUtxoAtTxOutRef env ref = do
     _anyOtherFailure -> throwIO $ MspvMultiUtxoPerRef ref
 
 -- | Query UTxO in case of multiple output references.
-maestroUtxosAtTxOutRefs :: Maestro.MaestroEnv -> [GYTxOutRef] -> IO GYUTxOs
+maestroUtxosAtTxOutRefs :: Maestro.MaestroEnv 'Maestro.V1 -> [GYTxOutRef] -> IO GYUTxOs
 maestroUtxosAtTxOutRefs env = fmap utxosFromList . maestroUtxosAtTxOutRefs' env
 
+toMaestroOutputReference :: GYTxOutRef -> Maestro.OutputReference
+toMaestroOutputReference oref =
+  let (txId, txIx) = txOutRefToTuple' oref
+  in Maestro.OutputReference (coerce txId) (coerce $ wordToNatural txIx)
+
 -- | Query UTxO in case of multiple output references.
-maestroUtxosAtTxOutRefs' :: Maestro.MaestroEnv -> [GYTxOutRef] -> IO [GYUTxO]
+maestroUtxosAtTxOutRefs' :: Maestro.MaestroEnv 'Maestro.V1 -> [GYTxOutRef] -> IO [GYUTxO]
 maestroUtxosAtTxOutRefs' env refs = do
-  -- Here we would like the behaviour that if UTxO corresponding to one of the reference is not found, whole call should not fail which is why we have sub exception catching.
-  res <- handleMaestroError locationIdent <=< try $ for refs $ \ref -> do
-      let (Api.serialiseToRawBytesHexText -> txId, utxoIdx) = bimap txIdToApi toInteger $ txOutRefToTuple ref
-      (Just <$> Maestro.txUtxo env (coerce txId) (fromInteger utxoIdx) (Just False) (Just False)) `catch` handler
+  -- NOTE: Earlier we had preferred the behaviour where if UTxO corresponding to one of the reference is not found, whole call would not fail with 404 but NOW it would.
+  let refs' = map toMaestroOutputReference refs
+  res <- handler <=< try $ Maestro.allPages (flip (Maestro.outputsByReferences env (Just False) (Just False)) refs')
 
   either
       (throwIO . MspvDeserializeFailure locationIdent)
       pure
-      . traverse utxoFromMaestro $ catMaybes res
+      $ traverse utxoFromMaestro res
   where
-    handler Maestro.MaestroNotFound = pure Nothing
-    handler other                   = throwIO other
+    -- This particular error is fine in this case, we can just return @mempty@.
+    handler (Left Maestro.MaestroNotFound) = pure []
+    handler other = handleMaestroError locationIdent other
 
     locationIdent = "UtxoByRefs"
 
 -- | Definition of 'GYQueryUTxO' for the Maestro provider.
-maestroQueryUtxo :: Maestro.MaestroEnv -> GYQueryUTxO
+maestroQueryUtxo :: Maestro.MaestroEnv 'Maestro.V1 -> GYQueryUTxO
 maestroQueryUtxo env = GYQueryUTxO
   { gyQueryUtxosAtAddresses'           = maestroUtxosAtAddresses env
   , gyQueryUtxosAtTxOutRefs'           = maestroUtxosAtTxOutRefs env
@@ -286,9 +292,9 @@ maestroQueryUtxo env = GYQueryUTxO
 -------------------------------------------------------------------------------
 
 -- | Returns the 'Api.S.ProtocolParameters' queried from Maestro.
-maestroProtocolParams :: Maestro.MaestroEnv -> IO Api.S.ProtocolParameters
+maestroProtocolParams :: Maestro.MaestroEnv 'Maestro.V1 -> IO Api.S.ProtocolParameters
 maestroProtocolParams env = do
-  Maestro.ProtocolParameters {..} <- handleMaestroError "ProtocolParams" <=< try $ Maestro.getProtocolParameters env
+  Maestro.ProtocolParameters {..} <- handleMaestroError "ProtocolParams" <=< try $ Maestro.getTimestampedData <$> Maestro.getProtocolParameters env
   pure $
     Api.S.ProtocolParameters
       { protocolParamProtocolVersion     = (Maestro._protocolVersionMajor _protocolParametersProtocolVersion, Maestro._protocolVersionMinor _protocolParametersProtocolVersion)
@@ -329,11 +335,11 @@ maestroProtocolParams env = do
                                                 )
                                               ]
       , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ toInteger _protocolParametersCoinsPerUtxoByte
-      , protocolParamUTxOCostPerWord     = Nothing -- Deprecated in Babbage.
+      , protocolParamUTxOCostPerWord     = Nothing  -- Deprecated in Babbage.
       }
 
 -- | Returns a set of all Stake Pool's 'Api.S.PoolId'.
-maestroStakePools :: Maestro.MaestroEnv -> IO (Set Api.S.PoolId)
+maestroStakePools :: Maestro.MaestroEnv 'Maestro.V1 -> IO (Set Api.S.PoolId)
 maestroStakePools env = do
   stkPoolsWithTicker <- handleMaestroError locationIdent <=< try $ Maestro.allPages (Maestro.listPools env)
   let stkPools = map (\(Maestro.PoolListInfo poolId _ticker) -> coerce poolId :: Text) stkPoolsWithTicker
@@ -349,14 +355,14 @@ maestroStakePools env = do
     locationIdent = "ListPools"
 
 -- | Returns the 'CTime.SystemStart' queried from Maestro.
-maestroSystemStart :: Maestro.MaestroEnv -> IO CTime.SystemStart
-maestroSystemStart env = fmap (CTime.SystemStart . Time.localTimeToUTC Time.utc . Maestro._systemStartTime) . handleMaestroError "SystemStart"
-    <=< try $ Maestro.getSystemStart env
+maestroSystemStart :: Maestro.MaestroEnv 'Maestro.V1 -> IO CTime.SystemStart
+maestroSystemStart env = fmap (CTime.SystemStart . Time.localTimeToUTC Time.utc) . handleMaestroError "SystemStart"
+    <=< try $ Maestro.getTimestampedData <$> Maestro.getSystemStart env
 
 -- | Returns the 'Api.EraHistory' queried from Maestro.
-maestroEraHistory :: Maestro.MaestroEnv -> IO (Api.EraHistory Api.CardanoMode)
+maestroEraHistory :: Maestro.MaestroEnv 'Maestro.V1 -> IO (Api.EraHistory Api.CardanoMode)
 maestroEraHistory env = do
-  eraSumms <- handleMaestroError "EraHistory" =<< try (Maestro.getEraHistory env)
+  eraSumms <- handleMaestroError "EraHistory" =<< try (Maestro.getTimestampedData <$> Maestro.getEraHistory env)
   maybe (throwIO $ MspvIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms
   where
     mkBound Maestro.EraBound {_eraBoundEpoch, _eraBoundSlot, _eraBoundTime} = Ouroboros.Bound
@@ -367,7 +373,7 @@ maestroEraHistory env = do
     mkEraParams Maestro.EraParameters {_eraParametersEpochLength, _eraParametersSlotLength, _eraParametersSafeZone} = Ouroboros.EraParams
         { eraEpochSize = CSlot.EpochSize $ fromIntegral _eraParametersEpochLength
         , eraSlotLength = CTime.mkSlotLength _eraParametersSlotLength
-        , eraSafeZone = Ouroboros.StandardSafeZone _eraParametersSafeZone
+        , eraSafeZone = Ouroboros.StandardSafeZone $ fromJust _eraParametersSafeZone
         }
     mkEra Maestro.EraSummary {_eraSummaryStart, _eraSummaryEnd, _eraSummaryParameters} = Ouroboros.EraSummary
         { eraStart = mkBound _eraSummaryStart
@@ -380,9 +386,9 @@ maestroEraHistory env = do
 -------------------------------------------------------------------------------
 
 -- | Given a 'GYDatumHash' returns the corresponding 'GYDatum' if found.
-maestroLookupDatum :: Maestro.MaestroEnv -> GYLookupDatum
+maestroLookupDatum :: Maestro.MaestroEnv 'Maestro.V1 -> GYLookupDatum
 maestroLookupDatum env dh = do
-  datumMaybe <- handler =<< try (Maestro.getDatumByHash env . Text.pack . show $ datumHashToPlutus dh)
+  datumMaybe <- handler =<< try (Maestro.getTimestampedData <$> (Maestro.getDatumByHash env . coerce . Text.pack . show $ datumHashToPlutus dh))
   sequence $ datumMaybe <&> \(Maestro.Datum datumBytes _datumJson) -> case datumFromMaestroCBOR datumBytes of  -- NOTE: `datumFromMaestroJSON datumJson` also gives the same result.
     Left err -> throwIO $ MspvDeserializeFailure locationIdent err
     Right bd -> pure bd

@@ -59,13 +59,12 @@ providersMashupTests configs =
           threadDelay 1_000_000
           utxosAtRefs <- gyQueryUtxosAtTxOutRefs provider outputRefs
           threadDelay 1_000_000
+          utxoRefsAtAddress' <- gyQueryUtxoRefsAtAddress provider $ unsafeAddressFromText addressWithDatumHashes
+          threadDelay 1_000_000
           utxosAtRefsWithDatums' <- gyQueryUtxosAtTxOutRefsWithDatums provider outputRefs
           threadDelay 1_000_000
           utxoAtRefWithDatum' <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxoAtTxOutRefWithDatum refWithDatumHash
-          pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums', utxosAtRefs, Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum')
-          threadDelay 1_000_000
-          utxoRefsAtAddress' <- gyQueryUtxoRefsAtAddress provider $ unsafeAddressFromText addressWithDatumHashes
-          pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums', utxosAtRefs, Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum', Set.fromList utxoRefsAtAddress')
+          pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums', utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum')
         assertBool "Utxos are not all equal" $ all (== head utxosProviders) (tail utxosProviders)
     , testCase "Checking presence of error message when submitting an invalid transaction" $ do
         let

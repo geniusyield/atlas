@@ -97,6 +97,9 @@ instance GYTxQueryMonad GYTxMonadNode where
     utxosAtTxOutRefs oref = GYTxMonadNode $ \env ->
         gyQueryUtxosAtTxOutRefs (envProviders env) oref
 
+    utxosAtTxOutRefsWithDatums refs = GYTxMonadNode $ \env ->
+        gyQueryUtxosAtTxOutRefsWithDatums (envProviders env) refs
+
     slotConfig = GYTxMonadNode $ \env ->
         gyGetSlotConfig (envProviders env)
 

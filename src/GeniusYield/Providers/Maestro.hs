@@ -30,7 +30,6 @@ import           Control.Monad                        ((<=<))
 import qualified Data.Aeson                           as Aeson
 import qualified Data.ByteString.Base16               as BS16
 import           Data.Either.Combinators              (maybeToRight)
-import           Data.Functor                         ((<&>))
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe                           (fromJust)
 import qualified Data.Set                             as Set

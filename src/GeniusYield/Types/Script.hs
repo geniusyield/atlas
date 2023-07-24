@@ -86,7 +86,7 @@ import           Data.GADT.Show
 import qualified Cardano.Api                      as Api
 import qualified Cardano.Api.Shelley              as Api.S
 import qualified Codec.Serialise
-import           Control.Lens                     ((&), (?~))
+import           Control.Lens                     ((?~))
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString.Base16           as BS16
 import qualified Data.ByteString.Lazy             as BSL

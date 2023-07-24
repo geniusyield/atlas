@@ -42,7 +42,7 @@ import qualified Cardano.Binary               as CBOR
 import qualified Cardano.Ledger.Crypto        as Crypto
 import qualified Cardano.Ledger.Shelley       as Shelley
 import qualified Cardano.Ledger.Shelley.Tx    as Shelley
-import           Control.Lens                 ((&), (?~))
+import           Control.Lens                 ((?~))
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.ByteString              as BS
 import qualified Data.ByteString.Base16       as BS16

@@ -26,7 +26,7 @@ module GeniusYield.Types.TxOutRef (
 import qualified Cardano.Api                      as Api
 import qualified Codec.CBOR.Read                  as CBOR
 import qualified Codec.CBOR.Term                  as CBOR
-import           Control.Lens                     ((&), (?~))
+import           Control.Lens                     ((?~))
 import qualified Data.Aeson                       as Aeson
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString.Base16           as Base16

@@ -8,7 +8,7 @@ Stability   : develop
 -}
 module GeniusYield.Test.Privnet.Examples.Oracle (tests) where
 
-import           Control.Lens                                     ((&), (.~))
+import           Control.Lens                                     ((.~))
 import qualified Data.Map.Strict                                  as Map
 import           Test.Tasty                                       (TestTree, testGroup)
 import           Test.Tasty.HUnit                                 (testCaseSteps)

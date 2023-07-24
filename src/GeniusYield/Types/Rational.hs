@@ -16,16 +16,16 @@ module GeniusYield.Types.Rational
 
 import           GeniusYield.Imports
 
-import           Control.Lens              ((?~), (&))
+import           Control.Lens                 ((?~))
 import qualified Data.Aeson                   as Aeson
-import qualified Data.Text                    as Text
-import qualified Data.Text.Read               as Text
-import qualified Web.HttpApiData              as Web
-import qualified Web.Internal.HttpApiData     as Web
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Swagger.Lens            ()
+import qualified Data.Text                    as Text
+import qualified Data.Text.Read               as Text
 import qualified PlutusTx.Ratio               as Plutus
+import qualified Web.HttpApiData              as Web
+import qualified Web.Internal.HttpApiData     as Web
 
 -- $setup
 --

@@ -40,7 +40,7 @@ import qualified Cardano.Ledger.Credential            as Ledger
 import qualified Cardano.Ledger.Crypto                as Ledger
 import qualified Cardano.Ledger.Hashes                as Ledger
 import qualified Cardano.Ledger.Keys                  as Ledger
-import           Control.Lens                         ((&), (?~))
+import           Control.Lens                         ((?~))
 import qualified Data.Aeson.Types                     as Aeson
 import qualified Data.Csv                             as Csv
 import           Data.Hashable                        (Hashable (..))
@@ -52,7 +52,8 @@ import qualified Data.Text.Encoding                   as TE
 import qualified Data.Vector                          as Vector
 import           Data.Word                            (Word64)
 import qualified Database.PostgreSQL.Simple           as PQ
-import qualified Database.PostgreSQL.Simple.FromField as PQ (FromField (..), returnError)
+import qualified Database.PostgreSQL.Simple.FromField as PQ (FromField (..),
+                                                             returnError)
 import qualified Database.PostgreSQL.Simple.ToField   as PQ
 import qualified Plutus.V1.Ledger.Address             as Plutus
 import qualified Plutus.V1.Ledger.Api                 as Plutus
@@ -67,7 +68,8 @@ import           GeniusYield.Types.NetworkId
 import           GeniusYield.Types.PubKeyHash
 import           GeniusYield.Types.Script
 import           Plutus.V1.Ledger.Address             (stakingCredential)
-import           Plutus.V2.Ledger.Api                 (Credential (..), StakingCredential (..))
+import           Plutus.V2.Ledger.Api                 (Credential (..),
+                                                       StakingCredential (..))
 
 -- $setup
 --

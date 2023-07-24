@@ -30,7 +30,6 @@ import           Control.Monad                        ((<=<))
 import qualified Data.Aeson                           as Aeson
 import qualified Data.ByteString.Base16               as BS16
 import           Data.Either.Combinators              (maybeToRight)
-import           Data.Functor                         ((<&>))
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe                           (fromJust)
 import qualified Data.Set                             as Set
@@ -208,7 +207,7 @@ maestroUtxosAtAddresses env addrs = do
     pure
     $ utxosFromList <$> traverse utxoFromMaestro addrUtxos
   where
-    locationIdent = "AddressesUtxo"
+    locationIdent = "AddressesUtxos"
 
 -- | Query UTxOs present at multiple addresses with datums.
 maestroUtxosAtAddressesWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> [GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]
@@ -222,7 +221,7 @@ maestroUtxosAtAddressesWithDatums env addrs = do
     pure
     $ traverse utxoFromMaestroWithDatum addrUtxos
   where
-    locationIdent = "AddressesUtxo"
+    locationIdent = "AddressesUtxosWithDatums"
 
 -- | Returns a list containing all 'GYTxOutRef' for a given 'GYAddress'.
 maestroRefsAtAddress :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> IO [GYTxOutRef]
@@ -250,7 +249,7 @@ maestroUtxoAtTxOutRef env ref = do
     -- This shouldn't happen.
     _anyOtherFailure -> throwIO $ MspvMultiUtxoPerRef ref
 
--- | Query UTxO in case of multiple output references.
+-- | Query UTxOs in case of multiple `GYTxOutRef`, i.e., multiple output references.
 maestroUtxosAtTxOutRefs :: Maestro.MaestroEnv 'Maestro.V1 -> [GYTxOutRef] -> IO GYUTxOs
 maestroUtxosAtTxOutRefs env = fmap utxosFromList . maestroUtxosAtTxOutRefs' env
 
@@ -277,11 +276,30 @@ maestroUtxosAtTxOutRefs' env refs = do
 
     locationIdent = "UtxoByRefs"
 
+-- | Query UTxOs present at multiple `GYTxOutRef` with datums.
+maestroUtxosAtTxOutRefsWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> [GYTxOutRef] -> IO [(GYUTxO, Maybe GYDatum)]
+maestroUtxosAtTxOutRefsWithDatums env refs = do
+  -- NOTE: Earlier we had preferred the behaviour where if UTxO corresponding to one of the reference is not found, whole call would not fail with 404 but NOW it would.
+  let refs' = map toMaestroOutputReference refs
+  res <- handler <=< try $ Maestro.allPages (flip (Maestro.outputsByReferences env (Just True) (Just False)) refs')
+
+  either
+      (throwIO . MspvDeserializeFailure locationIdent)
+      pure
+      $ traverse utxoFromMaestroWithDatum res
+  where
+    -- This particular error is fine in this case, we can just return @mempty@.
+    handler (Left Maestro.MaestroNotFound) = pure []
+    handler other = handleMaestroError locationIdent other
+
+    locationIdent = "UtxoByRefsWithDatums"
+
 -- | Definition of 'GYQueryUTxO' for the Maestro provider.
 maestroQueryUtxo :: Maestro.MaestroEnv 'Maestro.V1 -> GYQueryUTxO
 maestroQueryUtxo env = GYQueryUTxO
   { gyQueryUtxosAtAddresses'           = maestroUtxosAtAddresses env
   , gyQueryUtxosAtTxOutRefs'           = maestroUtxosAtTxOutRefs env
+  , gyQueryUtxosAtTxOutRefsWithDatums' = Just $ maestroUtxosAtTxOutRefsWithDatums env
   , gyQueryUtxoAtTxOutRef'             = maestroUtxoAtTxOutRef env
   , gyQueryUtxoRefsAtAddress'          = maestroRefsAtAddress env
   , gyQueryUtxosAtAddressesWithDatums' = Just $ maestroUtxosAtAddressesWithDatums env

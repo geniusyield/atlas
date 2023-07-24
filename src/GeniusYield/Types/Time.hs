@@ -20,7 +20,7 @@ module GeniusYield.Types.Time
 
 import           GeniusYield.Imports
 
-import           Control.Lens                 ((&), (?~))
+import           Control.Lens                 ((?~))
 import qualified Data.Aeson                   as Aeson
 import qualified Data.Csv                     as Csv
 import qualified Data.Swagger                 as Swagger
@@ -28,8 +28,8 @@ import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
 import qualified Data.Time.Clock              as Time
 import qualified Data.Time.Clock.POSIX        as Time
-import           Data.Time.Format.Internal    (FormatTime (..), ParseTime (..))
 import qualified Data.Time.Format.ISO8601     as Time
+import           Data.Time.Format.Internal    (FormatTime (..), ParseTime (..))
 import qualified Plutus.V1.Ledger.Api         as Plutus
 import qualified Web.HttpApiData              as Web
 

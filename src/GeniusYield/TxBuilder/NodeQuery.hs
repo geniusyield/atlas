@@ -87,6 +87,11 @@ instance GYTxQueryMonad GYTxQueryMonadNode where
       GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyQueryUtxosAtTxOutRefs providers oref
 
+    utxosAtTxOutRefsWithDatums orefs = do
+      logMsg mempty GYInfo $ printf "Querying utxos (with datums) At TxOutRefs: \n %s" (show orefs)
+      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+        gyQueryUtxosAtTxOutRefsWithDatums providers orefs
+
     slotConfig = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyGetSlotConfig providers
 

@@ -24,10 +24,15 @@ providersMashupTests configs =
         assertBool "Datums are not all equal" $ all (== head dats) (tail dats)
     , testCase "Parameters" $ do
         paramsList <- forM configs $ \config -> withCfgProviders config mempty $ \provider -> do
+           threadDelay 1_000_000
            protocolParams <- gyGetProtocolParameters provider
+           threadDelay 1_000_000
            systemStart <- gyGetSystemStart provider
+           threadDelay 1_000_000
            Api.EraHistory mode interpreter <- gyGetEraHistory provider  -- `mode` here doesn't appear to have `Eq` instance, comparing via it's `Show` instance should be fine.
+           threadDelay 1_000_000
            stakePools <- gyGetStakePools provider
+           threadDelay 1_000_000
            slotConfig' <- gyGetSlotConfig provider
            pure (protocolParams, systemStart, (show mode, interpreter), stakePools, slotConfig')
         assertBool "Parameters are not all equal" $ all (== head paramsList) (tail paramsList)
@@ -41,16 +46,25 @@ providersMashupTests configs =
                 , "addr_test1wpdz7qwyrpsxrwqe0e4yv3knfmy068euhh4k07ac4wp3kfgjhpd7w"  -- This address has UTxOs with inline datums.
                 , "addr_test1qr5zypvu3va5y3q2m8envvd08sj5mams3znp3nh8q6arx4vre0cyeg6lqagujyhvr4ylx5wlgwjs3uyl8z0spz4akxzq6wyfzk"  -- This address has UTxOs with reference scripts.
                 ]
+          threadDelay 1_000_000
           utxosAtAddresses' <- gyQueryUtxosAtAddresses provider myAddrList
+          threadDelay 1_000_000
           utxosAtAddressesWithDatums' <- gyQueryUtxosAtAddressesWithDatums provider myAddrList
-          let outputRefs =
+          let refWithDatumHash = "0c72765df71ff3739db11c0165bc71c0f3b0a160acec6f4f1448e523064e927e#0"
+              outputRefs =
                 [ "8aba7590148083c96e1ed742defecb6123126bbdb392cef3facb8d968825a983#1"  -- Contains reference script.
-                , "0c72765df71ff3739db11c0165bc71c0f3b0a160acec6f4f1448e523064e927e#0"  -- Contains datum hash.
+                ,  refWithDatumHash -- Contains datum hash.
                 , "4e2341767958f1fd83f2ec536e1001888db938d374fcae1a1e965dc21a05d0c6#0"  -- Contains inline datum.
                 ]
+          threadDelay 1_000_000
           utxosAtRefs <- gyQueryUtxosAtTxOutRefs provider outputRefs
+          threadDelay 1_000_000
           utxoRefsAtAddress' <- gyQueryUtxoRefsAtAddress provider $ unsafeAddressFromText addressWithDatumHashes
-          pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums', utxosAtRefs, Set.fromList utxoRefsAtAddress')
+          threadDelay 1_000_000
+          utxosAtRefsWithDatums' <- gyQueryUtxosAtTxOutRefsWithDatums provider outputRefs
+          threadDelay 1_000_000
+          utxoAtRefWithDatum' <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxoAtTxOutRefWithDatum refWithDatumHash
+          pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums', utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum')
         assertBool "Utxos are not all equal" $ all (== head utxosProviders) (tail utxosProviders)
     , testCase "Checking presence of error message when submitting an invalid transaction" $ do
         let

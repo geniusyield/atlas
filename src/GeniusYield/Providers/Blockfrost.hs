@@ -24,7 +24,6 @@ import qualified Data.ByteString.Base16               as BS16
 import qualified Data.ByteString.Lazy                 as LBS
 import           Data.Either.Combinators              (maybeToRight)
 import           Data.Foldable                        (fold)
-import           Data.Functor                         ((<&>))
 import qualified Data.Map.Strict                      as Map
 import qualified Data.Set                             as Set
 import qualified Data.Text                            as Text
@@ -122,6 +121,7 @@ blockfrostGetCurrentSlot proj = do
 blockfrostQueryUtxo :: Blockfrost.Project -> GYQueryUTxO
 blockfrostQueryUtxo proj = GYQueryUTxO
     { gyQueryUtxosAtTxOutRefs'           = blockfrostUtxosAtTxOutRefs proj
+    , gyQueryUtxosAtTxOutRefsWithDatums' = Nothing  -- Will use the default implementation.
     , gyQueryUtxoAtTxOutRef'             = blockfrostUtxosAtTxOutRef proj
     , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddresses'           = gyQueryUtxoAtAddressesDefault $ blockfrostUtxosAtAddress proj

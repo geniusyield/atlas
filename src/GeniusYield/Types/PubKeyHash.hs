@@ -14,7 +14,7 @@ module GeniusYield.Types.PubKeyHash (
     pubKeyHashFromApi,
 ) where
 
-import           Control.Lens                 ((&), (?~))
+import           Control.Lens                 ((?~))
 import           GeniusYield.Imports
 
 import qualified Cardano.Api                  as Api

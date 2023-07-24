@@ -19,6 +19,7 @@ module GeniusYield.TxBuilder.Class
     , RandT
     , lookupDatum'
     , utxoAtTxOutRef'
+    , utxoAtTxOutRefWithDatum'
     , someUTxOWithoutRefScript
     , slotToBeginTime
     , slotToEndTime
@@ -45,8 +46,10 @@ module GeniusYield.TxBuilder.Class
     , pubKeyHashFromPlutus'
     , advanceSlot'
     , utxosDatums
+    , utxosDatumsPure
     , utxoDatum
     , utxoDatumHushed
+    , utxoDatumPureHushed
     , utxoDatum'
     , mustHaveInput
     , mustHaveRefInput
@@ -70,6 +73,7 @@ import           Control.Monad.Reader         (ReaderT)
 import           Data.List                    (nubBy)
 
 import qualified Data.Map.Strict              as Map
+import           Data.Maybe                   (listToMaybe)
 import qualified Data.Set                     as Set
 import qualified Data.Text                    as Txt
 import qualified Plutus.V1.Ledger.Api         as Plutus
@@ -102,9 +106,17 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
             []       -> Nothing
             utxo : _ -> Just utxo
 
+    -- | Lookup UTxO at 'GYTxOutRef' with an attempt to resolve for datum.
+    utxoAtTxOutRefWithDatum :: GYTxOutRef -> m (Maybe (GYUTxO, Maybe GYDatum))
+    utxoAtTxOutRefWithDatum ref = listToMaybe <$> utxosAtTxOutRefsWithDatums [ref]
+
     -- | Lookup 'GYUTxOs' at multiple 'GYTxOutRef's at once
     utxosAtTxOutRefs :: [GYTxOutRef] -> m GYUTxOs
     utxosAtTxOutRefs orefs = utxosFromList <$> wither utxoAtTxOutRef orefs
+
+    -- | Lookup UTxOs at zero or more 'GYTxOutRef' with their datums. This has a default implementation using `utxosAtTxOutRefs` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
+    utxosAtTxOutRefsWithDatums :: [GYTxOutRef] -> m [(GYUTxO, Maybe GYDatum)]
+    utxosAtTxOutRefsWithDatums = gyQueryUtxosAtTxOutRefsWithDatumsDefault utxosAtTxOutRefs lookupDatum
 
     -- | Lookup 'GYUTxOs' at 'GYAddress'.
     utxosAtAddress :: GYAddress -> m GYUTxOs
@@ -117,7 +129,7 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
         f :: GYUTxOs -> GYAddress -> m GYUTxOs
         f utxos addr = (<> utxos) <$> utxosAtAddress addr
 
-    -- | Lookup 'GYUTxOs' at zero or more 'GYAddress' with their datums. This has a default implementation using `utxosAtAddresses` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
+    -- | Lookup UTxOs at zero or more 'GYAddress' with their datums. This has a default implementation using `utxosAtAddresses` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
     utxosAtAddressesWithDatums :: [GYAddress] -> m [(GYUTxO, Maybe GYDatum)]
     utxosAtAddressesWithDatums = gyQueryUtxosAtAddressesWithDatumsDefault utxosAtAddresses lookupDatum
 
@@ -159,6 +171,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     lookupDatum = lift . lookupDatum
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
+    utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
     utxosAtAddress = lift . utxosAtAddress
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -178,6 +191,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     lookupDatum = lift . lookupDatum
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
+    utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
     utxosAtAddress = lift . utxosAtAddress
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -197,6 +211,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     lookupDatum = lift . lookupDatum
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
+    utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
     utxosAtAddress = lift . utxosAtAddress
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -218,6 +233,13 @@ lookupDatum' h = lookupDatum h >>= maybe (throwError . GYQueryDatumException $ G
 -- | A version of 'utxoAtTxOutRef' that raises 'GYNoUtxoAtRef' if the utxo is not found.
 utxoAtTxOutRef' :: GYTxQueryMonad m => GYTxOutRef -> m GYUTxO
 utxoAtTxOutRef' ref = utxoAtTxOutRef ref
+    >>= maybe
+        (throwError . GYQueryUTxOException $ GYNoUtxoAtRef ref)
+        pure
+
+-- | A version of 'utxoAtTxOutRefWithDatum' that raises 'GYNoUtxoAtRef' if the utxo is not found.
+utxoAtTxOutRefWithDatum' :: GYTxQueryMonad m => GYTxOutRef -> m (GYUTxO, Maybe GYDatum)
+utxoAtTxOutRefWithDatum' ref = utxoAtTxOutRefWithDatum ref
     >>= maybe
         (throwError . GYQueryUTxOException $ GYNoUtxoAtRef ref)
         pure
@@ -506,6 +528,10 @@ advanceSlot' s t = maybe
 utxosDatums :: forall m a. (GYTxQueryMonad m, Plutus.FromData a) => GYUTxOs -> m (Map GYTxOutRef (GYAddress, GYValue, a))
 utxosDatums = witherUTxOs utxoDatumHushed
 
+-- | Pure variant of `utxosDatums`.
+utxosDatumsPure :: Plutus.FromData a => [(GYUTxO, Maybe GYDatum)] -> Map GYTxOutRef (GYAddress, GYValue, a)
+utxosDatumsPure = Map.fromList . mapMaybe utxoDatumPureHushed
+
 utxoDatum :: (GYTxQueryMonad m, Plutus.FromData a) => GYUTxO -> m (Either GYQueryDatumError (GYAddress, GYValue, a))
 utxoDatum utxo = case utxoOutDatum utxo of
     GYOutDatumNone -> pure . Left $ GYNoDatumHash utxo
@@ -519,6 +545,12 @@ utxoDatum utxo = case utxoOutDatum utxo of
     datumToRes x = case Plutus.fromBuiltinData $ datumToPlutus' x of
         Nothing -> pure . Left $ GYInvalidDatum x
         Just a  -> pure $ Right (utxoAddress utxo, utxoValue utxo, a)
+
+-- | Obtain original datum representation of an UTxO.
+utxoDatumPureHushed :: Plutus.FromData a => (GYUTxO, Maybe GYDatum) -> Maybe (GYTxOutRef, (GYAddress, GYValue, a))
+utxoDatumPureHushed (_utxo, Nothing) = Nothing
+utxoDatumPureHushed (GYUTxO {..}, Just d) =
+  datumToPlutus' d & Plutus.fromBuiltinData <&> \d' -> (utxoRef, (utxoAddress, utxoValue, d'))
 
 -- | Version of 'utxoDatum' that throws 'GYTxMonadException'.
 utxoDatum' :: (GYTxQueryMonad m, Plutus.FromData a) => GYUTxO -> m (GYAddress, GYValue, a)

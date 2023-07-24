@@ -15,7 +15,7 @@ import qualified Cardano.Api                      as Api
 import qualified Cardano.Api.Shelley              as Api.S
 import           Control.Applicative              ((<|>))
 import           Control.Concurrent               (threadDelay)
-import           Control.Lens                     ((&), (.~))
+import           Control.Lens                     ((.~))
 import           Test.Tasty                       (TestTree, testGroup)
 import           Test.Tasty.HUnit                 (testCaseSteps)
 

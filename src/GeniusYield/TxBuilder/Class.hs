@@ -550,9 +550,7 @@ utxoDatum utxo = case utxoOutDatum utxo of
 utxoDatumPureHushed :: Plutus.FromData a => (GYUTxO, Maybe GYDatum) -> Maybe (GYTxOutRef, (GYAddress, GYValue, a))
 utxoDatumPureHushed (_utxo, Nothing) = Nothing
 utxoDatumPureHushed (GYUTxO {..}, Just d) =
-  case Plutus.fromBuiltinData $ datumToPlutus' d of
-    Nothing -> Nothing
-    Just d' -> Just (utxoRef, (utxoAddress, utxoValue, d'))
+  datumToPlutus' d & Plutus.fromBuiltinData <&> \d' -> (utxoRef, (utxoAddress, utxoValue, d'))
 
 -- | Version of 'utxoDatum' that throws 'GYTxMonadException'.
 utxoDatum' :: (GYTxQueryMonad m, Plutus.FromData a) => GYUTxO -> m (GYAddress, GYValue, a)

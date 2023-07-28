@@ -121,7 +121,7 @@ data BuildTxException
     | BuildTxCollateralShortFall  -- ^ Shortfall (in collateral inputs) for collateral requirement.
         !Natural  -- ^ Transaction collateral requirement.
         !Natural  -- ^ Lovelaces in given collateral UTxO.
-    | BuildTxNoSuitableCollateral
+    | BuildTxNoSuitableCollateral !Natural
     -- ^ Couldn't find a UTxO to use as collateral.
     | BuildTxCborSimplificationError !CborSimplificationError
   deriving stock    Show

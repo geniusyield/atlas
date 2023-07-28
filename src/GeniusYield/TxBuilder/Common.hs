@@ -13,6 +13,8 @@ module GeniusYield.TxBuilder.Common
     , buildTxCore
     , collateralLovelace
     , collateralValue
+    , maximumRequiredCollateralLovelace
+    , maximumRequiredCollateralValue
     ) where
 
 import qualified Cardano.Api                  as Api
@@ -106,13 +108,13 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
               maybe
                 ( return $
                     find
-                      (\u -> utxoValue u `valueGreaterOrEqual` collateralValue)  -- Keeping it simple.
+                      (\u -> utxoValue u `valueGreaterOrEqual` maximumRequiredCollateralValue)  -- Keeping it simple.
                       (utxosToList ownUtxos')
 
                 ) (fmap Just . utxoAtTxOutRef') reservedCollateral
 
             case mCollateralUtxo of
-              Nothing -> return (Left BuildTxNoSuitableCollateral)
+              Nothing -> return (Left $ BuildTxNoSuitableCollateral $ fromInteger maximumRequiredCollateralLovelace)
               Just collateralUtxo ->
                 -- Build the transaction.
                 buildUnsignedTxBody
@@ -176,3 +178,15 @@ collateralLovelace = 5_000_000
 
 collateralValue :: GYValue
 collateralValue = valueFromLovelace collateralLovelace
+
+-- | See `maximumRequiredCollateralValue`.
+maximumRequiredCollateralLovelace :: Integer
+maximumRequiredCollateralLovelace = 1_320_000
+
+-- | What is the maximum possible collateral requirement as per current protocol parameters?
+--
+-- __NOTE:__ This value would need to be updated if we ever see update in protocol parameters.
+--
+-- Currently this is set to @1.32@ ada as maximum transaction fees possible currently is \(44 \times 16384 + 155381 = 876277\). Multiplying this by \(1.5\) (for collateral percentage) gives us \(13144155\).
+maximumRequiredCollateralValue :: GYValue
+maximumRequiredCollateralValue = valueFromLovelace maximumRequiredCollateralLovelace

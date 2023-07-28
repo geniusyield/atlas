@@ -187,6 +187,6 @@ maximumRequiredCollateralLovelace = 1_320_000
 --
 -- __NOTE:__ This value would need to be updated if we ever see update in protocol parameters.
 --
--- Currently this is set to @1.32@ ada as maximum transaction fees possible currently is \(44 \times 16384 + 155381 = 876277\). Multiplying this by \(1.5\) (for collateral percentage) gives us \(13144155\).
+-- Currently this is set to @1.32@ ada as maximum transaction fees possible currently is \(44 \times 16384 + 155381 = 876277\). Multiplying this by \(1.5\) (for collateral percentage) and taking ceil, gives us \(1314416\) lovelaces.
 maximumRequiredCollateralValue :: GYValue
 maximumRequiredCollateralValue = valueFromLovelace maximumRequiredCollateralLovelace

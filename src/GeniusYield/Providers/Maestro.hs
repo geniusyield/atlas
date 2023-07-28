@@ -223,6 +223,23 @@ maestroUtxosAtAddressesWithDatums env addrs = do
   where
     locationIdent = "AddressesUtxosWithDatums"
 
+-- | Query UTxOs present at multiple addresses.
+maestroUtxosAtPaymentCredential :: Maestro.MaestroEnv 'Maestro.V1 -> GYPaymentCredential -> IO GYUTxOs
+maestroUtxosAtPaymentCredential env paymentCredential = do
+  let paymentCredentialBech32 :: Maestro.Bech32StringOf Maestro.PaymentCredentialAddress =
+        case paymentCredential of
+          GYPaymentCredentialByKey pkh   -> undefined
+          GYPaymentCredentialByScript sh -> undefined
+  -- Here one would not get `MaestroNotFound` error.
+  utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosByPaymentCredential env (Just False) (Just False)) paymentCredentialBech32)
+
+  either
+    (throwIO . MspvDeserializeFailure locationIdent)
+    pure
+    $ utxosFromList <$> traverse utxoFromMaestro utxos
+  where
+    locationIdent = "PaymentCredentialUtxos"
+
 -- | Returns a list containing all 'GYTxOutRef' for a given 'GYAddress'.
 maestroRefsAtAddress :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> IO [GYTxOutRef]
 maestroRefsAtAddress env addr = do

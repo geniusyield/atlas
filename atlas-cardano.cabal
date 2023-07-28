@@ -115,6 +115,7 @@ library
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
+    GeniusYield.Types.Credential
     GeniusYield.Types.Datum
     GeniusYield.Types.Era
     GeniusYield.Types.Key

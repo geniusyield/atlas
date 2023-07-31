@@ -212,7 +212,7 @@ tests setup = testGroup "gift"
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
         forUTxOs_ newUserUtxos (info . show)
-        assertThrown (\case (BuildTxNoSuitableCollateral _) -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
+        assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
     , testCaseSteps "Checking if collateral is reserved in case we want it even if it's value is not 5 ada" $ \info -> withSetup setup info $ \ctx -> do
         ----------- Create a new user and fund it

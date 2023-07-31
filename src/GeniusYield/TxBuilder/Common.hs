@@ -17,13 +17,14 @@ module GeniusYield.TxBuilder.Common
     , maximumRequiredCollateralValue
     ) where
 
-import qualified Cardano.Api                  as Api
-import qualified Cardano.Api.Shelley          as Api.S
-import           Data.List.NonEmpty           (NonEmpty ((:|)))
-import qualified Data.List.NonEmpty           as NE
+import qualified Cardano.Api                    as Api
+import qualified Cardano.Api.Shelley            as Api.S
+import           Data.List.NonEmpty             (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty             as NE
 
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
+import           GeniusYield.Transaction.Common (minimumUTxO)
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
@@ -108,13 +109,22 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
               maybe
                 ( return $
                     find
-                      (\u -> utxoValue u `valueGreaterOrEqual` maximumRequiredCollateralValue)  -- Keeping it simple.
+                      (\u ->
+                        let v = utxoValue u
+                            -- Following depends on that we allow unsafe, i.e., negative coins count below. In future, we can take magnitude instead.
+                            vWithoutMaxCollPledge = v `valueMinus` maximumRequiredCollateralValue
+                            worstCaseCollOutput = mkGYTxOutNoDatum change vWithoutMaxCollPledge
+                            -- @vWithoutMaxCollPledge@ should satisfy minimum ada requirement.
+                        in
+                             v `valueGreaterOrEqual` maximumRequiredCollateralValue
+                          && minimumUTxO pp worstCaseCollOutput <= fromInteger (valueAssetClass vWithoutMaxCollPledge GYLovelace)
+                      )  -- Keeping it simple.
                       (utxosToList ownUtxos')
 
                 ) (fmap Just . utxoAtTxOutRef') reservedCollateral
 
             case mCollateralUtxo of
-              Nothing -> return (Left $ BuildTxNoSuitableCollateral $ fromInteger maximumRequiredCollateralLovelace)
+              Nothing -> return (Left BuildTxNoSuitableCollateral)
               Just collateralUtxo ->
                 -- Build the transaction.
                 buildUnsignedTxBody

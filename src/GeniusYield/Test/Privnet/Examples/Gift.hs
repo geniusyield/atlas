@@ -204,7 +204,7 @@ tests setup = testGroup "gift"
         -- Would have thrown error if unable to build body.
         void $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
-    , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error when no UTxO is greater than or equal to maximum possible total collateral" $ \info -> withSetup setup info $ \ctx -> do
         ----------- Create a new user and fund it
         let newUserValue = maximumRequiredCollateralValue `valueMinus` valueFromLovelace 1
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
@@ -213,6 +213,26 @@ tests setup = testGroup "gift"
         newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
         forUTxOs_ newUserUtxos (info . show)
         assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
+
+    , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error when UTxO is greater than or equal to maximum possible total collateral but resulting return collateral doesn't satisfy minimum ada requirement" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        let newUserValue = maximumRequiredCollateralValue <> valueFromLovelace 0_500_000
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
+
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+        assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
+
+    , testCaseSteps "No 'BuildTxNoSuitableCollateral' error is thrown when collateral input is sufficient" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        let newUserValue = maximumRequiredCollateralValue <> valueFromLovelace 1_500_000
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
+
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+        void $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
     , testCaseSteps "Checking if collateral is reserved in case we want it even if it's value is not 5 ada" $ \info -> withSetup setup info $ \ctx -> do
         ----------- Create a new user and fund it

@@ -149,6 +149,7 @@ dbSyncQueryUtxo conn = GYQueryUTxO
     , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ dbSyncQueryUtxosAtAddress conn
     , gyQueryUtxosAtAddresses'           = dbSyncQueryUtxosAtAddresses conn
     , gyQueryUtxosAtAddressesWithDatums' = Nothing  -- Will use the default implementation.
+    , gyQueryUtxosAtPaymentCredential'   = Nothing
     }
 
 gyDatumFromId :: PQ.Connection -> Integer -> IO (Maybe GYDatum)

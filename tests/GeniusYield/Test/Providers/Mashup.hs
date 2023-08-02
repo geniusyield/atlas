@@ -64,10 +64,6 @@ providersMashupTests configs =
           utxosAtRefsWithDatums' <- gyQueryUtxosAtTxOutRefsWithDatums provider outputRefs
           threadDelay 1_000_000
           utxoAtRefWithDatum' <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxoAtTxOutRefWithDatum refWithDatumHash
-          threadDelay 1_000_000
-          let paymentCredentialKey = GYPaymentCredentialByKey "f24712bd05f058c6dca5df794f6afbffa8392076e7cb9fda9f508d7a"  -- FIXME: Review this credential.
-          utxosAtPaymentCredential' <- gyQueryUtxosAtPaymentCredential provider paymentCredentialKey
-          print utxosAtPaymentCredential'
           pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums', utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum')
         assertBool "Utxos are not all equal" $ all (== head utxosProviders) (tail utxosProviders)
     , testCase "Checking presence of error message when submitting an invalid transaction" $ do

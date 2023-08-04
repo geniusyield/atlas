@@ -31,32 +31,33 @@ module GeniusYield.Types.Tx
     , GYTxWitness
     , txWitFromHexBS
     , txWitFromHex
-    , txWitFromApi
-    , txWitToApi
+    , txWitFromLedger
+    , txWitToLedger
     , txWitToKeyWitnessApi
 ) where
 
-import qualified Cardano.Api                  as Api
-import qualified Cardano.Api.Shelley          as Api.S
-import qualified Cardano.Binary               as CBOR
-import qualified Cardano.Ledger.Crypto        as Crypto
-import qualified Cardano.Ledger.Shelley       as Shelley
-import qualified Cardano.Ledger.Shelley.Tx    as Shelley
-import           Control.Lens                 ((?~))
-import qualified Data.Aeson.Types             as Aeson
-import qualified Data.ByteString              as BS
-import qualified Data.ByteString.Base16       as BS16
-import qualified Data.ByteString.Char8        as BS8
-import qualified Data.ByteString.Lazy         as LBS
-import qualified Data.Set                     as Set
-import qualified Data.Swagger                 as Swagger
-import qualified Data.Swagger.Internal.Schema as Swagger
-import qualified Data.Text                    as T
-import qualified Data.Text.Encoding           as TE
-import qualified Plutus.V1.Ledger.Api         as Plutus
-import qualified PlutusTx.Builtins.Internal   as Plutus
-import qualified Text.Printf                  as Printf
-import qualified Web.HttpApiData              as Web
+import qualified Cardano.Api                     as Api
+import qualified Cardano.Api.Shelley             as Api.S
+import qualified Cardano.Binary                  as CBOR
+import           Cardano.Ledger.Alonzo.TxWitness (TxWitness)
+import qualified Cardano.Ledger.Babbage          as Babbage (BabbageEra)
+import qualified Cardano.Ledger.Crypto           as Crypto
+import           Control.Lens                    ((?~))
+import qualified Data.Aeson.Types                as Aeson
+import qualified Data.ByteString                 as BS
+import qualified Data.ByteString.Base16          as BS16
+import qualified Data.ByteString.Char8           as BS8
+import qualified Data.ByteString.Lazy            as LBS
+import qualified Data.Set                        as Set
+import qualified Data.Swagger                    as Swagger
+import qualified Data.Swagger.Internal.Schema    as Swagger
+import qualified Data.Text                       as T
+import qualified Data.Text.Encoding              as TE
+import           GHC.Records                     (getField)
+import qualified Plutus.V1.Ledger.Api            as Plutus
+import qualified PlutusTx.Builtins.Internal      as Plutus
+import qualified Text.Printf                     as Printf
+import qualified Web.HttpApiData                 as Web
 
 import           GeniusYield.Imports
 
@@ -216,8 +217,8 @@ txIdFromApi = coerce
 txIdFromPlutus :: Plutus.TxId -> Maybe GYTxId
 txIdFromPlutus (Plutus.TxId (Plutus.BuiltinByteString bs)) = txIdFromApi <$> Api.deserialiseFromRawBytes Api.AsTxId bs
 
--- | Wrapper around transaction witness set, obtained used CPI-30 compatible wallet's `signTx` method.
-newtype GYTxWitness = GYTxWitness (Shelley.WitnessSetHKD Identity (Shelley.ShelleyEra Crypto.StandardCrypto))  -- Is the choice of `ShelleyEra StandardCrypto` here appropriate? It works nonetheless.
+-- | Wrapper around transaction witness set. Note that Babbage ledger also uses the same @TxWitness@ type defined in Alonzo ledger, which was updated for Plutus-V2 scripts and same is expected for Plutus-V3.
+newtype GYTxWitness = GYTxWitness (TxWitness (Babbage.BabbageEra Crypto.StandardCrypto))
   deriving newtype Show
 
 instance Swagger.ToSchema GYTxWitness where
@@ -245,21 +246,27 @@ txWitFromHexBS bs = do
 txWitFromHex :: String -> Maybe GYTxWitness
 txWitFromHex = rightToMaybe . txWitFromHexBS . TE.encodeUtf8 . fromString
 
-txWitFromApi :: Shelley.WitnessSetHKD Identity (Shelley.ShelleyEra Crypto.StandardCrypto) -> GYTxWitness
-txWitFromApi = coerce
+txWitFromLedger :: TxWitness (Babbage.BabbageEra Crypto.StandardCrypto) -> GYTxWitness
+txWitFromLedger = coerce
 
-txWitToApi :: GYTxWitness -> Shelley.WitnessSetHKD Identity (Shelley.ShelleyEra Crypto.StandardCrypto)
-txWitToApi = coerce
+txWitToLedger :: GYTxWitness -> TxWitness (Babbage.BabbageEra Crypto.StandardCrypto)
+txWitToLedger = coerce
 
 -- `txWitCbor` is the cbor obtained using CIP-30 compatible wallet's `api.signTx`.
 -- >>> txWitCbor = "a100818258206400a17ee58ce12a54c6edb7b964f0eb217e00dac75f2a47eccb6eedd02809a4584048bfa2dbf21514cafd1425b0072c67dd09cce82f5688169cff4761ca47e6557371ecc1ccbadde231dee179cf17d9dac29a61ac64ff9ef2dbd94968ec26301801"
 -- >>> txWit = txWitFromHex txWitCbor
 -- >>> show txWit
--- "Just (WitnessSet' {addrWits' = fromList [WitVKey' {wvkKey' = VKey (VerKeyEd25519DSIGN \"6400a17ee58ce12a54c6edb7b964f0eb217e00dac75f2a47eccb6eedd02809a4\"), wvkSig' = SignedDSIGN (SigEd25519DSIGN \"48bfa2dbf21514cafd1425b0072c67dd09cce82f5688169cff4761ca47e6557371ecc1ccbadde231dee179cf17d9dac29a61ac64ff9ef2dbd94968ec26301801\"), wvkKeyHash = KeyHash \"f24712bd05f058c6dca5df794f6afbffa8392076e7cb9fda9f508d7a\", wvkBytes = \"\\130X d\\NUL\\161~\\229\\140\\225*T\\198\\237\\183\\185d\\240\\235!~\\NUL\\218\\199_*G\\236\\203n\\237\\208(\\t\\164X@H\\191\\162\\219\\242\\NAK\\DC4\\202\\253\\DC4%\\176\\a,g\\221\\t\\204\\232/V\\136\\SYN\\156\\255Ga\\202G\\230Usq\\236\\193\\204\\186\\221\\226\\&1\\222\\225y\\207\\ETB\\217\\218\\194\\154a\\172d\\255\\158\\242\\219\\217Ih\\236&0\\CAN\\SOH\"}], scriptWits' = fromList [], bootWits' = fromList [], txWitsBytes = \"\\161\\NUL\\129\\130X d\\NUL\\161~\\229\\140\\225*T\\198\\237\\183\\185d\\240\\235!~\\NUL\\218\\199_*G\\236\\203n\\237\\208(\\t\\164X@H\\191\\162\\219\\242\\NAK\\DC4\\202\\253\\DC4%\\176\\a,g\\221\\t\\204\\232/V\\136\\SYN\\156\\255Ga\\202G\\230Usq\\236\\193\\204\\186\\221\\226\\&1\\222\\225y\\207\\ETB\\217\\218\\194\\154a\\172d\\255\\158\\242\\219\\217Ih\\236&0\\CAN\\SOH\"})"
-
+-- "Just TxWitnessRaw {_txwitsVKey = fromList [WitVKey' {wvkKey' = VKey (VerKeyEd25519DSIGN \"6400a17ee58ce12a54c6edb7b964f0eb217e00dac75f2a47eccb6eedd02809a4\"), wvkSig' = SignedDSIGN (SigEd25519DSIGN \"48bfa2dbf21514cafd1425b0072c67dd09cce82f5688169cff4761ca47e6557371ecc1ccbadde231dee179cf17d9dac29a61ac64ff9ef2dbd94968ec26301801\"), wvkKeyHash = KeyHash \"f24712bd05f058c6dca5df794f6afbffa8392076e7cb9fda9f508d7a\", wvkBytes = \"\\130X d\\NUL\\161~\\229\\140\\225*T\\198\\237\\183\\185d\\240\\235!~\\NUL\\218\\199_*G\\236\\203n\\237\\208(\\t\\164X@H\\191\\162\\219\\242\\NAK\\DC4\\202\\253\\DC4%\\176\\a,g\\221\\t\\204\\232/V\\136\\SYN\\156\\255Ga\\202G\\230Usq\\236\\193\\204\\186\\221\\226\\&1\\222\\225y\\207\\ETB\\217\\218\\194\\154a\\172d\\255\\158\\242\\219\\217Ih\\236&0\\CAN\\SOH\"}], _txwitsBoot = fromList [], _txscripts = fromList [], _txdats = TxDatsRaw (fromList []), _txrdmrs = RedeemersRaw (fromList [])}"
 -- >>> txWitToKeyWitnessApi <$> txWit
+-- Just [ShelleyKeyWitness ShelleyBasedEraBabbage (WitVKey' {wvkKey' = VKey (VerKeyEd25519DSIGN "6400a17ee58ce12a54c6edb7b964f0eb217e00dac75f2a47eccb6eedd02809a4"), wvkSig' = SignedDSIGN (SigEd25519DSIGN "48bfa2dbf21514cafd1425b0072c67dd09cce82f5688169cff4761ca47e6557371ecc1ccbadde231dee179cf17d9dac29a61ac64ff9ef2dbd94968ec26301801"), wvkKeyHash = KeyHash "f24712bd05f058c6dca5df794f6afbffa8392076e7cb9fda9f508d7a", wvkBytes = "\130X d\NUL\161~\229\140\225*T\198\237\183\185d\240\235!~\NUL\218\199_*G\236\203n\237\208(\t\164X@H\191\162\219\242\NAK\DC4\202\253\DC4%\176\a,g\221\t\204\232/V\136\SYN\156\255Ga\202G\230Usq\236\193\204\186\221\226\&1\222\225y\207\ETB\217\218\194\154a\172d\255\158\242\219\217Ih\236&0\CAN\SOH"})]
+
+-- >>> txWitCbor' = "A200818258206400A17EE58CE12A54C6EDB7B964F0EB217E00DAC75F2A47ECCB6EEDD02809A4584048BFA2DBF21514CAFD1425B0072C67DD09CCE82F5688169CFF4761CA47E6557371ECC1CCBADDE231DEE179CF17D9DAC29A61AC64FF9EF2DBD94968EC263018010481D87983581C25195AF85C41B9D97DA7F4F215D3E74C9CEF7F04739D6BA473BA72A2D87982D87981581C25195AF85C41B9D97DA7F4F215D3E74C9CEF7F04739D6BA473BA72A2D87981D87981D87981581C358A4E4105C08F59E4779070699C7A72566893332F9857DB4E742BEBD879811B00000189B0D436E7"
+-- >>> txWit' = txWitFromHex txWitCbor'
+-- >>> show txWit'
+-- "Just TxWitnessRaw {_txwitsVKey = fromList [WitVKey' {wvkKey' = VKey (VerKeyEd25519DSIGN \"6400a17ee58ce12a54c6edb7b964f0eb217e00dac75f2a47eccb6eedd02809a4\"), wvkSig' = SignedDSIGN (SigEd25519DSIGN \"48bfa2dbf21514cafd1425b0072c67dd09cce82f5688169cff4761ca47e6557371ecc1ccbadde231dee179cf17d9dac29a61ac64ff9ef2dbd94968ec26301801\"), wvkKeyHash = KeyHash \"f24712bd05f058c6dca5df794f6afbffa8392076e7cb9fda9f508d7a\", wvkBytes = \"\\130X d\\NUL\\161~\\229\\140\\225*T\\198\\237\\183\\185d\\240\\235!~\\NUL\\218\\199_*G\\236\\203n\\237\\208(\\t\\164X@H\\191\\162\\219\\242\\NAK\\DC4\\202\\253\\DC4%\\176\\a,g\\221\\t\\204\\232/V\\136\\SYN\\156\\255Ga\\202G\\230Usq\\236\\193\\204\\186\\221\\226\\&1\\222\\225y\\207\\ETB\\217\\218\\194\\154a\\172d\\255\\158\\242\\219\\217Ih\\236&0\\CAN\\SOH\"}], _txwitsBoot = fromList [], _txscripts = fromList [], _txdats = TxDatsRaw (fromList [(SafeHash \"363eaf5abda5b96e8887f50f2ecb619e65f9b1bc7ada10e46ddf67ccd8d60b54\",DataConstr Constr 0 [B \"%\\EMZ\\248\\\\A\\185\\217}\\167\\244\\242\\NAK\\211\\231L\\156\\239\\DEL\\EOTs\\157k\\164s\\186r\\162\",Constr 0 [Constr 0 [B \"%\\EMZ\\248\\\\A\\185\\217}\\167\\244\\242\\NAK\\211\\231L\\156\\239\\DEL\\EOTs\\157k\\164s\\186r\\162\"],Constr 0 [Constr 0 [Constr 0 [B \"5\\138NA\\ENQ\\192\\143Y\\228w\\144pi\\156zrVh\\147\\&3/\\152W\\219Nt+\\235\"]]]],Constr 0 [I 1690888845031]])]), _txrdmrs = RedeemersRaw (fromList [])}"
+-- >>> txWitToKeyWitnessApi <$> txWit'
 -- Just [ShelleyKeyWitness ShelleyBasedEraBabbage (WitVKey' {wvkKey' = VKey (VerKeyEd25519DSIGN "6400a17ee58ce12a54c6edb7b964f0eb217e00dac75f2a47eccb6eedd02809a4"), wvkSig' = SignedDSIGN (SigEd25519DSIGN "48bfa2dbf21514cafd1425b0072c67dd09cce82f5688169cff4761ca47e6557371ecc1ccbadde231dee179cf17d9dac29a61ac64ff9ef2dbd94968ec26301801"), wvkKeyHash = KeyHash "f24712bd05f058c6dca5df794f6afbffa8392076e7cb9fda9f508d7a", wvkBytes = "\130X d\NUL\161~\229\140\225*T\198\237\183\185d\240\235!~\NUL\218\199_*G\236\203n\237\208(\t\164X@H\191\162\219\242\NAK\DC4\202\253\DC4%\176\a,g\221\t\204\232/V\136\SYN\156\255Ga\202G\230Usq\236\193\204\186\221\226\&1\222\225y\207\ETB\217\218\194\154a\172d\255\158\242\219\217Ih\236&0\CAN\SOH"})]
 
 -- | Obtain `vkeywitness` as cddl calls it to make our unsigned transaction, signed (see `makeSignedTransaction` method).
 txWitToKeyWitnessApi :: GYTxWitness -> [Api.S.KeyWitness Api.S.BabbageEra]
-txWitToKeyWitnessApi = fmap (Api.S.ShelleyKeyWitness Api.ShelleyBasedEraBabbage) . Set.toList . Shelley.addrWits . txWitToApi
+txWitToKeyWitnessApi = fmap (Api.S.ShelleyKeyWitness Api.ShelleyBasedEraBabbage) . Set.toList . getField @"addrWits" . txWitToLedger

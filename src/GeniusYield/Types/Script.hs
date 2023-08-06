@@ -87,6 +87,7 @@ import qualified Cardano.Api                      as Api
 import qualified Cardano.Api.Shelley              as Api.S
 import qualified Codec.Serialise
 import           Control.Lens                     ((?~))
+import           Data.Aeson.Types                 (ToJSONKey (toJSONKey), FromJSONKey (fromJSONKey), FromJSONKeyFunction (FromJSONKeyTextParser), toJSONKeyText)
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString.Base16           as BS16
 import qualified Data.ByteString.Lazy             as BSL
@@ -276,6 +277,12 @@ readMintingPolicy = coerce readScript
 newtype GYMintingPolicyId = GYMintingPolicyId Api.PolicyId
   deriving stock   (Eq, Ord)
   deriving newtype (ToJSON, FromJSON)
+
+instance ToJSONKey GYMintingPolicyId where
+    toJSONKey = toJSONKeyText mintingPolicyIdToText
+
+instance FromJSONKey GYMintingPolicyId where
+    fromJSONKey = FromJSONKeyTextParser (either fail pure . mintingPolicyIdFromText)
 
 -- |
 --

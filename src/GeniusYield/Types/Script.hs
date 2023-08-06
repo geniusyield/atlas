@@ -306,15 +306,17 @@ instance Web.FromHttpApiData GYMintingPolicyId where
           Left x    -> fail $ "Invalid currency symbol: " ++ show cs ++ "; Reason: " ++ show x
           Right cs' -> return $ mintingPolicyIdFromApi cs'
 
+instance Swagger.ToParamSchema GYMintingPolicyId where
+  toParamSchema _ = mempty
+      & Swagger.type_           ?~ Swagger.SwaggerString
+      & Swagger.format          ?~ "hex"
+      & Swagger.maxLength       ?~ 56
+      & Swagger.minLength       ?~ 56
 
 instance Swagger.ToSchema GYMintingPolicyId where
-  declareNamedSchema _ = pure $ Swagger.named "GYMintingPolicyId" $ mempty
-                       & Swagger.type_           ?~ Swagger.SwaggerString
+  declareNamedSchema _ = pure $ Swagger.named "GYMintingPolicyId" $ Swagger.paramSchemaToSchema (Proxy @GYMintingPolicyId)
                        & Swagger.description     ?~ "This is the hash of a minting policy script."
-                       & Swagger.format          ?~ "hex"
                        & Swagger.example         ?~ toJSON ("ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef" :: Text)
-                       & Swagger.maxLength       ?~ 56
-                       & Swagger.minLength       ?~ 56
 
 mintingPolicyIdToApi :: GYMintingPolicyId -> Api.PolicyId
 mintingPolicyIdToApi = coerce

@@ -33,6 +33,7 @@ tests setup = testGroup "misc"
             tn     = "mintByRef"
             policy = testTokenPolicy amt (tokenNameToPlutus tn) utxoAsParam
             policyAsScript = mintingPolicyToScript policy
+            ac = GYToken (mintingPolicyId policy) tn
 
         txBodyRefScript <- ctxRunF ctx (ctxUserF ctx) $ addRefScript policyAsScript
 
@@ -55,5 +56,5 @@ tests setup = testGroup "misc"
 
         let diff = valueMinus balance' balance
 
-        assertEqual "Must have gained 1 mint token" diff (valueSingleton (GYToken (mintingPolicyId policy) tn) 1)
+        assertEqual "Must have gained 1 mint token" (valueAssetClass diff ac) 1
     ]

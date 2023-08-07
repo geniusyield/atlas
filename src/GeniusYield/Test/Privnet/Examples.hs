@@ -13,6 +13,7 @@ import           Test.Tasty                               (TestTree, testGroup)
 import qualified GeniusYield.Test.Privnet.Examples.Gift
 import qualified GeniusYield.Test.Privnet.Examples.Oracle
 import qualified GeniusYield.Test.Privnet.Examples.Treat
+import qualified GeniusYield.Test.Privnet.Examples.Misc
 import           GeniusYield.Test.Privnet.Setup
 
 tests :: IO Setup -> TestTree

@@ -90,7 +90,7 @@ tests setup = testGroup "gift"
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts  @'PlutusV1 giftValidatorV2
+        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts  @'PlutusV2 giftValidatorV2
         mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
@@ -124,7 +124,7 @@ tests setup = testGroup "gift"
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts  @'PlutusV1 giftValidatorV2
+        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts  @'PlutusV2 giftValidatorV2
         mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
@@ -165,7 +165,7 @@ tests setup = testGroup "gift"
         forUTxOs_ newUserUtxos (info . show)
 
         ---------- New user tries to grab it, since interacting with script, needs to give collateral
-        grabGiftsTxBody <- ctxRunF ctx newUser $ grabGifts  @'PlutusV1 giftValidatorV2
+        grabGiftsTxBody <- ctxRunF ctx newUser $ grabGifts  @'PlutusV2 giftValidatorV2
         grabGiftsTxBody' <- case grabGiftsTxBody of
           Nothing   -> assertFailure "Unable to build tx"
           Just body -> return body
@@ -554,7 +554,7 @@ tests setup = testGroup "gift"
         threadDelay 1_000_000
 
         grabGiftsTx <- ctxRunF ctx (ctxUser2 ctx) $ do
-          s1 <- grabGifts  @'PlutusV1 giftValidatorV1
+          s1 <- grabGifts  @'PlutusV2 giftValidatorV1
           s2 <- grabGifts treatValidatorV2
           return (s1 <|> s2)
 
@@ -606,7 +606,7 @@ giftCleanup ctx = do
     threadDelay 1_000_000
 
 grabGifts
-    :: forall u v m. (GYTxMonad m, VersionIsGreaterOrEqual v u)
+    :: forall u v m. (GYTxMonad m, VersionIsGreaterOrEqual u v)
     => GYValidator v
     -> m (Maybe (GYTxSkeleton u))
 grabGifts validator = do

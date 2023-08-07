@@ -31,7 +31,7 @@ data GYBalancedTx v = GYBalancedTx
     { gybtxIns           :: ![GYTxInDetailed v]
     , gybtxCollaterals   :: !GYUTxOs
     , gybtxOuts          :: ![GYTxOut v]
-    , gybtxMint          :: !(Maybe (GYValue, [(Some GYMintingPolicy, GYRedeemer)]))
+    , gybtxMint          :: !(Maybe (GYValue, [(GYMintingScriptWitness v, GYRedeemer)]))
     , gybtxInvalidBefore :: !(Maybe GYSlot)
     , gybtxInvalidAfter  :: !(Maybe GYSlot)
     , gybtxSigners       :: !(Set GYPubKeyHash)

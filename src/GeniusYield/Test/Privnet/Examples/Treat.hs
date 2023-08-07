@@ -83,7 +83,7 @@ tests setup = testGroup "treat"
     ]
 
 grabTreats
-    :: forall u v m. (GYTxMonad m, VersionIsGreaterOrEqual v u)
+    :: forall u v m. (GYTxMonad m, VersionIsGreaterOrEqual u v)
     => GYValidator v
     -> m (Maybe (GYTxSkeleton u))
 grabTreats validator = do

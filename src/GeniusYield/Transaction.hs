@@ -155,7 +155,7 @@ buildUnsignedTxBody :: forall m v.
         -> [GYTxInDetailed v]
         -> [GYTxOut v]
         -> GYUTxOs  -- ^ reference inputs
-        -> Maybe (GYValue, [(Some GYMintingPolicy, GYRedeemer)])  -- ^ minted values
+        -> Maybe (GYValue, [(GYMintingScriptWitness v, GYRedeemer)])  -- ^ minted values
         -> Maybe GYSlot
         -> Maybe GYSlot
         -> Set GYPubKeyHash
@@ -236,11 +236,11 @@ the tx with 'finalizeGYBalancedTx'. If such is the case, 'balanceTxStep' should 
 -}
 balanceTxStep :: (HasCallStack, MonadRandom m)
     => GYBuildTxEnv
-    -> Maybe (GYValue, [(Some GYMintingPolicy, GYRedeemer)]) -- ^ minting
-    -> [GYTxInDetailed v]                                    -- ^ transaction inputs
-    -> [GYTxOut v]                                           -- ^ transaction outputs
-    -> GYCoinSelectionStrategy                               -- ^ Coin selection strategy to use
-    -> Natural                                               -- ^ extra lovelace to look for on top of output value
+    -> Maybe (GYValue, [(GYMintingScriptWitness v, GYRedeemer)])  -- ^ minting
+    -> [GYTxInDetailed v]                                         -- ^ transaction inputs
+    -> [GYTxOut v]                                                -- ^ transaction outputs
+    -> GYCoinSelectionStrategy                                    -- ^ Coin selection strategy to use
+    -> Natural                                                    -- ^ extra lovelace to look for on top of output value
     -> m (Either BalancingError ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
 balanceTxStep
     GYBuildTxEnv
@@ -329,14 +329,21 @@ finalizeGYBalancedTx
 
     inRefs' :: [Api.TxIn]
     inRefs' = nub $
-        -- reference scripts
+        -- reference scripts given by inputs
         [ txOutRefToApi ref
         | GYTxInDetailed { gyTxInDet = GYTxIn { gyTxInWitness = GYTxInWitnessScript (GYInReference ref _) _ _ } } <- ins
         ] ++
         -- reference inputs
         [ txOutRefToApi (utxoRef utxo)
         | utxo <- utxosToList utxosRefInputs
-        ]
+        ] ++
+        -- reference scripts given by minting policies
+        case mmint of
+          Nothing -> []
+          Just (_v, mps) ->
+            [ txOutRefToApi r
+            | (GYMintingScriptWitnessReference r _s, _) <- mps
+            ]
 
     -- reference script:
     -- 2. and also provide the utxos with named scripts.
@@ -348,7 +355,15 @@ finalizeGYBalancedTx
     utxosRefScripts = utxosFromList
         [ GYUTxO ref addr mempty GYOutDatumNone (Just (Some s))
         | GYTxInDetailed { gyTxInDet = GYTxIn { gyTxInWitness = GYTxInWitnessScript (GYInReference ref s) _ _ } } <- ins
-        ]
+        ] <>
+        utxosFromList (
+          case mmint of
+            Nothing -> []
+            Just (_v, mps) ->
+              [ GYUTxO r addr mempty GYOutDatumNone (Just (Some s))
+              | (GYMintingScriptWitnessReference r s, _) <- mps
+              ]
+        )
       where
         -- TODO: any address seems to work!?
         addr = unsafeAddressFromText "addr_test1qrsuhwqdhz0zjgnf46unas27h93amfghddnff8lpc2n28rgmjv8f77ka0zshfgssqr5cnl64zdnde5f8q2xt923e7ctqu49mg5"
@@ -397,12 +412,12 @@ finalizeGYBalancedTx
     mint = case mmint of
         Nothing      -> Api.TxMintNone
         Just (v, xs) -> Api.TxMintValue Api.MultiAssetInBabbageEra (valueToApi v) $ Api.BuildTxWith $ Map.fromList
-            [ ( mintingPolicyApiId p
-            , mintingPolicyToApiPlutusScriptWitness p
-                    (redeemerToApi r)
-                    (Api.ExecutionUnits 0 0)
-            )
-            | (Some p, r) <- xs
+            [ ( mintingPolicyApiIdFromWitness p
+              , gyMintingScriptWitnessToApiPlutusSW p
+                      (redeemerToApi r)
+                      (Api.ExecutionUnits 0 0)
+              )
+            | (p, r) <- xs
             ]
 
     -- Putting `TxTotalCollateralNone` & `TxReturnCollateralNone` would have them appropriately calculated by `makeTransactionBodyAutoBalance` but then return collateral it generates is only for ada. To support multi-asset collateral input we therefore calculate correct values ourselves and put appropriate entries here to have `makeTransactionBodyAutoBalance` calculate appropriate overestimated fees.

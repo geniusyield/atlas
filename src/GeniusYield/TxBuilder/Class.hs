@@ -297,8 +297,7 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
     { gytxIns           :: ![GYTxIn v]
     , gytxOuts          :: ![GYTxOut v]
     , gytxRefIns        :: !(GYTxSkeletonRefIns v)
-    -- TODO: restrict versions of minting policies similarly to validators. #34 (https://github.com/geniusyield/atlas/issues/34)
-    , gytxMint          :: !(Map (Some GYMintingPolicy) (Map GYTokenName Integer, GYRedeemer))
+    , gytxMint          :: !(Map (GYMintingScriptWitness v) (Map GYTokenName Integer, GYRedeemer))
     , gytxSigs          :: !(Set GYPubKeyHash)
     , gytxInvalidBefore :: !(Maybe GYSlot)
     , gytxInvalidAfter  :: !(Maybe GYSlot)
@@ -573,9 +572,9 @@ mustHaveOutput o = emptyGYTxSkeleton {gytxOuts = [o]}
 mustHaveOptionalOutput :: Maybe (GYTxOut v) -> GYTxSkeleton v
 mustHaveOptionalOutput = maybe mempty $ \o -> emptyGYTxSkeleton {gytxOuts = [o]}
 
-mustMint :: GYMintingPolicy u -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkeleton v
+mustMint :: GYMintingScriptWitness v -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkeleton v
 mustMint _ _ _ 0  = mempty
-mustMint p r tn n = emptyGYTxSkeleton {gytxMint = Map.singleton (Some p) (Map.singleton tn n, r)}
+mustMint p r tn n = emptyGYTxSkeleton {gytxMint = Map.singleton p (Map.singleton tn n, r)}
 
 mustBeSignedBy :: GYPubKeyHash -> GYTxSkeleton v
 mustBeSignedBy pkh = emptyGYTxSkeleton {gytxSigs = Set.singleton pkh}

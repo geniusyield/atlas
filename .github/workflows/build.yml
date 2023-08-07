@@ -3,6 +3,7 @@ name: Validate
 on:
   push:
     branches: [ "main" ]
+  pull_request: [ "main" ]
   pull_request_target:
     types: [assigned, opened, synchronize, reopened]
     branches: [ "main" ]

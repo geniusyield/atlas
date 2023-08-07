@@ -36,8 +36,10 @@ module GeniusYield.Types.Script (
     GYMintingPolicy,
     mintingPolicyId,
     mintingPolicyVersion,
+    mintingPolicyVersionFromWitness,
     mintingPolicyFromPlutus,
     mintingPolicyToPlutus,
+    mintingPolicyToPlutusFromWitness,
     mintingPolicyToApi,
     mintingPolicyIdToText,
     mintingPolicyIdFromText,
@@ -237,6 +239,9 @@ instance GShow GYMintingPolicy where
 mintingPolicyVersion :: GYMintingPolicy v -> SingPlutusVersion v
 mintingPolicyVersion = coerce scriptVersion
 
+mintingPolicyVersionFromWitness :: GYMintingScriptWitness v -> PlutusVersion
+mintingPolicyVersionFromWitness (GYMintingScriptWitness mp) = fromSingPlutusVersion $ mintingPolicyVersion mp
+mintingPolicyVersionFromWitness (GYMintingScriptWitnessReference _ s) = fromSingPlutusVersion $ mintingPolicyVersion $ coerce s
 
 mintingPolicyId :: GYMintingPolicy v -> GYMintingPolicyId
 mintingPolicyId = coerce scriptApiHash
@@ -250,6 +255,10 @@ mintingPolicyFromPlutus = coerce (scriptFromPlutus @v)
 
 mintingPolicyToPlutus :: GYMintingPolicy v -> Plutus.MintingPolicy
 mintingPolicyToPlutus = coerce scriptToPlutus
+
+mintingPolicyToPlutusFromWitness :: GYMintingScriptWitness v -> Plutus.MintingPolicy
+mintingPolicyToPlutusFromWitness (GYMintingScriptWitness mp) = mintingPolicyToPlutus mp
+mintingPolicyToPlutusFromWitness (GYMintingScriptWitnessReference _ s) = mintingPolicyToPlutus $ coerce s
 
 mintingPolicyToScript :: GYMintingPolicy v -> GYScript v
 mintingPolicyToScript = coerce
@@ -279,7 +288,7 @@ mintingPolicyToApiPlutusScriptWitness (GYMintingPolicy s) =
 
 data GYMintingScriptWitness (u :: PlutusVersion) where
     -- | 'VersionIsGreaterOrEqual' restricts which version scripts can be used in this transaction.
-    GYMintingScriptWitness          :: u `VersionIsGreaterOrEqual` v => GYMintingPolicy v -> GYMintingScriptWitness u
+    GYMintingScriptWitness          :: v `VersionIsGreaterOrEqual` u => GYMintingPolicy v -> GYMintingScriptWitness u
 
     -- | Reference inputs can be only used in V2 transactions.
     GYMintingScriptWitnessReference :: !GYTxOutRef -> !(GYScript 'PlutusV2) -> GYMintingScriptWitness 'PlutusV2
@@ -519,7 +528,7 @@ scriptToApiPlutusScriptWitness (GYScript v _ api _ _) = case v of
         Api.PlutusScriptV2
         (Api.S.PScript api)
 
-referenceScriptToApiPlutusScriptWitness  -- In future, once we have `PlutusScriptV3`, we can add `VersionIsGreaterOrEqual v 'PlutusV2` and handle v3/v2 case in body appropriately.
+referenceScriptToApiPlutusScriptWitness
   :: GYTxOutRef
   -> GYScript 'PlutusV2
   -> Api.S.ScriptDatum witctx

@@ -20,4 +20,5 @@ tests setup = testGroup "examples"
     [ GeniusYield.Test.Privnet.Examples.Gift.tests setup
     , GeniusYield.Test.Privnet.Examples.Treat.tests setup
     , GeniusYield.Test.Privnet.Examples.Oracle.tests setup
+    , GeniusYield.Test.Privnet.Examples.Misc.tests setup
     ]

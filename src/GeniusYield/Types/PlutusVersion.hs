@@ -11,6 +11,7 @@ module GeniusYield.Types.PlutusVersion (
     PlutusVersion (..),
     SingPlutusVersion (..),
     SingPlutusVersionI (..),
+    fromSingPlutusVersion,
     PlutusVersionToApi,
     singPlutusVersionToApi,
     VersionIsGreaterOrEqual,
@@ -56,6 +57,10 @@ type family PlutusVersionToApi (v :: PlutusVersion) :: Type where
 singPlutusVersionToApi :: SingPlutusVersion v -> Api.S.PlutusScriptVersion (PlutusVersionToApi v)
 singPlutusVersionToApi SingPlutusV1 = Api.PlutusScriptV1
 singPlutusVersionToApi SingPlutusV2 = Api.PlutusScriptV2
+
+fromSingPlutusVersion :: SingPlutusVersion v -> PlutusVersion
+fromSingPlutusVersion SingPlutusV2 = PlutusV2
+fromSingPlutusVersion SingPlutusV1 = PlutusV1
 
 -- | Constraint that @v >= u@.
 --

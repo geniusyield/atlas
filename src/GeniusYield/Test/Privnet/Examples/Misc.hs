@@ -46,7 +46,7 @@ tests setup = testGroup "misc"
         txBodyMint <- ctxRunI ctx (ctxUser2 ctx) $ do
             return $
                  mustHaveInput (GYTxIn utxoAsParam GYTxInWitnessKey)
-              <> mustMint (GYMintingScriptWitnessReference refScript policyAsScript) unitRedeemer tn amt
+              <> mustMint (GYMintReference refScript policyAsScript) unitRedeemer tn amt
         void $ submitTx ctx (ctxUser2 ctx) txBodyMint
 
         -- wait a tiny bit.

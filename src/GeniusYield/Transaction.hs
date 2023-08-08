@@ -155,7 +155,7 @@ buildUnsignedTxBody :: forall m v.
         -> [GYTxInDetailed v]
         -> [GYTxOut v]
         -> GYUTxOs  -- ^ reference inputs
-        -> Maybe (GYValue, [(GYMintingScriptWitness v, GYRedeemer)])  -- ^ minted values
+        -> Maybe (GYValue, [(GYMintScript v, GYRedeemer)])  -- ^ minted values
         -> Maybe GYSlot
         -> Maybe GYSlot
         -> Set GYPubKeyHash
@@ -236,11 +236,11 @@ the tx with 'finalizeGYBalancedTx'. If such is the case, 'balanceTxStep' should 
 -}
 balanceTxStep :: (HasCallStack, MonadRandom m)
     => GYBuildTxEnv
-    -> Maybe (GYValue, [(GYMintingScriptWitness v, GYRedeemer)])  -- ^ minting
-    -> [GYTxInDetailed v]                                         -- ^ transaction inputs
-    -> [GYTxOut v]                                                -- ^ transaction outputs
-    -> GYCoinSelectionStrategy                                    -- ^ Coin selection strategy to use
-    -> Natural                                                    -- ^ extra lovelace to look for on top of output value
+    -> Maybe (GYValue, [(GYMintScript v, GYRedeemer)])  -- ^ minting
+    -> [GYTxInDetailed v]                               -- ^ transaction inputs
+    -> [GYTxOut v]                                      -- ^ transaction outputs
+    -> GYCoinSelectionStrategy                          -- ^ Coin selection strategy to use
+    -> Natural                                          -- ^ extra lovelace to look for on top of output value
     -> m (Either BalancingError ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
 balanceTxStep
     GYBuildTxEnv
@@ -342,7 +342,7 @@ finalizeGYBalancedTx
           Nothing -> []
           Just (_v, mps) ->
             [ txOutRefToApi r
-            | (GYMintingScriptWitnessReference r _s, _) <- mps
+            | (GYMintReference r _s, _) <- mps
             ]
 
     -- reference script:
@@ -361,7 +361,7 @@ finalizeGYBalancedTx
             Nothing -> []
             Just (_v, mps) ->
               [ GYUTxO r addr mempty GYOutDatumNone (Just (Some s))
-              | (GYMintingScriptWitnessReference r s, _) <- mps
+              | (GYMintReference r s, _) <- mps
               ]
         )
       where

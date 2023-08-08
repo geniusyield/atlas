@@ -297,7 +297,7 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
     { gytxIns           :: ![GYTxIn v]
     , gytxOuts          :: ![GYTxOut v]
     , gytxRefIns        :: !(GYTxSkeletonRefIns v)
-    , gytxMint          :: !(Map (GYMintingScriptWitness v) (Map GYTokenName Integer, GYRedeemer))
+    , gytxMint          :: !(Map (GYMintScript v) (Map GYTokenName Integer, GYRedeemer))
     , gytxSigs          :: !(Set GYPubKeyHash)
     , gytxInvalidBefore :: !(Maybe GYSlot)
     , gytxInvalidAfter  :: !(Maybe GYSlot)
@@ -572,7 +572,7 @@ mustHaveOutput o = emptyGYTxSkeleton {gytxOuts = [o]}
 mustHaveOptionalOutput :: Maybe (GYTxOut v) -> GYTxSkeleton v
 mustHaveOptionalOutput = maybe mempty $ \o -> emptyGYTxSkeleton {gytxOuts = [o]}
 
-mustMint :: GYMintingScriptWitness v -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkeleton v
+mustMint :: GYMintScript v -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkeleton v
 mustMint _ _ _ 0  = mempty
 mustMint p r tn n = emptyGYTxSkeleton {gytxMint = Map.singleton p (Map.singleton tn n, r)}
 

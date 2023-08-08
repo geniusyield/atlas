@@ -47,7 +47,7 @@ module GeniusYield.Types.Script (
     mintingPolicyToApiPlutusScriptWitness,
 
     -- * Witness for Minting Policy
-    GYMintingScriptWitness (..),
+    GYMintScript (..),
     mintingPolicyIdFromWitness,
     gyMintingScriptWitnessToApiPlutusSW,
 
@@ -239,16 +239,16 @@ instance GShow GYMintingPolicy where
 mintingPolicyVersion :: GYMintingPolicy v -> SingPlutusVersion v
 mintingPolicyVersion = coerce scriptVersion
 
-mintingPolicyVersionFromWitness :: GYMintingScriptWitness v -> PlutusVersion
-mintingPolicyVersionFromWitness (GYMintingScriptWitness mp) = fromSingPlutusVersion $ mintingPolicyVersion mp
-mintingPolicyVersionFromWitness (GYMintingScriptWitnessReference _ s) = fromSingPlutusVersion $ mintingPolicyVersion $ coerce s
+mintingPolicyVersionFromWitness :: GYMintScript v -> PlutusVersion
+mintingPolicyVersionFromWitness (GYMintScript mp) = fromSingPlutusVersion $ mintingPolicyVersion mp
+mintingPolicyVersionFromWitness (GYMintReference _ s) = fromSingPlutusVersion $ mintingPolicyVersion $ coerce s
 
 mintingPolicyId :: GYMintingPolicy v -> GYMintingPolicyId
 mintingPolicyId = coerce scriptApiHash
 
-mintingPolicyIdFromWitness :: GYMintingScriptWitness v -> GYMintingPolicyId
-mintingPolicyIdFromWitness (GYMintingScriptWitness p) = mintingPolicyId p
-mintingPolicyIdFromWitness (GYMintingScriptWitnessReference _ s) = mintingPolicyId $ coerce s
+mintingPolicyIdFromWitness :: GYMintScript v -> GYMintingPolicyId
+mintingPolicyIdFromWitness (GYMintScript p) = mintingPolicyId p
+mintingPolicyIdFromWitness (GYMintReference _ s) = mintingPolicyId $ coerce s
 
 mintingPolicyFromPlutus :: forall v. SingPlutusVersionI v => Plutus.MintingPolicy -> GYMintingPolicy v
 mintingPolicyFromPlutus = coerce (scriptFromPlutus @v)
@@ -256,9 +256,9 @@ mintingPolicyFromPlutus = coerce (scriptFromPlutus @v)
 mintingPolicyToPlutus :: GYMintingPolicy v -> Plutus.MintingPolicy
 mintingPolicyToPlutus = coerce scriptToPlutus
 
-mintingPolicyToPlutusFromWitness :: GYMintingScriptWitness v -> Plutus.MintingPolicy
-mintingPolicyToPlutusFromWitness (GYMintingScriptWitness mp) = mintingPolicyToPlutus mp
-mintingPolicyToPlutusFromWitness (GYMintingScriptWitnessReference _ s) = mintingPolicyToPlutus $ coerce s
+mintingPolicyToPlutusFromWitness :: GYMintScript v -> Plutus.MintingPolicy
+mintingPolicyToPlutusFromWitness (GYMintScript mp) = mintingPolicyToPlutus mp
+mintingPolicyToPlutusFromWitness (GYMintReference _ s) = mintingPolicyToPlutus $ coerce s
 
 mintingPolicyToScript :: GYMintingPolicy v -> GYScript v
 mintingPolicyToScript = coerce
@@ -275,7 +275,7 @@ mintingPolicyCurrencySymbol = coerce scriptPlutusHash
 mintingPolicyApiId :: GYMintingPolicy v -> Api.PolicyId
 mintingPolicyApiId = coerce . mintingPolicyId
 
-mintingPolicyApiIdFromWitness :: GYMintingScriptWitness v -> Api.PolicyId
+mintingPolicyApiIdFromWitness :: GYMintScript v -> Api.PolicyId
 mintingPolicyApiIdFromWitness = coerce . mintingPolicyIdFromWitness
 
 mintingPolicyToApiPlutusScriptWitness
@@ -286,33 +286,33 @@ mintingPolicyToApiPlutusScriptWitness
 mintingPolicyToApiPlutusScriptWitness (GYMintingPolicy s) =
     scriptToApiPlutusScriptWitness s Api.NoScriptDatumForMint
 
-data GYMintingScriptWitness (u :: PlutusVersion) where
+data GYMintScript (u :: PlutusVersion) where
     -- | 'VersionIsGreaterOrEqual' restricts which version scripts can be used in this transaction.
-    GYMintingScriptWitness          :: v `VersionIsGreaterOrEqual` u => GYMintingPolicy v -> GYMintingScriptWitness u
+    GYMintScript    :: v `VersionIsGreaterOrEqual` u => GYMintingPolicy v -> GYMintScript u
 
     -- | Reference inputs can be only used in V2 transactions.
-    GYMintingScriptWitnessReference :: !GYTxOutRef -> !(GYScript 'PlutusV2) -> GYMintingScriptWitness 'PlutusV2
+    GYMintReference :: !GYTxOutRef -> !(GYScript 'PlutusV2) -> GYMintScript 'PlutusV2
 
-deriving instance Show (GYMintingScriptWitness v)
+deriving instance Show (GYMintScript v)
 
-instance Eq (GYMintingScriptWitness v) where
-    GYMintingScriptWitnessReference r s == GYMintingScriptWitnessReference r' s' = r == r' && s == s'
-    GYMintingScriptWitness p == GYMintingScriptWitness p' = defaultEq p p'
+instance Eq (GYMintScript v) where
+    GYMintReference r s == GYMintReference r' s' = r == r' && s == s'
+    GYMintScript p == GYMintScript p' = defaultEq p p'
     _ == _ = False
 
-instance Ord (GYMintingScriptWitness v) where
-    GYMintingScriptWitnessReference r s `compare` GYMintingScriptWitnessReference r' s' = compare r r' <> compare s s'
-    GYMintingScriptWitnessReference _ _ `compare` _ = LT
-    GYMintingScriptWitness p `compare` GYMintingScriptWitness p' = defaultCompare p p'
-    GYMintingScriptWitness _ `compare` _ = GT
+instance Ord (GYMintScript v) where
+    GYMintReference r s `compare` GYMintReference r' s' = compare r r' <> compare s s'
+    GYMintReference _ _ `compare` _ = LT
+    GYMintScript p `compare` GYMintScript p' = defaultCompare p p'
+    GYMintScript _ `compare` _ = GT
 
 gyMintingScriptWitnessToApiPlutusSW
-  :: GYMintingScriptWitness u
+  :: GYMintScript u
   -> Api.S.ScriptRedeemer
   -> Api.S.ExecutionUnits
   -> Api.S.ScriptWitness Api.S.WitCtxMint Api.S.BabbageEra
-gyMintingScriptWitnessToApiPlutusSW (GYMintingScriptWitness p) = mintingPolicyToApiPlutusScriptWitness p
-gyMintingScriptWitnessToApiPlutusSW (GYMintingScriptWitnessReference r s) =
+gyMintingScriptWitnessToApiPlutusSW (GYMintScript p) = mintingPolicyToApiPlutusScriptWitness p
+gyMintingScriptWitnessToApiPlutusSW (GYMintReference r s) =
     referenceScriptToApiPlutusScriptWitness r s
     Api.NoScriptDatumForMint
 

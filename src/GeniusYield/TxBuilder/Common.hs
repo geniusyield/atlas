@@ -86,7 +86,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
 
         helper :: GYUTxOs -> GYTxSkeleton v -> m (Either BuildTxException GYTxBody)
         helper ownUtxos' GYTxSkeleton {..} = do
-            let gytxMint' :: Maybe (GYValue, [(GYMintingScriptWitness v, GYRedeemer)])
+            let gytxMint' :: Maybe (GYValue, [(GYMintScript v, GYRedeemer)])
                 gytxMint'
                   | null gytxMint = Nothing
                   | otherwise =

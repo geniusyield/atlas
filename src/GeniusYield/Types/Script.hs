@@ -87,6 +87,7 @@ import qualified Cardano.Api                      as Api
 import qualified Cardano.Api.Shelley              as Api.S
 import qualified Codec.Serialise
 import           Control.Lens                     ((?~))
+import           Data.Aeson.Types                 (ToJSONKey (toJSONKey), FromJSONKey (fromJSONKey), FromJSONKeyFunction (FromJSONKeyTextParser), toJSONKeyText)
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString.Base16           as BS16
 import qualified Data.ByteString.Lazy             as BSL
@@ -277,6 +278,12 @@ newtype GYMintingPolicyId = GYMintingPolicyId Api.PolicyId
   deriving stock   (Eq, Ord)
   deriving newtype (ToJSON, FromJSON)
 
+instance ToJSONKey GYMintingPolicyId where
+    toJSONKey = toJSONKeyText mintingPolicyIdToText
+
+instance FromJSONKey GYMintingPolicyId where
+    fromJSONKey = FromJSONKeyTextParser (either fail pure . mintingPolicyIdFromText)
+
 -- |
 --
 -- >>> fromString "ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef" :: GYMintingPolicyId
@@ -299,15 +306,17 @@ instance Web.FromHttpApiData GYMintingPolicyId where
           Left x    -> fail $ "Invalid currency symbol: " ++ show cs ++ "; Reason: " ++ show x
           Right cs' -> return $ mintingPolicyIdFromApi cs'
 
+instance Swagger.ToParamSchema GYMintingPolicyId where
+  toParamSchema _ = mempty
+      & Swagger.type_           ?~ Swagger.SwaggerString
+      & Swagger.format          ?~ "hex"
+      & Swagger.maxLength       ?~ 56
+      & Swagger.minLength       ?~ 56
 
 instance Swagger.ToSchema GYMintingPolicyId where
-  declareNamedSchema _ = pure $ Swagger.named "GYMintingPolicyId" $ mempty
-                       & Swagger.type_           ?~ Swagger.SwaggerString
+  declareNamedSchema _ = pure $ Swagger.named "GYMintingPolicyId" $ Swagger.paramSchemaToSchema (Proxy @GYMintingPolicyId)
                        & Swagger.description     ?~ "This is the hash of a minting policy script."
-                       & Swagger.format          ?~ "hex"
                        & Swagger.example         ?~ toJSON ("ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef" :: Text)
-                       & Swagger.maxLength       ?~ 56
-                       & Swagger.minLength       ?~ 56
 
 mintingPolicyIdToApi :: GYMintingPolicyId -> Api.PolicyId
 mintingPolicyIdToApi = coerce

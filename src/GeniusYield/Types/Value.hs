@@ -413,7 +413,11 @@ isEmptyValue (GYValue m) = Map.null m
 data GYAssetClass = GYLovelace | GYToken GYMintingPolicyId GYTokenName
   deriving stock (Show, Eq, Ord, Generic)
 
-instance Aeson.ToJSONKey GYAssetClass
+instance Aeson.ToJSONKey GYAssetClass where
+    toJSONKey = Aeson.toJSONKeyText Web.toUrlPiece
+
+instance Aeson.FromJSONKey GYAssetClass where
+    fromJSONKey = Aeson.FromJSONKeyTextParser (either (fail . show) pure . Web.parseUrlPiece)
 
 instance Swagger.ToSchema GYAssetClass where
   declareNamedSchema _ = do

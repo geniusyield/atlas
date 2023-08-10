@@ -114,6 +114,11 @@ makeSetup' DbSyncOpts {..} privnetPath = do
             Just dbSync' | dbSyncOptsLookupDatum -> dbSyncLookupDatum dbSync'
             _                                    -> lciLookupDatum lci
 
+    let localAwaitTxConfirmed :: GYAwaitTx
+        localAwaitTxConfirmed = case dbSync of
+            Just dbSync' | dbSyncOptsAwaitTx -> dbSyncAwaitTxConfirmed dbSync'
+            _                                -> lciAwaitTxConfirmed lci
+
     let localQueryUtxo :: GYQueryUTxO
         localQueryUtxo = case dbSync of
             Just dbSync' | dbSyncOptsQueryUtxos -> dbSyncQueryUtxo dbSync'
@@ -127,25 +132,26 @@ makeSetup' DbSyncOpts {..} privnetPath = do
     -- context used for tests
     let ctx0 :: Ctx
         ctx0 = Ctx
-            { ctxEra             = era
-            , ctxInfo            = info
-            , ctxLCI             = lci
-            , ctxDbSync          = dbSync
-            , ctxUserF           = User userFskey userFaddr
-            , ctxUser2           = uncurry User (V.index userSkeyAddr (Proxy @0))
-            , ctxUser3           = uncurry User (V.index userSkeyAddr (Proxy @1))
-            , ctxUser4           = uncurry User (V.index userSkeyAddr (Proxy @2))
-            , ctxUser5           = uncurry User (V.index userSkeyAddr (Proxy @3))
-            , ctxUser6           = uncurry User (V.index userSkeyAddr (Proxy @4))
-            , ctxUser7           = uncurry User (V.index userSkeyAddr (Proxy @5))
-            , ctxUser8           = uncurry User (V.index userSkeyAddr (Proxy @6))
-            , ctxUser9           = uncurry User (V.index userSkeyAddr (Proxy @7))
-            , ctxGold            = GYLovelace -- temporarily
-            , ctxIron            = GYLovelace -- temporarily
-            , ctxLog             = noLogging
-            , ctxLookupDatum     = localLookupDatum
-            , ctxQueryUtxos      = localQueryUtxo
-            , ctxGetParams       = localGetParams
+            { ctxEra              = era
+            , ctxInfo             = info
+            , ctxLCI              = lci
+            , ctxDbSync           = dbSync
+            , ctxUserF            = User userFskey userFaddr
+            , ctxUser2            = uncurry User (V.index userSkeyAddr (Proxy @0))
+            , ctxUser3            = uncurry User (V.index userSkeyAddr (Proxy @1))
+            , ctxUser4            = uncurry User (V.index userSkeyAddr (Proxy @2))
+            , ctxUser5            = uncurry User (V.index userSkeyAddr (Proxy @3))
+            , ctxUser6            = uncurry User (V.index userSkeyAddr (Proxy @4))
+            , ctxUser7            = uncurry User (V.index userSkeyAddr (Proxy @5))
+            , ctxUser8            = uncurry User (V.index userSkeyAddr (Proxy @6))
+            , ctxUser9            = uncurry User (V.index userSkeyAddr (Proxy @7))
+            , ctxGold             = GYLovelace -- temporarily
+            , ctxIron             = GYLovelace -- temporarily
+            , ctxLog              = noLogging
+            , ctxLookupDatum      = localLookupDatum
+            , ctxAwaitTxConfirmed = localAwaitTxConfirmed
+            , ctxQueryUtxos       = localQueryUtxo
+            , ctxGetParams        = localGetParams
             }
 
     userBalances <- V.imapM

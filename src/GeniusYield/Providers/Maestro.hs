@@ -10,6 +10,7 @@ Stability   : develop
 module GeniusYield.Providers.Maestro
   ( networkIdToMaestroEnv
   , maestroSubmitTx
+  , maestroAwaitTxConfirmed
   , maestroSlotActions
   , maestroGetCurrentSlot
   , utxoFromMaestro
@@ -88,6 +89,14 @@ maestroSubmitTx env tx = do
   where
     handleMaestroSubmitError :: Either Maestro.MaestroError a -> IO a
     handleMaestroSubmitError = either (throwIO . SubmitTxException . Text.pack . show . silenceHeadersMaestroClientError) pure
+
+-------------------------------------------------------------------------------
+-- Await tx confirmation
+-------------------------------------------------------------------------------
+
+-- | Awaits for the confirmation of a given 'GYTxId'
+maestroAwaitTxConfirmed :: Maestro.MaestroEnv 'Maestro.V1 -> GYAwaitTx
+maestroAwaitTxConfirmed = undefined -- COMPLETE ME
 
 -------------------------------------------------------------------------------
 -- Slot actions

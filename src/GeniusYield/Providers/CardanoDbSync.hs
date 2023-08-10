@@ -12,6 +12,8 @@ module GeniusYield.Providers.CardanoDbSync (
     -- * cardano-db-sync connection
     CardanoDbSyncConn,
     openDbSyncConn,
+    -- * Await Tx confirmed
+    dbSyncAwaitTxConfirmed,
     -- * Slot number
     dbSyncSlotNumber,
     dbSyncWaitUntilSlot,
@@ -90,6 +92,14 @@ openDbSyncConn ci = coerce $ Pool.createPool
 newtype CardanoDbSyncException = CardanoDbSyncException String
   deriving stock (Show)
   deriving anyclass (Exception)
+
+-------------------------------------------------------------------------------
+-- Await tx confirmation
+-------------------------------------------------------------------------------
+
+-- | Awaits for the confirmation of a given 'GYTxId'
+dbSyncAwaitTxConfirmed :: CardanoDbSyncConn -> GYAwaitTx
+dbSyncAwaitTxConfirmed = undefined -- COMPLETE ME
 
 -------------------------------------------------------------------------------
 -- Slot number

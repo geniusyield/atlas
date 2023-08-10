@@ -9,6 +9,7 @@ module GeniusYield.Providers.Blockfrost
     , blockfrostSlotActions
     , blockfrostGetCurrentSlot
     , blockfrostSubmitTx
+    , blockfrostAwaitTxConfirmed
     , networkIdToProject
     ) where
 
@@ -92,6 +93,14 @@ blockfrostSubmitTx proj tx = do
   where
     locationIdent = "SubmitTx"
     handleBlockfrostSubmitError = either (throwIO . SubmitTxException . Text.pack . show . silenceHeadersBlockfrostClientError) pure
+
+-------------------------------------------------------------------------------
+-- Await tx confirmation
+-------------------------------------------------------------------------------
+
+-- | Awaits for the confirmation of a given 'GYTxId'
+blockfrostAwaitTxConfirmed :: Blockfrost.Project -> GYAwaitTx
+blockfrostAwaitTxConfirmed = undefined -- COMPLETE ME
 
 -------------------------------------------------------------------------------
 -- Slot actions

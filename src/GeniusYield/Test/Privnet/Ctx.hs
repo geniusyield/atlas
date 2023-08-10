@@ -60,25 +60,26 @@ userPkh :: User -> GYPubKeyHash
 userPkh = pubKeyHash . paymentVerificationKey . userSKey
 
 data Ctx = Ctx
-    { ctxEra         :: !GYEra
-    , ctxInfo        :: !(Api.LocalNodeConnectInfo Api.CardanoMode)
-    , ctxLCI         :: !LCIClient
-    , ctxDbSync      :: !(Maybe CardanoDbSyncConn)
-    , ctxUserF       :: !User  -- ^ Funder. All other users begin with same status of funds.
-    , ctxUser2       :: !User
-    , ctxUser3       :: !User
-    , ctxUser4       :: !User
-    , ctxUser5       :: !User
-    , ctxUser6       :: !User
-    , ctxUser7       :: !User
-    , ctxUser8       :: !User
-    , ctxUser9       :: !User
-    , ctxGold        :: !GYAssetClass  -- ^ asset used in tests
-    , ctxIron        :: !GYAssetClass  -- ^ asset used in tests
-    , ctxLog         :: !GYLog
-    , ctxLookupDatum :: !GYLookupDatum
-    , ctxQueryUtxos  :: !GYQueryUTxO
-    , ctxGetParams   :: !GYGetParameters
+    { ctxEra              :: !GYEra
+    , ctxInfo             :: !(Api.LocalNodeConnectInfo Api.CardanoMode)
+    , ctxLCI              :: !LCIClient
+    , ctxDbSync           :: !(Maybe CardanoDbSyncConn)
+    , ctxUserF            :: !User  -- ^ Funder. All other users begin with same status of funds.
+    , ctxUser2            :: !User
+    , ctxUser3            :: !User
+    , ctxUser4            :: !User
+    , ctxUser5            :: !User
+    , ctxUser6            :: !User
+    , ctxUser7            :: !User
+    , ctxUser8            :: !User
+    , ctxUser9            :: !User
+    , ctxGold             :: !GYAssetClass  -- ^ asset used in tests
+    , ctxIron             :: !GYAssetClass  -- ^ asset used in tests
+    , ctxLog              :: !GYLog
+    , ctxLookupDatum      :: !GYLookupDatum
+    , ctxAwaitTxConfirmed :: !GYAwaitTx
+    , ctxQueryUtxos       :: !GYQueryUTxO
+    , ctxGetParams        :: !GYGetParameters
     }
 
 -- | List of context sibling users - all of which begin with same balance.
@@ -157,12 +158,13 @@ ctxQueryBalance ctx u = ctxRunC ctx u $ do
 
 ctxProviders :: Ctx -> GYProviders
 ctxProviders ctx = GYProviders
-    { gyLookupDatum    = ctxLookupDatum ctx
-    , gySubmitTx       = nodeSubmitTx (ctxInfo ctx)
-    , gySlotActions    = nodeSlotActions (ctxInfo ctx)
-    , gyGetParameters  = ctxGetParams ctx
-    , gyQueryUTxO      = ctxQueryUtxos ctx
-    , gyLog'           = ctxLog ctx
+    { gyLookupDatum      = ctxLookupDatum ctx
+    , gySubmitTx         = nodeSubmitTx (ctxInfo ctx)
+    , gyAwaitTxConfirmed = ctxAwaitTxConfirmed ctx
+    , gySlotActions      = nodeSlotActions (ctxInfo ctx)
+    , gyGetParameters    = ctxGetParams ctx
+    , gyQueryUTxO        = ctxQueryUtxos ctx
+    , gyLog'             = ctxLog ctx
     }
 
 submitTx :: Ctx -> User -> GYTxBody -> IO GYTxId

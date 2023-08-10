@@ -20,6 +20,7 @@ optionDescriptions :: [OptionDescription]
 optionDescriptions =
     [ Option (Proxy :: Proxy DbSyncConnInfo)
     , Option (Proxy :: Proxy DbSyncLookupDatum)
+    , Option (Proxy :: Proxy DbSyncAwaitTx)
     , Option (Proxy :: Proxy DbSyncQueryUtxos)
     , Option (Proxy :: Proxy DbSyncGetParameters)
     ]
@@ -27,6 +28,7 @@ optionDescriptions =
 data DbSyncOpts = DbSyncOpts
     { dbSyncConnInfo          :: Maybe PQ.ConnectInfo
     , dbSyncOptsLookupDatum   :: Bool
+    , dbSyncOptsAwaitTx       :: Bool
     , dbSyncOptsQueryUtxos    :: Bool
     , dbSyncOptsGetParameters :: Bool
     }
@@ -35,6 +37,7 @@ askDbSyncOpts :: (DbSyncOpts -> TestTree) -> TestTree
 askDbSyncOpts kont =
     askOption $ \(DbSyncConnInfo dbSyncConnInfo) ->
     askOption $ \(DbSyncLookupDatum dbSyncOptsLookupDatum) ->
+    askOption $ \(DbSyncGetParameters dbSyncOptsAwaitTx) ->
     askOption $ \(DbSyncQueryUtxos dbSyncOptsQueryUtxos) ->
     askOption $ \(DbSyncGetParameters dbSyncOptsGetParameters) ->
     kont DbSyncOpts {..}
@@ -55,6 +58,14 @@ instance IsOption DbSyncLookupDatum where
     optionName   = Tagged "db-sync-lookup-datum"
     optionHelp   = Tagged "Use cardano-db-sync for datum lookup"
 
+newtype DbSyncAwaitTx = DbSyncAwaitTx Bool
+
+instance IsOption DbSyncAwaitTx where
+    defaultValue = DbSyncAwaitTx False
+    parseValue s = DbSyncAwaitTx <$> safeReadBool s
+    optionName   = Tagged "db-sync-await-tx-confirmed"
+    optionHelp   = Tagged "Use cardano-db-sync for checking tx confirmed status"
+
 newtype DbSyncQueryUtxos = DbSyncQueryUtxos Bool
 
 instance IsOption DbSyncQueryUtxos where
@@ -70,4 +81,3 @@ instance IsOption DbSyncGetParameters where
     parseValue s = DbSyncGetParameters <$> safeReadBool s
     optionName   = Tagged "db-sync-get-params"
     optionHelp   = Tagged "Use cardano-db-sync to get network parameters"
-

@@ -11,6 +11,8 @@ module GeniusYield.Types.Providers
       GYLookupDatum
       -- * Submit Tx
     , GYSubmitTx
+      -- * Await Tx Confirmed
+    , GYAwaitTx
       -- * Get current slot
     , GYSlotActions (..)
     , gyGetCurrentSlot
@@ -62,6 +64,7 @@ import           Control.Concurrent                (MVar, modifyMVar, newMVar,
                                                     threadDelay)
 import           Control.Monad                     ((<$!>))
 import           Control.Monad.IO.Class            (MonadIO (..))
+import           Data.Default                      (Default, def)
 import qualified Data.Text                         as Txt
 import           Data.Time
 import           GeniusYield.CardanoApi.EraHistory (getEraEndSlot)
@@ -107,12 +110,13 @@ There is no (safe)way to perform IO within an 'atomically' block. So STM doesn't
 -------------------------------------------------------------------------------
 
 data GYProviders = GYProviders
-    { gyLookupDatum   :: !GYLookupDatum
-    , gySubmitTx      :: !GYSubmitTx
-    , gySlotActions   :: !GYSlotActions
-    , gyGetParameters :: !GYGetParameters
-    , gyQueryUTxO     :: !GYQueryUTxO
-    , gyLog'          :: !GYLog
+    { gyLookupDatum      :: !GYLookupDatum
+    , gySubmitTx         :: !GYSubmitTx
+    , gyAwaitTxConfirmed :: !GYAwaitTx
+    , gySlotActions      :: !GYSlotActions
+    , gyGetParameters    :: !GYGetParameters
+    , gyQueryUTxO        :: !GYQueryUTxO
+    , gyLog'             :: !GYLog
     }
 
 gyGetCurrentSlot :: GYProviders -> IO GYSlot
@@ -184,6 +188,30 @@ type GYLookupDatum = GYDatumHash -> IO (Maybe GYDatum)
 
 -- | How to submit a transaction?
 type GYSubmitTx = GYTx -> IO GYTxId
+
+-------------------------------------------------------------------------------
+-- Await tx confirmation
+-------------------------------------------------------------------------------
+
+-- | How to await for a transaction confirmation?
+type GYAwaitTx = GYAwaitTxParameters -> GYTxId -> IO ()
+
+-- | Await transaction parameters
+data GYAwaitTxParameters = GYAwaitTxParameters
+                           { maxAttemps    :: Int
+                           -- ^ Max number of attemps before give up.
+                           , checkInterval :: Int
+                           -- ^ Wait time for each attempt (in milliseconds).
+                           , confirmations :: Int
+                           -- ^ Min number of block confirmation.
+                           }
+
+instance Default GYAwaitTxParameters where
+    def = GYAwaitTxParameters
+          { maxAttemps    = 5
+          , checkInterval = 3_000
+          , confirmations = 5
+          }
 
 -------------------------------------------------------------------------------
 -- Current slot

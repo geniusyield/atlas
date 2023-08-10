@@ -14,6 +14,7 @@ module GeniusYield.Providers.LiteChainIndex (
     closeLCIClient,
     lciWaitUntilSlot,
     lciLookupDatum,
+    lciAwaitTxConfirmed,
     lciGetCurrentSlot,
     lciStats,
 ) where
@@ -93,6 +94,9 @@ lookupApiDatum (LCIClient _ _ dataVar) h = do
 
 lciLookupDatum :: LCIClient -> GYLookupDatum
 lciLookupDatum c dh = fmap datumFromApi' <$> lookupApiDatum c (datumHashToApi dh)
+
+lciAwaitTxConfirmed :: LCIClient -> GYAwaitTx
+lciAwaitTxConfirmed = undefined -- COMPLETE ME
 
 -- | This is not good 'GeniusYield.Types.Providers.gyGetCurrentSlot' provider as it might lag
 -- plenty behind the current slot of local node.

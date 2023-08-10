@@ -37,9 +37,10 @@ simpleProviders era nid nodeSocket mKey logging = do
 
     return GYProviders
       { gyLookupDatum   = maestroLookupDatum mEnv
-        , gySubmitTx      = nodeSubmitTx info
-        , gySlotActions   = nodeSlotActions info
-        , gyGetParameters = nodeGetParameters era info
-        , gyQueryUTxO     = nodeQueryUTxO era info
-        , gyLog'          = logging
-        }
+      , gyAwaitTxConfirmed = maestroAwaitTxConfirmed mEnv
+      , gySubmitTx      = nodeSubmitTx info
+      , gySlotActions   = nodeSlotActions info
+      , gyGetParameters = nodeGetParameters era info
+      , gyQueryUTxO     = nodeQueryUTxO era info
+      , gyLog'          = logging
+      }

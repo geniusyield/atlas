@@ -36,28 +36,28 @@ module GeniusYield.Types.Tx
     , txWitToKeyWitnessApi
 ) where
 
-import qualified Cardano.Api                     as Api
-import qualified Cardano.Api.Shelley             as Api.S
-import qualified Cardano.Binary                  as CBOR
-import           Cardano.Ledger.Alonzo.TxWitness (TxWitness)
-import qualified Cardano.Ledger.Babbage          as Babbage (BabbageEra)
-import qualified Cardano.Ledger.Crypto           as Crypto
-import           Control.Lens                    ((?~))
-import qualified Data.Aeson.Types                as Aeson
-import qualified Data.ByteString                 as BS
-import qualified Data.ByteString.Base16          as BS16
-import qualified Data.ByteString.Char8           as BS8
-import qualified Data.ByteString.Lazy            as LBS
-import qualified Data.Set                        as Set
-import qualified Data.Swagger                    as Swagger
-import qualified Data.Swagger.Internal.Schema    as Swagger
-import qualified Data.Text                       as T
-import qualified Data.Text.Encoding              as TE
-import           GHC.Records                     (getField)
-import qualified Plutus.V1.Ledger.Api            as Plutus
-import qualified PlutusTx.Builtins.Internal      as Plutus
-import qualified Text.Printf                     as Printf
-import qualified Web.HttpApiData                 as Web
+import qualified Cardano.Api                  as Api
+import qualified Cardano.Api.Shelley          as Api.S
+import           Cardano.Ledger.Alonzo.TxWits (AlonzoTxWits)
+import qualified Cardano.Ledger.Babbage       as Babbage (BabbageEra)
+import qualified Cardano.Ledger.Binary        as CBOR
+import qualified Cardano.Ledger.Crypto        as Crypto
+import           Control.Lens                 ((?~))
+import qualified Data.Aeson.Types             as Aeson
+import qualified Data.ByteString              as BS
+import qualified Data.ByteString.Base16       as BS16
+import qualified Data.ByteString.Char8        as BS8
+import qualified Data.ByteString.Lazy         as LBS
+import qualified Data.Set                     as Set
+import qualified Data.Swagger                 as Swagger
+import qualified Data.Swagger.Internal.Schema as Swagger
+import qualified Data.Text                    as T
+import qualified Data.Text.Encoding           as TE
+import           GHC.Records                  (getField)
+import qualified PlutusLedgerApi.V1           as Plutus
+import qualified PlutusTx.Builtins.Internal   as Plutus
+import qualified Text.Printf                  as Printf
+import qualified Web.HttpApiData              as Web
 
 import           GeniusYield.Imports
 
@@ -218,7 +218,7 @@ txIdFromPlutus :: Plutus.TxId -> Maybe GYTxId
 txIdFromPlutus (Plutus.TxId (Plutus.BuiltinByteString bs)) = txIdFromApi <$> Api.deserialiseFromRawBytes Api.AsTxId bs
 
 -- | Wrapper around transaction witness set. Note that Babbage ledger also uses the same @TxWitness@ type defined in Alonzo ledger, which was updated for Plutus-V2 scripts and same is expected for Plutus-V3.
-newtype GYTxWitness = GYTxWitness (TxWitness (Babbage.BabbageEra Crypto.StandardCrypto))
+newtype GYTxWitness = GYTxWitness (AlonzoTxWits (Babbage.BabbageEra Crypto.StandardCrypto))
   deriving newtype Show
 
 instance Swagger.ToSchema GYTxWitness where
@@ -246,10 +246,10 @@ txWitFromHexBS bs = do
 txWitFromHex :: String -> Maybe GYTxWitness
 txWitFromHex = rightToMaybe . txWitFromHexBS . TE.encodeUtf8 . fromString
 
-txWitFromLedger :: TxWitness (Babbage.BabbageEra Crypto.StandardCrypto) -> GYTxWitness
+txWitFromLedger :: AlonzoTxWits (Babbage.BabbageEra Crypto.StandardCrypto) -> GYTxWitness
 txWitFromLedger = coerce
 
-txWitToLedger :: GYTxWitness -> TxWitness (Babbage.BabbageEra Crypto.StandardCrypto)
+txWitToLedger :: GYTxWitness -> AlonzoTxWits (Babbage.BabbageEra Crypto.StandardCrypto)
 txWitToLedger = coerce
 
 -- `txWitCbor` is the cbor obtained using CIP-30 compatible wallet's `api.signTx`.

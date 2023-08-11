@@ -204,7 +204,7 @@ library
     , cardano-addresses
     , cardano-api
     , cardano-balance-tx
-    , cardano-binary
+    , cardano-ledger-binary
     , cardano-coin-selection
     , cardano-crypto-class
     , cardano-ledger-alonzo

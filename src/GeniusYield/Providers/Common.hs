@@ -32,13 +32,13 @@ import qualified Servant.Client                       as Servant
 import qualified Servant.Client.Core                  as Servant
 
 import qualified Cardano.Api                          as Api
+import qualified Cardano.Api.Shelley                  as Api
 import           Cardano.Slotting.Time                (RelativeTime (RelativeTime),
                                                        mkSlotLength)
 import           Data.Bifunctor                       (first)
-import           GeniusYield.Types.Datum              (scriptDataToData)
+import           Data.SOP.Counting                    (NonEmpty (NonEmptyCons, NonEmptyOne))
 import qualified Ouroboros.Consensus.Cardano.Block    as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
-import           Ouroboros.Consensus.Util.Counting    (NonEmpty (NonEmptyCons, NonEmptyOne))
 
 data SomeDeserializeError
     = DeserializeErrorBech32 !Api.Bech32DecodeError
@@ -73,7 +73,7 @@ fromJson :: FromData a => LBS.ByteString -> Either SomeDeserializeError a
 fromJson b = do
     v <- first (DeserializeErrorAeson . Text.pack) $ Aeson.eitherDecode b
     x <- first DeserializeErrorScriptDataJson $ Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema v
-    pure . fromJust . fromData $ scriptDataToData x
+    pure . fromJust . fromData $ Api.toPlutusData $ Api.getScriptData x
 
 {- | Convert a regular list of era summaries (a la Ogmios) into a typed EraHistory (a la Ouroboros).
 

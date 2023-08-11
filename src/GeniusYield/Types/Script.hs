@@ -96,7 +96,10 @@ import qualified Cardano.Api                      as Api
 import qualified Cardano.Api.Shelley              as Api.S
 import qualified Codec.Serialise
 import           Control.Lens                     ((?~))
-import           Data.Aeson.Types                 (ToJSONKey (toJSONKey), FromJSONKey (fromJSONKey), FromJSONKeyFunction (FromJSONKeyTextParser), toJSONKeyText)
+import           Data.Aeson.Types                 (FromJSONKey (fromJSONKey),
+                                                   FromJSONKeyFunction (FromJSONKeyTextParser),
+                                                   ToJSONKey (toJSONKey),
+                                                   toJSONKeyText)
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString.Base16           as BS16
 import qualified Data.ByteString.Lazy             as BSL
@@ -248,7 +251,7 @@ mintingPolicyId :: GYMintingPolicy v -> GYMintingPolicyId
 mintingPolicyId = coerce scriptApiHash
 
 mintingPolicyIdFromWitness :: GYMintScript v -> GYMintingPolicyId
-mintingPolicyIdFromWitness (GYMintScript p) = mintingPolicyId p
+mintingPolicyIdFromWitness (GYMintScript p)      = mintingPolicyId p
 mintingPolicyIdFromWitness (GYMintReference _ s) = mintingPolicyId $ coerce s
 
 mintingPolicyFromPlutus :: forall v. SingPlutusVersionI v => Plutus.MintingPolicy -> GYMintingPolicy v
@@ -298,8 +301,8 @@ deriving instance Show (GYMintScript v)
 
 instance Eq (GYMintScript v) where
     GYMintReference r s == GYMintReference r' s' = r == r' && s == s'
-    GYMintScript p == GYMintScript p' = defaultEq p p'
-    _ == _ = False
+    GYMintScript p == GYMintScript p'            = defaultEq p p'
+    _ == _                                       = False
 
 instance Ord (GYMintScript v) where
     GYMintReference r s `compare` GYMintReference r' s' = compare r r' <> compare s s'

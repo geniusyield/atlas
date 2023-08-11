@@ -9,6 +9,8 @@ Stability   : develop
 module GeniusYield.Types.Datum (
     -- * Datum
     GYDatum,
+    serialiseDatum,
+    serialiseDatumHex,
     datumToApi',
     datumFromApi',
     datumToPlutus,
@@ -17,8 +19,8 @@ module GeniusYield.Types.Datum (
     datumFromPlutus',
     datumFromPlutusData,
     hashDatum,
-    scriptDataToData,
-    dataToScriptData,
+    hashDatum',
+    hashDatum'Hex,
     -- * Datum hash
     GYDatumHash,
     datumHashFromHex,
@@ -35,16 +37,19 @@ import           Control.Monad                        ((>=>))
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString.Base16               as Base16
 import qualified Data.ByteString.Char8                as BS8
-import           Data.Either.Combinators              (maybeToRight)
+import           Data.Either.Combinators              (mapLeft)
 import qualified Data.Text                            as Txt
 import qualified Database.PostgreSQL.Simple           as PQ
 import qualified Database.PostgreSQL.Simple.FromField as PQ (FromField (..),
                                                              returnError)
 import qualified Database.PostgreSQL.Simple.ToField   as PQ
-import qualified Plutus.V1.Ledger.Api                 as Plutus
+import qualified PlutusLedgerApi.V1                   as Plutus
 
+import qualified Cardano.Api.Shelley                  as Api
+import           Control.Arrow                        ((>>>))
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
+import qualified PlutusTx.Builtins                    as Plutus
 
 -- | Datum
 --
@@ -55,13 +60,21 @@ newtype GYDatum = GYDatum Plutus.BuiltinData
     deriving stock (Eq, Ord, Show)
     deriving newtype (Plutus.ToData, Plutus.FromData)
 
--- | Convert a 'GYDatum' to 'Api.ScriptData' from Cardano Api
+-- | Serialise datum.
+serialiseDatum :: GYDatum -> ByteString
+serialiseDatum = datumToPlutus' >>> Plutus.serialiseData >>> Plutus.fromBuiltin
+
+-- | Hex representation of serialized datum.
+serialiseDatumHex :: GYDatum -> ByteString
+serialiseDatumHex = serialiseDatum >>> Base16.encode
+
+-- | Convert a 'GYDatum' to 'Api.ScriptData' from Cardano Api.
 datumToApi' :: GYDatum -> Api.ScriptData
-datumToApi' (GYDatum (Plutus.BuiltinData x)) = dataToScriptData x
+datumToApi' = datumToPlutus' >>> Plutus.builtinDataToData >>> Api.fromPlutusData
 
 -- | Get a 'GYDatum' from a Cardano Api 'Api.ScriptData'
 datumFromApi' :: Api.ScriptData -> GYDatum
-datumFromApi' = GYDatum . Plutus.BuiltinData . scriptDataToData
+datumFromApi' = GYDatum . Plutus.dataToBuiltinData . Api.toPlutusData
 
 -- | Convert a 'GYDatum' to 'Plutus.Datum' from Plutus
 datumToPlutus :: GYDatum -> Plutus.Datum
@@ -83,23 +96,17 @@ datumFromPlutus' = GYDatum
 datumFromPlutusData :: Plutus.ToData a => a -> GYDatum
 datumFromPlutusData = GYDatum . Plutus.toBuiltinData
 
-scriptDataToData :: Api.ScriptData -> Plutus.Data
-scriptDataToData (Api.ScriptDataConstructor n xs) = Plutus.Constr n $ scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataMap xs)           = Plutus.Map $ bimap scriptDataToData scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataList xs)          = Plutus.List $ scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataNumber n)         = Plutus.I n
-scriptDataToData (Api.ScriptDataBytes bs)         = Plutus.B bs
-
-dataToScriptData :: Plutus.Data -> Api.ScriptData
-dataToScriptData (Plutus.Constr n xs) = Api.ScriptDataConstructor n $ dataToScriptData <$> xs
-dataToScriptData (Plutus.Map xs)      = Api.ScriptDataMap [(dataToScriptData x, dataToScriptData y) | (x, y) <- xs]
-dataToScriptData (Plutus.List xs)     = Api.ScriptDataList $ dataToScriptData <$> xs
-dataToScriptData (Plutus.I n)         = Api.ScriptDataNumber n
-dataToScriptData (Plutus.B bs)        = Api.ScriptDataBytes bs
-
 -- | Returns the 'GYDatumHash' of the given 'GYDatum'
 hashDatum :: GYDatum -> GYDatumHash
-hashDatum = datumHashFromApi . Api.hashScriptData . datumToApi'
+hashDatum = datumHashFromApi . Api.hashScriptDataBytes . Api.unsafeHashableScriptData . datumToApi'
+
+-- | Returns the hash of the given datum.
+hashDatum' :: GYDatum -> ByteString
+hashDatum' = serialiseDatum >>> Plutus.toBuiltin >>> Plutus.blake2b_256 >>> Plutus.fromBuiltin
+
+-- | Returns the hash as hex of the given datum.
+hashDatum'Hex :: GYDatum -> ByteString
+hashDatum'Hex = hashDatum' >>> Base16.encode
 
 -------------------------------------------------------------------------------
 -- DatumHash
@@ -116,8 +123,8 @@ instance PQ.FromField GYDatumHash where
     fromField f bs' = do
         PQ.Binary bs <- PQ.fromField f bs'
         case Api.deserialiseFromRawBytes (Api.AsHash Api.AsScriptData) bs of
-            Just dh -> return (datumHashFromApi dh)
-            Nothing -> PQ.returnError PQ.ConversionFailed f "datum hash does not unserialise"
+            Right dh -> return (datumHashFromApi dh)
+            Left e -> PQ.returnError PQ.ConversionFailed f ("datum hash does not unserialise: " <> show e)
 
 instance PQ.ToField GYDatumHash where
     toField (GYDatumHash dh) = PQ.toField (PQ.Binary (Api.serialiseToRawBytes dh))
@@ -127,7 +134,7 @@ datumHashFromHex = rightToMaybe . datumHashFromHexE
 
 datumHashFromBS :: ByteString -> Either String GYDatumHash
 datumHashFromBS = fmap datumHashFromApi
-    . maybeToRight "RawBytes GYDatumHash decode fail"
+    . mapLeft (\e -> "RawBytes GYDatumHash decode fail: " <> show e)
     . Api.deserialiseFromRawBytes (Api.proxyToAsType @(Api.Hash Api.ScriptData) Proxy)
 
 datumHashFromHexE :: String -> Either String GYDatumHash

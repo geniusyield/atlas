@@ -51,9 +51,9 @@ newtype GYPubKeyHash = GYPubKeyHash (Api.Hash Api.PaymentKey)
 --
 pubKeyHashFromPlutus :: Plutus.PubKeyHash -> Either PlutusToCardanoError GYPubKeyHash
 pubKeyHashFromPlutus (Plutus.PubKeyHash (Plutus.BuiltinByteString h)) =
-    maybe
-        (Left $ DeserialiseRawBytesError $ Text.pack $ "pubKeyHashFromPlutus " ++ show h)
-        (Right . GYPubKeyHash)
+    bimap
+        (\e -> DeserialiseRawBytesError $ Text.pack $ "pubKeyHashFromPlutus " ++ show h ++ " " ++ show e)
+        GYPubKeyHash
     $ Api.deserialiseFromRawBytes (Api.AsHash Api.AsPaymentKey) h
 
 

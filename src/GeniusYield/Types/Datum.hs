@@ -46,7 +46,6 @@ import qualified Database.PostgreSQL.Simple.ToField   as PQ
 import qualified PlutusLedgerApi.V1                   as Plutus
 
 import qualified Cardano.Api.Shelley                  as Api
-import           Control.Arrow                        ((>>>))
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
 import qualified PlutusTx.Builtins                    as Plutus

@@ -99,7 +99,7 @@ newtype CardanoDbSyncException = CardanoDbSyncException String
 
 -- | Awaits for the confirmation of a given 'GYTxId'
 dbSyncAwaitTxConfirmed :: CardanoDbSyncConn -> GYAwaitTx
-dbSyncAwaitTxConfirmed = undefined -- COMPLETE ME
+dbSyncAwaitTxConfirmed _ _ _ = return () -- COMPLETE ME
 
 -------------------------------------------------------------------------------
 -- Slot number

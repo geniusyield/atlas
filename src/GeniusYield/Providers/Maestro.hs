@@ -96,7 +96,7 @@ maestroSubmitTx env tx = do
 
 -- | Awaits for the confirmation of a given 'GYTxId'
 maestroAwaitTxConfirmed :: Maestro.MaestroEnv 'Maestro.V1 -> GYAwaitTx
-maestroAwaitTxConfirmed = undefined -- COMPLETE ME
+maestroAwaitTxConfirmed _ _ _ = return () -- COMPLETE ME
 
 -------------------------------------------------------------------------------
 -- Slot actions

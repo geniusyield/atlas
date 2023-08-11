@@ -18,6 +18,7 @@ import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api.S
 import qualified Cardano.Slotting.Slot                as CSlot
 import qualified Cardano.Slotting.Time                as CTime
+import           Control.Concurrent                   (threadDelay)
 import           Control.Monad                        ((<=<))
 import           Control.Monad.Except                 (throwError)
 import qualified Data.Aeson                           as Aeson
@@ -49,8 +50,12 @@ data BlockfrostProviderException
     deriving stock (Eq, Show)
     deriving anyclass (Exception)
 
+throwBlpvApiError :: Text -> Blockfrost.BlockfrostError -> IO a
+throwBlpvApiError locationInfo =
+    throwIO . BlpvApiError locationInfo . silenceHeadersBlockfrostClientError
+
 handleBlockfrostError :: Text -> Either Blockfrost.BlockfrostError a -> IO a
-handleBlockfrostError locationInfo = either (throwIO . BlpvApiError locationInfo . silenceHeadersBlockfrostClientError) pure
+handleBlockfrostError locationInfo = either (throwBlpvApiError locationInfo) pure
 
 silenceHeadersBlockfrostClientError :: Blockfrost.BlockfrostError -> Blockfrost.BlockfrostError
 silenceHeadersBlockfrostClientError (Blockfrost.ServantClientError e) = Blockfrost.ServantClientError $ silenceHeadersClientError e
@@ -100,7 +105,50 @@ blockfrostSubmitTx proj tx = do
 
 -- | Awaits for the confirmation of a given 'GYTxId'
 blockfrostAwaitTxConfirmed :: Blockfrost.Project -> GYAwaitTx
-blockfrostAwaitTxConfirmed = undefined -- COMPLETE ME
+blockfrostAwaitTxConfirmed proj p@GYAwaitTxParameters{..} txId = blpAwaitTx 0
+  where
+    blpAwaitTx :: Int -> IO ()
+    blpAwaitTx attempt | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
+    blpAwaitTx attempt = do
+        eTxInfo <- blockfrostQueryTx proj txId
+        case eTxInfo of
+            Left Blockfrost.BlockfrostNotFound
+                | attempt < maxAttempts -> threadDelay checkInterval >>
+                                           blpAwaitTx (attempt + 1)
+            Left err -> throwBlpvApiError "AwaitTx" err
+            Right txInfo -> blpAwaitBlock attempt $
+                            Blockfrost._transactionBlock txInfo
+
+    blpAwaitBlock :: Int -> Blockfrost.BlockHash -> IO ()
+    blpAwaitBlock attempt _ | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
+    blpAwaitBlock attempt blockHash = do
+        eBlockInfo <- blockfrostQueryBlock proj blockHash
+        case eBlockInfo of
+            Left Blockfrost.BlockfrostNotFound
+                | attempt < maxAttempts -> threadDelay checkInterval >>
+                                           blpAwaitBlock (attempt + 1) blockHash
+            Left err -> throwBlpvApiError "AwaitTx" err
+            Right blockInfo ->
+                when (Blockfrost._blockConfirmations blockInfo < toInteger confirmations
+                      &&
+                      attempt < maxAttempts
+                     ) $
+                threadDelay checkInterval >> blpAwaitBlock (attempt + 1) blockHash
+
+blockfrostQueryBlock
+    :: Blockfrost.Project
+    -> Blockfrost.BlockHash
+    -> IO (Either Blockfrost.BlockfrostError Blockfrost.Block)
+blockfrostQueryBlock proj = Blockfrost.runBlockfrost proj
+                            . Blockfrost.getBlock . Right
+
+blockfrostQueryTx
+    :: Blockfrost.Project
+    -> GYTxId
+    -> IO (Either Blockfrost.BlockfrostError Blockfrost.Transaction)
+blockfrostQueryTx proj = Blockfrost.runBlockfrost proj
+                         . Blockfrost.getTx . Blockfrost.TxHash
+                         . Api.serialiseToRawBytesHexText . txIdToApi
 
 -------------------------------------------------------------------------------
 -- Slot actions

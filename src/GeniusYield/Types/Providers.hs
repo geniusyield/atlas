@@ -13,6 +13,8 @@ module GeniusYield.Types.Providers
     , GYSubmitTx
       -- * Await Tx Confirmed
     , GYAwaitTx
+    , GYAwaitTxParameters (..)
+    , GYAwaitTxException (..)
       -- * Get current slot
     , GYSlotActions (..)
     , gyGetCurrentSlot
@@ -198,20 +200,25 @@ type GYAwaitTx = GYAwaitTxParameters -> GYTxId -> IO ()
 
 -- | Await transaction parameters
 data GYAwaitTxParameters = GYAwaitTxParameters
-                           { maxAttemps    :: Int
-                           -- ^ Max number of attemps before give up.
+                           { maxAttempts   :: Int
+                           -- ^ Max number of attempts before give up.
                            , checkInterval :: Int
-                           -- ^ Wait time for each attempt (in milliseconds).
+                           -- ^ Wait time for each attempt (in nanoseconds).
                            , confirmations :: Int
                            -- ^ Min number of block confirmation.
                            }
+    deriving stock (Show)
 
 instance Default GYAwaitTxParameters where
     def = GYAwaitTxParameters
-          { maxAttemps    = 5
-          , checkInterval = 3_000
-          , confirmations = 5
+          { maxAttempts   = 10
+          , checkInterval = 3_000_000
+          , confirmations = 1
           }
+
+newtype GYAwaitTxException = GYAwaitTxException GYAwaitTxParameters
+  deriving stock (Show)
+  deriving anyclass (Exception)
 
 -------------------------------------------------------------------------------
 -- Current slot

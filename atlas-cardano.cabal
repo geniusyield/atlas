@@ -297,6 +297,7 @@ test-suite atlas-tests
     , bytestring
     , cardano-api
     , containers
+    , data-default
     , directory
     , filepath
     , http-api-data

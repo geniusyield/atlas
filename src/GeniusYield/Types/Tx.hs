@@ -38,11 +38,12 @@ module GeniusYield.Types.Tx
 
 import qualified Cardano.Api                  as Api
 import qualified Cardano.Api.Shelley          as Api.S
-import           Cardano.Ledger.Alonzo.TxWits (AlonzoTxWits)
+import           Cardano.Ledger.Alonzo.TxWits (AlonzoTxWits, addrAlonzoTxWitsL)
+import           Cardano.Ledger.Babbage       (Babbage)
 import qualified Cardano.Ledger.Babbage       as Babbage (BabbageEra)
 import qualified Cardano.Ledger.Binary        as CBOR
 import qualified Cardano.Ledger.Crypto        as Crypto
-import           Control.Lens                 ((?~))
+import           Control.Lens                 (view, (?~))
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.ByteString              as BS
 import qualified Data.ByteString.Base16       as BS16
@@ -53,12 +54,12 @@ import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as TE
-import           GHC.Records                  (getField)
 import qualified PlutusLedgerApi.V1           as Plutus
 import qualified PlutusTx.Builtins.Internal   as Plutus
 import qualified Text.Printf                  as Printf
 import qualified Web.HttpApiData              as Web
 
+import           Cardano.Ledger.Core          (eraProtVerHigh)
 import           GeniusYield.Imports
 
 -- $setup
@@ -214,7 +215,7 @@ txIdToApi = coerce
 txIdFromApi :: Api.TxId -> GYTxId
 txIdFromApi = coerce
 
-txIdFromPlutus :: Plutus.TxId -> Maybe GYTxId
+txIdFromPlutus :: Plutus.TxId -> Either Api.S.SerialiseAsRawBytesError GYTxId
 txIdFromPlutus (Plutus.TxId (Plutus.BuiltinByteString bs)) = txIdFromApi <$> Api.deserialiseFromRawBytes Api.AsTxId bs
 
 -- | Wrapper around transaction witness set. Note that Babbage ledger also uses the same @TxWitness@ type defined in Alonzo ledger, which was updated for Plutus-V2 scripts and same is expected for Plutus-V3.
@@ -240,7 +241,7 @@ instance Web.FromHttpApiData GYTxWitness where
 txWitFromHexBS :: BS.ByteString -> Either String GYTxWitness
 txWitFromHexBS bs = do
   bs' <- BS16.decode bs
-  txWit <- first show $ CBOR.decodeAnnotator "Reading transaction witness set" CBOR.fromCBOR (LBS.fromStrict bs')
+  txWit <- first show $ CBOR.decodeFullAnnotator (eraProtVerHigh @Babbage) "Reading transaction witness set" CBOR.decCBOR (LBS.fromStrict bs')
   return (GYTxWitness txWit)
 
 txWitFromHex :: String -> Maybe GYTxWitness
@@ -269,4 +270,4 @@ txWitToLedger = coerce
 
 -- | Obtain `vkeywitness` as cddl calls it to make our unsigned transaction, signed (see `makeSignedTransaction` method).
 txWitToKeyWitnessApi :: GYTxWitness -> [Api.S.KeyWitness Api.S.BabbageEra]
-txWitToKeyWitnessApi = fmap (Api.S.ShelleyKeyWitness Api.ShelleyBasedEraBabbage) . Set.toList . getField @"addrWits" . txWitToLedger
+txWitToKeyWitnessApi = fmap (Api.S.ShelleyKeyWitness Api.ShelleyBasedEraBabbage) . Set.toList . view addrAlonzoTxWitsL . txWitToLedger

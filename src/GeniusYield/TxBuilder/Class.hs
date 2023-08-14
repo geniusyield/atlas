@@ -76,8 +76,11 @@ import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (listToMaybe)
 import qualified Data.Set                     as Set
 import qualified Data.Text                    as Txt
-import qualified Plutus.V1.Ledger.Api         as Plutus
-import qualified Plutus.V1.Ledger.Value       as PlutusValue
+import qualified PlutusLedgerApi.V1           as Plutus (Address, DatumHash,
+                                                         FromData (..),
+                                                         PubKeyHash, TokenName,
+                                                         TxOutRef, Value)
+import qualified PlutusLedgerApi.V1.Value     as Plutus (AssetClass)
 
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
@@ -439,7 +442,7 @@ valueFromPlutus' val = either
 -- | Convert a 'Plutus.Value' to 'GYValue' in 'IO'.
 --
 -- Throw 'GYConversionException' if conversion fails.
-valueFromPlutusIO :: PlutusValue.Value -> IO GYValue
+valueFromPlutusIO :: Plutus.Value -> IO GYValue
 valueFromPlutusIO val = either
     (throwIO . GYConversionException . flip GYInvalidPlutusValue val)
     pure
@@ -463,10 +466,10 @@ makeAssetClassIO a b = either
     pure
     (makeAssetClass a b)
 
--- | Convert a 'PlutusValue.AssetClass' to 'GYAssetClass' in 'GYTxMonad'.
+-- | Convert a 'Plutus.AssetClass' to 'GYAssetClass' in 'GYTxMonad'.
 --
 -- Throw 'GYConversionException' if conversion fails.
-assetClassFromPlutus' :: MonadError GYTxMonadException m => PlutusValue.AssetClass -> m GYAssetClass
+assetClassFromPlutus' :: MonadError GYTxMonadException m => Plutus.AssetClass -> m GYAssetClass
 assetClassFromPlutus' x = either
     (throwError . GYConversionException . GYInvalidPlutusAsset)
     pure
@@ -475,7 +478,7 @@ assetClassFromPlutus' x = either
 -- | Convert a 'PlutusValue.TokenName' to 'GYTokenName' in 'GYTxMonad'.
 --
 -- Throw 'GYConversionException' if conversion fails.
-tokenNameFromPlutus' :: MonadError GYTxMonadException m => PlutusValue.TokenName -> m GYTokenName
+tokenNameFromPlutus' :: MonadError GYTxMonadException m => Plutus.TokenName -> m GYTokenName
 tokenNameFromPlutus' x = maybe
     (throwError . GYConversionException . GYInvalidPlutusAsset $ GYTokenNameTooBig x)
     pure

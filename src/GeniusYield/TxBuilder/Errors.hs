@@ -18,7 +18,7 @@ module GeniusYield.TxBuilder.Errors
 import           Control.Monad.Except       (MonadError, throwError)
 
 import           Cardano.Slotting.Time      (SystemStart)
-import qualified Plutus.V1.Ledger.Api       as Plutus
+import qualified PlutusLedgerApi.V1.Value   as Plutus (Value)
 
 import           GeniusYield.HTTP.Errors
 import           GeniusYield.Imports

@@ -28,9 +28,9 @@ import           Cardano.Slotting.Time                          (SystemStart (..
                                                                  mkSlotLength)
 import           Data.ByteString                                (ByteString)
 import           Data.Maybe                                     (listToMaybe)
+import           Data.Scientific                                (Scientific)
 import           Data.SOP.BasicFunctors                         (K (..))
 import           Data.SOP.Strict                                (NP (..))
-import           Data.Scientific                                (Scientific)
 import qualified Data.Text                                      as Txt
 import           Data.Word                                      (Word64)
 import           Type.Reflection                                (Typeable,
@@ -53,13 +53,13 @@ import qualified Database.PostgreSQL.Simple.FromField           as PQ (Conversio
 import qualified Database.PostgreSQL.Simple.Newtypes            as PQ
 import qualified Database.PostgreSQL.Simple.ToField             as PQ
 
+import qualified Data.SOP.Counting                              as Ouroboros
 import qualified Ouroboros.Consensus.Block.Abstract             as Ouroboros
 import qualified Ouroboros.Consensus.Cardano.Block              as Ouroboros
 import qualified Ouroboros.Consensus.Config.SecurityParam       as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History.EraParams as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History.Qry       as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History.Summary   as Ouroboros
-import qualified Ouroboros.Consensus.Util.Counting              as Ouroboros
 
 
 import           Database.PostgreSQL.Simple                     (ResultError (UnexpectedNull))
@@ -134,7 +134,7 @@ newtype SD = SD Api.ScriptData
 
 instance FromJSON SD where
     parseJSON v = case Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema v of
-        Right x -> return (SD x)
+        Right x -> return (SD $ Api.getScriptData x)
         Left e  -> fail $ show e
 
 -------------------------------------------------------------------------------
@@ -293,7 +293,7 @@ instance FromJSON MA where
             Hex tn' <- obj Aeson..: "name"
             amt     <- obj Aeson..: "quantity"
 
-            pn     <- maybe (fail "invalid policy")    return $ Api.deserialiseFromRawBytes Api.AsPolicyId pn'
+            pn     <- either (\e -> fail $ "invalid policy: " <> show e)    return $ Api.deserialiseFromRawBytes Api.AsPolicyId pn'
             tn     <- maybe (fail "invalid tokenname") return $ tokenNameFromBS tn'
             return (GYToken (mintingPolicyIdFromApi pn) tn, amt)
 
@@ -344,8 +344,8 @@ dbSyncGetProtocolParameters (Conn pool) = Pool.withResource pool $ \conn -> do
             , protocolParamMaxBlockHeaderSize  = unN ppBHSize
             , protocolParamMaxBlockBodySize    = unN ppBlockSize
             , protocolParamMaxTxSize           = unN ppMaxTxSize
-            , protocolParamTxFeeFixed          = unN ppTxFeeFixed
-            , protocolParamTxFeePerByte        = unN ppTxFeePerByte
+            , protocolParamTxFeeFixed          = Api.Lovelace $ toInteger $ unN ppTxFeeFixed
+            , protocolParamTxFeePerByte        = Api.Lovelace $ toInteger $ unN ppTxFeePerByte
             , protocolParamMinUTxOValue        = Nothing
             , protocolParamStakeAddressDeposit = Api.Lovelace (unSI ppStakeAddressDeposit)
             , protocolParamStakePoolDeposit    = Api.Lovelace (unSI ppStakePoolDeposit)
@@ -399,6 +399,8 @@ data PP = PP
     }
   deriving (Generic)
 
+deriving newtype instance FromJSON Api.CostModel  -- FIXME: Need to test this!
+
 instance PQ.FromRow PP
 
 -- for some reason, cardano-db-sync uses difference encoding then there is in cardano-api (or was)
@@ -448,6 +450,7 @@ dbSyncGetEraHistory (Conn pool) =  Pool.withResource pool $ \conn -> do
             K (mkEraParams 500 0.1 300) :*
             K (mkEraParams 500 0.1 300) :*
             K (mkEraParams 500 0.1 300) :*
+            K (mkEraParams 500 0.1 300) :*
             Nil
 
         -- privatenet eras don't use defaultEraParams
@@ -476,8 +479,8 @@ instance (Api.SerialiseAsRawBytes a, Api.HasTypeProxy a, Typeable a) => PQ.FromF
     fromField f bs = do
         PQ.Binary bs' <- PQ.fromField f bs
         case Api.deserialiseFromRawBytes (Api.proxyToAsType (Proxy @a)) bs' of
-            Just x  -> return (RawBytes x)
-            Nothing -> PQ.returnError PQ.ConversionFailed f $ "does not unserialise: " ++ show (typeRep @a)
+            Right x -> return (RawBytes x)
+            Left e  -> PQ.returnError PQ.ConversionFailed f $ "does not unserialise: " <> show (typeRep @a) <> ", error: " <> show e
 
 instance Api.SerialiseAsRawBytes a => PQ.ToField (RawBytes a) where
     toField (RawBytes x) = PQ.toField (PQ.Binary (Api.serialiseToRawBytes x))

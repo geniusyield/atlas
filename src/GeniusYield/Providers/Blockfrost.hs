@@ -295,8 +295,8 @@ blockfrostProtocolParams proj = do
   where
     toApiCostModel = Map.fromList
         . Map.foldlWithKey (\acc k x -> case k of
-            Blockfrost.PlutusV1 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV1, Api.CostModel x) : acc
-            Blockfrost.PlutusV2 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2, Api.CostModel x) : acc
+            Blockfrost.PlutusV1 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV1, Api.CostModel $ Map.elems x) : acc
+            Blockfrost.PlutusV2 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2, Api.CostModel $ Map.elems x) : acc
             -- Don't care about non plutus cost models.
             Blockfrost.Timelock -> acc
         )

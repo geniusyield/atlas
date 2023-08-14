@@ -79,8 +79,8 @@ txInToApi useInline (GYTxIn oref m) = (txOutRefToApi oref, Api.BuildTxWith $ f m
     f GYTxInWitnessKey = Api.KeyWitness Api.KeyWitnessForSpending
     f (GYTxInWitnessScript v d r) =
         Api.ScriptWitness Api.ScriptWitnessForSpending $ g v
-        (if useInline then Api.InlineScriptDatum else Api.ScriptDatumForTxIn $ datumToApi' d)
-        (redeemerToApi r)
+        (if useInline then Api.InlineScriptDatum else Api.ScriptDatumForTxIn $ Api.unsafeHashableScriptData $ datumToApi' d)
+        (Api.unsafeHashableScriptData $ redeemerToApi r)
         (Api.ExecutionUnits 0 0)
 
     g (GYInScript v)        = validatorToApiPlutusScriptWitness v

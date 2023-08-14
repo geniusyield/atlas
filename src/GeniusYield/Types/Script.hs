@@ -10,7 +10,6 @@ module GeniusYield.Types.Script (
     -- * Validator
     GYValidator,
     validatorFromPlutus,
-    validatorToPlutus,
     validatorToApi,
     validatorFromApi,
     validatorToApiPlutusScriptWitness,
@@ -38,8 +37,6 @@ module GeniusYield.Types.Script (
     mintingPolicyVersion,
     mintingPolicyVersionFromWitness,
     mintingPolicyFromPlutus,
-    mintingPolicyToPlutus,
-    mintingPolicyToPlutusFromWitness,
     mintingPolicyToApi,
     mintingPolicyIdToText,
     mintingPolicyIdFromText,
@@ -74,9 +71,7 @@ module GeniusYield.Types.Script (
     scriptToApi,
     scriptFromCBOR,
     scriptFromCBOR',
-    scriptToPlutus,
     scriptFromPlutus,
-    someScriptToPlutus,
     scriptApiHash,
     scriptPlutusHash,
     someScriptPlutusHash,
@@ -94,7 +89,6 @@ import           Data.GADT.Show
 
 import qualified Cardano.Api                      as Api
 import qualified Cardano.Api.Shelley              as Api.S
-import qualified Codec.Serialise
 import           Control.Lens                     ((?~))
 import           Data.Aeson.Types                 (FromJSONKey (fromJSONKey),
                                                    FromJSONKeyFunction (FromJSONKeyTextParser),
@@ -102,15 +96,14 @@ import           Data.Aeson.Types                 (FromJSONKey (fromJSONKey),
                                                    toJSONKeyText)
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString.Base16           as BS16
-import qualified Data.ByteString.Lazy             as BSL
-import qualified Data.ByteString.Short            as SBS
 import qualified Data.Swagger                     as Swagger
 import qualified Data.Swagger.Internal.Schema     as Swagger
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as TE
-import qualified Plutus.V1.Ledger.Api             as Plutus
-import qualified Plutus.V1.Ledger.Scripts         as Plutus
-import qualified PlutusTx.Builtins.Internal       as Plutus
+import qualified PlutusLedgerApi.Common           as Plutus
+import qualified PlutusLedgerApi.V1               as PlutusV1
+import qualified PlutusTx
+import qualified PlutusTx.Builtins                as PlutusTx
 import qualified Text.Printf                      as Printf
 import qualified Web.HttpApiData                  as Web
 
@@ -137,11 +130,8 @@ deriving newtype instance GCompare GYValidator
 instance GShow GYValidator where
   gshowsPrec = showsPrec
 
-validatorFromPlutus :: forall v. SingPlutusVersionI v => Plutus.Validator -> GYValidator v
-validatorFromPlutus = coerce (scriptFromPlutus @v) -- TODO: generalise #28
-                                                   --       (https://github.com/geniusyield/atlas/issues/28)
-validatorToPlutus :: GYValidator v  -> Plutus.Validator
-validatorToPlutus = coerce scriptToPlutus
+validatorFromPlutus :: forall v. SingPlutusVersionI v => PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ()) -> GYValidator v
+validatorFromPlutus = coerce (scriptFromPlutus @v)
 
 validatorToScript :: GYValidator v -> GYScript v
 validatorToScript = coerce
@@ -155,7 +145,7 @@ validatorFromApi = coerce (scriptFromApi @v)
 validatorHash :: GYValidator v -> GYValidatorHash
 validatorHash = coerce scriptApiHash
 
-validatorPlutusHash :: GYValidator v -> Plutus.ValidatorHash
+validatorPlutusHash :: GYValidator v -> PlutusV1.ScriptHash
 validatorPlutusHash = coerce scriptPlutusHash
 
 validatorApiHash :: GYValidator v -> Api.ScriptHash
@@ -202,9 +192,8 @@ instance IsString GYValidatorHash where
 instance Printf.PrintfArg GYValidatorHash where
     formatArg (GYValidatorHash h) = formatArg $ init $ tail $ show h
 
-validatorHashToPlutus :: GYValidatorHash -> Plutus.ValidatorHash
-validatorHashToPlutus (GYValidatorHash h) =
-    Plutus.ValidatorHash $ Plutus.toBuiltin $ Api.serialiseToRawBytes h
+validatorHashToPlutus :: GYValidatorHash -> PlutusV1.ScriptHash
+validatorHashToPlutus = apiHashToPlutus . validatorHashToApi
 
 validatorHashToApi :: GYValidatorHash -> Api.ScriptHash
 validatorHashToApi = coerce
@@ -220,12 +209,12 @@ validatorHashFromApi = coerce
 -- >>> validatorHashFromPlutus "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7"
 -- Left (DeserialiseRawBytesError {ptceTag = "validatorHashFromPlutus: cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7"})
 --
-validatorHashFromPlutus :: Plutus.ValidatorHash -> Either PlutusToCardanoError GYValidatorHash
-validatorHashFromPlutus vh@(Plutus.ValidatorHash (Plutus.BuiltinByteString bs)) =
-    maybe
-        (Left $ DeserialiseRawBytesError $ Text.pack $ "validatorHashFromPlutus: " ++ show vh)
-        (Right . coerce)
-    $ Api.deserialiseFromRawBytes Api.AsScriptHash bs
+validatorHashFromPlutus :: PlutusV1.ScriptHash -> Either PlutusToCardanoError GYValidatorHash
+validatorHashFromPlutus vh@(PlutusV1.ScriptHash ibs) =
+    bimap
+        (\e -> DeserialiseRawBytesError $ Text.pack $ "validatorHashFromPlutus: " <> show vh <> ", error: " <> show e)
+        validatorHashFromApi
+    $ Api.deserialiseFromRawBytes Api.AsScriptHash $ PlutusTx.fromBuiltin ibs
 
 -------------------------------------------------------------------------------
 -- Minting Policy
@@ -254,15 +243,8 @@ mintingPolicyIdFromWitness :: GYMintScript v -> GYMintingPolicyId
 mintingPolicyIdFromWitness (GYMintScript p)      = mintingPolicyId p
 mintingPolicyIdFromWitness (GYMintReference _ s) = mintingPolicyId $ coerce s
 
-mintingPolicyFromPlutus :: forall v. SingPlutusVersionI v => Plutus.MintingPolicy -> GYMintingPolicy v
+mintingPolicyFromPlutus :: forall v. SingPlutusVersionI v => PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ()) -> GYMintingPolicy v
 mintingPolicyFromPlutus = coerce (scriptFromPlutus @v)
-
-mintingPolicyToPlutus :: GYMintingPolicy v -> Plutus.MintingPolicy
-mintingPolicyToPlutus = coerce scriptToPlutus
-
-mintingPolicyToPlutusFromWitness :: GYMintScript v -> Plutus.MintingPolicy
-mintingPolicyToPlutusFromWitness (GYMintScript mp) = mintingPolicyToPlutus mp
-mintingPolicyToPlutusFromWitness (GYMintReference _ s) = mintingPolicyToPlutus $ coerce s
 
 mintingPolicyToScript :: GYMintingPolicy v -> GYScript v
 mintingPolicyToScript = coerce
@@ -273,7 +255,7 @@ mintingPolicyToApi = coerce scriptToApi
 mintingPolicyFromApi :: forall v. SingPlutusVersionI v => Api.PlutusScript (PlutusVersionToApi v) -> GYMintingPolicy v
 mintingPolicyFromApi = coerce (scriptFromApi @v)
 
-mintingPolicyCurrencySymbol :: GYMintingPolicy v -> Plutus.CurrencySymbol
+mintingPolicyCurrencySymbol :: GYMintingPolicy v -> PlutusV1.CurrencySymbol
 mintingPolicyCurrencySymbol = coerce scriptPlutusHash
 
 mintingPolicyApiId :: GYMintingPolicy v -> Api.PolicyId
@@ -381,8 +363,8 @@ mintingPolicyIdToApi = coerce
 mintingPolicyIdFromApi :: Api.PolicyId -> GYMintingPolicyId
 mintingPolicyIdFromApi = coerce
 
-mintingPolicyIdCurrencySymbol :: GYMintingPolicyId -> Plutus.CurrencySymbol
-mintingPolicyIdCurrencySymbol = coerce $ Plutus.BuiltinByteString . Api.serialiseToRawBytes @Api.PolicyId
+mintingPolicyIdCurrencySymbol :: GYMintingPolicyId -> PlutusV1.CurrencySymbol
+mintingPolicyIdCurrencySymbol = coerce $ PlutusTx.toBuiltin . Api.serialiseToRawBytes @Api.PolicyId
 
 mintingPolicyIdToText :: GYMintingPolicyId -> Text
 mintingPolicyIdToText = Api.serialiseToRawBytesHexText . Api.unPolicyId . mintingPolicyIdToApi
@@ -401,9 +383,7 @@ mintingPolicyIdFromText policyid = bimap customError mintingPolicyIdFromApi
 -- | Plutus script
 data GYScript (v :: PlutusVersion) = GYScript
     !(SingPlutusVersion v)
-    !Plutus.Script
     !(Api.PlutusScript (PlutusVersionToApi v))
-    !Plutus.ScriptHash
     !Api.ScriptHash
 
 -- | Equality and comparison are on script hash.
@@ -418,18 +398,18 @@ instance Ord (GYScript v) where
     compare = defaultCompare
 
 instance Show (GYScript v) where
-    showsPrec d (GYScript _ _ _ _ h) = showParen (d > 10)
+    showsPrec d (GYScript _ _ h) = showParen (d > 10)
         $ showString "GYScript "
         . showsPrec 11 h
 
 instance GEq GYScript where
-    geq (GYScript v1 _ _ _ h1) (GYScript v2 _ _ _ h2) = do
+    geq (GYScript v1 _ h1) (GYScript v2 _ h2) = do
         Refl <- geq v1 v2
         guard (h1 == h2)
         return Refl
 
 instance GCompare GYScript where
-    gcompare (GYScript v1 _ _ _ h1) (GYScript v2 _ _ _ h2) = case gcompare v1 v2 of
+    gcompare (GYScript v1 _ h1) (GYScript v2 _ h2) = case gcompare v1 v2 of
         GEQ -> case compare h1 h2 of
           EQ -> GEQ
           LT -> GLT
@@ -442,38 +422,17 @@ instance GShow GYScript where
 
 -- In implementation we cache the api representation and hashes.
 
-scriptFromPlutus :: forall v. SingPlutusVersionI v => Plutus.Script -> GYScript v
-scriptFromPlutus script =
-    GYScript v script apiPlutusScript plutusHash apiHash
-  where
-    -- implementation: Ledger.Scripts.toCardanoApiScript script
-    apiPlutusScript
-        = Api.S.PlutusScriptSerialised
-        $ SBS.toShort
-        $ BSL.toStrict
-        $ Codec.Serialise.serialise script
-
-    v = singPlutusVersion @v
-
-    apiScript :: Api.S.Script (PlutusVersionToApi v)
-    apiScript  = Api.PlutusScript (singPlutusVersionToApi v) apiPlutusScript
-    apiHash    = Api.hashScript apiScript
-    plutusHash = coerce $ Plutus.BuiltinByteString $ Api.serialiseToRawBytes apiHash
+scriptFromPlutus :: forall v a. SingPlutusVersionI v => PlutusTx.CompiledCode a -> GYScript v
+scriptFromPlutus script = scriptFromApi $ Api.S.PlutusScriptSerialised $ Plutus.serialiseCompiledCode script
 
 scriptVersion :: GYScript v -> SingPlutusVersion v
-scriptVersion (GYScript v _ _ _ _) = v
-
-scriptToPlutus :: GYScript v -> Plutus.Script
-scriptToPlutus (GYScript _ p _ _ _) = p
-
-someScriptToPlutus :: Some GYScript -> Plutus.Script
-someScriptToPlutus (Some s) = scriptToPlutus s
+scriptVersion (GYScript v _ _) = v
 
 scriptToApi :: GYScript v -> Api.PlutusScript (PlutusVersionToApi v)
-scriptToApi (GYScript _ _ api _ _) = api
+scriptToApi (GYScript _ api _) = api
 
 someScriptToReferenceApi :: Some GYScript -> Api.S.ReferenceScript Api.S.BabbageEra
-someScriptToReferenceApi (Some (GYScript v _ apiScript _ _)) =
+someScriptToReferenceApi (Some (GYScript v apiScript _)) =
     Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra $
     Api.ScriptInAnyLang (Api.PlutusScriptLanguage v') $
     Api.PlutusScript v' apiScript
@@ -485,7 +444,7 @@ someScriptToReferenceApi (Some (GYScript v _ apiScript _ _)) =
 -- /Note/: Simple scripts are converted to 'Nothing'.
 someScriptFromReferenceApi :: Api.S.ReferenceScript era -> Maybe (Some GYScript)
 someScriptFromReferenceApi Api.S.ReferenceScriptNone = Nothing
-someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra (Api.ScriptInAnyLang (Api.SimpleScriptLanguage _) _)) = Nothing
+someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra (Api.ScriptInAnyLang Api.SimpleScriptLanguage _)) = Nothing
 someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra (Api.ScriptInAnyLang (Api.PlutusScriptLanguage Api.PlutusScriptV1) (Api.PlutusScript _ x))) = Just (Some y)
   where
     y :: GYScript 'PlutusV1
@@ -497,32 +456,34 @@ someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInl
     y = scriptFromApi x
 
 scriptFromApi :: forall v. SingPlutusVersionI v => Api.PlutusScript (PlutusVersionToApi v) -> GYScript v
-scriptFromApi = scriptFromPlutus . Codec.Serialise.deserialise . BSL.fromStrict . with Api.serialiseToRawBytes
+scriptFromApi script = GYScript v script apiHash
   where
-    with :: (Api.S.HasTypeProxy (PlutusVersionToApi v) => r) -> r
-    with k = case singPlutusVersion @v of
-        SingPlutusV1 -> k
-        SingPlutusV2 -> k
+    v = singPlutusVersion @v
+    apiScript :: Api.S.Script (PlutusVersionToApi v)
+    apiScript = Api.PlutusScript (singPlutusVersionToApi v) script
+    apiHash = Api.hashScript apiScript
 
--- TODO: Can be defined in terms of `scriptFromCBOR'`.
 scriptFromCBOR :: forall v. SingPlutusVersionI v => Text -> Maybe (GYScript v)
-scriptFromCBOR t = do
-    bs <- BSL.fromStrict <$> rightToMaybe (BS16.decode $ encodeUtf8 t)
-    scriptFromPlutus @v <$> rightToMaybe (Codec.Serialise.deserialiseOrFail @Plutus.Script bs)
+scriptFromCBOR = scriptFromCBOR' . encodeUtf8
 
 scriptFromCBOR' :: forall v. SingPlutusVersionI v => ByteString -> Maybe (GYScript v)
 scriptFromCBOR' b = do
-    bs <- BSL.fromStrict <$> rightToMaybe (BS16.decode b)
-    scriptFromPlutus @v <$> rightToMaybe (Codec.Serialise.deserialiseOrFail @Plutus.Script bs)
+    bs <- rightToMaybe (BS16.decode b)
+    case singPlutusVersion @v of
+      SingPlutusV1 -> fmap scriptFromApi $ rightToMaybe $ flip Api.deserialiseFromRawBytes bs $ Api.AsPlutusScript $ Api.proxyToAsType $ Proxy @(PlutusVersionToApi v)
+      SingPlutusV2 -> fmap scriptFromApi $ rightToMaybe $ flip Api.deserialiseFromRawBytes bs $ Api.AsPlutusScript $ Api.proxyToAsType $ Proxy @(PlutusVersionToApi v)
 
-scriptPlutusHash :: GYScript v -> Plutus.ScriptHash
-scriptPlutusHash (GYScript _ _ _ ph _) = ph
+scriptPlutusHash :: GYScript v -> PlutusV1.ScriptHash
+scriptPlutusHash = apiHashToPlutus . scriptApiHash
 
-someScriptPlutusHash :: Some GYScript -> Plutus.ScriptHash
+apiHashToPlutus :: Api.ScriptHash -> PlutusV1.ScriptHash
+apiHashToPlutus h = PlutusV1.ScriptHash $ PlutusTx.toBuiltin $ Api.serialiseToRawBytes h
+
+someScriptPlutusHash :: Some GYScript -> PlutusV1.ScriptHash
 someScriptPlutusHash (Some s) = scriptPlutusHash s
 
 scriptApiHash :: GYScript v -> Api.ScriptHash
-scriptApiHash (GYScript _ _ _ _ ah) = ah
+scriptApiHash (GYScript _ _ ah) = ah
 
 scriptToApiPlutusScriptWitness
     :: GYScript v
@@ -530,7 +491,7 @@ scriptToApiPlutusScriptWitness
     -> Api.ScriptRedeemer
     -> Api.ExecutionUnits
     -> Api.ScriptWitness ctx Api.BabbageEra
-scriptToApiPlutusScriptWitness (GYScript v _ api _ _) = case v of
+scriptToApiPlutusScriptWitness (GYScript v api _) = case v of
     SingPlutusV1 -> Api.PlutusScriptWitness
         Api.PlutusScriptV1InBabbage
         Api.PlutusScriptV1
@@ -563,13 +524,13 @@ writeScript = writeScriptCore "Script"
 readScript :: forall v. SingPlutusVersionI v => FilePath -> IO (GYScript v)
 readScript file = case singPlutusVersion @v of
     SingPlutusV1 -> do
-        e <- Api.readFileTextEnvelope (Api.AsPlutusScript Api.AsPlutusScriptV1) file
+        e <- Api.readFileTextEnvelope (Api.AsPlutusScript Api.AsPlutusScriptV1) (Api.File file)
         case e of
             Left (err :: Api.FileError Api.TextEnvelopeError) -> throwIO $ userError $ show err
             Right s                                           -> return $ scriptFromApi s
 
     SingPlutusV2 -> do
-        e <- Api.readFileTextEnvelope (Api.AsPlutusScript Api.AsPlutusScriptV2) file
+        e <- Api.readFileTextEnvelope (Api.AsPlutusScript Api.AsPlutusScriptV2) (Api.File file)
         case e of
             Left (err :: Api.FileError Api.TextEnvelopeError) -> throwIO $ userError $ show err
             Right s                                           -> return $ scriptFromApi s
@@ -577,8 +538,8 @@ readScript file = case singPlutusVersion @v of
 writeScriptCore :: forall v. Api.S.TextEnvelopeDescr -> FilePath -> GYScript v -> IO ()
 writeScriptCore desc file s = do
     e <- case scriptVersion @v s of
-        SingPlutusV1 -> Api.writeFileTextEnvelope file (Just desc) $ scriptToApi s
-        SingPlutusV2 -> Api.writeFileTextEnvelope file (Just desc) $ scriptToApi s
+        SingPlutusV1 -> Api.writeFileTextEnvelope (Api.File file) (Just desc) $ scriptToApi s
+        SingPlutusV2 -> Api.writeFileTextEnvelope (Api.File file) (Just desc) $ scriptToApi s
     case e of
         Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
         Right ()                       -> return ()

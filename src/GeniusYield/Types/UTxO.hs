@@ -52,7 +52,7 @@ import qualified Cardano.Api                as Api
 import qualified Cardano.Api.Shelley        as Api.S
 import           Control.Monad.Random       (MonadRandom (getRandomR))
 import qualified Data.Map.Strict            as Map
-import qualified Plutus.V2.Ledger.Tx        as Plutus
+import qualified PlutusLedgerApi.V2.Tx      as Plutus
 import qualified Text.Printf                as Printf
 
 import           Data.Maybe                 (isNothing)
@@ -130,7 +130,7 @@ utxosToApi (GYUTxOs m) = Api.UTxO $ Map.foldlWithKey' f Map.empty m
 
     outDatumToApi GYOutDatumNone     = Api.TxOutDatumNone
     outDatumToApi (GYOutDatumHash h) = Api.TxOutDatumHash Api.ScriptDataInBabbageEra $ datumHashToApi h
-    outDatumToApi (GYOutDatumInline d) = Api.TxOutDatumInline Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra $ datumToApi' d
+    outDatumToApi (GYOutDatumInline d) = Api.TxOutDatumInline Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra $ Api.unsafeHashableScriptData $ datumToApi' d
 
 utxoFromApi :: Api.TxIn -> Api.TxOut Api.CtxTx Api.BabbageEra -> GYUTxO
 utxoFromApi txIn (Api.TxOut a v d s) = GYUTxO
@@ -144,8 +144,8 @@ utxoFromApi txIn (Api.TxOut a v d s) = GYUTxO
     f :: Api.TxOutDatum Api.CtxTx Api.BabbageEra -> GYOutDatum
     f Api.TxOutDatumNone          = GYOutDatumNone
     f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
-    f (Api.TxOutDatumInTx _ sd)   = GYOutDatumHash . hashDatum $ datumFromApi' sd
-    f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' sd
+    f (Api.TxOutDatumInTx _ sd)   = GYOutDatumHash . hashDatum $ datumFromApi' $ Api.getScriptData sd
+    f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' $ Api.getScriptData sd
 
 utxoFromApi' :: Api.TxIn -> Api.TxOut Api.CtxUTxO era -> GYUTxO
 utxoFromApi' txIn (Api.TxOut a v d s) = GYUTxO
@@ -159,7 +159,7 @@ utxoFromApi' txIn (Api.TxOut a v d s) = GYUTxO
     f :: Api.TxOutDatum Api.CtxUTxO era -> GYOutDatum
     f Api.TxOutDatumNone          = GYOutDatumNone
     f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
-    f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' sd
+    f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' $ Api.getScriptData sd
 
 utxoToPlutus :: GYUTxO -> Plutus.TxOut
 utxoToPlutus GYUTxO{..} = Plutus.TxOut

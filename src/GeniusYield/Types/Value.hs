@@ -95,6 +95,7 @@ import qualified Text.Printf                      as Printf
 import qualified Web.HttpApiData                  as Web
 
 
+import           Data.Either.Combinators          (mapLeft)
 import qualified GeniusYield.Imports              as TE
 import qualified GeniusYield.Types.Ada            as Ada
 import           GeniusYield.Types.Script
@@ -445,7 +446,7 @@ assetClassFromPlutus (Plutus.AssetClass (cs, tn))
     | cs == Ada.adaSymbol, tn == Ada.adaToken  = Right GYLovelace
     | otherwise                                = do
         tn' <- maybe (Left $ GYTokenNameTooBig tn) Right $ tokenNameFromPlutus tn
-        cs' <- maybe (Left $ GYInvalidPolicyId cs) Right . Api.deserialiseFromRawBytes Api.AsScriptHash $
+        cs' <- mapLeft (\_ -> GYInvalidPolicyId cs) . Api.deserialiseFromRawBytes Api.AsScriptHash $
             case cs of Plutus.CurrencySymbol bs -> fromBuiltin bs
         return (GYToken (mintingPolicyIdFromApi (Api.PolicyId cs')) tn')
 

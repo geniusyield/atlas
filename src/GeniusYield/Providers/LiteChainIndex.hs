@@ -71,7 +71,7 @@ chainSyncCallback slotVar dataVar (RollForward block@(Api.BlockInMode (Api.Block
     STM.atomically $ do
         STM.writeTVar slotVar slot
         STM.modifyTVar' dataVar $ \m ->
-            foldl' (\m' sd -> Map.insert (Api.hashScriptData sd) sd m') m (blockDatums block)
+            foldl' (\m' sd -> Map.insert (Api.hashScriptDataBytes $ Api.unsafeHashableScriptData sd) sd m') m (blockDatums block)
 
 chainSyncCallback _ _ _ = return ()
 
@@ -200,6 +200,6 @@ blockDatums (Api.BlockInMode block _) = goBlock block where
 
     goDatum :: Api.TxOutDatum Api.CtxTx era -> [Api.ScriptData]
     goDatum Api.TxOutDatumNone          = []
-    goDatum (Api.TxOutDatumInTx _ sd)   = [sd]
+    goDatum (Api.TxOutDatumInTx _ sd)   = [Api.getScriptData sd]
     goDatum (Api.TxOutDatumHash _ _h)   = []
-    goDatum (Api.TxOutDatumInline _ sd) = [sd]
+    goDatum (Api.TxOutDatumInline _ sd) = [Api.getScriptData sd]

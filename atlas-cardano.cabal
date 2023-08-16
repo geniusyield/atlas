@@ -218,6 +218,7 @@ library
     , ouroboros-consensus
     , ouroboros-consensus-cardano
     , ouroboros-network
+    , ouroboros-network-protocols
     , plutus-ledger-api
     , plutus-tx
     , text-class

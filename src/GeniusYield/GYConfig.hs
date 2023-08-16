@@ -55,6 +55,15 @@ newtype Confidential a = Confidential a
 instance Show (Confidential a) where
   showsPrec _ _ = showString "<Confidential>"
 
+newtype PQConnInf = PQConnInf PQ.ConnectInfo
+  deriving newtype (Show)
+
+instance FromJSON PQConnInf where
+  parseJSON = Aeson.withText "ConnectInfo URL" $ \t ->
+    case PQConnInf <$> PQ.parseDatabaseUrl (T.unpack t) of
+      Nothing -> fail "Invalid PostgreSQL URL"
+      Just ci -> pure ci
+
 {- |
 The supported providers. The options are:
 
@@ -77,6 +86,14 @@ data GYCoreProviderInfo
   | GYMaestro {cpiMaestroToken :: !(Confidential Text)}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock (Show)
+
+$( deriveFromJSON
+    defaultOptions
+      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+      , sumEncoding = UntaggedValue
+      }
+    ''GYCoreProviderInfo
+ )
 
 coreProviderIO :: FilePath -> IO GYCoreProviderInfo
 coreProviderIO filePath = do
@@ -127,6 +144,13 @@ data GYCoreConfig = GYCoreConfig
   , cfgUtxoCacheEnable :: !Bool
   }
   deriving stock (Show)
+
+$( deriveFromJSON
+    defaultOptions
+      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+      }
+    ''GYCoreConfig
+ )
 
 coreConfigIO :: FilePath -> IO GYCoreConfig
 coreConfigIO file = do
@@ -223,26 +247,3 @@ withCfgProviders
                 logRun gyLog' mempty GYError $ printf "ERROR: %s" $ show err
                 throwIO err
 
-newtype PQConnInf = PQConnInf PQ.ConnectInfo
-  deriving newtype (Show)
-
-instance FromJSON PQConnInf where
-  parseJSON = Aeson.withText "ConnectInfo URL" $ \t ->
-    case PQConnInf <$> PQ.parseDatabaseUrl (T.unpack t) of
-      Nothing -> fail "Invalid PostgreSQL URL"
-      Just ci -> pure ci
-
-$( deriveFromJSON
-    defaultOptions
-      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
-      , sumEncoding = UntaggedValue
-      }
-    ''GYCoreProviderInfo
- )
-
-$( deriveFromJSON
-    defaultOptions
-      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
-      }
-    ''GYCoreConfig
- )

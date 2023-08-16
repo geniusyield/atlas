@@ -110,6 +110,7 @@ utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref witns) addr val ms useInline) =
 data BuildTxException
     = BuildTxBalancingError !BalancingError
     | BuildTxBodyErrorAutoBalance !Api.TxBodyErrorAutoBalance
+    | BuildTxPPConversionError !Api.ProtocolParametersConversionError
     | BuildTxMissingMaxExUnitsParam
     -- ^ Missing max ex units in protocol params
     | BuildTxExUnitsTooBig  -- ^ Execution units required is higher than the maximum as specified by protocol params.

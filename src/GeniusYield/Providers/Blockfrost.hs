@@ -127,7 +127,7 @@ blockfrostAwaitTxConfirmed proj p@GYAwaitTxParameters{..} txId = blpAwaitTx 0
             Left Blockfrost.BlockfrostNotFound
                 | attempt < maxAttempts -> threadDelay checkInterval >>
                                            blpAwaitBlock (attempt + 1) blockHash
-            Left err -> throwBlpvApiError "AwaitTx" err
+            Left err -> throwBlpvApiError "AwaitBlock" err
             Right blockInfo ->
                 when (Blockfrost._blockConfirmations blockInfo < toInteger confirmations
                       &&

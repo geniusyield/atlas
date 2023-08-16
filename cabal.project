@@ -12,7 +12,7 @@ repository cardano-haskell-packages
 
 
 index-state: 2022-09-26T22:25:36Z
-index-state: 
+index-state:
   , hackage.haskell.org      2022-09-26T22:25:36Z
   , cardano-haskell-packages 2022-10-25T17:33:07Z
 
@@ -94,9 +94,9 @@ source-repository-package
 
 source-repository-package
   type: git
-  location: https://github.com/maestro-org/haskell-sdk
-  tag: deb1e133cd7de989e9e85c2b44e9361f52e93776
-  --sha256: sha256-k4OoAAUFdYkKDSTDeM2dwC/DrJrPotiz0EIeU0xccXY=
+  location: https://github.com/alegadea/haskell-sdk
+  tag: d916e60c0f4eef5d9d51385ada99b014b86fae7e
+  --sha256: sha256-nZHSNhulnbaXhRpwrQbKzVLPPrJpFiTmz18PArLhgNs=
 
 -- Everything below is essentially copied from cardano-wallet's cabal.project.
 

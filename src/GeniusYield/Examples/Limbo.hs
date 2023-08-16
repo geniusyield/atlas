@@ -23,8 +23,9 @@ import           GeniusYield.TxBuilder.Class
 import           GeniusYield.Types
 
 import qualified Data.Map.Strict             as Map
-import qualified Plutus.V1.Ledger.Scripts    as Plutus
+import           GeniusYield.Examples.Common (toDeBruijn)
 import qualified PlutusCore                  as PLC
+import qualified PlutusLedgerApi.Common      as Plutus
 import qualified UntypedPlutusCore           as UPLC
 
 -------------------------------------------------------------------------------
@@ -46,30 +47,17 @@ limboScript
     scName       = UPLC.Name "sc" (UPLC.Unique 2)
 
 limboScript' :: UPLC.Term UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
-limboScript' = case UPLC.deBruijnTerm limboScript of
-    Left exc    -> error $ "Converting to deBruijn " ++ show (exc :: UPLC.FreeVariableError)
-    Right term' -> renameUPLC (\(UPLC.NamedDeBruijn _ i) -> UPLC.DeBruijn i) term'
-
-renameUPLC :: (name -> name') -> UPLC.Term name uni fun ann -> UPLC.Term name' uni fun ann
-renameUPLC rnm = go where
-    go (UPLC.Var ann n       ) = UPLC.Var ann (rnm n)
-    go (UPLC.LamAbs ann n t  ) = UPLC.LamAbs ann (rnm n) (go t)
-    go (UPLC.Apply ann t1 t2 ) = UPLC.Apply ann (go t1) (go t2)
-    go (UPLC.Delay ann t     ) = UPLC.Delay ann (go t)
-    go (UPLC.Force ann t     ) = UPLC.Force ann (go t)
-    go (UPLC.Constant ann con) = UPLC.Constant ann con
-    go (UPLC.Builtin ann bn  ) = UPLC.Builtin ann bn
-    go (UPLC.Error ann       ) = UPLC.Error ann
-
-limboValidatorPlutus :: Plutus.Validator
-limboValidatorPlutus = Plutus.Validator $ Plutus.Script $
-    UPLC.Program () (PLC.defaultVersion ()) limboScript'
+limboScript' = toDeBruijn limboScript
 
 limboValidatorV1 :: GYValidator 'PlutusV1
-limboValidatorV1 = validatorFromPlutus limboValidatorPlutus
+limboValidatorV1 = validatorFromSerialisedScript limboValidatorPlutusSerialised
 
 limboValidatorV2 :: GYValidator 'PlutusV2
-limboValidatorV2 = validatorFromPlutus limboValidatorPlutus
+limboValidatorV2 = validatorFromSerialisedScript limboValidatorPlutusSerialised
+
+limboValidatorPlutusSerialised :: Plutus.SerialisedScript
+limboValidatorPlutusSerialised = Plutus.serialiseUPLC $
+    UPLC.Program () PLC.latestVersion limboScript'
 
 -------------------------------------------------------------------------------
 -- API

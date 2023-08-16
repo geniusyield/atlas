@@ -10,14 +10,15 @@ Stability   : develop
 module GeniusYield.Examples.Gift (
     -- * Scripts
     giftValidatorV1,
-    giftValidatorV2, 
+    giftValidatorV2,
 ) where
 
 import           GeniusYield.Types
 
-import qualified Plutus.V1.Ledger.Scripts          as Plutus
-import qualified PlutusCore                        as PLC
-import qualified UntypedPlutusCore                 as UPLC
+import           GeniusYield.Examples.Common (toDeBruijn)
+import qualified PlutusCore                  as PLC
+import qualified PlutusLedgerApi.Common      as Plutus
+import qualified UntypedPlutusCore           as UPLC
 
 -------------------------------------------------------------------------------
 -- Script
@@ -38,27 +39,14 @@ giftScript
     scName       = UPLC.Name "sc" (UPLC.Unique 2)
 
 giftScript' :: UPLC.Term UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
-giftScript' = case UPLC.deBruijnTerm giftScript of
-    Left exc    -> error $ "Converting to deBruijn " ++ show (exc :: UPLC.FreeVariableError)
-    Right term' -> renameUPLC (\(UPLC.NamedDeBruijn _ i) -> UPLC.DeBruijn i) term'
-
-renameUPLC :: (name -> name') -> UPLC.Term name uni fun ann -> UPLC.Term name' uni fun ann
-renameUPLC rnm = go where
-    go (UPLC.Var ann n       ) = UPLC.Var ann (rnm n)
-    go (UPLC.LamAbs ann n t  ) = UPLC.LamAbs ann (rnm n) (go t)
-    go (UPLC.Apply ann t1 t2 ) = UPLC.Apply ann (go t1) (go t2)
-    go (UPLC.Delay ann t     ) = UPLC.Delay ann (go t)
-    go (UPLC.Force ann t     ) = UPLC.Force ann (go t)
-    go (UPLC.Constant ann con) = UPLC.Constant ann con
-    go (UPLC.Builtin ann bn  ) = UPLC.Builtin ann bn
-    go (UPLC.Error ann       ) = UPLC.Error ann
-
-giftValidatorPlutus :: Plutus.Validator
-giftValidatorPlutus = Plutus.Validator $ Plutus.Script $
-    UPLC.Program () (PLC.defaultVersion ()) giftScript'
+giftScript' = toDeBruijn giftScript
 
 giftValidatorV1 :: GYValidator 'PlutusV1
-giftValidatorV1 = validatorFromPlutus giftValidatorPlutus
+giftValidatorV1 = validatorFromSerialisedScript giftValidatorPlutusSerialised
 
 giftValidatorV2 :: GYValidator 'PlutusV2
-giftValidatorV2 = validatorFromPlutus giftValidatorPlutus
+giftValidatorV2 = validatorFromSerialisedScript giftValidatorPlutusSerialised
+
+giftValidatorPlutusSerialised :: Plutus.SerialisedScript
+giftValidatorPlutusSerialised = Plutus.serialiseUPLC $
+    UPLC.Program () PLC.latestVersion giftScript'

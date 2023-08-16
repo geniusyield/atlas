@@ -10,6 +10,7 @@ module GeniusYield.Types.Script (
     -- * Validator
     GYValidator,
     validatorFromPlutus,
+    validatorFromSerialisedScript,
     validatorToApi,
     validatorFromApi,
     validatorToApiPlutusScriptWitness,
@@ -37,6 +38,7 @@ module GeniusYield.Types.Script (
     mintingPolicyVersion,
     mintingPolicyVersionFromWitness,
     mintingPolicyFromPlutus,
+    mintingPolicyFromSerialisedScript,
     mintingPolicyToApi,
     mintingPolicyIdToText,
     mintingPolicyIdFromText,
@@ -132,6 +134,9 @@ instance GShow GYValidator where
 
 validatorFromPlutus :: forall v. SingPlutusVersionI v => PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ()) -> GYValidator v
 validatorFromPlutus = coerce (scriptFromPlutus @v)
+
+validatorFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYValidator v
+validatorFromSerialisedScript = coerce . scriptFromSerialisedScript
 
 validatorToScript :: GYValidator v -> GYScript v
 validatorToScript = coerce
@@ -245,6 +250,9 @@ mintingPolicyIdFromWitness (GYMintReference _ s) = mintingPolicyId $ coerce s
 
 mintingPolicyFromPlutus :: forall v. SingPlutusVersionI v => PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ()) -> GYMintingPolicy v
 mintingPolicyFromPlutus = coerce (scriptFromPlutus @v)
+
+mintingPolicyFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYMintingPolicy v
+mintingPolicyFromSerialisedScript = coerce . scriptFromSerialisedScript
 
 mintingPolicyToScript :: GYMintingPolicy v -> GYScript v
 mintingPolicyToScript = coerce
@@ -424,6 +432,10 @@ instance GShow GYScript where
 
 scriptFromPlutus :: forall v a. SingPlutusVersionI v => PlutusTx.CompiledCode a -> GYScript v
 scriptFromPlutus script = scriptFromApi $ Api.S.PlutusScriptSerialised $ Plutus.serialiseCompiledCode script
+
+scriptFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYScript v
+scriptFromSerialisedScript serialisedScript =
+  scriptFromApi $ Api.S.PlutusScriptSerialised @(PlutusVersionToApi v) serialisedScript
 
 scriptVersion :: GYScript v -> SingPlutusVersion v
 scriptVersion (GYScript v _ _) = v

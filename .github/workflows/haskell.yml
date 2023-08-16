@@ -103,8 +103,8 @@ jobs:
     - name: Setup haskell tooling
       uses: haskell/actions/setup@v2
       with:
-        ghc-version: '8.10.7'
-        cabal-version: '3.8'
+        ghc-version: '9.2.8'
+        cabal-version: '3.10.1.0'
         enable-stack: true
         stack-version: '2.9'
     - name: Setup cache
@@ -175,7 +175,7 @@ jobs:
     - name: Upload haddock documentation
       uses: actions/upload-pages-artifact@v1.0.8
       with:
-        path: ./dist-newstyle/build/x86_64-linux/ghc-8.10.7/${{env.ATLAS_VERSION}}/doc/html/atlas-cardano/
+        path: ./dist-newstyle/build/x86_64-linux/ghc-9.2.8/${{env.ATLAS_VERSION}}/doc/html/atlas-cardano/
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:

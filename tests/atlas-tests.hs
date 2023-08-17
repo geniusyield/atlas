@@ -1,23 +1,23 @@
 module Main (main) where
 
-import qualified Cardano.Api                       as Api
-import qualified Data.ByteString                   as BS
-import qualified Data.ByteString.Lazy              as LBS
-import           System.Directory                  (doesFileExist)
-import           System.FilePath                   ((</>))
-import           Test.Tasty                        (defaultMain, testGroup)
-import           Test.Tasty.Golden                 (goldenVsString)
-import           Test.Tasty.HUnit                  (assertEqual, testCase,
-                                                    (@=?))
+import qualified Cardano.Api                    as Api
+import qualified Data.ByteString                as BS
+import qualified Data.ByteString.Lazy           as LBS
+import           System.Directory               (doesFileExist)
+import           System.FilePath                ((</>))
+import           Test.Tasty                     (defaultMain, testGroup)
+import           Test.Tasty.Golden              (goldenVsString)
+import           Test.Tasty.HUnit               (assertEqual, testCase, (@=?))
 
 import           GeniusYield.Examples.Gift
-import           GeniusYield.GYConfig              (coreConfigIO, findMaestroTokenAndNetId)
+import           GeniusYield.GYConfig           (coreConfigIO,
+                                                 findMaestroTokenAndNetId)
 import           GeniusYield.Imports
-import           GeniusYield.Test.CoinSelection    (coinSelectionTests)
-import           GeniusYield.Test.Config           (configTests)
-import           GeniusYield.Test.GYTxSkeleton     (gyTxSkeletonTests)
-import           GeniusYield.Test.Providers        (providersTests)
-import           GeniusYield.Test.SlotConfig       (slotConversionTests)
+import           GeniusYield.Test.CoinSelection (coinSelectionTests)
+import           GeniusYield.Test.Config        (configTests)
+import           GeniusYield.Test.GYTxSkeleton  (gyTxSkeletonTests)
+import           GeniusYield.Test.Providers     (providersTests)
+import           GeniusYield.Test.SlotConfig    (slotConversionTests)
 import           GeniusYield.Types
 
 -------------------------------------------------------------------------------

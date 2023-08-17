@@ -134,7 +134,7 @@ maestroTests token netId =
             let expected = Right GYUTxO { utxoRef       = mockTxOutRef
                                         , utxoAddress   = mockAddress
                                         , utxoValue     = valueFromList []
-                                        , utxoOutDatum  = GYOutDatumInline $ datumFromApi' $ either (error "Unable to read mock datum") id $ Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema mockScriptDataDetailed
+                                        , utxoOutDatum  = GYOutDatumInline $ datumFromApi' $ either (error "Unable to read mock datum") Api.getScriptData $ Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema mockScriptDataDetailed
                                         , utxoRefScript = Nothing
                                         }
                 res = utxoFromMaestro $ mockMaestroUtxo [] (Just maestroInlineDatum) Nothing

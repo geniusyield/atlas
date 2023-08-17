@@ -15,8 +15,8 @@ module GeniusYield.Test.OnChain.GuessRefInputDatum
     , Guess (..)
     ) where
 
-import           Plutus.V2.Ledger.Api
-import           Plutus.V2.Ledger.Contexts (findDatum)
+import           PlutusLedgerApi.V2
+import           PlutusLedgerApi.V2.Contexts (findDatum)
 import qualified PlutusTx
 import           PlutusTx.Prelude          as PlutusTx
 

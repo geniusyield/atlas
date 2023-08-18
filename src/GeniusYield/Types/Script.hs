@@ -36,13 +36,20 @@ module GeniusYield.Types.Script (
     GYMintingPolicy,
     mintingPolicyId,
     mintingPolicyVersion,
+    mintingPolicyVersionFromWitness,
     mintingPolicyFromPlutus,
     mintingPolicyToPlutus,
+    mintingPolicyToPlutusFromWitness,
     mintingPolicyToApi,
     mintingPolicyIdToText,
     mintingPolicyIdFromText,
     mintingPolicyFromApi,
     mintingPolicyToApiPlutusScriptWitness,
+
+    -- * Witness for Minting Policy
+    GYMintScript (..),
+    mintingPolicyIdFromWitness,
+    gyMintingScriptWitnessToApiPlutusSW,
 
     -- ** File operations
     writeMintingPolicy,
@@ -51,6 +58,7 @@ module GeniusYield.Types.Script (
     -- ** Selectors
     mintingPolicyCurrencySymbol,
     mintingPolicyApiId,
+    mintingPolicyApiIdFromWitness,
 
     -- * MintingPolicyId
     GYMintingPolicyId,
@@ -74,6 +82,7 @@ module GeniusYield.Types.Script (
     someScriptPlutusHash,
     someScriptToReferenceApi,
     someScriptFromReferenceApi,
+    referenceScriptToApiPlutusScriptWitness,
 
     -- ** File operations
     writeScript,
@@ -87,6 +96,7 @@ import qualified Cardano.Api                      as Api
 import qualified Cardano.Api.Shelley              as Api.S
 import qualified Codec.Serialise
 import           Control.Lens                     ((?~))
+import           Data.Aeson.Types                 (ToJSONKey (toJSONKey), FromJSONKey (fromJSONKey), FromJSONKeyFunction (FromJSONKeyTextParser), toJSONKeyText)
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString.Base16           as BS16
 import qualified Data.ByteString.Lazy             as BSL
@@ -105,6 +115,7 @@ import           Data.ByteString                  (ByteString)
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger         (PlutusToCardanoError (..))
 import           GeniusYield.Types.PlutusVersion
+import           GeniusYield.Types.TxOutRef       (GYTxOutRef, txOutRefToApi)
 
 -- $setup
 --
@@ -229,15 +240,26 @@ instance GShow GYMintingPolicy where
 mintingPolicyVersion :: GYMintingPolicy v -> SingPlutusVersion v
 mintingPolicyVersion = coerce scriptVersion
 
+mintingPolicyVersionFromWitness :: GYMintScript v -> PlutusVersion
+mintingPolicyVersionFromWitness (GYMintScript mp) = fromSingPlutusVersion $ mintingPolicyVersion mp
+mintingPolicyVersionFromWitness (GYMintReference _ s) = fromSingPlutusVersion $ mintingPolicyVersion $ coerce s
 
 mintingPolicyId :: GYMintingPolicy v -> GYMintingPolicyId
 mintingPolicyId = coerce scriptApiHash
+
+mintingPolicyIdFromWitness :: GYMintScript v -> GYMintingPolicyId
+mintingPolicyIdFromWitness (GYMintScript p) = mintingPolicyId p
+mintingPolicyIdFromWitness (GYMintReference _ s) = mintingPolicyId $ coerce s
 
 mintingPolicyFromPlutus :: forall v. SingPlutusVersionI v => Plutus.MintingPolicy -> GYMintingPolicy v
 mintingPolicyFromPlutus = coerce (scriptFromPlutus @v)
 
 mintingPolicyToPlutus :: GYMintingPolicy v -> Plutus.MintingPolicy
 mintingPolicyToPlutus = coerce scriptToPlutus
+
+mintingPolicyToPlutusFromWitness :: GYMintScript v -> Plutus.MintingPolicy
+mintingPolicyToPlutusFromWitness (GYMintScript mp) = mintingPolicyToPlutus mp
+mintingPolicyToPlutusFromWitness (GYMintReference _ s) = mintingPolicyToPlutus $ coerce s
 
 mintingPolicyToScript :: GYMintingPolicy v -> GYScript v
 mintingPolicyToScript = coerce
@@ -252,7 +274,10 @@ mintingPolicyCurrencySymbol :: GYMintingPolicy v -> Plutus.CurrencySymbol
 mintingPolicyCurrencySymbol = coerce scriptPlutusHash
 
 mintingPolicyApiId :: GYMintingPolicy v -> Api.PolicyId
-mintingPolicyApiId = coerce scriptApiHash
+mintingPolicyApiId = coerce . mintingPolicyId
+
+mintingPolicyApiIdFromWitness :: GYMintScript v -> Api.PolicyId
+mintingPolicyApiIdFromWitness = coerce . mintingPolicyIdFromWitness
 
 mintingPolicyToApiPlutusScriptWitness
     :: GYMintingPolicy v
@@ -261,6 +286,36 @@ mintingPolicyToApiPlutusScriptWitness
     -> Api.ScriptWitness Api.WitCtxMint Api.BabbageEra
 mintingPolicyToApiPlutusScriptWitness (GYMintingPolicy s) =
     scriptToApiPlutusScriptWitness s Api.NoScriptDatumForMint
+
+data GYMintScript (u :: PlutusVersion) where
+    -- | 'VersionIsGreaterOrEqual' restricts which version scripts can be used in this transaction.
+    GYMintScript    :: v `VersionIsGreaterOrEqual` u => GYMintingPolicy v -> GYMintScript u
+
+    -- | Reference inputs can be only used in V2 transactions.
+    GYMintReference :: !GYTxOutRef -> !(GYScript 'PlutusV2) -> GYMintScript 'PlutusV2
+
+deriving instance Show (GYMintScript v)
+
+instance Eq (GYMintScript v) where
+    GYMintReference r s == GYMintReference r' s' = r == r' && s == s'
+    GYMintScript p == GYMintScript p' = defaultEq p p'
+    _ == _ = False
+
+instance Ord (GYMintScript v) where
+    GYMintReference r s `compare` GYMintReference r' s' = compare r r' <> compare s s'
+    GYMintReference _ _ `compare` _ = LT
+    GYMintScript p `compare` GYMintScript p' = defaultCompare p p'
+    GYMintScript _ `compare` _ = GT
+
+gyMintingScriptWitnessToApiPlutusSW
+  :: GYMintScript u
+  -> Api.S.ScriptRedeemer
+  -> Api.S.ExecutionUnits
+  -> Api.S.ScriptWitness Api.S.WitCtxMint Api.S.BabbageEra
+gyMintingScriptWitnessToApiPlutusSW (GYMintScript p) = mintingPolicyToApiPlutusScriptWitness p
+gyMintingScriptWitnessToApiPlutusSW (GYMintReference r s) =
+    referenceScriptToApiPlutusScriptWitness r s
+    Api.NoScriptDatumForMint
 
 -- | Writes a minting policy to a file.
 --
@@ -276,6 +331,12 @@ readMintingPolicy = coerce readScript
 newtype GYMintingPolicyId = GYMintingPolicyId Api.PolicyId
   deriving stock   (Eq, Ord)
   deriving newtype (ToJSON, FromJSON)
+
+instance ToJSONKey GYMintingPolicyId where
+    toJSONKey = toJSONKeyText mintingPolicyIdToText
+
+instance FromJSONKey GYMintingPolicyId where
+    fromJSONKey = FromJSONKeyTextParser (either fail pure . mintingPolicyIdFromText)
 
 -- |
 --
@@ -299,15 +360,17 @@ instance Web.FromHttpApiData GYMintingPolicyId where
           Left x    -> fail $ "Invalid currency symbol: " ++ show cs ++ "; Reason: " ++ show x
           Right cs' -> return $ mintingPolicyIdFromApi cs'
 
+instance Swagger.ToParamSchema GYMintingPolicyId where
+  toParamSchema _ = mempty
+      & Swagger.type_           ?~ Swagger.SwaggerString
+      & Swagger.format          ?~ "hex"
+      & Swagger.maxLength       ?~ 56
+      & Swagger.minLength       ?~ 56
 
 instance Swagger.ToSchema GYMintingPolicyId where
-  declareNamedSchema _ = pure $ Swagger.named "GYMintingPolicyId" $ mempty
-                       & Swagger.type_           ?~ Swagger.SwaggerString
+  declareNamedSchema _ = pure $ Swagger.named "GYMintingPolicyId" $ Swagger.paramSchemaToSchema (Proxy @GYMintingPolicyId)
                        & Swagger.description     ?~ "This is the hash of a minting policy script."
-                       & Swagger.format          ?~ "hex"
                        & Swagger.example         ?~ toJSON ("ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef" :: Text)
-                       & Swagger.maxLength       ?~ 56
-                       & Swagger.minLength       ?~ 56
 
 mintingPolicyIdToApi :: GYMintingPolicyId -> Api.PolicyId
 mintingPolicyIdToApi = coerce
@@ -473,6 +536,19 @@ scriptToApiPlutusScriptWitness (GYScript v _ api _ _) = case v of
         Api.PlutusScriptV2InBabbage
         Api.PlutusScriptV2
         (Api.S.PScript api)
+
+referenceScriptToApiPlutusScriptWitness
+  :: GYTxOutRef
+  -> GYScript 'PlutusV2
+  -> Api.S.ScriptDatum witctx
+  -> Api.S.ScriptRedeemer
+  -> Api.S.ExecutionUnits
+  -> Api.S.ScriptWitness witctx Api.S.BabbageEra
+referenceScriptToApiPlutusScriptWitness r s =
+    Api.PlutusScriptWitness
+    Api.PlutusScriptV2InBabbage
+    Api.PlutusScriptV2
+    (Api.S.PReferenceScript (txOutRefToApi r) (Just (scriptApiHash s)))
 
 -- | Writes a script to a file.
 --

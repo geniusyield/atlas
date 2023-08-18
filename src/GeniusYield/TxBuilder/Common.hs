@@ -86,12 +86,14 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
 
         helper :: GYUTxOs -> GYTxSkeleton v -> m (Either BuildTxException GYTxBody)
         helper ownUtxos' GYTxSkeleton {..} = do
-            let gytxMint' :: Maybe (GYValue, [(Some GYMintingPolicy, GYRedeemer)])
-                gytxMint' | null gytxMint = Nothing
-                    | otherwise = Just
-                    ( valueFromList [ (GYToken (mintingPolicyId mp) tn, n) | (Some mp, (tokens, _)) <- itoList gytxMint, (tn, n) <- itoList tokens ]
-                    , [(mp, redeemer) | (mp, (_, redeemer)) <- itoList gytxMint]
-                    )
+            let gytxMint' :: Maybe (GYValue, [(GYMintScript v, GYRedeemer)])
+                gytxMint'
+                  | null gytxMint = Nothing
+                  | otherwise =
+                      Just
+                        ( valueFromList [ (GYToken (mintingPolicyIdFromWitness mp) tn, n) | (mp, (tokens, _)) <- itoList gytxMint, (tn, n) <- itoList tokens ]
+                        , [(mp, redeemer) | (mp, (_, redeemer)) <- itoList gytxMint]
+                        )
 
             -- Convert the 'GYTxIn's to 'GYTxInDetailed's by fetching chain information about them.
             gyInUtxos       <- utxosAtTxOutRefs $ gyTxInTxOutRef <$> gytxIns

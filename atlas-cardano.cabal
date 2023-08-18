@@ -92,6 +92,7 @@ library
     GeniusYield.Test.Privnet.Ctx
     GeniusYield.Test.Privnet.Examples
     GeniusYield.Test.Privnet.Examples.Gift
+    GeniusYield.Test.Privnet.Examples.Misc
     GeniusYield.Test.Privnet.Examples.Oracle
     GeniusYield.Test.Privnet.Examples.Treat
     GeniusYield.Test.Privnet.Options

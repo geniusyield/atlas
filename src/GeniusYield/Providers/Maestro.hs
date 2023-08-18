@@ -108,9 +108,8 @@ maestroAwaitTxConfirmed env p@GYAwaitTxParameters{..} txId = mspvAwaitTx 0
     mspvAwaitTx attempt = do
         eTxInfo <- maestroQueryTx env txId
         case eTxInfo of
-            Left Maestro.MaestroNotFound
-                | attempt < maxAttempts -> threadDelay checkInterval >>
-                                           mspvAwaitTx (attempt + 1)
+            Left Maestro.MaestroNotFound -> threadDelay checkInterval >>
+                                            mspvAwaitTx (attempt + 1)
             Left err -> throwMspvApiError "AwaitTx" err
             Right txInfo -> msvpAwaitBlock attempt $
                             Maestro._txDetailsBlockHash $
@@ -121,17 +120,19 @@ maestroAwaitTxConfirmed env p@GYAwaitTxParameters{..} txId = mspvAwaitTx 0
     msvpAwaitBlock attempt blockHash = do
         eBlockInfo <- maestroQueryBlock env blockHash
         case eBlockInfo of
-            Left Maestro.MaestroNotFound
-                | attempt < maxAttempts -> threadDelay checkInterval >>
-                                           msvpAwaitBlock (attempt + 1) blockHash
+            Left Maestro.MaestroNotFound -> threadDelay checkInterval >>
+                                            msvpAwaitBlock (attempt + 1) blockHash
             Left err -> throwMspvApiError "AwaitBlock" err
+
+            Right (Maestro.getTimestampedData -> blockInfo) | attempt + 1 == maxAttempts ->
+                when (toInteger (Maestro._blockDetailsConfirmations blockInfo)
+                      <
+                      toInteger confirmations) $ throwIO $ GYAwaitTxException p
+
             Right (Maestro.getTimestampedData -> blockInfo) ->
                 when (toInteger (Maestro._blockDetailsConfirmations blockInfo)
                       <
-                      toInteger confirmations
-                      &&
-                      attempt < maxAttempts
-                     ) $
+                      toInteger confirmations) $
                 threadDelay checkInterval >> msvpAwaitBlock (attempt + 1) blockHash
 
 maestroQueryBlock

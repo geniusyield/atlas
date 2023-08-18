@@ -112,9 +112,8 @@ blockfrostAwaitTxConfirmed proj p@GYAwaitTxParameters{..} txId = blpAwaitTx 0
     blpAwaitTx attempt = do
         eTxInfo <- blockfrostQueryTx proj txId
         case eTxInfo of
-            Left Blockfrost.BlockfrostNotFound
-                | attempt < maxAttempts -> threadDelay checkInterval >>
-                                           blpAwaitTx (attempt + 1)
+            Left Blockfrost.BlockfrostNotFound -> threadDelay checkInterval >>
+                                                  blpAwaitTx (attempt + 1)
             Left err -> throwBlpvApiError "AwaitTx" err
             Right txInfo -> blpAwaitBlock attempt $
                             Blockfrost._transactionBlock txInfo
@@ -124,15 +123,16 @@ blockfrostAwaitTxConfirmed proj p@GYAwaitTxParameters{..} txId = blpAwaitTx 0
     blpAwaitBlock attempt blockHash = do
         eBlockInfo <- blockfrostQueryBlock proj blockHash
         case eBlockInfo of
-            Left Blockfrost.BlockfrostNotFound
-                | attempt < maxAttempts -> threadDelay checkInterval >>
-                                           blpAwaitBlock (attempt + 1) blockHash
+            Left Blockfrost.BlockfrostNotFound -> threadDelay checkInterval >>
+                                                  blpAwaitBlock (attempt + 1) blockHash
             Left err -> throwBlpvApiError "AwaitBlock" err
+
+            Right blockInfo | attempt + 1 == maxAttempts ->
+                when (Blockfrost._blockConfirmations blockInfo < toInteger confirmations) $
+                throwIO $ GYAwaitTxException p
+
             Right blockInfo ->
-                when (Blockfrost._blockConfirmations blockInfo < toInteger confirmations
-                      &&
-                      attempt < maxAttempts
-                     ) $
+                when (Blockfrost._blockConfirmations blockInfo < toInteger confirmations) $
                 threadDelay checkInterval >> blpAwaitBlock (attempt + 1) blockHash
 
 blockfrostQueryBlock

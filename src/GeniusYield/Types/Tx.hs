@@ -36,28 +36,30 @@ module GeniusYield.Types.Tx
     , txWitToKeyWitnessApi
 ) where
 
-import qualified Cardano.Api                     as Api
-import qualified Cardano.Api.Shelley             as Api.S
-import qualified Cardano.Binary                  as CBOR
-import           Cardano.Ledger.Alonzo.TxWitness (TxWitness)
-import qualified Cardano.Ledger.Babbage          as Babbage (BabbageEra)
-import qualified Cardano.Ledger.Crypto           as Crypto
-import           Control.Lens                    ((?~))
-import qualified Data.Aeson.Types                as Aeson
-import qualified Data.ByteString                 as BS
-import qualified Data.ByteString.Base16          as BS16
-import qualified Data.ByteString.Char8           as BS8
-import qualified Data.ByteString.Lazy            as LBS
-import qualified Data.Set                        as Set
-import qualified Data.Swagger                    as Swagger
-import qualified Data.Swagger.Internal.Schema    as Swagger
-import qualified Data.Text                       as T
-import qualified Data.Text.Encoding              as TE
-import           GHC.Records                     (getField)
-import qualified Plutus.V1.Ledger.Api            as Plutus
-import qualified PlutusTx.Builtins.Internal      as Plutus
-import qualified Text.Printf                     as Printf
-import qualified Web.HttpApiData                 as Web
+import qualified Cardano.Api                        as Api
+import qualified Cardano.Api.Shelley                as Api.S
+import qualified Cardano.Binary                     as CBOR
+import           Cardano.Ledger.Alonzo.TxWitness    (TxWitness)
+import qualified Cardano.Ledger.Babbage             as Babbage (BabbageEra)
+import qualified Cardano.Ledger.Crypto              as Crypto
+import           Control.Lens                       ((?~))
+import qualified Data.Aeson.Types                   as Aeson
+import qualified Data.ByteString                    as BS
+import qualified Data.ByteString.Base16             as BS16
+import qualified Data.ByteString.Char8              as BS8
+import qualified Data.ByteString.Lazy               as LBS
+import qualified Data.Set                           as Set
+import qualified Data.Swagger                       as Swagger
+import qualified Data.Swagger.Internal.Schema       as Swagger
+import qualified Data.Text                          as T
+import qualified Data.Text.Encoding                 as TE
+import qualified Database.PostgreSQL.Simple         as PQ
+import qualified Database.PostgreSQL.Simple.ToField as PQ
+import           GHC.Records                        (getField)
+import qualified Plutus.V1.Ledger.Api               as Plutus
+import qualified PlutusTx.Builtins.Internal         as Plutus
+import qualified Text.Printf                        as Printf
+import qualified Web.HttpApiData                    as Web
 
 import           GeniusYield.Imports
 
@@ -159,6 +161,9 @@ txToHex = BS8.unpack . txToHexBS
 -- | Transaction hash/id of a particular transaction.
 newtype GYTxId = GYTxId Api.TxId
     deriving (Eq, Ord)
+
+instance PQ.ToField GYTxId where
+    toField (GYTxId txId) = PQ.toField (PQ.Binary (Api.serialiseToRawBytes txId))
 
 -- |
 --

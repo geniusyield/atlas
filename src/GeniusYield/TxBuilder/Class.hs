@@ -76,8 +76,8 @@ import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (listToMaybe)
 import qualified Data.Set                     as Set
 import qualified Data.Text                    as Txt
-import qualified Plutus.V1.Ledger.Api         as Plutus
-import qualified Plutus.V1.Ledger.Value       as PlutusValue
+import qualified PlutusLedgerApi.V1         as Plutus
+import qualified PlutusLedgerApi.V1.Value       as PlutusValue
 
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors

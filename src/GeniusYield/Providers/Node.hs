@@ -27,8 +27,6 @@ import           Control.Exception                                 (throwIO)
 import qualified Data.Set                                          as Set
 import qualified Data.Text                                         as Txt
 
-import           Ouroboros.Network.Protocol.LocalTxSubmission.Type (SubmitResult (..))
-
 import           GeniusYield.CardanoApi.Query
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
@@ -42,8 +40,8 @@ nodeSubmitTx info tx = do
     -- We may submit transaction in older eras as well, it seems.
     res <- Api.submitTxToNodeLocal info $ Api.TxInMode (txToApi tx) Api.BabbageEraInCardanoMode
     case res of
-        SubmitSuccess  -> return $ txIdFromApi $ Api.getTxId $ Api.getTxBody $ txToApi tx
-        SubmitFail err -> throwIO $ userError $ show err
+        Api.S.SubmitSuccess  -> return $ txIdFromApi $ Api.getTxId $ Api.getTxBody $ txToApi tx
+        Api.S.SubmitFail err -> throwIO $ userError $ show err
 
 -------------------------------------------------------------------------------
 -- Current slot

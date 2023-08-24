@@ -301,7 +301,7 @@ toCardanoValue tb = Api.S.valueFromList $
         Api.S.AssetId (toCardanoPolicyId pid) (toCardanoAssetName name)
 
     toCardanoAssetName (CWallet.UnsafeTokenName name) =
-        fromMaybe (error "toCardanoValue: unable to desrialise")
+        fromRight (error "toCardanoValue: unable to desrialise")
         $ Api.S.deserialiseFromRawBytes Api.S.AsAssetName name
 
     coinToQuantity = fromIntegral . CWallet.unCoin
@@ -309,7 +309,7 @@ toCardanoValue tb = Api.S.valueFromList $
 
 toCardanoPolicyId :: CWallet.TokenPolicyId -> Api.S.PolicyId
 toCardanoPolicyId (CWallet.UnsafeTokenPolicyId (CWallet.Hash pid)) =
-    fromMaybe (error "toCardanoPolicyId: unable to desrialise")
+    fromRight (error "toCardanoPolicyId: unable to desrialise")
     $ Api.S.deserialiseFromRawBytes Api.S.AsPolicyId pid
 
 toTokenMap :: GYValue -> CWTokenMap.TokenMap
@@ -379,7 +379,7 @@ toCWalletAddress :: GYAddress -> CWallet.Address
 toCWalletAddress = CWallet.Address . Api.serialiseToRawBytes . addressToApi
 
 fromCWalletAddress :: CWallet.Address -> GYAddress
-fromCWalletAddress (CWallet.Address bs) = maybe customError addressFromApi $ Api.deserialiseFromRawBytes Api.AsAddressAny bs
+fromCWalletAddress (CWallet.Address bs) = either customError addressFromApi $ Api.deserialiseFromRawBytes Api.AsAddressAny bs
   where
     customError = error "fromCWalletAddress: unable to deserialize"
 
@@ -399,7 +399,7 @@ fromCWalletTxIn CWallet.TxIn { inputId, inputIx } = txOutRefFromTuple (txId, fro
     customError = error "fromCWalletTxIn: unable to deserialise txId"
 
 fromCWalletBalancingError :: CBalanceInternal.SelectionBalanceError ctx -> BalancingError
-fromCWalletBalancingError (CBalance.BalanceInsufficient (CBalance.BalanceInsufficientError _ v)) =
+fromCWalletBalancingError (CBalance.BalanceInsufficient (CBalance.BalanceInsufficientError{utxoBalanceShortfall = v})) =
     BalancingErrorInsufficientFunds $ fromTokenBundle v
 fromCWalletBalancingError (CBalance.SelectionLimitReached _) =
     -- This should never happen. We specified NoLimit in SelectionConstraints.

@@ -52,7 +52,7 @@ import qualified Cardano.Api                as Api
 import qualified Cardano.Api.Shelley        as Api.S
 import           Control.Monad.Random       (MonadRandom (getRandomR))
 import qualified Data.Map.Strict            as Map
-import qualified Plutus.V2.Ledger.Tx        as Plutus
+import qualified PlutusLedgerApi.V2.Tx        as Plutus
 import qualified Text.Printf                as Printf
 
 import           Data.Maybe                 (isNothing)

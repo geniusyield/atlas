@@ -311,7 +311,20 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
 
     collateral' <- obtainCollateral
 
-    e <- unGYTxMonadNode (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral' loggedAction) GYTxNodeEnv
+    e <- unGYTxMonadNode
+        (buildTxCore
+            ss
+            eh
+            (Api.bundleProtocolParams Api.BabbageEra pp)
+            ps
+            cstrat
+            ownUtxoUpdateF
+            addrs
+            change
+            collateral'
+            loggedAction
+        )
+        GYTxNodeEnv
             { envNid           = nid
             , envProviders     = providers
             , envAddrs         = addrs

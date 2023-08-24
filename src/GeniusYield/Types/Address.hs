@@ -55,8 +55,8 @@ import qualified Database.PostgreSQL.Simple           as PQ
 import qualified Database.PostgreSQL.Simple.FromField as PQ (FromField (..),
                                                              returnError)
 import qualified Database.PostgreSQL.Simple.ToField   as PQ
-import qualified Plutus.V1.Ledger.Address             as Plutus
-import qualified Plutus.V1.Ledger.Api                 as Plutus
+import qualified PlutusLedgerApi.V1.Address             as Plutus
+import qualified PlutusLedgerApi.V1                 as Plutus
 import qualified PlutusTx.Builtins.Internal           as Plutus
 import qualified PlutusTx.Prelude                     as PlutusTx
 import qualified Text.Printf                          as Printf
@@ -67,8 +67,8 @@ import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.NetworkId
 import           GeniusYield.Types.PubKeyHash
 import           GeniusYield.Types.Script
-import           Plutus.V1.Ledger.Address             (stakingCredential)
-import           Plutus.V2.Ledger.Api                 (Credential (..),
+import           PlutusLedgerApi.V1.Address             (stakingCredential)
+import           PlutusLedgerApi.V2                 (Credential (..),
                                                        StakingCredential (..))
 
 -- $setup
@@ -158,7 +158,7 @@ shelleyAddressToPlutus (Api.S.ShelleyAddress _network credential stake) =
 
 shelleyCredentialToPlutus :: Api.S.PaymentCredential -> Plutus.Credential
 shelleyCredentialToPlutus (Api.S.PaymentCredentialByKey x)    = Plutus.PubKeyCredential $ Plutus.PubKeyHash    $ PlutusTx.toBuiltin $ Api.serialiseToRawBytes x
-shelleyCredentialToPlutus (Api.S.PaymentCredentialByScript x) = Plutus.ScriptCredential $ Plutus.ValidatorHash $ PlutusTx.toBuiltin $ Api.serialiseToRawBytes x
+shelleyCredentialToPlutus (Api.S.PaymentCredentialByScript x) = Plutus.ScriptCredential $ Plutus.ScriptHash $ PlutusTx.toBuiltin $ Api.serialiseToRawBytes x
 
 shelleyStakeRefToPlutus :: Api.S.StakeAddressReference -> Maybe Plutus.StakingCredential
 shelleyStakeRefToPlutus Api.S.NoStakeAddress                      = Nothing
@@ -167,7 +167,7 @@ shelleyStakeRefToPlutus (Api.StakeAddressByValue stakeCredential) = Just $ Plutu
 
 fromCardanoStakeCredential :: Api.StakeCredential -> Plutus.Credential
 fromCardanoStakeCredential (Api.S.StakeCredentialByKey x)    = Plutus.PubKeyCredential $ Plutus.PubKeyHash    $ PlutusTx.toBuiltin $ Api.serialiseToRawBytes x
-fromCardanoStakeCredential (Api.S.StakeCredentialByScript x) = Plutus.ScriptCredential $ Plutus.ValidatorHash $ PlutusTx.toBuiltin $ Api.serialiseToRawBytes x
+fromCardanoStakeCredential (Api.S.StakeCredentialByScript x) = Plutus.ScriptCredential $ Plutus.ScriptHash $ PlutusTx.toBuiltin $ Api.serialiseToRawBytes x
 
 -- | Used to inject wallet pubkeyhashes into addresses.
 --
@@ -187,8 +187,8 @@ addressFromPlutus nid addr =
     nid' = networkIdToLedger nid
 
     credential :: Plutus.Credential -> Maybe (Ledger.Credential kr Ledger.StandardCrypto)
-    credential (Plutus.PubKeyCredential (Plutus.PubKeyHash    (Plutus.BuiltinByteString bs))) = Ledger.KeyHashObj    . Ledger.KeyHash    <$> Crypto.hashFromBytes bs
-    credential (Plutus.ScriptCredential (Plutus.ValidatorHash (Plutus.BuiltinByteString bs))) = Ledger.ScriptHashObj . Ledger.ScriptHash <$> Crypto.hashFromBytes bs
+    credential (Plutus.PubKeyCredential (Plutus.PubKeyHash (Plutus.BuiltinByteString bs))) = Ledger.KeyHashObj    . Ledger.KeyHash    <$> Crypto.hashFromBytes bs
+    credential (Plutus.ScriptCredential (Plutus.ScriptHash (Plutus.BuiltinByteString bs))) = Ledger.ScriptHashObj . Ledger.ScriptHash <$> Crypto.hashFromBytes bs
 
     paymentCredential :: Maybe (Ledger.PaymentCredential Ledger.StandardCrypto)
     paymentCredential = credential $ Plutus.addressCredential addr

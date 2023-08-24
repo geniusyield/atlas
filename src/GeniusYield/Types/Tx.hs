@@ -39,7 +39,7 @@ module GeniusYield.Types.Tx
 import qualified Cardano.Api                     as Api
 import qualified Cardano.Api.Shelley             as Api.S
 import qualified Cardano.Binary                  as CBOR
-import           Cardano.Ledger.Alonzo.TxWitness (TxWitness)
+import           Cardano.Ledger.Alonzo.TxWitness (TxWitness (txwitsVKey'))
 import qualified Cardano.Ledger.Babbage          as Babbage (BabbageEra)
 import qualified Cardano.Ledger.Crypto           as Crypto
 import           Control.Lens                    ((?~))
@@ -53,8 +53,7 @@ import qualified Data.Swagger                    as Swagger
 import qualified Data.Swagger.Internal.Schema    as Swagger
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as TE
-import           GHC.Records                     (getField)
-import qualified Plutus.V1.Ledger.Api            as Plutus
+import qualified PlutusLedgerApi.V1            as Plutus
 import qualified PlutusTx.Builtins.Internal      as Plutus
 import qualified Text.Printf                     as Printf
 import qualified Web.HttpApiData                 as Web
@@ -215,7 +214,7 @@ txIdFromApi :: Api.TxId -> GYTxId
 txIdFromApi = coerce
 
 txIdFromPlutus :: Plutus.TxId -> Maybe GYTxId
-txIdFromPlutus (Plutus.TxId (Plutus.BuiltinByteString bs)) = txIdFromApi <$> Api.deserialiseFromRawBytes Api.AsTxId bs
+txIdFromPlutus (Plutus.TxId (Plutus.BuiltinByteString bs)) = txIdFromApi <$> rightToMaybe (Api.deserialiseFromRawBytes Api.AsTxId bs)
 
 -- | Wrapper around transaction witness set. Note that Babbage ledger also uses the same @TxWitness@ type defined in Alonzo ledger, which was updated for Plutus-V2 scripts and same is expected for Plutus-V3.
 newtype GYTxWitness = GYTxWitness (TxWitness (Babbage.BabbageEra Crypto.StandardCrypto))
@@ -269,4 +268,4 @@ txWitToLedger = coerce
 
 -- | Obtain `vkeywitness` as cddl calls it to make our unsigned transaction, signed (see `makeSignedTransaction` method).
 txWitToKeyWitnessApi :: GYTxWitness -> [Api.S.KeyWitness Api.S.BabbageEra]
-txWitToKeyWitnessApi = fmap (Api.S.ShelleyKeyWitness Api.ShelleyBasedEraBabbage) . Set.toList . getField @"addrWits" . txWitToLedger
+txWitToKeyWitnessApi = fmap (Api.S.ShelleyKeyWitness Api.ShelleyBasedEraBabbage) . Set.toList . txwitsVKey' . txWitToLedger

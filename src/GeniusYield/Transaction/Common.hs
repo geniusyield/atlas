@@ -54,6 +54,7 @@ data GYTxInDetailed v = GYTxInDetailed
 
 data BalancingError
     = BalancingErrorInsufficientFunds !GYValue
+    -- ^ Lovelace shortfall in general required output creation.
     | forall v. BalancingErrorNonPositiveTxOut !(GYTxOut v)
     | BalancingErrorChangeShortFall !Natural
     -- ^ Lovelace shortfall in constructing a change output. See: "Cardano.CoinSelection.Balance.UnableToConstructChangeError"
@@ -73,13 +74,13 @@ instance Eq BalancingError where
 -- Transaction Utilities
 -------------------------------------------------------------------------------
 
-minimumUTxO :: Api.S.ProtocolParameters -> GYTxOut v -> Natural
+minimumUTxO :: Api.S.BundledProtocolParameters Api.BabbageEra -> GYTxOut v -> Natural
 minimumUTxO pp txOut = do
     case Api.calculateMinimumUTxO Api.ShelleyBasedEraBabbage (txOutToApi txOut) pp of
         -- This function can only ever fail if the protocol params doesn't contain the min ada value.
         Left err -> error
             $ "minimumUTxO: Protocol Params missing minimum UTxO value; Original error: " ++ show err
-        Right v  -> extractLovelace v
+        Right (Api.Lovelace n) -> fromIntegral $ max 0 n
 
 adjustTxOut :: (GYTxOut v -> Natural) -> GYTxOut v -> GYTxOut v
 adjustTxOut minimumUTxOF = helper

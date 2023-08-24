@@ -25,7 +25,7 @@ import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
 import           GeniusYield.Types.Ledger
-import qualified Plutus.V1.Ledger.Api         as Plutus
+import qualified PlutusLedgerApi.V1         as Plutus
 import qualified PlutusTx.Builtins.Internal   as Plutus
 import qualified Text.Printf                  as Printf
 
@@ -51,9 +51,9 @@ newtype GYPubKeyHash = GYPubKeyHash (Api.Hash Api.PaymentKey)
 --
 pubKeyHashFromPlutus :: Plutus.PubKeyHash -> Either PlutusToCardanoError GYPubKeyHash
 pubKeyHashFromPlutus (Plutus.PubKeyHash (Plutus.BuiltinByteString h)) =
-    maybe
-        (Left $ DeserialiseRawBytesError $ Text.pack $ "pubKeyHashFromPlutus " ++ show h)
-        (Right . GYPubKeyHash)
+    bimap
+        (DeserialiseRawBytesError . Text.pack . show)
+        GYPubKeyHash
     $ Api.deserialiseFromRawBytes (Api.AsHash Api.AsPaymentKey) h
 
 

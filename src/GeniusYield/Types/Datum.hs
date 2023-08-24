@@ -35,13 +35,12 @@ import           Control.Monad                        ((>=>))
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString.Base16               as Base16
 import qualified Data.ByteString.Char8                as BS8
-import           Data.Either.Combinators              (maybeToRight)
 import qualified Data.Text                            as Txt
 import qualified Database.PostgreSQL.Simple           as PQ
 import qualified Database.PostgreSQL.Simple.FromField as PQ (FromField (..),
                                                              returnError)
 import qualified Database.PostgreSQL.Simple.ToField   as PQ
-import qualified Plutus.V1.Ledger.Api                 as Plutus
+import qualified PlutusLedgerApi.V1                 as Plutus
 
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
@@ -56,11 +55,11 @@ newtype GYDatum = GYDatum Plutus.BuiltinData
     deriving newtype (Plutus.ToData, Plutus.FromData)
 
 -- | Convert a 'GYDatum' to 'Api.ScriptData' from Cardano Api
-datumToApi' :: GYDatum -> Api.ScriptData
+datumToApi' :: GYDatum -> Api.HashableScriptData
 datumToApi' (GYDatum (Plutus.BuiltinData x)) = dataToScriptData x
 
 -- | Get a 'GYDatum' from a Cardano Api 'Api.ScriptData'
-datumFromApi' :: Api.ScriptData -> GYDatum
+datumFromApi' :: Api.HashableScriptData -> GYDatum
 datumFromApi' = GYDatum . Plutus.BuiltinData . scriptDataToData
 
 -- | Convert a 'GYDatum' to 'Plutus.Datum' from Plutus
@@ -83,23 +82,27 @@ datumFromPlutus' = GYDatum
 datumFromPlutusData :: Plutus.ToData a => a -> GYDatum
 datumFromPlutusData = GYDatum . Plutus.toBuiltinData
 
-scriptDataToData :: Api.ScriptData -> Plutus.Data
-scriptDataToData (Api.ScriptDataConstructor n xs) = Plutus.Constr n $ scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataMap xs)           = Plutus.Map $ bimap scriptDataToData scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataList xs)          = Plutus.List $ scriptDataToData <$> xs
-scriptDataToData (Api.ScriptDataNumber n)         = Plutus.I n
-scriptDataToData (Api.ScriptDataBytes bs)         = Plutus.B bs
+scriptDataToData :: Api.HashableScriptData -> Plutus.Data
+scriptDataToData hsd = helper $ Api.getScriptData hsd
+  where
+    helper (Api.ScriptDataConstructor n xs) = Plutus.Constr n $ helper <$> xs
+    helper (Api.ScriptDataMap xs)           = Plutus.Map $ bimap helper helper <$> xs
+    helper (Api.ScriptDataList xs)          = Plutus.List $ helper <$> xs
+    helper (Api.ScriptDataNumber n)         = Plutus.I n
+    helper (Api.ScriptDataBytes bs)         = Plutus.B bs
 
-dataToScriptData :: Plutus.Data -> Api.ScriptData
-dataToScriptData (Plutus.Constr n xs) = Api.ScriptDataConstructor n $ dataToScriptData <$> xs
-dataToScriptData (Plutus.Map xs)      = Api.ScriptDataMap [(dataToScriptData x, dataToScriptData y) | (x, y) <- xs]
-dataToScriptData (Plutus.List xs)     = Api.ScriptDataList $ dataToScriptData <$> xs
-dataToScriptData (Plutus.I n)         = Api.ScriptDataNumber n
-dataToScriptData (Plutus.B bs)        = Api.ScriptDataBytes bs
+dataToScriptData :: Plutus.Data -> Api.HashableScriptData
+dataToScriptData = Api.unsafeHashableScriptData . helper
+  where
+    helper (Plutus.Constr n xs) = Api.ScriptDataConstructor n $ helper <$> xs
+    helper (Plutus.Map xs)      = Api.ScriptDataMap [(helper x, helper y) | (x, y) <- xs]
+    helper (Plutus.List xs)     = Api.ScriptDataList $ helper <$> xs
+    helper (Plutus.I n)         = Api.ScriptDataNumber n
+    helper (Plutus.B bs)        = Api.ScriptDataBytes bs
 
 -- | Returns the 'GYDatumHash' of the given 'GYDatum'
 hashDatum :: GYDatum -> GYDatumHash
-hashDatum = datumHashFromApi . Api.hashScriptData . datumToApi'
+hashDatum = datumHashFromApi . Api.hashScriptDataBytes . datumToApi'
 
 -------------------------------------------------------------------------------
 -- DatumHash
@@ -116,8 +119,8 @@ instance PQ.FromField GYDatumHash where
     fromField f bs' = do
         PQ.Binary bs <- PQ.fromField f bs'
         case Api.deserialiseFromRawBytes (Api.AsHash Api.AsScriptData) bs of
-            Just dh -> return (datumHashFromApi dh)
-            Nothing -> PQ.returnError PQ.ConversionFailed f "datum hash does not unserialise"
+            Right dh -> return (datumHashFromApi dh)
+            Left err -> PQ.returnError PQ.ConversionFailed f $ show err
 
 instance PQ.ToField GYDatumHash where
     toField (GYDatumHash dh) = PQ.toField (PQ.Binary (Api.serialiseToRawBytes dh))
@@ -127,7 +130,7 @@ datumHashFromHex = rightToMaybe . datumHashFromHexE
 
 datumHashFromBS :: ByteString -> Either String GYDatumHash
 datumHashFromBS = fmap datumHashFromApi
-    . maybeToRight "RawBytes GYDatumHash decode fail"
+    . first show
     . Api.deserialiseFromRawBytes (Api.proxyToAsType @(Api.Hash Api.ScriptData) Proxy)
 
 datumHashFromHexE :: String -> Either String GYDatumHash

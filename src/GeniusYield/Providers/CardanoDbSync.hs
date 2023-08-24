@@ -33,8 +33,7 @@ import           Data.SOP.Strict                                (NP (..))
 import           Data.Scientific                                (Scientific)
 import qualified Data.Text                                      as Txt
 import           Data.Word                                      (Word64)
-import           Type.Reflection                                (Typeable,
-                                                                 typeRep)
+import           Type.Reflection                                (Typeable)
 
 import qualified Cardano.Api                                    as Api
 import qualified Cardano.Api.Shelley                            as Api.S
@@ -129,7 +128,7 @@ dbSyncLookupDatum (Conn pool) dh = Pool.withResource pool $ \conn -> do
         [PQ.Only (PQ.Aeson (SD sd))] -> return $ Just $ datumFromApi' sd
         _anyOtherMatch               -> return Nothing
 
-newtype SD = SD Api.ScriptData
+newtype SD = SD Api.HashableScriptData
   deriving Show
 
 instance FromJSON SD where
@@ -293,8 +292,8 @@ instance FromJSON MA where
             Hex tn' <- obj Aeson..: "name"
             amt     <- obj Aeson..: "quantity"
 
-            pn     <- maybe (fail "invalid policy")    return $ Api.deserialiseFromRawBytes Api.AsPolicyId pn'
-            tn     <- maybe (fail "invalid tokenname") return $ tokenNameFromBS tn'
+            pn     <- either (fail . show)              pure $ Api.deserialiseFromRawBytes Api.AsPolicyId pn'
+            tn     <- maybe  (fail "invalid tokenname") return $ tokenNameFromBS tn'
             return (GYToken (mintingPolicyIdFromApi pn) tn, amt)
 
 newtype Hex = Hex ByteString
@@ -448,6 +447,7 @@ dbSyncGetEraHistory (Conn pool) =  Pool.withResource pool $ \conn -> do
             K (mkEraParams 500 0.1 300) :*
             K (mkEraParams 500 0.1 300) :*
             K (mkEraParams 500 0.1 300) :*
+            K (mkEraParams 500 0.1 300) :*
             Nil
 
         -- privatenet eras don't use defaultEraParams
@@ -476,8 +476,8 @@ instance (Api.SerialiseAsRawBytes a, Api.HasTypeProxy a, Typeable a) => PQ.FromF
     fromField f bs = do
         PQ.Binary bs' <- PQ.fromField f bs
         case Api.deserialiseFromRawBytes (Api.proxyToAsType (Proxy @a)) bs' of
-            Just x  -> return (RawBytes x)
-            Nothing -> PQ.returnError PQ.ConversionFailed f $ "does not unserialise: " ++ show (typeRep @a)
+            Right x  -> return (RawBytes x)
+            Left err -> PQ.returnError PQ.ConversionFailed f $ show err
 
 instance Api.SerialiseAsRawBytes a => PQ.ToField (RawBytes a) where
     toField (RawBytes x) = PQ.toField (PQ.Binary (Api.serialiseToRawBytes x))

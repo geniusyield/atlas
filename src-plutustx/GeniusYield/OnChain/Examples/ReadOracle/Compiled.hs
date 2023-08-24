@@ -12,11 +12,12 @@ module GeniusYield.OnChain.Examples.ReadOracle.Compiled
     ( readOracleValidator
     ) where
 
-import           Plutus.V2.Ledger.Api
+import           PlutusLedgerApi.V2
 import qualified PlutusTx
 
 import           GeniusYield.OnChain.Examples.ReadOracle
+import           GeniusYield.OnChain.Utils
 
-readOracleValidator :: Validator
-readOracleValidator = mkValidatorScript
+readOracleValidator :: PlutusProgram
+readOracleValidator = mkScript
     $$(PlutusTx.compile [|| mkReadOracleValidator ||])

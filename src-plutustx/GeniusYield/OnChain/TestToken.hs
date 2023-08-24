@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS -fno-strictness -fno-spec-constr -fno-specialise #-}
+
 {-|
 Module      : GeniusYield.OnChain.TestToken
 Copyright   : (c) 2023 GYELD GMBH
@@ -13,8 +14,8 @@ module GeniusYield.OnChain.TestToken (
     mkTestTokenPolicy,
 ) where
 
-import           Plutus.V1.Ledger.Value (flattenValue)
-import           Plutus.V2.Ledger.Api
+import           PlutusLedgerApi.V1.Value (flattenValue)
+import           PlutusLedgerApi.V2
 import           PlutusTx.Prelude
 
 {-# INLINABLE mkTestTokenPolicy #-}

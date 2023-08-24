@@ -214,6 +214,7 @@ library framework-onchain-plutustx
     GeniusYield.OnChain.Examples.ReadOracle.Compiled
     GeniusYield.OnChain.TestToken
     GeniusYield.OnChain.TestToken.Compiled
+    GeniusYield.OnChain.Utils
 
   build-depends:    base     ^>=4.14.1.0
 

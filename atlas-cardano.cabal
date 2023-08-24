@@ -66,12 +66,8 @@ library
   import:          common
   hs-source-dirs:  src
   exposed-modules:
-    GeniusYield.Api.TestTokens
     GeniusYield.CardanoApi.EraHistory
     GeniusYield.CardanoApi.Query
-    GeniusYield.Examples.Gift
-    GeniusYield.Examples.Limbo
-    GeniusYield.Examples.Treat
     GeniusYield.GYConfig
     GeniusYield.HTTP.Errors
     GeniusYield.Imports
@@ -87,19 +83,6 @@ library
     GeniusYield.Providers.Node
     GeniusYield.Providers.Sentry
     GeniusYield.Providers.SubmitApi
-    GeniusYield.Scripts.TestToken
-    GeniusYield.Test.Privnet.Asserts
-    GeniusYield.Test.Privnet.Ctx
-    GeniusYield.Test.Privnet.Examples
-    GeniusYield.Test.Privnet.Examples.Gift
-    GeniusYield.Test.Privnet.Examples.Misc
-    GeniusYield.Test.Privnet.Examples.Oracle
-    GeniusYield.Test.Privnet.Examples.Treat
-    GeniusYield.Test.Privnet.Options
-    GeniusYield.Test.Privnet.Paths
-    GeniusYield.Test.Privnet.Setup
-    GeniusYield.Test.Privnet.Utils
-    GeniusYield.Test.Utils
     GeniusYield.Transaction
     GeniusYield.Transaction.CBOR
     GeniusYield.Transaction.CoinSelection
@@ -112,7 +95,6 @@ library
     GeniusYield.TxBuilder.Node
     GeniusYield.TxBuilder.NodeQuery
     GeniusYield.TxBuilder.Random
-    GeniusYield.TxBuilder.Run
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
@@ -153,11 +135,7 @@ library
     , cassava                ^>=0.5.3.0
     , cborg                  ^>=0.2.8.0
     , containers             ^>=0.6.5.1
-    , directory              ^>=1.3.6.0
     , either                 ^>=5.0.2
-    , filepath               ^>=1.4.2.1
-    -- TODO: Version 1.2.1.1 of @fixed-vector@ has an important bug fix, need to upgrade to it.
-    , fixed-vector           ^>=1.2.1.0
     , hashable               ^>=1.3.5.0
     , http-api-data          ^>=0.4.3
     , http-client            ^>=0.7.13.1
@@ -176,7 +154,6 @@ library
     , resource-pool          ^>=0.2.3.2
     , safe-money             ^>=0.9.1
     , scientific             ^>=0.3.7.0
-    , serialise              ^>=0.2.6.0
     , servant                ^>=0.19
     , servant-client         ^>=0.19
     , servant-client-core    ^>=0.19
@@ -184,10 +161,6 @@ library
     , sop-core               ^>=0.5.0.2
     , stm                    ^>=2.5.0.1
     , swagger2               ^>=2.8.4
-    , tagged                 ^>=0.8.6.1
-    , tasty                  ^>=1.4.2.3
-    , tasty-hunit            ^>=0.10.0.3
-    , tasty-quickcheck       ^>=0.10.2
     , template-haskell       ^>=2.16.0.0
     , text                   ^>=1.2.4.1
     , time                   ^>=1.9.3
@@ -217,18 +190,9 @@ library
     , cardano-wallet-primitive
     , ouroboros-consensus
     , ouroboros-consensus-cardano
-    , ouroboros-network
     , plutus-ledger-api
     , plutus-tx
     , text-class
-
-  -- Custom forks (version pinned by @source-repository-package@ stanza).
-  build-depends:   plutus-simple-model
-
-  -- needed for examples
-  -- Version of @plutus-core@ is pinned in @cabal.project@ file.
-  build-depends:   plutus-core
-  build-depends:   framework-onchain-plutustx
 
 library framework-onchain-plutustx
   default-language: Haskell2010

@@ -284,6 +284,7 @@ test-suite atlas-tests
   other-modules:
     GeniusYield.Test.CoinSelection
     GeniusYield.Test.Config
+    GeniusYield.Test.GYTxBody
     GeniusYield.Test.GYTxSkeleton
     GeniusYield.Test.OnChain.GuessRefInputDatum
     GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
@@ -316,6 +317,8 @@ test-suite atlas-tests
     , text
     , time
     , transformers
+    , plutus-simple-model
+    , cardano-simple
 
   -- Additional dependencies.
   build-depends:

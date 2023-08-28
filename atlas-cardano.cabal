@@ -101,6 +101,7 @@ library
     GeniusYield.Test.Privnet.Paths
     GeniusYield.Test.Privnet.Setup
     GeniusYield.Test.Privnet.Utils
+    GeniusYield.Test.Utils
     GeniusYield.Transaction
     GeniusYield.Transaction.CBOR
     GeniusYield.Transaction.CoinSelection

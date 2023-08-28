@@ -17,6 +17,7 @@ import           GeniusYield.Test.CoinSelection (coinSelectionTests)
 import           GeniusYield.Test.Config        (configTests)
 import           GeniusYield.Test.GYTxBody      (gyTxBodyTests)
 import           GeniusYield.Test.GYTxSkeleton  (gyTxSkeletonTests)
+import           GeniusYield.Test.RefInput      (refInputTests)
 import           GeniusYield.Test.Providers     (providersTests)
 import           GeniusYield.Test.SlotConfig    (slotConversionTests)
 import           GeniusYield.Types
@@ -67,6 +68,7 @@ main = do
         , gyTxBodyTests
         , configTests
         , gyTxSkeletonTests
+        , refInputTests
         , providersTests configs providerToken netId
         ]
 

@@ -63,6 +63,20 @@ common common
   ghc-options:        -fno-show-valid-hole-fits
   ghc-options:        -Wunused-packages
 
+common plutus-ghc-options
+  -- so unfoldings are present even when compiled without optmizations
+  ghc-options:
+    -fno-ignore-interface-pragmas -fno-omit-interface-pragmas
+    -Wno-partial-type-signatures
+
+  -- expose all unfoldings, so plutustx compiler can do its job
+  ghc-options:
+    -fexpose-all-unfoldings -fobject-code
+    -fplugin-opt PlutusTx.Plugin:defer-errors
+
+  -- set target plutus-core version
+  ghc-options: -fplugin-opt PlutusTx.Plugin:target-version=1.0.0
+
 library
   import:          common
   hs-source-dirs:  src
@@ -236,18 +250,9 @@ library
   build-depends:   atlas-cardano:framework-onchain-plutustx
 
 library framework-onchain-plutustx
+  import: plutus-ghc-options
   default-language: Haskell2010
   ghc-options:      -Wall
-
-  -- so unfoldings are present even when compiled without optmizations
-  ghc-options:
-    -fno-ignore-interface-pragmas -fno-omit-interface-pragmas
-    -Wno-partial-type-signatures
-
-  -- expose all unfoldings, so plutustx compiler can do its job
-  ghc-options:
-    -fexpose-all-unfoldings -fobject-code -fplugin-opt
-    PlutusTx.Plugin:defer-errors
 
   hs-source-dirs:   src-plutustx
   exposed-modules:
@@ -266,21 +271,13 @@ library framework-onchain-plutustx
     , plutus-tx-plugin
 
 test-suite atlas-tests
-  import:         common
+  import:         common, plutus-ghc-options
   type:           exitcode-stdio-1.0
   main-is:        atlas-tests.hs
   hs-source-dirs: tests
   ghc-options:    -threaded -rtsopts -Wall
-
-  -- so unfoldings are present even when compiled without optmizations
-  ghc-options:
-    -fno-ignore-interface-pragmas -fno-omit-interface-pragmas
-    -Wno-partial-type-signatures
-
-  -- expose all unfoldings, so plutustx compiler can do its job
-  ghc-options:
-    -fexpose-all-unfoldings -fobject-code -fplugin-opt
-    PlutusTx.Plugin:defer-errors
+  -- set target plutus-core version
+  ghc-options: -fplugin-opt PlutusTx.Plugin:target-version=1.0.0
 
   other-modules:
     GeniusYield.Test.CoinSelection
@@ -291,6 +288,7 @@ test-suite atlas-tests
     GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
     GeniusYield.Test.Providers
     GeniusYield.Test.Providers.Mashup
+    GeniusYield.Test.RefInput
     GeniusYield.Test.SlotConfig
 
   -- Dependencies inherited from the library. No need to specify bounds.

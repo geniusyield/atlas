@@ -18,8 +18,7 @@ index-state:
 
 packages: .
 
-tests: True
-
+-- TODO: Default value should be @direct@ in upcoming 3.10 version of cabal, omit this line then.
 test-show-details: direct
 
 -- Using 0.7.1.0, which is already on hackage; but bumping the index state will break everything.
@@ -38,7 +37,7 @@ allow-newer:
   , cardano-wallet:blockfrost-client
   , cardano-wallet:blockfrost-client-core
 
--- FIXME:
+-- TODO: This is fixed for in their later version, omit this when we update to it.
 package strict-containers
   ghc-options: -Wwarn=noncanonical-monad-instances
 
@@ -48,7 +47,35 @@ source-repository-package
   tag: deb1e133cd7de989e9e85c2b44e9361f52e93776
   --sha256: sha256-k4OoAAUFdYkKDSTDeM2dwC/DrJrPotiz0EIeU0xccXY=
 
+-- Unfortunately, cardano-node 8.1.2 is constrained with plutus-ledger-api 1.5.0.0 and we would like at least 1.6.0.0.
+-- This is done in accordance with changes in https://github.com/input-output-hk/cardano-ledger/pull/3430/files.
+constraints:
+    plutus-ledger-api == 1.6.0.0
+  , plutus-core == 1.6.0.0
+
+allow-newer:
+  , cardano-ledger-alonzo:plutus-ledger-api
+  , cardano-ledger-alonzo:plutus-core
+  , cardano-ledger-alonzo-test:plutus-ledger-api
+  , cardano-ledger-alonzo-test:plutus-ledger-api-testlib
+  , cardano-ledger-babbage:plutus-ledger-api
+  , cardano-ledger-conway:plutus-ledger-api
+  , cardano-ledger-binary:plutus-ledger-api
+  , cardano-api:plutus-ledger-api
+  , cardano-api:plutus-ledger-api-testlib
+  , cardano-api:prettyprinter-configurable
+
+source-repository-package
+  type: git
+  location: https://github.com/geniusyield/plutus-simple-model
+  tag: c4e7dff7663b56e1dabf43d0afdac3dbafe8d639
+  --sha256: sha256-FIXME:
+  subdir:
+    cardano-simple
+    psm
+
 -- Everything below is essentially copied from cardano-wallet's cabal.project.
+-------- Begin contents from @cardano-wallet@'s @cabal.project@ file. --------
 
 source-repository-package
   type: git
@@ -131,6 +158,7 @@ allow-newer:
   , ekg:*
   , ntp-client:*
   , libsystemd-journal:base
+  , size-based:template-haskell
 
 constraints:
     bimap >= 0.4.0
@@ -171,3 +199,4 @@ package cardano-node
   flags: -systemd
 
 -- -------------------------------------------------------------------------
+-------- End contents from @cardano-wallet@'s @cabal.project@ file. --------

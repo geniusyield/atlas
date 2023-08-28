@@ -1,4 +1,4 @@
-cabal-version:      3.0
+cabal-version:      3.8
 name:               atlas-cardano
 version:            0.3.0
 synopsis:           Application backend for Plutus smart contracts on Cardano
@@ -226,7 +226,7 @@ library
   -- needed for examples
   -- Version of @plutus-core@ is pinned in @cabal.project@ file.
   build-depends:   plutus-core
-  build-depends:   framework-onchain-plutustx
+  build-depends:   atlas-cardano:framework-onchain-plutustx
 
 library framework-onchain-plutustx
   default-language: Haskell2010

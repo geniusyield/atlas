@@ -15,7 +15,7 @@ import           GeniusYield.Types
 
 testTokenPolicy
     :: Integer           -- ^ count
-    -> GYTokenName         -- ^ token name (e.g. @GOLD@)
+    -> GYTokenName       -- ^ token name (e.g. @GOLD@)
     -> GYTxOutRef        -- ^ utxo to base token on
     -> GYMintingPolicy 'PlutusV2
 testTokenPolicy count tn utxo =

@@ -24,7 +24,7 @@ import           GeniusYield.Types
 
 import qualified Data.Map.Strict             as Map
 import           GeniusYield.Examples.Common (toDeBruijn)
-import qualified PlutusCore                  as PLC
+import qualified PlutusCore.Version          as PLC
 import qualified PlutusLedgerApi.Common      as Plutus
 import qualified UntypedPlutusCore           as UPLC
 
@@ -57,7 +57,7 @@ limboValidatorV2 = validatorFromSerialisedScript limboValidatorPlutusSerialised
 
 limboValidatorPlutusSerialised :: Plutus.SerialisedScript
 limboValidatorPlutusSerialised = Plutus.serialiseUPLC $
-    UPLC.Program () PLC.latestVersion limboScript'
+    UPLC.Program () PLC.plcVersion100 limboScript'
 
 -------------------------------------------------------------------------------
 -- API

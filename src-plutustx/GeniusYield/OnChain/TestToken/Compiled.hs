@@ -15,6 +15,7 @@ module GeniusYield.OnChain.TestToken.Compiled (
 import           GeniusYield.OnChain.TestToken
 import qualified PlutusLedgerApi.V2
 import qualified PlutusTx
+import PlutusCore.Version (plcVersion100)
 
 originalTestTokenPolicy
   :: Integer                       -- ^ Count.
@@ -23,6 +24,6 @@ originalTestTokenPolicy
   -> PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ())
 originalTestTokenPolicy count tn utxo =
     $$(PlutusTx.compile [|| mkTestTokenPolicy ||])
-    `PlutusTx.unsafeApplyCode` PlutusTx.liftCode count
-    `PlutusTx.unsafeApplyCode` PlutusTx.liftCode tn
-    `PlutusTx.unsafeApplyCode` PlutusTx.liftCode utxo
+    `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 count
+    `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 tn
+    `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 utxo

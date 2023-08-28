@@ -16,9 +16,9 @@ module GeniusYield.Examples.Gift (
 import           GeniusYield.Types
 
 import           GeniusYield.Examples.Common (toDeBruijn)
-import qualified PlutusCore                  as PLC
 import qualified PlutusLedgerApi.Common      as Plutus
 import qualified UntypedPlutusCore           as UPLC
+import qualified PlutusCore.Version          as PLC
 
 -------------------------------------------------------------------------------
 -- Script
@@ -49,4 +49,4 @@ giftValidatorV2 = validatorFromSerialisedScript giftValidatorPlutusSerialised
 
 giftValidatorPlutusSerialised :: Plutus.SerialisedScript
 giftValidatorPlutusSerialised = Plutus.serialiseUPLC $
-    UPLC.Program () PLC.latestVersion giftScript'
+    UPLC.Program () PLC.plcVersion100 giftScript'

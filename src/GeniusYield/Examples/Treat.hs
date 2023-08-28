@@ -20,6 +20,7 @@ import           GeniusYield.Examples.Common
 import           GeniusYield.Types
 
 import qualified PlutusCore                  as PLC
+import qualified PlutusCore.Version          as PLC
 import qualified PlutusLedgerApi.Common      as Plutus
 import qualified UntypedPlutusCore           as UPLC
 
@@ -48,7 +49,7 @@ treatScript' = toDeBruijn treatScript
 
 treatValidatorPlutusSerialised :: Plutus.SerialisedScript
 treatValidatorPlutusSerialised = Plutus.serialiseUPLC $
-    UPLC.Program () PLC.latestVersion treatScript'
+    UPLC.Program () PLC.plcVersion100 treatScript'
 
 treatValidatorV1 :: GYValidator 'PlutusV1
 treatValidatorV1 = validatorFromSerialisedScript treatValidatorPlutusSerialised

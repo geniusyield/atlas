@@ -37,6 +37,7 @@ common common
     GADTs
     GeneralizedNewtypeDeriving
     ImportQualifiedPost
+    LambdaCase
     MultiParamTypeClasses
     MultiWayIf
     NamedFieldPuns
@@ -112,6 +113,7 @@ library
     GeniusYield.TxBuilder.Node
     GeniusYield.TxBuilder.NodeQuery
     GeniusYield.TxBuilder.Random
+    GeniusYield.TxBuilder.Run
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
@@ -199,6 +201,10 @@ library
   build-depends:
     , blockfrost-client
     , maestro-sdk
+
+  -- Custom forks (version pinned by @source-repository-package@ stanza).
+  build-depends:   plutus-simple-model
+                 , cardano-simple
 
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
   build-depends:

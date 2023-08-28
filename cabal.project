@@ -68,7 +68,7 @@ allow-newer:
 source-repository-package
   type: git
   location: https://github.com/geniusyield/plutus-simple-model
-  tag: c4e7dff7663b56e1dabf43d0afdac3dbafe8d639
+  tag: 546b5d997c8159ffc643df0f1987948dd1c9e050
   --sha256: sha256-FIXME:
   subdir:
     cardano-simple

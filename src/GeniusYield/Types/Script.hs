@@ -11,6 +11,7 @@ module GeniusYield.Types.Script (
     GYValidator,
     validatorFromPlutus,
     validatorFromSerialisedScript,
+    validatorToSerialisedScript,
     validatorToApi,
     validatorFromApi,
     validatorToApiPlutusScriptWitness,
@@ -39,6 +40,7 @@ module GeniusYield.Types.Script (
     mintingPolicyVersionFromWitness,
     mintingPolicyFromPlutus,
     mintingPolicyFromSerialisedScript,
+    mintingPolicyToSerialisedScript,
     mintingPolicyToApi,
     mintingPolicyIdToText,
     mintingPolicyIdFromText,
@@ -48,6 +50,7 @@ module GeniusYield.Types.Script (
     -- * Witness for Minting Policy
     GYMintScript (..),
     mintingPolicyIdFromWitness,
+    gyMintScriptToSerialisedScript,
     gyMintingScriptWitnessToApiPlutusSW,
 
     -- ** File operations
@@ -74,6 +77,8 @@ module GeniusYield.Types.Script (
     scriptFromCBOR,
     scriptFromCBOR',
     scriptFromPlutus,
+    scriptFromSerialisedScript,
+    scriptToSerialisedScript,
     scriptApiHash,
     scriptPlutusHash,
     someScriptPlutusHash,
@@ -114,6 +119,7 @@ import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger         (PlutusToCardanoError (..))
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.TxOutRef       (GYTxOutRef, txOutRefToApi)
+import           Data.ByteString.Short            (ShortByteString)
 
 -- $setup
 --
@@ -137,6 +143,9 @@ validatorFromPlutus = coerce (scriptFromPlutus @v)
 
 validatorFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYValidator v
 validatorFromSerialisedScript = coerce . scriptFromSerialisedScript
+
+validatorToSerialisedScript :: GYValidator v -> Plutus.SerialisedScript
+validatorToSerialisedScript = coerce >>> scriptToSerialisedScript >>> coerce
 
 validatorToScript :: GYValidator v -> GYScript v
 validatorToScript = coerce
@@ -254,6 +263,9 @@ mintingPolicyFromPlutus = coerce (scriptFromPlutus @v)
 mintingPolicyFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYMintingPolicy v
 mintingPolicyFromSerialisedScript = coerce . scriptFromSerialisedScript
 
+mintingPolicyToSerialisedScript :: GYMintingPolicy v -> Plutus.SerialisedScript
+mintingPolicyToSerialisedScript = coerce >>> scriptToSerialisedScript >>> coerce
+
 mintingPolicyToScript :: GYMintingPolicy v -> GYScript v
 mintingPolicyToScript = coerce
 
@@ -299,6 +311,10 @@ instance Ord (GYMintScript v) where
     GYMintReference _ _ `compare` _ = LT
     GYMintScript p `compare` GYMintScript p' = defaultCompare p p'
     GYMintScript _ `compare` _ = GT
+
+gyMintScriptToSerialisedScript :: GYMintScript u -> Plutus.SerialisedScript
+gyMintScriptToSerialisedScript (GYMintScript mp) = coerce mp & scriptToSerialisedScript & coerce
+gyMintScriptToSerialisedScript (GYMintReference _ s) = scriptToSerialisedScript s & coerce
 
 gyMintingScriptWitnessToApiPlutusSW
   :: GYMintScript u
@@ -436,6 +452,10 @@ scriptFromPlutus script = scriptFromApi $ Api.S.PlutusScriptSerialised $ Plutus.
 scriptFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYScript v
 scriptFromSerialisedScript serialisedScript =
   scriptFromApi $ Api.S.PlutusScriptSerialised @(PlutusVersionToApi v) serialisedScript
+
+scriptToSerialisedScript :: GYScript v -> ShortByteString
+scriptToSerialisedScript script = scriptToApi script & \case
+  (Api.S.PlutusScriptSerialised s) -> s
 
 scriptVersion :: GYScript v -> SingPlutusVersion v
 scriptVersion (GYScript v _ _) = v

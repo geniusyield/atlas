@@ -53,7 +53,7 @@ import           GeniusYield.Types.Tx
 --
 -- >>> :set -XOverloadedStrings -XTypeApplications
 -- >>> import qualified Data.Csv                   as Csv
--- >>> import qualified Plutus.V1.Ledger.Api       as Plutus
+-- >>> import qualified PlutusLedgerApi.V1         as Plutus
 -- >>> import qualified Web.HttpApiData            as Web
 --
 
@@ -77,7 +77,7 @@ instance Hashable GYTxOutRef where
 -- Right (GYTxOutRef (TxIn "4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189" (TxIx 12)))
 --
 -- >>> txOutRefFromPlutus $ Plutus.TxOutRef "ae" 12
--- Left (UnknownPlutusToCardanoError {ptceTag = "txOutRefFromPlutus: invalid txOutRefId ae"})
+-- Left (UnknownPlutusToCardanoError {ptceTag = "txOutRefFromPlutus: invalid txOutRefId ae, error: SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise TxId\"}"})
 --
 -- >>> txOutRefFromPlutus $ Plutus.TxOutRef "4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189" (-2)
 -- Left (UnknownPlutusToCardanoError {ptceTag = "txOutRefFromPlutus: negative txOutRefIdx -2"})

@@ -315,7 +315,7 @@ instance Web.ToHttpApiData GYAddress where
 -- Right (unsafeAddressFromText "addr_test1qrsuhwqdhz0zjgnf46unas27h93amfghddnff8lpc2n28rgmjv8f77ka0zshfgssqr5cnl64zdnde5f8q2xt923e7ctqu49mg5")
 --
 -- >>> Web.parseUrlPiece @GYAddress "00"
--- Left "Not an address: 00; Reason: RawBytesHexErrorRawBytesDecodeFail \"00\""
+-- Left "Not an address: 00; Reason: RawBytesHexErrorRawBytesDecodeFail \"00\" AddressAny (SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise AddressAny\"})"
 --
 instance Web.FromHttpApiData GYAddress where
     parseUrlPiece t = case Api.deserialiseFromRawBytesHex Api.AsAddressAny (TE.encodeUtf8 t) of

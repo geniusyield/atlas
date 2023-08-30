@@ -32,11 +32,6 @@ source-repository-package
     blockfrost-client
     blockfrost-client-core
 
-allow-newer:
-  , cardano-wallet:blockfrost-api
-  , cardano-wallet:blockfrost-client
-  , cardano-wallet:blockfrost-client-core
-
 -- TODO: This is fixed for in their later version, omit this when we update to it.
 package strict-containers
   ghc-options: -Wwarn=noncanonical-monad-instances

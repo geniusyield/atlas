@@ -420,8 +420,8 @@ lookupScriptHash h = do
                 Nothing   -> return Nothing
                 Just cbor -> return $
                     if t == Blockfrost.PlutusV1
-                        then Some <$> scriptFromCBOR @PlutusV1 cbor
-                        else Some <$> scriptFromCBOR @PlutusV2 cbor
+                        then Some <$> scriptFromCBOR @'PlutusV1 cbor
+                        else Some <$> scriptFromCBOR @'PlutusV2 cbor
 
 lookupScriptHashIO :: Blockfrost.Project -> Maybe Blockfrost.ScriptHash -> IO (Maybe (Some GYScript))
 lookupScriptHashIO _ Nothing  = return Nothing

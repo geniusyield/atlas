@@ -49,7 +49,7 @@ import qualified Web.HttpApiData                      as Web
 
 -- | Convert our representation of Network ID to Maestro's.
 networkIdToMaestroEnv :: Text -> GYNetworkId -> IO (Maestro.MaestroEnv 'Maestro.V1)
-networkIdToMaestroEnv key nid = Maestro.mkMaestroEnv @'Maestro.V1 key $ fromMaybe (error "Only preprod and mainnet networks are supported by Maestro") $ M.lookup nid $ M.fromList [(GYMainnet, Maestro.Mainnet), (GYTestnetPreprod, Maestro.Preprod)]
+networkIdToMaestroEnv key nid = Maestro.mkMaestroEnv @'Maestro.V1 key $ fromMaybe (error "Only preview, preprod and mainnet networks are supported by Maestro") $ M.lookup nid $ M.fromList [(GYMainnet, Maestro.Mainnet), (GYTestnetPreprod, Maestro.Preprod), (GYTestnetPreview, Maestro.Preview)]
 
 -- | Exceptions.
 data MaestroProviderException

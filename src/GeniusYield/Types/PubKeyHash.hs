@@ -47,12 +47,12 @@ newtype GYPubKeyHash = GYPubKeyHash (Api.Hash Api.PaymentKey)
 -- Right (GYPubKeyHash "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d")
 --
 -- >>> pubKeyHashFromPlutus "abcd"
--- Left (DeserialiseRawBytesError {ptceTag = "pubKeyHashFromPlutus \"\\171\\205\" SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise Hash PaymentKey\"}"})
+-- Left (DeserialiseRawBytesError {ptceTag = "pubKeyHashFromPlutus \"\\171\\205\", error: SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise Hash PaymentKey\"}"})
 --
 pubKeyHashFromPlutus :: Plutus.PubKeyHash -> Either PlutusToCardanoError GYPubKeyHash
 pubKeyHashFromPlutus (Plutus.PubKeyHash (Plutus.BuiltinByteString h)) =
     bimap
-        (\e -> DeserialiseRawBytesError $ Text.pack $ "pubKeyHashFromPlutus " ++ show h ++ " " ++ show e)
+        (\e -> DeserialiseRawBytesError $ Text.pack $ "pubKeyHashFromPlutus " ++ show h ++ ", error: " ++ show e)
         GYPubKeyHash
     $ Api.deserialiseFromRawBytes (Api.AsHash Api.AsPaymentKey) h
 

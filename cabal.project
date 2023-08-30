@@ -21,6 +21,9 @@ packages: .
 -- TODO: Default value should be @direct@ in upcoming 3.10 version of cabal, omit this line then.
 test-show-details: direct
 
+package cardano-crypto-praos
+  flags: -external-libsodium-vrf
+
 -- Using 0.7.1.0, which is already on hackage; but bumping the index state will break everything.
 source-repository-package
   type: git
@@ -64,7 +67,7 @@ source-repository-package
   type: git
   location: https://github.com/geniusyield/plutus-simple-model
   tag: e50689784c6adc6d04507ce537c2d850bc7d07ae
-  --sha256: sha256-FIXME:
+  --sha256: sha256-FZ7Ctff0Vg4MykfB3ZzGWhrWrB3Ht0smkgIVY8AlxWg=
   subdir:
     cardano-simple
     psm

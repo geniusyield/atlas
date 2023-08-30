@@ -9,8 +9,6 @@ Stability   : develop
 module GeniusYield.Types.Datum (
     -- * Datum
     GYDatum,
-    serialiseDatum,
-    serialiseDatumHex,
     datumToApi',
     datumFromApi',
     datumToPlutus,
@@ -19,8 +17,6 @@ module GeniusYield.Types.Datum (
     datumFromPlutus',
     datumFromPlutusData,
     hashDatum,
-    hashDatum',
-    hashDatum'Hex,
     -- * Datum hash
     GYDatumHash,
     datumHashFromHex,
@@ -48,7 +44,6 @@ import qualified PlutusLedgerApi.V1                   as Plutus
 import qualified Cardano.Api.Shelley                  as Api
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
-import qualified PlutusTx.Builtins                    as Plutus
 
 -- | Datum
 --
@@ -59,21 +54,15 @@ newtype GYDatum = GYDatum Plutus.BuiltinData
     deriving stock (Eq, Ord, Show)
     deriving newtype (Plutus.ToData, Plutus.FromData)
 
--- | Serialise datum.
-serialiseDatum :: GYDatum -> ByteString
-serialiseDatum = datumToPlutus' >>> Plutus.serialiseData >>> Plutus.fromBuiltin
-
--- | Hex representation of serialized datum.
-serialiseDatumHex :: GYDatum -> ByteString
-serialiseDatumHex = serialiseDatum >>> Base16.encode
-
--- | Convert a 'GYDatum' to 'Api.ScriptData' from Cardano Api.
-datumToApi' :: GYDatum -> Api.ScriptData
-datumToApi' = datumToPlutus' >>> Plutus.builtinDataToData >>> Api.fromPlutusData
+-- | Convert a 'GYDatum' to 'Api.HashableScriptData' from Cardano Api.
+--
+-- __NOTE:__ This function is to be used only when generating for new outputs in a transaction as doing `datumFromApi'` followed by `datumToApi'` does not guarantee same low level CBOR representation of the high level data type.
+datumToApi' :: GYDatum -> Api.HashableScriptData
+datumToApi' = datumToPlutus' >>> Plutus.builtinDataToData >>> Api.fromPlutusData >>> Api.unsafeHashableScriptData  -- @unsafeHashableScriptData@ is fine here as there is no original datum bytes here, i.e. to say, this is a new datum which we are serialising and since we are serialising, we govern it.
 
 -- | Get a 'GYDatum' from a Cardano Api 'Api.ScriptData'
-datumFromApi' :: Api.ScriptData -> GYDatum
-datumFromApi' = GYDatum . Plutus.dataToBuiltinData . Api.toPlutusData
+datumFromApi' :: Api.HashableScriptData -> GYDatum
+datumFromApi' = GYDatum . Plutus.dataToBuiltinData . Api.toPlutusData . Api.getScriptData
 
 -- | Convert a 'GYDatum' to 'Plutus.Datum' from Plutus
 datumToPlutus :: GYDatum -> Plutus.Datum
@@ -97,15 +86,7 @@ datumFromPlutusData = GYDatum . Plutus.toBuiltinData
 
 -- | Returns the 'GYDatumHash' of the given 'GYDatum'
 hashDatum :: GYDatum -> GYDatumHash
-hashDatum = datumHashFromApi . Api.hashScriptDataBytes . Api.unsafeHashableScriptData . datumToApi'
-
--- | Returns the hash of the given datum.
-hashDatum' :: GYDatum -> ByteString
-hashDatum' = serialiseDatum >>> Plutus.toBuiltin >>> Plutus.blake2b_256 >>> Plutus.fromBuiltin
-
--- | Returns the hash as hex of the given datum.
-hashDatum'Hex :: GYDatum -> ByteString
-hashDatum'Hex = hashDatum' >>> Base16.encode
+hashDatum = datumHashFromApi . Api.hashScriptDataBytes . datumToApi'
 
 -------------------------------------------------------------------------------
 -- DatumHash

@@ -11,7 +11,6 @@ module GeniusYield.Providers.Common (
     , newServantClientEnv
     , fromJson
     , parseEraHist
-    , babbageProtocolVersion
     , preprodEraHist
     , previewEraHist
     , mainnetEraHist
@@ -23,7 +22,6 @@ import qualified Data.ByteString.Lazy                 as LBS
 import           Data.Maybe                           (fromJust)
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
-import           Numeric.Natural                      (Natural)
 
 import qualified Network.HTTP.Client                  as HttpClient
 import qualified Network.HTTP.Client.TLS              as HttpClientTLS
@@ -98,10 +96,6 @@ parseEraHist mkEra [byronEra, shelleyEra, allegraEra, maryEra, alonzoEra, babbag
     . NonEmptyCons (mkEra alonzoEra)
     $ NonEmptyOne (mkEra babbageEra)
 parseEraHist _ _ = Nothing
-
--- | Hardcoded babbage protocol Version
-babbageProtocolVersion :: Natural
-babbageProtocolVersion = 7
 
 {- | Hardcoded era history for preprod.
 FIXME: Remove this hack as it shouldn't be hardcoded.

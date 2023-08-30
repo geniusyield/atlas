@@ -32,7 +32,7 @@ import qualified Data.Map.Strict              as Map
 data LCIClient = LCIClient
     (Async.Async ())
     (STM.TVar Api.SlotNo)
-    (STM.TVar (Map (Api.Hash Api.ScriptData) Api.ScriptData))
+    (STM.TVar (Map (Api.Hash Api.ScriptData) Api.HashableScriptData))
 
 withLCIClient
     :: Api.LocalNodeConnectInfo Api.CardanoMode
@@ -66,12 +66,12 @@ newLCIClient info resumePoints = do
     a <- newChainSync info resumePoints cb
     return $ LCIClient a slotVar dataVar
 
-chainSyncCallback :: STM.TVar Api.SlotNo -> STM.TVar (Map (Api.Hash Api.ScriptData) Api.ScriptData) -> ChainSyncCallback
+chainSyncCallback :: STM.TVar Api.SlotNo -> STM.TVar (Map (Api.Hash Api.ScriptData) Api.HashableScriptData) -> ChainSyncCallback
 chainSyncCallback slotVar dataVar (RollForward block@(Api.BlockInMode (Api.Block (Api.BlockHeader slot _ _) _txs) _) _tip) =
     STM.atomically $ do
         STM.writeTVar slotVar slot
         STM.modifyTVar' dataVar $ \m ->
-            foldl' (\m' sd -> Map.insert (Api.hashScriptDataBytes $ Api.unsafeHashableScriptData sd) sd m') m (blockDatums block)
+            foldl' (\m' sd -> Map.insert (Api.hashScriptDataBytes sd) sd m') m (blockDatums block)
 
 chainSyncCallback _ _ _ = return ()
 
@@ -86,7 +86,7 @@ lciWaitUntilSlot (LCIClient _ slotVar _) (slotToApi -> slot) = STM.atomically $ 
     unless (slot' >= slot) STM.retry
     return (slotFromApi slot')
 
-lookupApiDatum :: LCIClient -> Api.Hash Api.ScriptData -> IO (Maybe Api.ScriptData)
+lookupApiDatum :: LCIClient -> Api.Hash Api.ScriptData -> IO (Maybe Api.HashableScriptData)
 lookupApiDatum (LCIClient _ _ dataVar) h = do
     m <- STM.readTVarIO dataVar
     return $ Map.lookup h m
@@ -184,22 +184,22 @@ chainSyncClient resumePoints cb =
 -- Utilities
 -------------------------------------------------------------------------------
 
-blockDatums :: Api.BlockInMode Api.CardanoMode -> [Api.ScriptData]
+blockDatums :: Api.BlockInMode Api.CardanoMode -> [Api.HashableScriptData]
 blockDatums (Api.BlockInMode block _) = goBlock block where
-    goBlock :: Api.Block era -> [Api.ScriptData]
+    goBlock :: Api.Block era -> [Api.HashableScriptData]
     goBlock (Api.Block _header txs) = concatMap goTx txs
 
-    goTx :: Api.Tx era -> [Api.ScriptData]
+    goTx :: Api.Tx era -> [Api.HashableScriptData]
     goTx (Api.Tx (Api.TxBody body) _witnesses) = goTxBody body
 
-    goTxBody :: Api.TxBodyContent Api.ViewTx era -> [Api.ScriptData]
+    goTxBody :: Api.TxBodyContent Api.ViewTx era -> [Api.HashableScriptData]
     goTxBody body = concatMap goTxOut (Api.txOuts body)
 
-    goTxOut :: Api.TxOut Api.CtxTx era -> [Api.ScriptData]
+    goTxOut :: Api.TxOut Api.CtxTx era -> [Api.HashableScriptData]
     goTxOut (Api.TxOut _addr _value datum _) = goDatum datum
 
-    goDatum :: Api.TxOutDatum Api.CtxTx era -> [Api.ScriptData]
+    goDatum :: Api.TxOutDatum Api.CtxTx era -> [Api.HashableScriptData]
     goDatum Api.TxOutDatumNone          = []
-    goDatum (Api.TxOutDatumInTx _ sd)   = [Api.getScriptData sd]
+    goDatum (Api.TxOutDatumInTx _ sd)   = [sd]
     goDatum (Api.TxOutDatumHash _ _h)   = []
-    goDatum (Api.TxOutDatumInline _ sd) = [Api.getScriptData sd]
+    goDatum (Api.TxOutDatumInline _ sd) = [sd]

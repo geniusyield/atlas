@@ -80,12 +80,7 @@ type QueryUtxo' = (RawBytes Api.TxId, Integer, GYAddressBech32, Integer, PQ.Aeso
      Maybe GYDatumHash, Maybe GYDatum, Maybe (Some GYScript))
 
 openDbSyncConn :: PQ.ConnectInfo -> IO CardanoDbSyncConn
-openDbSyncConn ci = coerce $ Pool.createPool
-    (PQ.connect ci)
-    PQ.close
-    1  -- strip
-    30 -- seconds to keep connections open
-    5  -- connections per strip.
+openDbSyncConn ci = coerce $ Pool.newPool (Pool.setNumStripes (Just 1) $ Pool.defaultPoolConfig (PQ.connect ci) PQ.close 30 5)
 
 newtype CardanoDbSyncException = CardanoDbSyncException String
   deriving stock (Show)
@@ -129,12 +124,12 @@ dbSyncLookupDatum (Conn pool) dh = Pool.withResource pool $ \conn -> do
         [PQ.Only (PQ.Aeson (SD sd))] -> return $ Just $ datumFromApi' sd
         _anyOtherMatch               -> return Nothing
 
-newtype SD = SD Api.ScriptData
+newtype SD = SD Api.HashableScriptData
   deriving Show
 
 instance FromJSON SD where
     parseJSON v = case Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema v of
-        Right x -> return (SD $ Api.getScriptData x)
+        Right x -> return (SD x)
         Left e  -> fail $ show e
 
 -------------------------------------------------------------------------------

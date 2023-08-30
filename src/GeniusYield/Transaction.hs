@@ -415,7 +415,7 @@ finalizeGYBalancedTx
         Just (v, xs) -> Api.TxMintValue Api.MultiAssetInBabbageEra (valueToApi v) $ Api.BuildTxWith $ Map.fromList
             [ ( mintingPolicyApiIdFromWitness p
               , gyMintingScriptWitnessToApiPlutusSW p
-                      (Api.unsafeHashableScriptData $ redeemerToApi r)
+                      (redeemerToApi r)
                       (Api.ExecutionUnits 0 0)
               )
             | (p, r) <- xs

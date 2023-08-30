@@ -391,7 +391,7 @@ datumHashFromBlockfrost = first (DeserializeErrorHex . Text.pack) . datumHashFro
 datumFromBlockfrostCBOR :: Blockfrost.ScriptDatumCBOR -> Either SomeDeserializeError GYDatum
 datumFromBlockfrostCBOR d = do
     bs  <- fromEither $ BS16.decode $ Text.encodeUtf8 t
-    api <- fromEither $ Api.deserialiseFromCBOR Api.AsScriptData bs
+    api <- fromEither $ Api.deserialiseFromCBOR Api.AsHashableScriptData bs
     return $ datumFromApi' api
   where
     t = Blockfrost._scriptDatumCborCbor d

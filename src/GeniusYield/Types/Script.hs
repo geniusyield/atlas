@@ -486,6 +486,9 @@ someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInl
   where
     y :: GYScript 'PlutusV2
     y = scriptFromApi x
+-- TODO: Following patterns should be fixed when Conway unleashes!
+someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra (Api.ScriptInAnyLang (Api.PlutusScriptLanguage Api.PlutusScriptV3) (Api.PlutusScript _ _))) = Nothing
+someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInConwayEra _) = Nothing
 
 scriptFromApi :: forall v. SingPlutusVersionI v => Api.PlutusScript (PlutusVersionToApi v) -> GYScript v
 scriptFromApi script = GYScript v script apiHash

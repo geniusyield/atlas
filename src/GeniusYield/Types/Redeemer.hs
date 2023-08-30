@@ -43,8 +43,8 @@ redeemerFromPlutus' = GYRedeemer
 redeemerFromPlutusData :: Plutus.ToData a => a -> GYRedeemer
 redeemerFromPlutusData = GYRedeemer . Plutus.toBuiltinData
 
-redeemerToApi :: GYRedeemer -> Api.ScriptData
-redeemerToApi = redeemerToPlutus' >>> Plutus.builtinDataToData >>> Api.fromPlutusData
+redeemerToApi :: GYRedeemer -> Api.HashableScriptData
+redeemerToApi = redeemerToPlutus' >>> Plutus.builtinDataToData >>> Api.fromPlutusData >>> Api.unsafeHashableScriptData
 
 -- | Unit redeemer
 --

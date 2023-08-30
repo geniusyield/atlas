@@ -120,7 +120,7 @@ datumHashFromMaestro = first (DeserializeErrorHex . Text.pack) . datumHashFromHe
 datumFromMaestroCBOR :: Text -> Either SomeDeserializeError GYDatum
 datumFromMaestroCBOR d = do
   bs  <- fromEither $ BS16.decode $ Text.encodeUtf8 d
-  api <- fromEither $ Api.deserialiseFromCBOR Api.AsScriptData bs
+  api <- fromEither $ Api.deserialiseFromCBOR Api.AsHashableScriptData bs
   return $ datumFromApi' api
   where
     e = DeserializeErrorHex d

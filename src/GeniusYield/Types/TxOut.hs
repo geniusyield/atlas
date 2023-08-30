@@ -80,8 +80,8 @@ txOutToApi (GYTxOut addr v md mrs) = Api.TxOut
     mkDatum :: Maybe (GYDatum, GYTxOutUseInlineDatum v) -> Api.TxOutDatum Api.CtxTx Api.BabbageEra
     mkDatum Nothing        = Api.TxOutDatumNone
     mkDatum (Just (d, di))
-        | di'    = Api.TxOutDatumInline Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra $ Api.unsafeHashableScriptData d'
-        | otherwise        = Api.TxOutDatumInTx Api.ScriptDataInBabbageEra $ Api.unsafeHashableScriptData d'
+        | di'       = Api.TxOutDatumInline Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra d'
+        | otherwise = Api.TxOutDatumInTx Api.ScriptDataInBabbageEra d'
       where
         d' = datumToApi' d
 

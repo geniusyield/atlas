@@ -357,11 +357,17 @@ dbSyncGetProtocolParameters (Conn pool) = Pool.withResource pool $ \conn -> do
             , protocolParamMaxValueSize        = Just (unSN ppMaxValueSize)
             , protocolParamCollateralPercent   = Just (unSN ppMaxCollateralPercent)
             , protocolParamMaxCollateralInputs = Just (unSN ppMaxCollateralInputs)
-            , protocolParamCostModels          = Map.mapKeys coerce (coerce ppCosts)
+            , protocolParamCostModels          =
+                let
+                  ppCosts' :: Map PlutusScriptVersion CostModel = coerce ppCosts
+                  ppCosts'' :: Map PlutusScriptVersion Api.CostModel = fmap (coerce . Map.elems) ppCosts'
+                in Map.mapKeys coerce ppCosts''
             , protocolParamUTxOCostPerByte     = Just $ Api.Lovelace (unSI ppUTxOCostPerWord `div` 8)
             }
 
         _ -> throwIO $ CardanoDbSyncException "dbSyncGetProtocolParameters: zero or multiple SQL results"
+
+type CostModel = (Map Text Integer)
 
 data PP = PP
     { ppMaj                  :: !N
@@ -390,11 +396,9 @@ data PP = PP
     , ppMaxValueSize         :: !SN
     , ppMaxCollateralPercent :: !SN
     , ppMaxCollateralInputs  :: !SN
-    , ppCosts                :: !(PQ.Aeson (Map PlutusScriptVersion Api.CostModel))
+    , ppCosts                :: !(PQ.Aeson (Map PlutusScriptVersion CostModel))
     }
   deriving (Generic)
-
-deriving newtype instance FromJSON Api.CostModel  -- FIXME: Need to test this!
 
 instance PQ.FromRow PP
 

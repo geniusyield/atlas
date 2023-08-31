@@ -389,9 +389,9 @@ sendSkeleton' skeleton ws = do
             , Fork.txScripts = sm
             }
 
-    addMint :: Tx -> (Some GYMintingPolicy, (Map GYTokenName Integer, GYRedeemer)) -> GYTxMonadRun Tx
-    addMint tx (Some mp, (m, r)) = do
-        let pid = mintingPolicyId mp
+    addMint :: Tx -> (GYMintScript v, (Map GYTokenName Integer, GYRedeemer)) -> GYTxMonadRun Tx
+    addMint tx (mp, (m, r)) = do
+        let pid = mintingPolicyIdFromWitness mp
             vmp = mintingPolicyToVersioned mp
             r'  =  redeemerToPlutus r
             v   = valueToPlutus $ foldMap (\(tn, n) -> valueSingleton (GYToken pid tn) n) $ Map.toList m
@@ -418,10 +418,10 @@ sendSkeleton' skeleton ws = do
         SingPlutusV1 -> Versioned Ledger.PlutusV1 $ validatorToPlutus v
         SingPlutusV2 -> Versioned Ledger.PlutusV2 $ validatorToPlutus v
 
-    mintingPolicyToVersioned :: GYMintingPolicy v -> Versioned Plutus.MintingPolicy
-    mintingPolicyToVersioned v = case mintingPolicyVersion v of
-        SingPlutusV1 -> Versioned Ledger.PlutusV1 $ mintingPolicyToPlutus v
-        SingPlutusV2 -> Versioned Ledger.PlutusV2 $ mintingPolicyToPlutus v
+    mintingPolicyToVersioned :: GYMintScript v -> Versioned Plutus.MintingPolicy
+    mintingPolicyToVersioned v = case mintingPolicyVersionFromWitness v of
+        PlutusV1 -> Versioned Ledger.PlutusV1 $ mintingPolicyToPlutusFromWitness v
+        PlutusV2 -> Versioned Ledger.PlutusV2 $ mintingPolicyToPlutusFromWitness v
 
 skeletonToTxBody :: GYTxSkeleton v -> GYTxMonadRun GYTxBody
 skeletonToTxBody skeleton = do

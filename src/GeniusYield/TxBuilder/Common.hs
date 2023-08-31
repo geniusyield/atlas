@@ -13,15 +13,18 @@ module GeniusYield.TxBuilder.Common
     , buildTxCore
     , collateralLovelace
     , collateralValue
+    , maximumRequiredCollateralLovelace
+    , maximumRequiredCollateralValue
     ) where
 
-import qualified Cardano.Api                  as Api
-import qualified Cardano.Api.Shelley          as Api.S
-import           Data.List.NonEmpty           (NonEmpty ((:|)))
-import qualified Data.List.NonEmpty           as NE
+import qualified Cardano.Api                    as Api
+import qualified Cardano.Api.Shelley            as Api.S
+import           Data.List.NonEmpty             (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty             as NE
 
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
+import           GeniusYield.Transaction.Common (minimumUTxO)
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
@@ -83,12 +86,14 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
 
         helper :: GYUTxOs -> GYTxSkeleton v -> m (Either BuildTxException GYTxBody)
         helper ownUtxos' GYTxSkeleton {..} = do
-            let gytxMint' :: Maybe (GYValue, [(Some GYMintingPolicy, GYRedeemer)])
-                gytxMint' | null gytxMint = Nothing
-                    | otherwise = Just
-                    ( valueFromList [ (GYToken (mintingPolicyId mp) tn, n) | (Some mp, (tokens, _)) <- itoList gytxMint, (tn, n) <- itoList tokens ]
-                    , [(mp, redeemer) | (mp, (_, redeemer)) <- itoList gytxMint]
-                    )
+            let gytxMint' :: Maybe (GYValue, [(GYMintScript v, GYRedeemer)])
+                gytxMint'
+                  | null gytxMint = Nothing
+                  | otherwise =
+                      Just
+                        ( valueFromList [ (GYToken (mintingPolicyIdFromWitness mp) tn, n) | (mp, (tokens, _)) <- itoList gytxMint, (tn, n) <- itoList tokens ]
+                        , [(mp, redeemer) | (mp, (_, redeemer)) <- itoList gytxMint]
+                        )
 
             -- Convert the 'GYTxIn's to 'GYTxInDetailed's by fetching chain information about them.
             gyInUtxos       <- utxosAtTxOutRefs $ gyTxInTxOutRef <$> gytxIns
@@ -106,7 +111,16 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
               maybe
                 ( return $
                     find
-                      (\u -> utxoValue u `valueGreaterOrEqual` collateralValue)  -- Keeping it simple.
+                      (\u ->
+                        let v = utxoValue u
+                            -- Following depends on that we allow unsafe, i.e., negative coins count below. In future, we can take magnitude instead.
+                            vWithoutMaxCollPledge = v `valueMinus` maximumRequiredCollateralValue
+                            worstCaseCollOutput = mkGYTxOutNoDatum change vWithoutMaxCollPledge
+                            -- @vWithoutMaxCollPledge@ should satisfy minimum ada requirement.
+                        in
+                             v `valueGreaterOrEqual` maximumRequiredCollateralValue
+                          && minimumUTxO pp worstCaseCollOutput <= fromInteger (valueAssetClass vWithoutMaxCollPledge GYLovelace)
+                      )  -- Keeping it simple.
                       (utxosToList ownUtxos')
 
                 ) (fmap Just . utxoAtTxOutRef') reservedCollateral
@@ -176,3 +190,15 @@ collateralLovelace = 5_000_000
 
 collateralValue :: GYValue
 collateralValue = valueFromLovelace collateralLovelace
+
+-- | See `maximumRequiredCollateralValue`.
+maximumRequiredCollateralLovelace :: Integer
+maximumRequiredCollateralLovelace = 3_700_000
+
+-- | What is the maximum possible collateral requirement as per current protocol parameters?
+--
+-- __NOTE:__ This value would need to be updated if we ever see update in protocol parameters.
+--
+-- Currently this is set to @3.7@ ada as maximum transaction fees possible currently is \(44 \times 16384 + 155381 + 10000000000 \times (721 / 10000000) + 14000000 \times (577 / 10000)  = 2405077\). Multiplying this by \(1.5\) (for collateral percentage) and taking ceil, gives us \(3607616\) lovelaces.
+maximumRequiredCollateralValue :: GYValue
+maximumRequiredCollateralValue = valueFromLovelace maximumRequiredCollateralLovelace

@@ -92,6 +92,7 @@ library
     GeniusYield.Test.Privnet.Ctx
     GeniusYield.Test.Privnet.Examples
     GeniusYield.Test.Privnet.Examples.Gift
+    GeniusYield.Test.Privnet.Examples.Misc
     GeniusYield.Test.Privnet.Examples.Oracle
     GeniusYield.Test.Privnet.Examples.Treat
     GeniusYield.Test.Privnet.Options
@@ -211,9 +212,9 @@ library
     , cardano-coin-selection
     , cardano-crypto-class
     , cardano-ledger-alonzo
+    , cardano-ledger-babbage
     , cardano-ledger-byron
     , cardano-ledger-core
-    , cardano-ledger-shelley
     , cardano-slotting
     , cardano-wallet-primitive
     , ouroboros-consensus

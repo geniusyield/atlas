@@ -13,8 +13,8 @@ module GeniusYield.OnChain.TestToken (
     mkTestTokenPolicy,
 ) where
 
-import           Plutus.V1.Ledger.Api
-import           Plutus.V1.Ledger.Value    (flattenValue)
+import           Plutus.V1.Ledger.Value (flattenValue)
+import           Plutus.V2.Ledger.Api
 import           PlutusTx.Prelude
 
 {-# INLINABLE mkTestTokenPolicy #-}

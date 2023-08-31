@@ -9,7 +9,7 @@ Stability   : develop
 
 {-# LANGUAGE LambdaCase #-}
 
-module GeniusYield.Test.Privnet.Examples.Gift (tests) where
+module GeniusYield.Test.Privnet.Examples.Gift (tests, resolveRefScript, resolveRefScript') where
 
 import qualified Cardano.Api                      as Api
 import qualified Cardano.Api.Shelley              as Api.S
@@ -34,7 +34,8 @@ import           GeniusYield.Test.Privnet.Asserts
 import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder.Class
-import           GeniusYield.TxBuilder.Common     (collateralValue)
+import           GeniusYield.TxBuilder.Common     (collateralValue,
+                                                   maximumRequiredCollateralValue)
 
 tests :: IO Setup -> TestTree
 tests setup = testGroup "gift"
@@ -89,7 +90,7 @@ tests setup = testGroup "gift"
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts  @'PlutusV1 giftValidatorV2
+        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts  @'PlutusV2 giftValidatorV2
         mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
@@ -123,7 +124,7 @@ tests setup = testGroup "gift"
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts  @'PlutusV1 giftValidatorV2
+        grabGiftsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabGifts  @'PlutusV2 giftValidatorV2
         mapM_ (submitTx ctx (ctxUser2 ctx)) grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
@@ -164,7 +165,7 @@ tests setup = testGroup "gift"
         forUTxOs_ newUserUtxos (info . show)
 
         ---------- New user tries to grab it, since interacting with script, needs to give collateral
-        grabGiftsTxBody <- ctxRunF ctx newUser $ grabGifts  @'PlutusV1 giftValidatorV2
+        grabGiftsTxBody <- ctxRunF ctx newUser $ grabGifts  @'PlutusV2 giftValidatorV2
         grabGiftsTxBody' <- case grabGiftsTxBody of
           Nothing   -> assertFailure "Unable to build tx"
           Just body -> return body
@@ -203,15 +204,35 @@ tests setup = testGroup "gift"
         -- Would have thrown error if unable to build body.
         void $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
-    , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error when no UTxO is greater than or equal to maximum possible total collateral" $ \info -> withSetup setup info $ \ctx -> do
         ----------- Create a new user and fund it
-        let newUserValue = valueFromLovelace 4_000_000
+        let newUserValue = maximumRequiredCollateralValue `valueMinus` valueFromLovelace 1
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
 
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
         forUTxOs_ newUserUtxos (info . show)
-        assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 2_000_000)
+        assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
+
+    , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error when UTxO is greater than or equal to maximum possible total collateral but resulting return collateral doesn't satisfy minimum ada requirement" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        let newUserValue = maximumRequiredCollateralValue <> valueFromLovelace 0_500_000
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
+
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+        assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
+
+    , testCaseSteps "No 'BuildTxNoSuitableCollateral' error is thrown when collateral input is sufficient" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        let newUserValue = maximumRequiredCollateralValue <> valueFromLovelace 1_500_000
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
+
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        forUTxOs_ newUserUtxos (info . show)
+        void $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
     , testCaseSteps "Checking if collateral is reserved in case we want it even if it's value is not 5 ada" $ \info -> withSetup setup info $ \ctx -> do
         ----------- Create a new user and fund it
@@ -235,14 +256,7 @@ tests setup = testGroup "gift"
 
         txBodyRefScript <- ctxRunI ctx (ctxUserF ctx) $ addRefScript' (validatorToScript giftValidatorV2)
 
-        ref <- do
-          let refs = findRefScriptsInBody txBodyRefScript
-          ref <- case Map.lookup (Some (validatorToScript giftValidatorV2)) refs of
-              Just ref -> return ref
-              Nothing  -> fail "Shouldn't happen: no ref in body"
-
-          void $ submitTx ctx (ctxUserF ctx) txBodyRefScript
-          return ref
+        ref <- resolveRefScript' ctx txBodyRefScript (Some (validatorToScript giftValidatorV2))
 
         info $ "Reference at " ++ show ref
 
@@ -268,17 +282,7 @@ tests setup = testGroup "gift"
         --
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
         txBodyRefScript <- ctxRunF ctx (ctxUserF ctx) $ addRefScript (validatorToScript giftValidatorV2)
-
-        ref <- case txBodyRefScript of
-            Left ref   -> return ref
-            Right body -> do
-                let refs = findRefScriptsInBody body
-                ref <- case Map.lookup (Some (validatorToScript giftValidatorV2)) refs of
-                    Just ref -> return ref
-                    Nothing  -> fail "Shouldn't happen: no ref in body"
-
-                void $ submitTx ctx (ctxUserF ctx) body
-                return ref
+        ref <- resolveRefScript ctx txBodyRefScript (Some (validatorToScript giftValidatorV2))
 
         info $ "Reference at " ++ show ref
 
@@ -327,17 +331,7 @@ tests setup = testGroup "gift"
         --
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
         txBodyRefScript <- ctxRunF ctx (ctxUserF ctx) $ addRefScript (validatorToScript giftValidatorV2)
-
-        ref <- case txBodyRefScript of
-            Left ref   -> return ref
-            Right body -> do
-                let refs = findRefScriptsInBody body
-                ref <- case Map.lookup (Some (validatorToScript giftValidatorV2)) refs of
-                    Just ref -> return ref
-                    Nothing  -> fail "Shouldn't happen: no ref in body"
-
-                void $ submitTx ctx (ctxUserF ctx) body
-                return ref
+        ref <- resolveRefScript ctx txBodyRefScript (Some (validatorToScript giftValidatorV2))
 
         info $ "Reference at " ++ show ref
 
@@ -389,17 +383,7 @@ tests setup = testGroup "gift"
         --
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
         txBodyRefScript <- ctxRunF ctx (ctxUserF ctx) $ addRefScript (validatorToScript giftValidatorV2)
-
-        ref <- case txBodyRefScript of
-            Left ref   -> return ref
-            Right body -> do
-                let refs = findRefScriptsInBody body
-                ref <- case Map.lookup (Some (validatorToScript giftValidatorV2)) refs of
-                    Just ref -> return ref
-                    Nothing  -> fail "Shouldn't happen: no ref in body"
-
-                void $ submitTx ctx (ctxUserF ctx) body
-                return ref
+        ref <- resolveRefScript ctx txBodyRefScript (Some (validatorToScript giftValidatorV2))
 
         info $ "Reference at " ++ show ref
 
@@ -645,3 +629,19 @@ checkCollateral inputValue returnValue totalCollateralLovelace txFee collPer =
   && balanceLovelace>= ceiling (txFee * collPer % 100)  -- Api checks via `balanceLovelace * 100 >= txFee * collPer` which IMO works as `balanceLovelace` is an integer & 100 but in general `c >= ceil (a / b)` is not equivalent to `c * b >= a`.
   && inputValue == returnValue <> valueFromLovelace totalCollateralLovelace
   where (balanceLovelace, balanceOther) = valueSplitAda $ inputValue `valueMinus` returnValue
+
+resolveRefScript :: Ctx -> Either GYTxOutRef GYTxBody -> Some GYScript -> IO GYTxOutRef
+resolveRefScript ctx txBodyRefScript script =
+  case txBodyRefScript of
+    Left ref   -> return ref
+    Right body -> resolveRefScript' ctx body script
+
+resolveRefScript' :: Ctx -> GYTxBody -> Some GYScript -> IO GYTxOutRef
+resolveRefScript' ctx txBodyRefScript script = do
+  let refs = findRefScriptsInBody txBodyRefScript
+  ref <- case Map.lookup script refs of
+      Just ref -> return ref
+      Nothing  -> fail "Shouldn't happen: no ref in body"
+
+  void $ submitTx ctx (ctxUserF ctx) txBodyRefScript
+  return ref

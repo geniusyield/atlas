@@ -14,11 +14,9 @@ module GeniusYield.Types.TxIn (
     txInToApi,
 ) where
 
-import           Data.GADT.Compare               (GEq (geq))
-import           Data.Maybe                      (isJust)
+import           Data.GADT.Compare               (defaultEq)
 
 import qualified Cardano.Api                     as Api
-import qualified Cardano.Api.Shelley             as Api.S
 
 import           GeniusYield.Types.Datum
 import           GeniusYield.Types.PlutusVersion
@@ -66,7 +64,7 @@ deriving instance Show (GYInScript v)
 
 instance Eq (GYInScript v) where
     GYInReference ref1 script1 == GYInReference ref2 script2 = ref1 == ref2 && script1 == script2
-    GYInScript v1 == GYInScript v2                           = isJust $ geq v1 v2
+    GYInScript v1 == GYInScript v2                           = defaultEq v1 v2
     _ == _ = False
 
 -- |
@@ -81,12 +79,9 @@ txInToApi useInline (GYTxIn oref m) = (txOutRefToApi oref, Api.BuildTxWith $ f m
     f GYTxInWitnessKey = Api.KeyWitness Api.KeyWitnessForSpending
     f (GYTxInWitnessScript v d r) =
         Api.ScriptWitness Api.ScriptWitnessForSpending $ g v
-        (if useInline then Api.InlineScriptDatum else Api.ScriptDatumForTxIn $ datumToApi' d) -- TODO: Investigate if we can use Api.InlineScriptDatum in TxIn.hs #21 (https://github.com/geniusyield/atlas/issues/21)
+        (if useInline then Api.InlineScriptDatum else Api.ScriptDatumForTxIn $ datumToApi' d)
         (redeemerToApi r)
         (Api.ExecutionUnits 0 0)
 
     g (GYInScript v)        = validatorToApiPlutusScriptWitness v
-    g (GYInReference ref s) = Api.PlutusScriptWitness
-        Api.PlutusScriptV2InBabbage
-        Api.PlutusScriptV2
-        (Api.S.PReferenceScript (txOutRefToApi ref) (Just (scriptApiHash s)))
+    g (GYInReference ref s) = referenceScriptToApiPlutusScriptWitness ref s

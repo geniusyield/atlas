@@ -20,6 +20,7 @@ providersMashupTests :: [GYCoreConfig] -> TestTree
 providersMashupTests configs =
   testGroup "Providers Mashup"
     [ testCase "Datum lookup - GYLookupDatum" $ do
+        threadDelay 1_000_000
         dats <- forM configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> fromJust <$> gyLookupDatum "d81d2abd12bdc2c19001a5d659c6aefd3fe4e073a37835b6818c2e676f84c03c"
         assertBool "Datums are not all equal" $ all (== head dats) (tail dats)
     , testCase "Parameters" $ do

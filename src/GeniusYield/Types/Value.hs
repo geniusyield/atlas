@@ -686,6 +686,9 @@ instance Web.FromHttpApiData GYTokenName where
 tokenNameToHex :: GYTokenName -> Text
 tokenNameToHex (GYTokenName bs ) = TE.decodeUtf8 $ Base16.encode bs
 
+-- >>> tokenNameToPlutus "GOLD"
+-- "GOLD"
+
 tokenNameToPlutus :: GYTokenName -> Plutus.TokenName
 tokenNameToPlutus (GYTokenName bs) = Plutus.TokenName (toBuiltin bs)
 

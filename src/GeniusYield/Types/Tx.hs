@@ -54,7 +54,7 @@ import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as TE
-import qualified PlutusLedgerApi.V1           as Plutus
+import qualified PlutusLedgerApi.V1           as Plutus (TxId (..))
 import qualified PlutusTx.Builtins.Internal   as Plutus
 import qualified Text.Printf                  as Printf
 import qualified Web.HttpApiData              as Web

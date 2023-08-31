@@ -55,7 +55,10 @@ import qualified Database.PostgreSQL.Simple           as PQ
 import qualified Database.PostgreSQL.Simple.FromField as PQ (FromField (..),
                                                              returnError)
 import qualified Database.PostgreSQL.Simple.ToField   as PQ
-import qualified PlutusLedgerApi.V1                   as Plutus
+import qualified PlutusLedgerApi.V1.Address           as Plutus
+import qualified PlutusLedgerApi.V1.Credential        as Plutus
+import qualified PlutusLedgerApi.V1.Crypto            as Plutus
+import qualified PlutusLedgerApi.V1.Scripts           as Plutus
 import qualified PlutusTx.Builtins.Internal           as Plutus
 import qualified PlutusTx.Prelude                     as PlutusTx
 import qualified Text.Printf                          as Printf

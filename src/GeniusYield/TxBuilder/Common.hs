@@ -21,6 +21,8 @@ import qualified Cardano.Api                    as Api
 import qualified Cardano.Api.Shelley            as Api.S
 import           Data.List.NonEmpty             (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty             as NE
+import qualified Data.Map.Strict                as Map
+import qualified Data.Set                       as Set
 
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
@@ -103,8 +105,12 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                     Nothing                                                           -> throwError . GYQueryUTxOException $ GYNoUtxoAtRef ref
                     Just GYUTxO {utxoAddress, utxoValue, utxoRefScript, utxoOutDatum} -> pure $
                         GYTxInDetailed gyTxIn utxoAddress utxoValue utxoRefScript (isInlineDatum utxoOutDatum)
-
-            refInsUtxos <- utxosAtTxOutRefs $ gyTxSkeletonRefInsToList gytxRefIns
+            let refIns =
+                    gyTxSkeletonRefInsToList gytxRefIns
+                  <> [r | GYTxIn { gyTxInWitness = GYTxInWitnessScript (GYInReference r _) _ _ } <- gytxIns]
+                  <> [r | GYMintReference r _ <- Map.keys gytxMint]
+            -- TODO: Merge this call of @utxosAtTxOutRefs refIns@ with earlier call to get for @gyInUtxos@. Issue tracked at https://github.com/geniusyield/atlas/issues/215.
+            refInsUtxos <- utxosAtTxOutRefs refIns
 
             -- This operation is `O(n)` where `n` denotes the number of UTxOs in `ownUtxos'`.
             mCollateralUtxo <-
@@ -130,7 +136,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
               Just collateralUtxo ->
                 -- Build the transaction.
                 buildUnsignedTxBody
-                    (buildEnvWith ownUtxos' (gyTxSkeletonRefInsSet gytxRefIns) collateralUtxo)
+                    (buildEnvWith ownUtxos' (Set.fromList refIns) collateralUtxo)
                     cstrat
                     gyTxInsDetailed
                     gytxOuts
@@ -141,7 +147,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                     gytxSigs
 
         go :: GYUTxOs -> GYTxBuildResult f -> [f (GYTxSkeleton v)] -> m (Either BuildTxException  (GYTxBuildResult f))
-        go _         acc []           = pure $ Right $ reverseResult acc
+        go _         acc []             = pure $ Right $ reverseResult acc
         go ownUtxos' acc (fbody : rest) = do
             res <- sequence <$> traverse (helper ownUtxos') fbody
             case res of

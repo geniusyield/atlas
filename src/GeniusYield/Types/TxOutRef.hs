@@ -39,7 +39,7 @@ import qualified Data.Swagger.Lens                ()
 import qualified Data.Text                        as T
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as TE
-import qualified PlutusLedgerApi.V1               as Plutus
+import qualified PlutusLedgerApi.V1               as Plutus (TxOutRef (..), TxId (..))
 import qualified PlutusTx.Builtins.Internal       as Plutus
 import qualified Text.Printf                      as Printf
 import qualified Web.HttpApiData                  as Web

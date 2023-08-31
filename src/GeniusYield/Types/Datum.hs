@@ -39,7 +39,9 @@ import qualified Database.PostgreSQL.Simple           as PQ
 import qualified Database.PostgreSQL.Simple.FromField as PQ (FromField (..),
                                                              returnError)
 import qualified Database.PostgreSQL.Simple.ToField   as PQ
-import qualified PlutusLedgerApi.V1                   as Plutus
+import qualified PlutusLedgerApi.V1.Scripts           as Plutus
+import qualified PlutusTx
+import qualified PlutusTx.Builtins                    as PlutusTx
 
 import qualified Cardano.Api.Shelley                  as Api
 import           GeniusYield.Imports
@@ -50,26 +52,26 @@ import           GeniusYield.Types.Ledger
 -- In the GY system we always include datums in transactions
 -- so this simple type is sufficient.
 --
-newtype GYDatum = GYDatum Plutus.BuiltinData
+newtype GYDatum = GYDatum PlutusTx.BuiltinData
     deriving stock (Eq, Ord, Show)
-    deriving newtype (Plutus.ToData, Plutus.FromData)
+    deriving newtype (PlutusTx.ToData, PlutusTx.FromData)
 
 -- | Convert a 'GYDatum' to 'Api.HashableScriptData' from Cardano Api.
 --
 -- __NOTE:__ This function is to be used only when generating for new outputs in a transaction as doing `datumFromApi'` followed by `datumToApi'` does not guarantee same low level CBOR representation of the high level data type.
 datumToApi' :: GYDatum -> Api.HashableScriptData
-datumToApi' = datumToPlutus' >>> Plutus.builtinDataToData >>> Api.fromPlutusData >>> Api.unsafeHashableScriptData  -- @unsafeHashableScriptData@ is fine here as there is no original datum bytes here, i.e. to say, this is a new datum which we are serialising and since we are serialising, we govern it.
+datumToApi' = datumToPlutus' >>> PlutusTx.builtinDataToData >>> Api.fromPlutusData >>> Api.unsafeHashableScriptData  -- @unsafeHashableScriptData@ is fine here as there is no original datum bytes here, i.e. to say, this is a new datum which we are serialising and since we are serialising, we govern it.
 
 -- | Get a 'GYDatum' from a Cardano Api 'Api.ScriptData'
 datumFromApi' :: Api.HashableScriptData -> GYDatum
-datumFromApi' = GYDatum . Plutus.dataToBuiltinData . Api.toPlutusData . Api.getScriptData
+datumFromApi' = GYDatum . PlutusTx.dataToBuiltinData . Api.toPlutusData . Api.getScriptData
 
 -- | Convert a 'GYDatum' to 'Plutus.Datum' from Plutus
 datumToPlutus :: GYDatum -> Plutus.Datum
 datumToPlutus = Plutus.Datum . datumToPlutus'
 
 -- | Convert a 'GYDatum' to 'Plutus.BuiltinData' from Plutus
-datumToPlutus' :: GYDatum -> Plutus.BuiltinData
+datumToPlutus' :: GYDatum -> PlutusTx.BuiltinData
 datumToPlutus' (GYDatum x) = x
 
 -- | Get a 'GYDatum' from a Plutus 'Plutus.Datum'
@@ -77,12 +79,12 @@ datumFromPlutus :: Plutus.Datum -> GYDatum
 datumFromPlutus (Plutus.Datum d) = GYDatum d
 
 -- | Get a 'GYDatum' from a Plutus 'Plutus.BuiltinData'
-datumFromPlutus' :: Plutus.BuiltinData -> GYDatum
+datumFromPlutus' :: PlutusTx.BuiltinData -> GYDatum
 datumFromPlutus' = GYDatum
 
 -- | Get a 'GYDatum' from any Plutus 'Plutus.ToData' type.
-datumFromPlutusData :: Plutus.ToData a => a -> GYDatum
-datumFromPlutusData = GYDatum . Plutus.toBuiltinData
+datumFromPlutusData :: PlutusTx.ToData a => a -> GYDatum
+datumFromPlutusData = GYDatum . PlutusTx.toBuiltinData
 
 -- | Returns the 'GYDatumHash' of the given 'GYDatum'
 hashDatum :: GYDatum -> GYDatumHash
@@ -124,7 +126,7 @@ datumHashFromHexE = Base16.decode . BS8.pack
 datumHashFromPlutus :: Plutus.DatumHash -> Either PlutusToCardanoError GYDatumHash
 datumHashFromPlutus (Plutus.DatumHash h) = first
     (\t -> DeserialiseRawBytesError . Txt.pack $ "datumHashFromPlutus" ++ '.':t)
-    . datumHashFromBS $ Plutus.fromBuiltin h
+    . datumHashFromBS $ PlutusTx.fromBuiltin h
 
 unsafeDatumHashFromPlutus :: Plutus.DatumHash -> GYDatumHash
 unsafeDatumHashFromPlutus =
@@ -133,7 +135,7 @@ unsafeDatumHashFromPlutus =
 -- TODO: remove me #27
 --       (https://github.com/geniusyield/atlas/issues/27)
 datumHashToPlutus :: GYDatumHash -> Plutus.DatumHash
-datumHashToPlutus h = Plutus.DatumHash (Plutus.toBuiltin (Api.serialiseToRawBytes (datumHashToApi h)))
+datumHashToPlutus h = Plutus.DatumHash (PlutusTx.toBuiltin (Api.serialiseToRawBytes (datumHashToApi h)))
 
 datumHashFromApi :: Api.Hash Api.ScriptData -> GYDatumHash
 datumHashFromApi = coerce

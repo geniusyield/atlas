@@ -25,7 +25,8 @@ import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
 import           GeniusYield.Types.Ledger
-import qualified PlutusLedgerApi.V1           as Plutus
+import qualified PlutusLedgerApi.V1.Crypto    as Plutus
+import qualified PlutusTx.Builtins            as Plutus
 import qualified PlutusTx.Builtins.Internal   as Plutus
 import qualified Text.Printf                  as Printf
 

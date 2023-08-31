@@ -19,9 +19,10 @@ module GeniusYield.Types.Redeemer (
 import qualified Cardano.Api         as Api
 import qualified Cardano.Api.Shelley as Api
 import           GeniusYield.Imports ((>>>))
-import qualified PlutusLedgerApi.V1  as Plutus
+import qualified PlutusLedgerApi.V1  as PlutusV1
+import qualified PlutusTx
 
-newtype GYRedeemer = GYRedeemer Plutus.BuiltinData
+newtype GYRedeemer = GYRedeemer PlutusTx.BuiltinData
   deriving (Eq)
 
 instance Show GYRedeemer where
@@ -31,20 +32,20 @@ instance Show GYRedeemer where
         . shows x
         . showString "))"
 
-redeemerToPlutus :: GYRedeemer -> Plutus.Redeemer
-redeemerToPlutus (GYRedeemer x) = Plutus.Redeemer x
+redeemerToPlutus :: GYRedeemer -> PlutusV1.Redeemer
+redeemerToPlutus (GYRedeemer x) = PlutusV1.Redeemer x
 
-redeemerToPlutus' :: GYRedeemer -> Plutus.BuiltinData
+redeemerToPlutus' :: GYRedeemer -> PlutusTx.BuiltinData
 redeemerToPlutus' (GYRedeemer x) = x
 
-redeemerFromPlutus' :: Plutus.BuiltinData -> GYRedeemer
+redeemerFromPlutus' :: PlutusTx.BuiltinData -> GYRedeemer
 redeemerFromPlutus' = GYRedeemer
 
-redeemerFromPlutusData :: Plutus.ToData a => a -> GYRedeemer
-redeemerFromPlutusData = GYRedeemer . Plutus.toBuiltinData
+redeemerFromPlutusData :: PlutusTx.ToData a => a -> GYRedeemer
+redeemerFromPlutusData = GYRedeemer . PlutusTx.toBuiltinData
 
 redeemerToApi :: GYRedeemer -> Api.HashableScriptData
-redeemerToApi = redeemerToPlutus' >>> Plutus.builtinDataToData >>> Api.fromPlutusData >>> Api.unsafeHashableScriptData
+redeemerToApi = redeemerToPlutus' >>> PlutusTx.builtinDataToData >>> Api.fromPlutusData >>> Api.unsafeHashableScriptData
 
 -- | Unit redeemer
 --

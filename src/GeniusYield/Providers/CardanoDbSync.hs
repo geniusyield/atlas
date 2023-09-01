@@ -111,6 +111,8 @@ dbSyncAwaitTxConfirmed (Conn pool) p@GYAwaitTxParameters{..} txId =
             [PQ.Only (blockConfirmations :: Int)] ->
                 when (blockConfirmations < confirmations) $
                 threadDelay checkInterval >> dbSyncAwaitTx (attempt + 1) conn
+            [] | attempt + 1 == maxAttempts -> throwIO $ GYAwaitTxException p
+            [] -> threadDelay checkInterval >> dbSyncAwaitTx (attempt + 1) conn
             _anyOtherMatch -> throwIO $ CardanoDbSyncException "dbSyncAwaitTxConfirmed: zero or multiple SQL results"
 
 -------------------------------------------------------------------------------

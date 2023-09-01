@@ -101,4 +101,3 @@ providersMashupTests configs =
         forM_ configs $ \config -> withCfgProviders config mempty $
             \GYProviders {..} -> handle handleAwaitTxException $ gyAwaitTxConfirmed def{maxAttempts=2, checkInterval=1_000_000} "9b50152cc5cfca6a842f32b1e886a3ffdc1a1704fa87a15a88837996b6a9df36"
     ]
-

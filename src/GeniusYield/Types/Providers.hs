@@ -203,7 +203,7 @@ data GYAwaitTxParameters = GYAwaitTxParameters
                            { maxAttempts   :: Int
                            -- ^ Max number of attempts before give up.
                            , checkInterval :: Int
-                           -- ^ Wait time for each attempt (in nanoseconds).
+                           -- ^ Wait time for each attempt (in microseconds).
                            , confirmations :: Int
                            -- ^ Min number of block confirmation.
                            }
@@ -217,8 +217,11 @@ instance Default GYAwaitTxParameters where
           }
 
 newtype GYAwaitTxException = GYAwaitTxException GYAwaitTxParameters
-  deriving stock (Show)
-  deriving anyclass (Exception)
+    deriving anyclass (Exception)
+
+instance Show GYAwaitTxException where
+    show (GYAwaitTxException awaitTxParams) =
+        "Tries exceeded, given maximum: " ++ show awaitTxParams
 
 -------------------------------------------------------------------------------
 -- Current slot

@@ -61,7 +61,6 @@ module GeniusYield.Transaction (
 
 import           Control.Monad.Trans.Except            (runExceptT, throwE)
 import           Data.Foldable                         (for_)
-import           Data.List                             (nub)
 import qualified Data.Map                              as Map
 import           Data.Ratio                            ((%))
 import           GHC.Records                           (getField)
@@ -320,53 +319,13 @@ finalizeGYBalancedTx
         changeAddr
   where
 
-    -- reference scripts
-    -- 1. it seems we need to tell both which refs have reference scripts
     inRefs :: Api.TxInsReference Api.BuildTx Api.BabbageEra
     inRefs = case inRefs' of
         [] -> Api.TxInsReferenceNone
         _  -> Api.TxInsReference Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra inRefs'
 
     inRefs' :: [Api.TxIn]
-    inRefs' = nub $
-        -- reference scripts given by inputs
-        [ txOutRefToApi ref
-        | GYTxInDetailed { gyTxInDet = GYTxIn { gyTxInWitness = GYTxInWitnessScript (GYInReference ref _) _ _ } } <- ins
-        ] ++
-        -- reference inputs
-        [ txOutRefToApi (utxoRef utxo)
-        | utxo <- utxosToList utxosRefInputs
-        ] ++
-        -- reference scripts given by minting policies
-        case mmint of
-          Nothing -> []
-          Just (_v, mps) ->
-            [ txOutRefToApi r
-            | (GYMintReference r _s, _) <- mps
-            ]
-
-    -- reference script:
-    -- 2. and also provide the utxos with named scripts.
-    --
-    -- Note: we can implement this also by having the caller provide this UTxO
-    -- (they need to provide own UTxO already for balancing)
-    -- But this seems to work for now as well.
-    utxosRefScripts :: GYUTxOs
-    utxosRefScripts = utxosFromList
-        [ GYUTxO ref addr mempty GYOutDatumNone (Just (Some s))
-        | GYTxInDetailed { gyTxInDet = GYTxIn { gyTxInWitness = GYTxInWitnessScript (GYInReference ref s) _ _ } } <- ins
-        ] <>
-        utxosFromList (
-          case mmint of
-            Nothing -> []
-            Just (_v, mps) ->
-              [ GYUTxO r addr mempty GYOutDatumNone (Just (Some s))
-              | (GYMintReference r s, _) <- mps
-              ]
-        )
-      where
-        -- TODO: any address seems to work!?
-        addr = unsafeAddressFromText "addr_test1qrsuhwqdhz0zjgnf46unas27h93amfghddnff8lpc2n28rgmjv8f77ka0zshfgssqr5cnl64zdnde5f8q2xt923e7ctqu49mg5"
+    inRefs' = [ txOutRefToApi r | r <- utxosRefs utxosRefInputs ]
 
     -- utxos for inputs
     utxosIn :: GYUTxOs
@@ -374,7 +333,7 @@ finalizeGYBalancedTx
 
     -- Map to lookup information for various utxos.
     utxos :: GYUTxOs
-    utxos = utxosIn <> utxosRefScripts <> utxosRefInputs <> collaterals
+    utxos = utxosIn <> utxosRefInputs <> collaterals
 
     outs' :: [Api.S.TxOut Api.S.CtxTx Api.S.BabbageEra]
     outs' = txOutToApi <$> outs

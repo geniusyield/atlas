@@ -20,6 +20,7 @@ providersMashupTests :: [GYCoreConfig] -> TestTree
 providersMashupTests configs =
   testGroup "Providers Mashup"
     [ testCase "Datum lookup - GYLookupDatum" $ do
+        threadDelay 1_000_000
         dats <- forM configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> fromJust <$> gyLookupDatum "d81d2abd12bdc2c19001a5d659c6aefd3fe4e073a37835b6818c2e676f84c03c"
         assertBool "Datums are not all equal" $ all (== head dats) (tail dats)
     , testCase "Parameters" $ do
@@ -75,18 +76,23 @@ providersMashupTests configs =
                      pure "6c751d3e198c5608dfafdfdffe16aeac8a28f88f3a769cf22dd45e8bc84f47e8"  -- Any transaction ID.
                    else error "Not satisfied"
                  )
-        forM_ configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> handle handler $ gySubmitTx . fromRight (error "absurd") $ txFromHexBS "84a30083825820cd1fd0900870f19cba004ad73996d5f01f22790c7e2efcd46b7d1bacbf97ca6d00825820cd1fd0900870f19cba004ad73996d5f01f22790c7e2efcd46b7d1bacbf97ca6d01825820cd1fd0900870f19cba004ad73996d5f01f22790c7e2efcd46b7d1bacbf97ca6d020183a200581d6007fb2b78b3917d3f6bfa3a59de61f3c225cbf0d5564a1cbc6f96d6eb011a3b3b81d5a200581d6007fb2b78b3917d3f6bfa3a59de61f3c225cbf0d5564a1cbc6f96d6eb011a002dc6c0a200581d6007fb2b78b3917d3f6bfa3a59de61f3c225cbf0d5564a1cbc6f96d6eb011a001bc75b021a0002bd25a10081825820b8ee2dc03ba6f88baa7e4430675df3e559d63a1282f7763de71227041e351023584020313e571def2f09145ae6b0eb26e99260d14885789929a354fea4a585d5f053fc2eae86d36f484269b0d95a25abb7acc3b15033565d00afd83af83f24d9be0ef5f6"
+        forM_ configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> do
+          threadDelay 1_000_000
+          handle handler $ gySubmitTx . fromRight (error "absurd") $ txFromHexBS "84a30083825820cd1fd0900870f19cba004ad73996d5f01f22790c7e2efcd46b7d1bacbf97ca6d00825820cd1fd0900870f19cba004ad73996d5f01f22790c7e2efcd46b7d1bacbf97ca6d01825820cd1fd0900870f19cba004ad73996d5f01f22790c7e2efcd46b7d1bacbf97ca6d020183a200581d6007fb2b78b3917d3f6bfa3a59de61f3c225cbf0d5564a1cbc6f96d6eb011a3b3b81d5a200581d6007fb2b78b3917d3f6bfa3a59de61f3c225cbf0d5564a1cbc6f96d6eb011a002dc6c0a200581d6007fb2b78b3917d3f6bfa3a59de61f3c225cbf0d5564a1cbc6f96d6eb011a001bc75b021a0002bd25a10081825820b8ee2dc03ba6f88baa7e4430675df3e559d63a1282f7763de71227041e351023584020313e571def2f09145ae6b0eb26e99260d14885789929a354fea4a585d5f053fc2eae86d36f484269b0d95a25abb7acc3b15033565d00afd83af83f24d9be0ef5f6"
     , testCase "Submitting a valid transaction" $ do
         skey <- readPaymentSigningKey "preprod-submit-test-wallet.skey"
         let nid = GYTestnetPreprod
             senderAddress = addressFromPubKeyHash GYTestnetPreprod $ pubKeyHash $ paymentVerificationKey skey
         let totalConfigs = length configs
         forM_ (zip [1 ..] configs) $ \(i, config) -> withCfgProviders config mempty $ \provider@GYProviders {..} -> do
+          threadDelay 1_000_000
           senderUTxOs <- runGYTxQueryMonadNode nid provider $ utxosAtAddress senderAddress
+          threadDelay 1_000_000
           let totalSenderFunds = foldMapUTxOs utxoValue senderUTxOs
               valueToSend     = totalSenderFunds `valueMinus` valueFromLovelace 5_000_000
               -- This way, UTxO distribution in test wallet should remain same.
           txBody <- runGYTxMonadNode nid provider [senderAddress] senderAddress Nothing $ pure $ mustHaveOutput $ mkGYTxOutNoDatum @'PlutusV2 senderAddress valueToSend
+          threadDelay 1_000_000
           let signedTxBody = signGYTxBody txBody [skey]
           printf "Signed tx: %s\n" (txToHex signedTxBody)
           tid    <- gySubmitTx signedTxBody

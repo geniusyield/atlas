@@ -139,7 +139,7 @@ ctxCurrentSlot (ctxProviders -> providers) =
 
 ctxWaitNextSlot :: Ctx -> IO ()
 ctxWaitNextSlot ctx@(ctxProviders -> providers) = do
-    slot <- gyWaitForNextBlock providers
+    slot <- gyWaitForNextSlot providers
     _ <- lciWaitUntilSlot (ctxLCI ctx) slot
     forM_ (ctxDbSync ctx) $ \dbSync -> dbSyncWaitUntilSlot dbSync slot
 
@@ -174,7 +174,7 @@ submitTx ctx@Ctx { ctxInfo } User {..} txBody = do
     txId <- nodeSubmitTx ctxInfo tx
     -- printf "Submitted transaction %s\n" (show txId)
 
-    ctxWaitNextSlot ctx
+    gyAwaitTxConfirmed (ctxProviders ctx) (GYAwaitTxParameters { maxAttempts = 30, checkInterval = 0_100_000, confirmations = 1 }) txId
     return txId
 
 -- | Function to find for the first locked output in the given `GYTxBody` at the given `GYAddress`.

@@ -18,9 +18,9 @@ module GeniusYield.Types.Providers
       -- * Get current slot
     , GYSlotActions (..)
     , gyGetCurrentSlot
-    , gyWaitForNextBlock
-    , gyWaitForNextBlock_
-    , gyWaitForNextBlockDefault
+    , gyWaitForNextSlot
+    , gyWaitForNextSlot_
+    , gyWaitForNextSlotDefault
     , gyWaitUntilSlot
     , gyWaitUntilSlotDefault
     , makeSlotActions
@@ -124,16 +124,16 @@ data GYProviders = GYProviders
 gyGetCurrentSlot :: GYProviders -> IO GYSlot
 gyGetCurrentSlot = gyGetCurrentSlot' . gySlotActions
 
-gyWaitForNextBlock :: GYProviders -> IO GYSlot
-gyWaitForNextBlock = gyWaitForNextBlock' . gySlotActions
+gyWaitForNextSlot :: GYProviders -> IO GYSlot
+gyWaitForNextSlot = gyWaitForNextSlot' . gySlotActions
 
 gyWaitUntilSlot :: GYProviders -> GYSlot -> IO GYSlot
 gyWaitUntilSlot providers = gyWaitUntilSlot' (gySlotActions providers)
 
--- | 'gyWaitForNextBlock' variant which doesn't return current slot.
+-- | 'gyWaitForNextSlot' variant which doesn't return current slot.
 --
-gyWaitForNextBlock_ :: GYProviders -> IO ()
-gyWaitForNextBlock_ = void . gyWaitForNextBlock' . gySlotActions
+gyWaitForNextSlot_ :: GYProviders -> IO ()
+gyWaitForNextSlot_ = void . gyWaitForNextSlot
 
 gyQueryUtxosAtAddress :: GYProviders -> GYAddress -> IO GYUTxOs
 gyQueryUtxosAtAddress = gyQueryUtxosAtAddress' . gyQueryUTxO
@@ -200,11 +200,11 @@ type GYAwaitTx = GYAwaitTxParameters -> GYTxId -> IO ()
 
 -- | Await transaction parameters
 data GYAwaitTxParameters = GYAwaitTxParameters
-                           { maxAttempts   :: Int
+                           { maxAttempts   :: !Int
                            -- ^ Max number of attempts before give up.
-                           , checkInterval :: Int
+                           , checkInterval :: !Int
                            -- ^ Wait time for each attempt (in microseconds).
-                           , confirmations :: Int
+                           , confirmations :: !Int
                            -- ^ Min number of block confirmation.
                            }
     deriving stock (Show)
@@ -229,16 +229,16 @@ instance Show GYAwaitTxException where
 
 -- | How to get current slot?
 data GYSlotActions = GYSlotActions
-    { gyGetCurrentSlot'   :: !(IO GYSlot)
-    , gyWaitForNextBlock' :: !(IO GYSlot)
-    , gyWaitUntilSlot'    :: !(GYSlot -> IO GYSlot)
+    { gyGetCurrentSlot'  :: !(IO GYSlot)
+    , gyWaitForNextSlot' :: !(IO GYSlot)
+    , gyWaitUntilSlot'   :: !(GYSlot -> IO GYSlot)
     }
 
--- | Wait for the next block
+-- | Wait for the next slot
 --
 -- 'threadDelay' until current slot getter returns another value.
-gyWaitForNextBlockDefault :: IO GYSlot -> IO GYSlot
-gyWaitForNextBlockDefault getCurrentSlot = do
+gyWaitForNextSlotDefault :: IO GYSlot -> IO GYSlot
+gyWaitForNextSlotDefault getCurrentSlot = do
     s <- getCurrentSlot
     go s
   where
@@ -285,7 +285,7 @@ makeSlotActions t getCurrentSlot = do
     let gcs = getCurrentSlot' slotStoreRef
     pure GYSlotActions
         { gyGetCurrentSlot'   = gcs
-        , gyWaitForNextBlock' = gyWaitForNextBlockDefault gcs
+        , gyWaitForNextSlot'  = gyWaitForNextSlotDefault gcs
         , gyWaitUntilSlot'    = gyWaitUntilSlotDefault gcs
         }
   where

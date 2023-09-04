@@ -11,7 +11,6 @@ module GeniusYield.Providers.Maestro
   ( networkIdToMaestroEnv
   , maestroSubmitTx
   , maestroAwaitTxConfirmed
-  , maestroSlotActions
   , maestroGetCurrentSlot
   , utxoFromMaestro
   , maestroQueryUtxo
@@ -151,16 +150,6 @@ maestroQueryTx env = try . Maestro.txDetailsByHash env . Maestro.TxHash .
 -------------------------------------------------------------------------------
 -- Slot actions
 -------------------------------------------------------------------------------
-
--- | Definition of 'GYSlotActions' for the Maestro provider.
-maestroSlotActions :: Maestro.MaestroEnv 'Maestro.V1 -> GYSlotActions
-maestroSlotActions env = GYSlotActions
-    { gyGetCurrentSlot'   = x
-    , gyWaitForNextBlock' = gyWaitForNextBlockDefault x
-    , gyWaitUntilSlot'    = gyWaitUntilSlotDefault x
-    }
-  where
-    x = maestroGetCurrentSlot env
 
 -- | Returns the current 'GYSlot'.
 maestroGetCurrentSlot :: Maestro.MaestroEnv 'Maestro.V1 -> IO GYSlot

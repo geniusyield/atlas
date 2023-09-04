@@ -6,7 +6,6 @@ module GeniusYield.Providers.Blockfrost
     , blockfrostEraHistory
     , blockfrostQueryUtxo
     , blockfrostLookupDatum
-    , blockfrostSlotActions
     , blockfrostGetCurrentSlot
     , blockfrostSubmitTx
     , blockfrostAwaitTxConfirmed
@@ -153,15 +152,6 @@ blockfrostQueryTx proj = Blockfrost.runBlockfrost proj
 -------------------------------------------------------------------------------
 -- Slot actions
 -------------------------------------------------------------------------------
-
-blockfrostSlotActions :: Blockfrost.Project -> GYSlotActions
-blockfrostSlotActions proj = GYSlotActions
-    { gyGetCurrentSlot'   = getCurrentSlot
-    , gyWaitForNextBlock' = gyWaitForNextBlockDefault getCurrentSlot
-    , gyWaitUntilSlot'    = gyWaitUntilSlotDefault getCurrentSlot
-    }
-  where
-    getCurrentSlot = blockfrostGetCurrentSlot proj
 
 blockfrostGetCurrentSlot :: Blockfrost.Project -> IO GYSlot
 blockfrostGetCurrentSlot proj = do

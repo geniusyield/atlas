@@ -57,7 +57,7 @@ nodeGetCurrentSlot info = do
 nodeSlotActions :: Api.LocalNodeConnectInfo Api.CardanoMode -> GYSlotActions
 nodeSlotActions info = GYSlotActions
     { gyGetCurrentSlot'   = getCurrentSlot
-    , gyWaitForNextBlock' = gyWaitForNextBlockDefault getCurrentSlot
+    , gyWaitForNextSlot'  = gyWaitForNextSlotDefault getCurrentSlot
     , gyWaitUntilSlot'    = gyWaitUntilSlotDefault getCurrentSlot
     }
   where

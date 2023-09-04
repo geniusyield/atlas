@@ -173,7 +173,6 @@ library
     , resource-pool          ^>=0.4.0.0
     , safe-money             ^>=0.9.1
     , scientific             ^>=0.3.7.0
-    , serialise              ^>=0.2.6.0
     , servant                ^>=0.19.1
     , servant-client         ^>=0.19
     , servant-client-core    ^>=0.19
@@ -219,7 +218,6 @@ library
     , cardano-wallet-primitive
     , ouroboros-consensus
     , ouroboros-consensus-cardano
-    , ouroboros-network
     , ouroboros-network-protocols
     , plutus-ledger-api
     , plutus-tx

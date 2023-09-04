@@ -112,6 +112,7 @@ library
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
+    GeniusYield.Types.Credential
     GeniusYield.Types.Datum
     GeniusYield.Types.Era
     GeniusYield.Types.Key
@@ -195,6 +196,7 @@ library
   -- Dependencies whose version is fixed by @cabal.project@ file.
   build-depends:
     , maestro-sdk
+    , bech32
 
   -- Custom forks (version pinned by @source-repository-package@ stanza in @cabal.project@ file).
   build-depends:

@@ -105,6 +105,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                     Nothing                                                           -> throwError . GYQueryUTxOException $ GYNoUtxoAtRef ref
                     Just GYUTxO {utxoAddress, utxoValue, utxoRefScript, utxoOutDatum} -> pure $
                         GYTxInDetailed gyTxIn utxoAddress utxoValue utxoRefScript (isInlineDatum utxoOutDatum)
+
             let refIns =
                     gyTxSkeletonRefInsToList gytxRefIns
                   <> [r | GYTxIn { gyTxInWitness = GYTxInWitnessScript (GYInReference r _) _ _ } <- gytxIns]

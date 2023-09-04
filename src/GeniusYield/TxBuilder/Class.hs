@@ -92,7 +92,7 @@ import           GeniusYield.Types
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), (utxosAtAddress | utxosAtAddresses), slotConfig, currentSlot, logMsg #-}
+    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), (utxosAtAddress | utxosAtAddresses), utxosAtPaymentCredential, slotConfig, currentSlot, logMsg #-}
 
     -- | Get the network id
     networkId :: m GYNetworkId
@@ -140,6 +140,8 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     utxoRefsAtAddress :: GYAddress -> m [GYTxOutRef]
     utxoRefsAtAddress = fmap (Map.keys . mapUTxOs id) . utxosAtAddress
 
+    utxosAtPaymentCredential :: GYPaymentCredential -> m (Maybe GYUTxOs)
+
     {- | Obtain the slot config for the network.
 
     Implementations using era history to create slot config may raise 'GYEraSummariesToSlotConfigError'.
@@ -179,6 +181,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
+    utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     slotConfig = lift slotConfig
     currentSlot = lift currentSlot
     logMsg ns s = lift . logMsg ns s
@@ -199,6 +202,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
+    utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     slotConfig = lift slotConfig
     currentSlot = lift currentSlot
     logMsg ns s = lift . logMsg ns s
@@ -219,6 +223,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
+    utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     slotConfig = lift slotConfig
     currentSlot = lift currentSlot
     logMsg ns s = lift . logMsg ns s

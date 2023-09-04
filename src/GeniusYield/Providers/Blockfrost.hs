@@ -126,6 +126,7 @@ blockfrostQueryUtxo proj = GYQueryUTxO
     , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddresses'           = gyQueryUtxoAtAddressesDefault $ blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddressesWithDatums' = Nothing  -- Will use the default implementation.
+    , gyQueryUtxosAtPaymentCredential'   = Nothing
     }
 
 blockfrostUtxosAtAddress :: Blockfrost.Project -> GYAddress -> IO GYUTxOs

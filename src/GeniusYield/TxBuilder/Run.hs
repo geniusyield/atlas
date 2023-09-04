@@ -160,6 +160,8 @@ instance GYTxQueryMonad GYTxMonadRun where
                 Left _     -> return Nothing
                 Right ref' -> utxoAtTxOutRef ref'
 
+    utxosAtPaymentCredential = const $ pure Nothing
+
     utxoAtTxOutRef ref = do
         mUtxosWithoutRefScripts   <- liftRun $ gets mockUtxos
         mRefScripts <- liftRun $ gets mockRefScripts  -- IMPORTANT: as the fate would have it, our fork because of being old, doesn't contain these inside `mockUtxos` (which is not the case for original)

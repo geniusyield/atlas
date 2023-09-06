@@ -46,6 +46,7 @@ import qualified Data.Map.Strict               as Map
 import           Data.Maybe                    (fromJust)
 import           Data.Semigroup                (Sum (..))
 import           Data.Typeable
+import           Plutus.Model
 import qualified Plutus.Model.Fork.Ledger.Slot as Fork
 import qualified Plutus.Model.Fork.Ledger.Tx   as Fork
 import qualified Plutus.V1.Ledger.Value        as Plutus

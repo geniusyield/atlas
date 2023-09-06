@@ -139,7 +139,7 @@ ctxCurrentSlot (ctxProviders -> providers) =
 
 ctxWaitNextSlot :: Ctx -> IO ()
 ctxWaitNextSlot ctx@(ctxProviders -> providers) = do
-    slot <- gyWaitForNextSlot providers
+    slot <- gyWaitForNextBlock providers
     _ <- lciWaitUntilSlot (ctxLCI ctx) slot
     forM_ (ctxDbSync ctx) $ \dbSync -> dbSyncWaitUntilSlot dbSync slot
 

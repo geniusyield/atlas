@@ -13,9 +13,8 @@ module GeniusYield.Providers.Node
     , nodeQueryUTxO
     , nodeGetParameters
     -- * Low-level
-    , nodeGetCurrentSlot
+    , nodeGetCurrentBlock'sSlot
     , nodeUtxosAtAddress
-    , nodeSlotConfig
     -- * Auxiliary
     , networkIdToLocalNodeConnectInfo
     ) where
@@ -49,19 +48,19 @@ nodeSubmitTx info tx = do
 -- Current slot
 -------------------------------------------------------------------------------
 
-nodeGetCurrentSlot :: Api.LocalNodeConnectInfo Api.CardanoMode -> IO GYSlot
-nodeGetCurrentSlot info = do
+nodeGetCurrentBlock'sSlot :: Api.LocalNodeConnectInfo Api.CardanoMode -> IO GYSlot
+nodeGetCurrentBlock'sSlot info = do
     Api.ChainTip s _ _ <- Api.getLocalChainTip info
     return $ slotFromApi s
 
 nodeSlotActions :: Api.LocalNodeConnectInfo Api.CardanoMode -> GYSlotActions
 nodeSlotActions info = GYSlotActions
-    { gyGetCurrentSlot'   = getCurrentSlot
-    , gyWaitForNextBlock' = gyWaitForNextBlockDefault getCurrentSlot
-    , gyWaitUntilSlot'    = gyWaitUntilSlotDefault getCurrentSlot
+    { gyGetCurrentBlock'sSlot' = getCurrentBlock'sSlot
+    , gyWaitForNextBlock'      = gyWaitForNextBlockDefault getCurrentBlock'sSlot
+    , gyWaitUntilSlot'         = gyWaitUntilSlotDefault getCurrentBlock'sSlot
     }
   where
-    getCurrentSlot = nodeGetCurrentSlot info
+    getCurrentBlock'sSlot = nodeGetCurrentBlock'sSlot info
 
 -------------------------------------------------------------------------------
 -- UTxO query
@@ -119,24 +118,6 @@ systemStart info = queryCardanoMode info Api.QuerySystemStart
 
 eraHistory :: Api.LocalNodeConnectInfo Api.CardanoMode -> IO (Api.EraHistory Api.CardanoMode)
 eraHistory info = queryCardanoMode info $ Api.QueryEraHistory Api.CardanoModeIsMultiEra
-
--------------------------------------------------------------------------------
--- Slot configuration
--------------------------------------------------------------------------------
-
-genesisParameters :: GYEra -> Api.LocalNodeConnectInfo Api.CardanoMode -> IO Api.GenesisParameters
-genesisParameters GYAlonzo  info = queryAlonzoEra  info Api.QueryGenesisParameters
-genesisParameters GYBabbage info = queryBabbageEra info Api.QueryGenesisParameters
-
--- | Return 'GYSlotConfig', from which we can estimate what the currentSlot should be.
-nodeSlotConfig :: GYEra -> Api.LocalNodeConnectInfo Api.CardanoMode -> IO GYSlotConfig
-nodeSlotConfig era info = do
-    gp <- genesisParameters era info
-
-    let slotLength = Api.protocolParamSlotLength gp
-    let slotZero   = Api.protocolParamSystemStart gp
-
-    return $ simpleSlotConfig slotZero slotLength
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions

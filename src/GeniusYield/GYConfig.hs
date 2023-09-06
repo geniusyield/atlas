@@ -153,7 +153,7 @@ withCfgProviders
           let info = nodeConnectInfo path cfgNetworkId
               era = networkIdToEra cfgNetworkId
           mEnv <- MaestroApi.networkIdToMaestroEnv key cfgNetworkId
-          nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetCurrentSlot info
+          nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetCurrentBlock'sSlot info
           pure
             ( Node.nodeGetParameters era info
             , nodeSlotActions
@@ -178,12 +178,12 @@ withCfgProviders
         GYMaestro (Confidential apiToken) -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
           maestroGetParams <- makeGetParameters
-            (MaestroApi.maestroGetCurrentSlot maestroApiEnv)
+            (MaestroApi.maestroGetCurrentBlock'sSlot maestroApiEnv)
             (MaestroApi.maestroProtocolParams maestroApiEnv)
             (MaestroApi.maestroSystemStart maestroApiEnv)
             (MaestroApi.maestroEraHistory maestroApiEnv)
             (MaestroApi.maestroStakePools maestroApiEnv)
-          maestroSlotActions <- makeSlotActions slotCachingTime $ MaestroApi.maestroGetCurrentSlot maestroApiEnv
+          maestroSlotActions <- makeSlotActions slotCachingTime $ MaestroApi.maestroGetCurrentBlock'sSlot maestroApiEnv
           pure
             ( maestroGetParams
             , maestroSlotActions
@@ -195,12 +195,12 @@ withCfgProviders
         GYBlockfrost (Confidential key) -> do
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
           blockfrostGetParams <- makeGetParameters
-            (Blockfrost.blockfrostGetCurrentSlot proj)
+            (Blockfrost.blockfrostGetCurrentBlock'sSlot proj)
             (Blockfrost.blockfrostProtocolParams proj)
             (Blockfrost.blockfrostSystemStart proj)
             (Blockfrost.blockfrostEraHistory proj)
             (Blockfrost.blockfrostStakePools proj)
-          blockfrostSlotActions <- makeSlotActions slotCachingTime $ Blockfrost.blockfrostGetCurrentSlot proj
+          blockfrostSlotActions <- makeSlotActions slotCachingTime $ Blockfrost.blockfrostGetCurrentBlock'sSlot proj
           pure
             ( blockfrostGetParams
             , blockfrostSlotActions

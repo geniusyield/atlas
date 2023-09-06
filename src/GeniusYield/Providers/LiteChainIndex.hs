@@ -15,7 +15,7 @@ module GeniusYield.Providers.LiteChainIndex (
     lciWaitUntilSlot,
     lciLookupDatum,
     lciAwaitTxConfirmed,
-    lciGetCurrentSlot,
+    lciGetCurrentBlock'sSlot,
     lciStats,
 ) where
 
@@ -118,10 +118,8 @@ lciAwaitTxConfirmed (LCIClient _ _ _ txIdVar) p@GYAwaitTxParameters{..} (txIdToA
         unless (Set.member txId s) $
             threadDelay checkInterval >> lciAwaitTx (attempt + 1)
 
--- | This is not good 'GeniusYield.Types.Providers.gyGetCurrentSlot' provider as it might lag
--- plenty behind the current slot of local node.
-lciGetCurrentSlot :: LCIClient -> IO GYSlot
-lciGetCurrentSlot (LCIClient _ slotVar _ _) = slotFromApi <$> STM.readTVarIO slotVar
+lciGetCurrentBlock'sSlot :: LCIClient -> IO GYSlot
+lciGetCurrentBlock'sSlot (LCIClient _ slotVar _ _) = slotFromApi <$> STM.readTVarIO slotVar
 
 -- | Return statistics of 'LCIClient': currently processed slot and number of hashes known.
 lciStats :: LCIClient -> IO (GYSlot, Int)

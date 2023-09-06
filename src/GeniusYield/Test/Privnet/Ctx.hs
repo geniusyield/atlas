@@ -19,7 +19,7 @@ module GeniusYield.Test.Privnet.Ctx (
     ctxRunC,
     ctxRunF,
     ctxRunFWithCollateral,
-    ctxCurrentSlot,
+    ctxCurrentBlock'sSlot,
     ctxWaitNextSlot,
     ctxWaitUntilSlot,
     ctxProviders,
@@ -133,9 +133,9 @@ ctxRunC = coerce (ctxRunF @(Const a))
 ctxRunI :: Ctx -> User -> GYTxMonadNode (GYTxSkeleton v) -> IO GYTxBody
 ctxRunI = coerce (ctxRunF @Identity)
 
-ctxCurrentSlot :: Ctx -> IO GYSlot
-ctxCurrentSlot (ctxProviders -> providers) =
-    gyGetCurrentSlot providers
+ctxCurrentBlock'sSlot :: Ctx -> IO GYSlot
+ctxCurrentBlock'sSlot (ctxProviders -> providers) =
+    gyGetCurrentBlock'sSlot providers
 
 ctxWaitNextSlot :: Ctx -> IO ()
 ctxWaitNextSlot ctx@(ctxProviders -> providers) = do

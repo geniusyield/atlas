@@ -351,18 +351,27 @@ sendSkeleton' skeleton ws = do
     addReferenceInput tx ref = do
       let ref' = txOutRefToPlutus ref
       utxo <- utxoAtTxOutRef' ref
+      let sm = case utxoRefScript utxo of
+                   Nothing       -> Map.empty
+                   Just (Some s) ->
+                       let sh = scriptPlutusHash s
+                           v = Versioned Ledger.PlutusV2 $ scriptToPlutus s
+                       in Map.singleton sh v
+
       case utxoOutDatum utxo of
         GYOutDatumHash dh -> do  -- Caution! Currently we don't support referring datum for such an input! Though have written code here in case framework adds support of it later.
           d <- findDatum dh
           return $ tx <> toExtra (
             mempty {
               Fork.txReferenceInputs = Set.singleton $ Fork.TxIn ref' Nothing,
-              Fork.txData = Map.singleton (datumHashToPlutus dh) (datumToPlutus d)
+              Fork.txData = Map.singleton (datumHashToPlutus dh) (datumToPlutus d),
+              Fork.txScripts = sm
               }
             )
         _InlineOrNone -> return $ tx <> toExtra (
           mempty {
-              Fork.txReferenceInputs = Set.singleton $ Fork.TxIn ref' Nothing
+              Fork.txReferenceInputs = Set.singleton $ Fork.TxIn ref' Nothing,
+              Fork.txScripts = sm
             }
           )
 

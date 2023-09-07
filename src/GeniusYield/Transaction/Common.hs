@@ -43,12 +43,8 @@ data GYTxInDetailed v = GYTxInDetailed
     { gyTxInDet          :: !(GYTxIn v)
     , gyTxInDetAddress   :: !GYAddress
     , gyTxInDetValue     :: !GYValue
-    {- When a GYUTxO is converted to a GYTxInDetailed (and back again later), this field preserves the ref script
-    attached to the UTxO (potentially so other inputs can refer to the script). -}
+    , gyTxInDetDatum     :: !GYOutDatum
     , gyTxInDetScriptRef :: !(Maybe (Some GYScript))
-
-    -- | Did GYUtXo had inline datum?
-    , gyTxInDetInlineDat :: !Bool
     }
   deriving (Eq, Show)
 

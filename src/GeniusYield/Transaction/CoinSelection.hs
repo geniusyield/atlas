@@ -270,14 +270,14 @@ selectInputsLegacy ownUtxos targetOut existingIns = go targetOut [] mempty $ utx
 -------------------------------------------------------------------------------
 
 utxoAsPubKeyInp :: GYUTxO -> GYTxInDetailed v
-utxoAsPubKeyInp GYUTxO {utxoRef, utxoAddress, utxoValue, utxoRefScript} =
+utxoAsPubKeyInp GYUTxO {utxoRef, utxoAddress, utxoValue, utxoOutDatum, utxoRefScript} =
     GYTxInDetailed
         -- It is assumed the 'GYUTxOs' arg designates key wallet utxos.
         { gyTxInDet          = GYTxIn utxoRef GYTxInWitnessKey
         , gyTxInDetAddress   = utxoAddress
         , gyTxInDetValue     = fst $ valueSplitSign utxoValue
+        , gyTxInDetDatum     = utxoOutDatum
         , gyTxInDetScriptRef = utxoRefScript
-        , gyTxInDetInlineDat = False  -- framework doesn't allow spending public key utxos with datums.
         }
 
 tokenBundleSizeAssessor :: CWallet.TxSize -> CWallet.TokenBundleSizeAssessor

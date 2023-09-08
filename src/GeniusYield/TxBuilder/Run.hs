@@ -197,7 +197,7 @@ instance GYTxQueryMonad GYTxMonadRun where
         return $ simpleSlotConfig zero len
 
     -- TODO: Make it actually the last seen block's slot.
-    currentBlock'sSlot = do
+    slotOfCurrentBlock = do
         s <- liftRun $ Fork.getSlot <$> Plutus.Model.currentSlot
         case slotFromInteger s of
             Nothing -> throwError $ GYConversionException $ GYInvalidSlot s

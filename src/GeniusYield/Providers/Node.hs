@@ -13,7 +13,7 @@ module GeniusYield.Providers.Node
     , nodeQueryUTxO
     , nodeGetParameters
     -- * Low-level
-    , nodeGetCurrentBlock'sSlot
+    , nodeGetSlotOfCurrentBlock
     , nodeUtxosAtAddress
     -- * Auxiliary
     , networkIdToLocalNodeConnectInfo
@@ -48,19 +48,19 @@ nodeSubmitTx info tx = do
 -- Current slot
 -------------------------------------------------------------------------------
 
-nodeGetCurrentBlock'sSlot :: Api.LocalNodeConnectInfo Api.CardanoMode -> IO GYSlot
-nodeGetCurrentBlock'sSlot info = do
+nodeGetSlotOfCurrentBlock :: Api.LocalNodeConnectInfo Api.CardanoMode -> IO GYSlot
+nodeGetSlotOfCurrentBlock info = do
     Api.ChainTip s _ _ <- Api.getLocalChainTip info
     return $ slotFromApi s
 
 nodeSlotActions :: Api.LocalNodeConnectInfo Api.CardanoMode -> GYSlotActions
 nodeSlotActions info = GYSlotActions
-    { gyGetCurrentBlock'sSlot' = getCurrentBlock'sSlot
-    , gyWaitForNextBlock'      = gyWaitForNextBlockDefault getCurrentBlock'sSlot
-    , gyWaitUntilSlot'         = gyWaitUntilSlotDefault getCurrentBlock'sSlot
+    { gyGetSlotOfCurrentBlock' = getSlotOfCurrentBlock
+    , gyWaitForNextBlock'      = gyWaitForNextBlockDefault getSlotOfCurrentBlock
+    , gyWaitUntilSlot'         = gyWaitUntilSlotDefault getSlotOfCurrentBlock
     }
   where
-    getCurrentBlock'sSlot = nodeGetCurrentBlock'sSlot info
+    getSlotOfCurrentBlock = nodeGetSlotOfCurrentBlock info
 
 -------------------------------------------------------------------------------
 -- UTxO query

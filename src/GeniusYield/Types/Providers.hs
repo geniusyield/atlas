@@ -17,7 +17,7 @@ module GeniusYield.Types.Providers
     , GYAwaitTxException (..)
       -- * Get current slot
     , GYSlotActions (..)
-    , gyGetCurrentBlock'sSlot
+    , gyGetSlotOfCurrentBlock
     , gyWaitForNextBlock
     , gyWaitForNextBlock_
     , gyWaitForNextBlockDefault
@@ -123,8 +123,8 @@ data GYProviders = GYProviders
     , gyLog'             :: !GYLog
     }
 
-gyGetCurrentBlock'sSlot :: GYProviders -> IO GYSlot
-gyGetCurrentBlock'sSlot = gyGetCurrentBlock'sSlot' . gySlotActions
+gyGetSlotOfCurrentBlock :: GYProviders -> IO GYSlot
+gyGetSlotOfCurrentBlock = gyGetSlotOfCurrentBlock' . gySlotActions
 
 gyWaitForNextBlock :: GYProviders -> IO GYSlot
 gyWaitForNextBlock = gyWaitForNextBlock' . gySlotActions
@@ -237,7 +237,7 @@ instance Show GYAwaitTxException where
 
 -- | How to get current slot?
 data GYSlotActions = GYSlotActions
-    { gyGetCurrentBlock'sSlot' :: !(IO GYSlot)
+    { gyGetSlotOfCurrentBlock' :: !(IO GYSlot)
     , gyWaitForNextBlock'      :: !(IO GYSlot)
     , gyWaitUntilSlot'         :: !(GYSlot -> IO GYSlot)
     }
@@ -246,14 +246,14 @@ data GYSlotActions = GYSlotActions
 --
 -- 'threadDelay' until current slot getter returns another value.
 gyWaitForNextBlockDefault :: IO GYSlot -> IO GYSlot
-gyWaitForNextBlockDefault getCurrentBlock'sSlot = do
-    s <- getCurrentBlock'sSlot
+gyWaitForNextBlockDefault getSlotOfCurrentBlock = do
+    s <- getSlotOfCurrentBlock
     go s
   where
     go :: GYSlot -> IO GYSlot
     go s = do
         threadDelay 100_000
-        t <- getCurrentBlock'sSlot
+        t <- getSlotOfCurrentBlock
         if t > s
             then return t
             else go s
@@ -262,11 +262,11 @@ gyWaitForNextBlockDefault getCurrentBlock'sSlot = do
 --
 -- Returns the new current slot, which might be larger.
 gyWaitUntilSlotDefault :: IO GYSlot -> GYSlot -> IO GYSlot
-gyWaitUntilSlotDefault getCurrentBlock'sSlot s = loop
+gyWaitUntilSlotDefault getSlotOfCurrentBlock s = loop
   where
     loop :: IO GYSlot
     loop = do
-        t <- getCurrentBlock'sSlot
+        t <- getSlotOfCurrentBlock
         if t >= s
             then return t
             else do
@@ -276,7 +276,7 @@ gyWaitUntilSlotDefault getCurrentBlock'sSlot s = loop
 -- | Contains the data, alongside the time after which it should be refetched.
 data GYSlotStore = GYSlotStore !UTCTime !GYSlot
 
-{- | Construct efficient 'GYSlotActions' methods by ensuring the supplied getCurrentBlock'sSlot is only made after
+{- | Construct efficient 'GYSlotActions' methods by ensuring the supplied getSlotOfCurrentBlock is only made after
 a given duration of time has passed.
 
 This uses IO to set up some mutable references used for caching.
@@ -286,19 +286,19 @@ makeSlotActions :: NominalDiffTime
                 -> IO GYSlot
                 -- ^ Getting current slot directly from the provider
                 -> IO GYSlotActions
-makeSlotActions t getCurrentBlock'sSlot = do
+makeSlotActions t getSlotOfCurrentBlock = do
     slotRefetchTime <- addUTCTime t <$> getCurrentTime
-    initSlot        <- getCurrentBlock'sSlot
+    initSlot        <- getSlotOfCurrentBlock
     slotStoreRef    <- newMVar $ GYSlotStore slotRefetchTime initSlot
-    let gcs = getCurrentBlock'sSlot' slotStoreRef
+    let gcs = getSlotOfCurrentBlock' slotStoreRef
     pure GYSlotActions
-        { gyGetCurrentBlock'sSlot' = gcs
+        { gyGetSlotOfCurrentBlock' = gcs
         , gyWaitForNextBlock'      = gyWaitForNextBlockDefault gcs
         , gyWaitUntilSlot'         = gyWaitUntilSlotDefault gcs
         }
   where
-    getCurrentBlock'sSlot' :: MVar GYSlotStore -> IO GYSlot
-    getCurrentBlock'sSlot' var = do
+    getSlotOfCurrentBlock' :: MVar GYSlotStore -> IO GYSlot
+    getSlotOfCurrentBlock' var = do
         -- See note: [Caching and concurrently accessible MVars].
         modifyMVar var $ \(GYSlotStore slotRefetchTime slotData) -> do
             now <- getCurrentTime
@@ -306,7 +306,7 @@ makeSlotActions t getCurrentBlock'sSlot = do
                 -- Return unmodified.
                 pure (GYSlotStore slotRefetchTime slotData, slotData)
             else do
-                newSlot <- getCurrentBlock'sSlot
+                newSlot <- getSlotOfCurrentBlock
                 newNow <- getCurrentTime
                 let newSlotRefetchTime = addUTCTime t newNow
                 pure (GYSlotStore newSlotRefetchTime newSlot, newSlot)
@@ -342,7 +342,7 @@ makeGetParameters :: IO GYSlot
                 -> IO (Set Api.S.PoolId)
                 -- ^ Getting stake pools
                 -> IO GYGetParameters
-makeGetParameters getCurrentBlock'sSlot getProtParams getSysStart getEraHist getStkPools = do
+makeGetParameters getSlotOfCurrentBlock getProtParams getSysStart getEraHist getStkPools = do
     sysStart       <- getSysStart
     let getSlotConf = makeSlotConfigIO sysStart
     initProtParams <- getProtParams
@@ -376,7 +376,7 @@ makeGetParameters getCurrentBlock'sSlot getProtParams getSysStart getEraHist get
     mkMethod dataRefreshF dataRef = do
         -- See note: [Caching and concurrently accessible MVars].
         modifyMVar dataRef $ \(GYParameterStore eraEndSlot a) -> do
-            currSlot <- getCurrentBlock'sSlot
+            currSlot <- getSlotOfCurrentBlock
             if beforeEnd currSlot eraEndSlot then
                 pure (GYParameterStore eraEndSlot a, a)
             else do

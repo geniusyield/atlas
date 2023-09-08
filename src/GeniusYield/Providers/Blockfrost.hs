@@ -6,7 +6,7 @@ module GeniusYield.Providers.Blockfrost
     , blockfrostEraHistory
     , blockfrostQueryUtxo
     , blockfrostLookupDatum
-    , blockfrostGetCurrentBlock'sSlot
+    , blockfrostGetSlotOfCurrentBlock
     , blockfrostSubmitTx
     , blockfrostAwaitTxConfirmed
     , networkIdToProject
@@ -153,8 +153,8 @@ blockfrostQueryTx proj = Blockfrost.runBlockfrost proj
 -- Slot actions
 -------------------------------------------------------------------------------
 
-blockfrostGetCurrentBlock'sSlot :: Blockfrost.Project -> IO GYSlot
-blockfrostGetCurrentBlock'sSlot proj = do
+blockfrostGetSlotOfCurrentBlock :: Blockfrost.Project -> IO GYSlot
+blockfrostGetSlotOfCurrentBlock proj = do
     Blockfrost.Block {_blockSlot=slotMaybe, _blockHash=hash} <-
         Blockfrost.runBlockfrost proj Blockfrost.getLatestBlock >>= handleBlockfrostError "Slot"
     case slotMaybe of

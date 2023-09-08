@@ -92,7 +92,7 @@ import           GeniusYield.Types
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), (utxosAtAddress | utxosAtAddresses), utxosAtPaymentCredential, slotConfig, currentBlock'sSlot, logMsg #-}
+    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), (utxosAtAddress | utxosAtAddresses), utxosAtPaymentCredential, slotConfig, slotOfCurrentBlock, logMsg #-}
 
     -- | Get the network id
     networkId :: m GYNetworkId
@@ -149,7 +149,7 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     slotConfig :: m GYSlotConfig
 
     -- | This is expected to give the slot of the latest block. We say "expected" as we cache the result for 5 seconds.
-    currentBlock'sSlot :: m GYSlot
+    slotOfCurrentBlock :: m GYSlot
 
     -- | Log a message with specified namespace and severity.
     logMsg :: HasCallStack => GYLogNamespace -> GYLogSeverity -> String -> m ()
@@ -183,7 +183,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     slotConfig = lift slotConfig
-    currentBlock'sSlot = lift currentBlock'sSlot
+    slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (RandT g m) where
@@ -204,7 +204,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     slotConfig = lift slotConfig
-    currentBlock'sSlot = lift currentBlock'sSlot
+    slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ReaderT g m) where
@@ -225,7 +225,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     slotConfig = lift slotConfig
-    currentBlock'sSlot = lift currentBlock'sSlot
+    slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ExceptT GYTxMonadException m) where

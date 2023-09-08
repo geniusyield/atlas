@@ -11,7 +11,7 @@ module GeniusYield.Providers.Maestro
   ( networkIdToMaestroEnv
   , maestroSubmitTx
   , maestroAwaitTxConfirmed
-  , maestroGetCurrentBlock'sSlot
+  , maestroGetSlotOfCurrentBlock
   , utxoFromMaestro
   , maestroQueryUtxo
   , maestroProtocolParams
@@ -152,9 +152,9 @@ maestroQueryTx env = try . Maestro.txDetailsByHash env . Maestro.TxHash .
 -------------------------------------------------------------------------------
 
 -- | Returns the current 'GYSlot'.
-maestroGetCurrentBlock'sSlot :: Maestro.MaestroEnv 'Maestro.V1 -> IO GYSlot
-maestroGetCurrentBlock'sSlot env =
-  try (Maestro.getChainTip env) >>= handleMaestroError "CurrentBlock'sSlot" <&> slotFromApi . coerce . Maestro._chainTipSlot . Maestro.getTimestampedData
+maestroGetSlotOfCurrentBlock :: Maestro.MaestroEnv 'Maestro.V1 -> IO GYSlot
+maestroGetSlotOfCurrentBlock env =
+  try (Maestro.getChainTip env) >>= handleMaestroError "SlotOfCurrentBlock" <&> slotFromApi . coerce . Maestro._chainTipSlot . Maestro.getTimestampedData
 
 -------------------------------------------------------------------------------
 -- Query UTxO

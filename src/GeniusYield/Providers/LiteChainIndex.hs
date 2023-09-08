@@ -14,6 +14,7 @@ module GeniusYield.Providers.LiteChainIndex (
     closeLCIClient,
     lciWaitUntilSlot,
     lciLookupDatum,
+    lciAwaitTxConfirmed,
     lciGetCurrentSlot,
     lciStats,
 ) where
@@ -23,16 +24,19 @@ import           GeniusYield.Types
 
 import qualified Cardano.Api                  as Api
 import qualified Cardano.Api.ChainSync.Client as Api.Sync
+import           Control.Concurrent           (threadDelay)
 import qualified Control.Concurrent.Async     as Async
 import qualified Control.Concurrent.STM       as STM
 import qualified Data.Map.Strict              as Map
+import qualified Data.Set                     as Set
 
 -- | A very simple chain index client, which only maintains a datum hashes.
 --
 data LCIClient = LCIClient
-    (Async.Async ())
-    (STM.TVar Api.SlotNo)
-    (STM.TVar (Map (Api.Hash Api.ScriptData) Api.HashableScriptData))
+                 (Async.Async ())
+                 (STM.TVar Api.SlotNo)
+                 (STM.TVar (Map (Api.Hash Api.ScriptData) Api.HashableScriptData))
+                 (STM.TVar (Set Api.TxId))
 
 withLCIClient
     :: Api.LocalNodeConnectInfo Api.CardanoMode
@@ -42,13 +46,15 @@ withLCIClient
 withLCIClient info resumePoints kont = do
     slotVar <- STM.newTVarIO $ Api.SlotNo 0
     dataVar <- STM.newTVarIO Map.empty
+    txIdVar <- STM.newTVarIO Set.empty
 
-    let cb = chainSyncCallback slotVar dataVar
+    let cb = chainSyncCallback slotVar dataVar txIdVar
 
     withChainSync info resumePoints cb $ \a -> kont $ LCIClient
         a
         slotVar
         dataVar
+        txIdVar
 
 -- | Create new 'LCIClient'.
 --
@@ -60,48 +66,66 @@ newLCIClient
 newLCIClient info resumePoints = do
     slotVar <- STM.newTVarIO $ Api.SlotNo 0
     dataVar <- STM.newTVarIO Map.empty
+    txIdVar <- STM.newTVarIO Set.empty
 
-    let cb = chainSyncCallback slotVar dataVar
+    let cb = chainSyncCallback slotVar dataVar txIdVar
 
     a <- newChainSync info resumePoints cb
-    return $ LCIClient a slotVar dataVar
+    return $ LCIClient a slotVar dataVar txIdVar
 
-chainSyncCallback :: STM.TVar Api.SlotNo -> STM.TVar (Map (Api.Hash Api.ScriptData) Api.HashableScriptData) -> ChainSyncCallback
-chainSyncCallback slotVar dataVar (RollForward block@(Api.BlockInMode (Api.Block (Api.BlockHeader slot _ _) _txs) _) _tip) =
+chainSyncCallback
+    :: STM.TVar Api.SlotNo
+    -> STM.TVar (Map (Api.Hash Api.ScriptData) Api.HashableScriptData)
+    -> STM.TVar (Set Api.TxId)
+    -> ChainSyncCallback
+chainSyncCallback slotVar dataVar txIdVar (RollForward block@(Api.BlockInMode (Api.Block (Api.BlockHeader slot _ _) _txs) _) _tip) =
     STM.atomically $ do
         STM.writeTVar slotVar slot
         STM.modifyTVar' dataVar $ \m ->
             foldl' (\m' sd -> Map.insert (Api.hashScriptDataBytes sd) sd m') m (blockDatums block)
+        STM.modifyTVar' txIdVar $
+            Set.union (Set.fromList $ map (Api.getTxId . Api.getTxBody) _txs)
 
-chainSyncCallback _ _ _ = return ()
+chainSyncCallback _ _ _ _ = return ()
 
 -- | Close (destroy) 'LCIClient'.
 closeLCIClient :: LCIClient -> IO ()
-closeLCIClient (LCIClient a _ _) = Async.cancel a
+closeLCIClient (LCIClient a _ _ _) = Async.cancel a
 
 -- | Wait until 'LCIClient' has processed a given slot.
 lciWaitUntilSlot :: LCIClient -> GYSlot -> IO GYSlot
-lciWaitUntilSlot (LCIClient _ slotVar _) (slotToApi -> slot) = STM.atomically $ do
+lciWaitUntilSlot (LCIClient _ slotVar _ _) (slotToApi -> slot) = STM.atomically $ do
     slot' <- STM.readTVar slotVar
     unless (slot' >= slot) STM.retry
     return (slotFromApi slot')
 
 lookupApiDatum :: LCIClient -> Api.Hash Api.ScriptData -> IO (Maybe Api.HashableScriptData)
-lookupApiDatum (LCIClient _ _ dataVar) h = do
+lookupApiDatum (LCIClient _ _ dataVar _) h = do
     m <- STM.readTVarIO dataVar
     return $ Map.lookup h m
 
 lciLookupDatum :: LCIClient -> GYLookupDatum
 lciLookupDatum c dh = fmap datumFromApi' <$> lookupApiDatum c (datumHashToApi dh)
 
+lciAwaitTxConfirmed :: LCIClient -> GYAwaitTx
+lciAwaitTxConfirmed (LCIClient _ _ _ txIdVar) p@GYAwaitTxParameters{..} (txIdToApi -> txId) =
+    lciAwaitTx 0
+  where
+    lciAwaitTx :: Int -> IO ()
+    lciAwaitTx attempt | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
+    lciAwaitTx attempt = do
+        s <- STM.readTVarIO txIdVar
+        unless (Set.member txId s) $
+            threadDelay checkInterval >> lciAwaitTx (attempt + 1)
+
 -- | This is not good 'GeniusYield.Types.Providers.gyGetCurrentSlot' provider as it might lag
 -- plenty behind the current slot of local node.
 lciGetCurrentSlot :: LCIClient -> IO GYSlot
-lciGetCurrentSlot (LCIClient _ slotVar _) = slotFromApi <$> STM.readTVarIO slotVar
+lciGetCurrentSlot (LCIClient _ slotVar _ _) = slotFromApi <$> STM.readTVarIO slotVar
 
 -- | Return statistics of 'LCIClient': currently processed slot and number of hashes known.
 lciStats :: LCIClient -> IO (GYSlot, Int)
-lciStats (LCIClient _ slotVar dataVar) = STM.atomically $ do
+lciStats (LCIClient _ slotVar dataVar _) = STM.atomically $ do
     slot <- STM.readTVar slotVar
     m    <- STM.readTVar dataVar
     return (slotFromApi slot, Map.size m)

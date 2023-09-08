@@ -10,6 +10,7 @@ Stability   : develop
 module GeniusYield.Providers.Maestro
   ( networkIdToMaestroEnv
   , maestroSubmitTx
+  , maestroAwaitTxConfirmed
   , maestroSlotActions
   , maestroGetCurrentSlot
   , utxoFromMaestro
@@ -25,6 +26,7 @@ import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api.S
 import qualified Cardano.Slotting.Slot                as CSlot
 import qualified Cardano.Slotting.Time                as CTime
+import           Control.Concurrent                   (threadDelay)
 import           Control.Exception                    (try)
 import           Control.Monad                        ((<=<))
 import qualified Data.Aeson                           as Aeson
@@ -64,9 +66,13 @@ data MaestroProviderException
   deriving stock (Eq, Show)
   deriving anyclass (Exception)
 
+throwMspvApiError :: Text -> Maestro.MaestroError -> IO a
+throwMspvApiError locationInfo =
+    throwIO . MspvApiError locationInfo . silenceHeadersMaestroClientError
+
 -- | Utility function to handle Maestro errors, which also removes header (if present) so as to conceal API key.
 handleMaestroError :: Text -> Either Maestro.MaestroError a -> IO a
-handleMaestroError locationInfo = either (throwIO . MspvApiError locationInfo . silenceHeadersMaestroClientError) pure
+handleMaestroError locationInfo = either (throwMspvApiError locationInfo) pure
 
 -- | Remove headers (if `MaestroError` contains `ClientError`).
 silenceHeadersMaestroClientError :: Maestro.MaestroError -> Maestro.MaestroError
@@ -88,6 +94,59 @@ maestroSubmitTx env tx = do
   where
     handleMaestroSubmitError :: Either Maestro.MaestroError a -> IO a
     handleMaestroSubmitError = either (throwIO . SubmitTxException . Text.pack . show . silenceHeadersMaestroClientError) pure
+
+-------------------------------------------------------------------------------
+-- Await tx confirmation
+-------------------------------------------------------------------------------
+
+-- | Awaits for the confirmation of a given 'GYTxId'
+maestroAwaitTxConfirmed :: Maestro.MaestroEnv 'Maestro.V1 -> GYAwaitTx
+maestroAwaitTxConfirmed env p@GYAwaitTxParameters{..} txId = mspvAwaitTx 0
+  where
+    mspvAwaitTx :: Int -> IO ()
+    mspvAwaitTx attempt | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
+    mspvAwaitTx attempt = do
+        eTxInfo <- maestroQueryTx env txId
+        case eTxInfo of
+            Left Maestro.MaestroNotFound -> threadDelay checkInterval >>
+                                            mspvAwaitTx (attempt + 1)
+            Left err -> throwMspvApiError "AwaitTx" err
+            Right txInfo -> msvpAwaitBlock attempt $
+                            Maestro._txDetailsBlockHash $
+                            Maestro.getTimestampedData txInfo
+
+    msvpAwaitBlock :: Int -> Maestro.BlockHash -> IO ()
+    msvpAwaitBlock attempt _ | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
+    msvpAwaitBlock attempt blockHash = do
+        eBlockInfo <- maestroQueryBlock env blockHash
+        case eBlockInfo of
+            Left Maestro.MaestroNotFound -> threadDelay checkInterval >>
+                                            msvpAwaitBlock (attempt + 1) blockHash
+            Left err -> throwMspvApiError "AwaitBlock" err
+
+            Right (Maestro.getTimestampedData -> blockInfo) | attempt + 1 == maxAttempts ->
+                when (toInteger (Maestro._blockDetailsConfirmations blockInfo)
+                      <
+                      toInteger confirmations) $ throwIO $ GYAwaitTxException p
+
+            Right (Maestro.getTimestampedData -> blockInfo) ->
+                when (toInteger (Maestro._blockDetailsConfirmations blockInfo)
+                      <
+                      toInteger confirmations) $
+                threadDelay checkInterval >> msvpAwaitBlock (attempt + 1) blockHash
+
+maestroQueryBlock
+    :: Maestro.MaestroEnv 'Maestro.V1
+    -> Maestro.BlockHash
+    -> IO (Either Maestro.MaestroError Maestro.TimestampedBlockDetails)
+maestroQueryBlock env = try . Maestro.blockDetailsByHash env
+
+maestroQueryTx
+    :: Maestro.MaestroEnv 'Maestro.V1
+    -> GYTxId
+    -> IO (Either Maestro.MaestroError Maestro.TimestampedTxDetails)
+maestroQueryTx env = try . Maestro.txDetailsByHash env . Maestro.TxHash .
+                     Api.serialiseToRawBytesHexText . txIdToApi
 
 -------------------------------------------------------------------------------
 -- Slot actions

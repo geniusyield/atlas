@@ -173,7 +173,7 @@ withCfgProviders
     ns
     f =
     do
-      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx) <- case cfgCoreProvider of
+      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed) <- case cfgCoreProvider of
         GYNodeChainIx path (Confidential key) -> do
           let info = nodeConnectInfo path cfgNetworkId
               era = networkIdToEra cfgNetworkId
@@ -183,8 +183,9 @@ withCfgProviders
             ( Node.nodeGetParameters era info
             , nodeSlotActions
             , Node.nodeQueryUTxO era info
-            , MaestroApi.maestroLookupDatum  mEnv
+            , MaestroApi.maestroLookupDatum mEnv
             , Node.nodeSubmitTx info
+            , MaestroApi.maestroAwaitTxConfirmed mEnv
             )
         GYDbSync (PQConnInf ci) submitUrl -> do
           -- NOTE: This provider generally does not support anything other than private testnets.
@@ -197,6 +198,7 @@ withCfgProviders
             , DbSync.dbSyncQueryUtxo conn
             , DbSync.dbSyncLookupDatum conn
             , SubmitApi.submitApiSubmitTxDefault submitApiEnv
+            , DbSync.dbSyncAwaitTxConfirmed conn
             )
         GYMaestro (Confidential apiToken) -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
@@ -213,6 +215,7 @@ withCfgProviders
             , MaestroApi.maestroQueryUtxo maestroApiEnv
             , MaestroApi.maestroLookupDatum maestroApiEnv
             , MaestroApi.maestroSubmitTx maestroApiEnv
+            , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
@@ -229,6 +232,7 @@ withCfgProviders
             , Blockfrost.blockfrostQueryUtxo proj
             , Blockfrost.blockfrostLookupDatum proj
             , Blockfrost.blockfrostSubmitTx proj
+            , Blockfrost.blockfrostAwaitTxConfirmed proj
             )
 
       bracket (Katip.mkKatipLog ns cfgLogging) logCleanUp $ \gyLog' -> do

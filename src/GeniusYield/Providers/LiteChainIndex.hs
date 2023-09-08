@@ -100,7 +100,7 @@ lciWaitUntilSlot (LCIClient _ slotVar _ _) (slotToApi -> slot) = STM.atomically 
     return (slotFromApi slot')
 
 lookupApiDatum :: LCIClient -> Api.Hash Api.ScriptData -> IO (Maybe Api.HashableScriptData)
-lookupApiDatum (LCIClient _ _ dataVar) h = do
+lookupApiDatum (LCIClient _ _ dataVar _) h = do
     m <- STM.readTVarIO dataVar
     return $ Map.lookup h m
 

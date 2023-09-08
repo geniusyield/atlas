@@ -63,7 +63,6 @@ import           Control.Monad.Trans.Except            (runExceptT, throwE)
 import           Data.Foldable                         (for_)
 import qualified Data.Map                              as Map
 import           Data.Ratio                            ((%))
-import           GHC.Records                           (getField)
 
 import           Data.Either.Combinators               (maybeToRight)
 import           Data.Maybe                            (fromJust)
@@ -74,6 +73,8 @@ import qualified Cardano.Ledger.Alonzo.Scripts         as AlonzoScripts
 import qualified Cardano.Ledger.Alonzo.Tx              as AlonzoTx
 import           Cardano.Slotting.Time                 (SystemStart)
 
+import           Cardano.Ledger.Core                   (EraTx (sizeTxF))
+import           Control.Lens                          (view)
 import           Control.Monad.Random
 import           GeniusYield.HTTP.Errors               (IsGYApiError)
 import           GeniusYield.Imports
@@ -86,7 +87,7 @@ import           GeniusYield.Types
 data GYBuildTxEnv = GYBuildTxEnv
     { gyBTxEnvSystemStart    :: !SystemStart
     , gyBTxEnvEraHistory     :: !(Api.EraHistory Api.CardanoMode)
-    , gyBTxEnvProtocolParams :: !Api.S.ProtocolParameters
+    , gyBTxEnvProtocolParams :: !(Api.S.BundledProtocolParameters Api.S.BabbageEra)
     , gyBTxEnvPools          :: !(Set Api.S.PoolId)
     , gyBTxEnvOwnUtxos       :: !GYUTxOs
     -- ^ own utxos available for use as additional input
@@ -108,6 +109,7 @@ utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref witns) addr val ms useInline) =
 data BuildTxException
     = BuildTxBalancingError !BalancingError
     | BuildTxBodyErrorAutoBalance !Api.TxBodyErrorAutoBalance
+    | BuildTxPPConversionError !Api.ProtocolParametersConversionError
     | BuildTxMissingMaxExUnitsParam
     -- ^ Missing max ex units in protocol params
     | BuildTxExUnitsTooBig  -- ^ Execution units required is higher than the maximum as specified by protocol params.
@@ -277,7 +279,7 @@ balanceTxStep
                             . adjustTxOut (minimumUTxO pp)
                     , maxValueSize    = fromMaybe
                                             (error "protocolParamMaxValueSize missing from protocol params")
-                                            $ Api.S.protocolParamMaxValueSize pp
+                                            $ Api.S.protocolParamMaxValueSize $ Api.S.unbundleProtocolParams pp
                     }
                 cstrat
             pure (ins ++ addIns, collaterals, adjustedOuts ++ changeOuts)
@@ -285,9 +287,8 @@ balanceTxStep
     isScriptWitness GYTxInWitnessKey      = False
     isScriptWitness GYTxInWitnessScript{} = True
 
--- Impossible to throw error (with respect to `fromJust`), to avoid it, it would have been nice if `Cardano.Api` also exposed constructors of GADT `TxTotalAndReturnCollateralSupportedInEra era` (though it is done in later version, and thus can modify below line then). Now, even type of this GADT isn't exported, thus can't annotate type below.
--- retColSup :: Api.TxTotalAndReturnCollateralSupportedInEra Api.BabbageEra
-retColSup = fromJust $ Api.totalAndReturnCollateralSupportedInEra Api.BabbageEra
+retColSup :: Api.S.TxTotalAndReturnCollateralSupportedInEra Api.S.BabbageEra
+retColSup = Api.TxTotalAndReturnCollateralInBabbageEra
 
 finalizeGYBalancedTx :: GYBuildTxEnv -> GYBalancedTx v -> Either BuildTxException GYTxBody
 finalizeGYBalancedTx
@@ -407,7 +408,7 @@ finalizeGYBalancedTx
         Api.TxMetadataNone
         Api.TxAuxScriptsNone
         extra
-        (Api.BuildTxWith $ Just pp)
+        (Api.BuildTxWith $ Just $ Api.S.unbundleProtocolParams pp)
         Api.TxWithdrawalsNone
         Api.TxCertificatesNone
         Api.TxUpdateProposalNone
@@ -421,7 +422,7 @@ If not checked, the returned txbody may fail during submission.
 makeTransactionBodyAutoBalanceWrapper :: GYUTxOs
                                       -> SystemStart
                                       -> Api.S.EraHistory Api.S.CardanoMode
-                                      -> Api.S.ProtocolParameters
+                                      -> Api.S.BundledProtocolParameters Api.S.BabbageEra
                                       -> Set Api.S.PoolId
                                       -> Api.S.UTxO Api.S.BabbageEra
                                       -> Api.S.TxBodyContent Api.S.BuildTx Api.S.BabbageEra
@@ -431,31 +432,32 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
     Api.ExecutionUnits
         { executionSteps  = maxSteps
         , executionMemory = maxMemory
-        } <- maybeToRight BuildTxMissingMaxExUnitsParam $ Api.S.protocolParamMaxTxExUnits pp
-    let maxTxSize = Api.S.protocolParamMaxTxSize pp
+        } <- maybeToRight BuildTxMissingMaxExUnitsParam $ Api.S.protocolParamMaxTxExUnits $ Api.S.unbundleProtocolParams pp
+    let maxTxSize = Api.S.protocolParamMaxTxSize $ Api.S.unbundleProtocolParams pp
         changeAddrApi :: Api.S.AddressInEra Api.S.BabbageEra = addressToApi' changeAddr
+        stakeDelegDeposits = mempty  -- TODO: Currently it's empty as we don't support for unregistration!
 
     -- First we obtain the calculated fees to correct for our collaterals.
-    bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ (Api.Lovelace feeOld)) <-
+    bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ _ (Api.Lovelace feeOld)) <-
       first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
-        Api.BabbageEraInCardanoMode
         ss
-        eh
-        pp
+        (Api.toLedgerEpochInfo eh)
+        (Api.S.unbundleProtocolParams pp)
         ps
+        stakeDelegDeposits
         utxos
         body
         changeAddrApi
         Nothing
 
     -- We should call `makeTransactionBodyAutoBalance` again with updated values of collaterals so as to get slightly lower fee estimate.
-    Api.BalancedTxBody txBody _ _ <- if collaterals == mempty then return bodyBeforeCollUpdate else
+    Api.BalancedTxBody _ txBody _ _ <- if collaterals == mempty then return bodyBeforeCollUpdate else
 
       let
 
         collateralTotalValue :: GYValue = foldMapUTxOs utxoValue collaterals
         collateralTotalLovelace :: Integer = fst $ valueSplitAda collateralTotalValue
-        balanceNeeded :: Integer = ceiling $ (feeOld * toInteger (fromJust $ Api.S.protocolParamCollateralPercent pp)) % 100
+        balanceNeeded :: Integer = ceiling $ (feeOld * toInteger (fromJust $ Api.S.protocolParamCollateralPercent $ Api.S.unbundleProtocolParams pp)) % 100
 
       in do
 
@@ -469,11 +471,11 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
           else Left $ BuildTxCollateralShortFall (fromInteger balanceNeeded) (fromInteger collateralTotalLovelace) -- In this case `makeTransactionBodyAutoBalance` doesn't return an error but instead returns `(Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)`
 
         first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
-          Api.BabbageEraInCardanoMode
           ss
-          eh
-          pp
+          (Api.toLedgerEpochInfo eh)
+          (Api.S.unbundleProtocolParams pp)
           ps
+          stakeDelegDeposits
           utxos
           body {Api.txTotalCollateral = txColl, Api.txReturnCollateral = collRet}
           changeAddrApi
@@ -485,7 +487,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
             { AlonzoScripts.exUnitsSteps = steps
             , AlonzoScripts.exUnitsMem   = mem
             } = AlonzoTx.totExUnits ltx
-        txSize :: Natural = fromInteger $ getField @"txsize" ltx
+        txSize :: Natural = fromInteger $ view sizeTxF ltx
     -- See: Cardano.Ledger.Alonzo.Rules.validateExUnitsTooBigUTxO
     unless (steps <= maxSteps && mem <= maxMemory) $
         Left $ BuildTxExUnitsTooBig (maxSteps, maxMemory) (steps, mem)

@@ -47,10 +47,10 @@ import           Data.Maybe                    (fromJust)
 import           Data.Semigroup                (Sum (..))
 import           Data.Typeable
 import           Plutus.Model                  hiding (currentSlot)
-import qualified Plutus.Model.Fork.Ledger.Slot as Fork
-import qualified Plutus.Model.Fork.Ledger.Tx   as Fork
-import qualified Plutus.V1.Ledger.Value        as Plutus
-import qualified Plutus.V2.Ledger.Api          as Plutus2
+import qualified Cardano.Simple.Ledger.Slot    as Fork
+import qualified Cardano.Simple.Ledger.Tx      as Fork
+import qualified PlutusLedgerApi.V1.Value      as Plutus
+import qualified PlutusLedgerApi.V2            as Plutus2
 import qualified Test.Tasty                    as Tasty
 import qualified Test.Tasty.QuickCheck         as Tasty
 import qualified Test.Tasty.Runners            as Tasty

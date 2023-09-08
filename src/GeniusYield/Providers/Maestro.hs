@@ -36,11 +36,11 @@ import qualified Data.Set                             as Set
 import qualified Data.Text                            as Text
 import qualified Data.Text.Encoding                   as Text
 import qualified Data.Time                            as Time
-import           GHC.Natural                          (wordToNatural)
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
 import           GeniusYield.Providers.SubmitApi      (SubmitTxException (..))
 import           GeniusYield.Types
+import           GHC.Natural                          (wordToNatural)
 import qualified Maestro.Client.V1                    as Maestro
 import qualified Maestro.Types.V1                     as Maestro
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
@@ -120,7 +120,7 @@ datumHashFromMaestro = first (DeserializeErrorHex . Text.pack) . datumHashFromHe
 datumFromMaestroCBOR :: Text -> Either SomeDeserializeError GYDatum
 datumFromMaestroCBOR d = do
   bs  <- fromEither $ BS16.decode $ Text.encodeUtf8 d
-  api <- fromEither $ Api.deserialiseFromCBOR Api.AsScriptData bs
+  api <- fromEither $ Api.deserialiseFromCBOR Api.AsHashableScriptData bs
   return $ datumFromApi' api
   where
     e = DeserializeErrorHex d
@@ -336,8 +336,8 @@ maestroProtocolParams env = do
       , protocolParamMaxBlockHeaderSize  = _protocolParametersMaxBlockHeaderSize
       , protocolParamMaxBlockBodySize    = _protocolParametersMaxBlockBodySize
       , protocolParamMaxTxSize           = _protocolParametersMaxTxSize
-      , protocolParamTxFeeFixed          = _protocolParametersMinFeeConstant
-      , protocolParamTxFeePerByte        = _protocolParametersMinFeeCoefficient
+      , protocolParamTxFeeFixed          = Api.Lovelace $ toInteger _protocolParametersMinFeeConstant
+      , protocolParamTxFeePerByte        = Api.Lovelace $ toInteger _protocolParametersMinFeeCoefficient
       , protocolParamMinUTxOValue        = Nothing -- Deprecated in Alonzo.
       , protocolParamStakeAddressDeposit = Api.Lovelace $ toInteger _protocolParametersStakeKeyDeposit
       , protocolParamStakePoolDeposit    = Api.Lovelace $ toInteger _protocolParametersPoolDeposit
@@ -361,10 +361,10 @@ maestroProtocolParams env = do
       , protocolParamMaxCollateralInputs = Just _protocolParametersMaxCollateralInputs
       , protocolParamCostModels          = M.fromList
                                               [ ( Api.S.AnyPlutusScriptVersion Api.PlutusScriptV1
-                                                , coerce $ Maestro._costModelsPlutusV1 _protocolParametersCostModels
+                                                , Api.CostModel $ M.elems $ coerce $ Maestro._costModelsPlutusV1 _protocolParametersCostModels
                                                 )
                                               , ( Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2
-                                                , coerce $ Maestro._costModelsPlutusV2 _protocolParametersCostModels
+                                                , Api.CostModel $ M.elems $ coerce $ Maestro._costModelsPlutusV2 _protocolParametersCostModels
                                                 )
                                               ]
       , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ toInteger _protocolParametersCoinsPerUtxoByte

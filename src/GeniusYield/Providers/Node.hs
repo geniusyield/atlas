@@ -151,5 +151,5 @@ networkIdToLocalNodeConnectInfo :: GYNetworkId                              -- ^
 networkIdToLocalNodeConnectInfo nid nodeSocket = Api.LocalNodeConnectInfo
     { localConsensusModeParams = Api.CardanoModeParams $ networkIdToEpochSlots nid
     , localNodeNetworkId       = networkIdToApi nid
-    , localNodeSocketPath      = nodeSocket
+    , localNodeSocketPath      = Api.File nodeSocket
     }

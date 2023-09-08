@@ -20,6 +20,7 @@ module GeniusYield.Imports (
 ) where
 
 import           Control.Applicative        as X (liftA2)
+import           Control.Arrow              as X ((>>>))
 import           Control.Exception          as X (Exception, catch, throwIO)
 import           Control.Monad              as X (ap, foldM, forM, forM_, guard,
                                                   join, unless, when)

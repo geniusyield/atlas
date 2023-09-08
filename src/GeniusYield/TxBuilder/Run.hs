@@ -42,15 +42,15 @@ import           Data.Time.Clock                      (NominalDiffTime, UTCTime)
 import           Data.Time.Clock.POSIX                (posixSecondsToUTCTime)
 import qualified Ouroboros.Consensus.Cardano.Block    as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
-import           Ouroboros.Consensus.Util.Counting    (NonEmpty (NonEmptyCons, NonEmptyOne))
+import           Data.SOP.Counting    (NonEmpty (NonEmptyCons, NonEmptyOne))
 import           Plutus.Model
-import qualified Plutus.Model.Fork.Ledger.Slot        as Fork
-import qualified Plutus.Model.Fork.Ledger.TimeSlot    as Fork
-import qualified Plutus.Model.Fork.Ledger.Tx          as Fork
+import qualified Cardano.Simple.Ledger.Slot           as Fork
+import qualified Cardano.Simple.Ledger.TimeSlot       as Fork
+import qualified Cardano.Simple.Ledger.Tx             as Fork
 import           Plutus.Model.Mock.ProtocolParameters
 import           Plutus.Model.Stake
-import qualified Plutus.V1.Ledger.Interval            as Plutus
-import qualified Plutus.V2.Ledger.Api                 as Plutus
+import qualified PlutusLedgerApi.V1.Interval          as Plutus
+import qualified PlutusLedgerApi.V2                   as Plutus
 import qualified PlutusTx.Builtins.Internal           as Plutus
 
 import           GeniusYield.Imports
@@ -60,6 +60,8 @@ import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+import qualified Cardano.Simple.PlutusLedgerApi.V1.Scripts as Fork
+import           Data.Sequence                        (viewr, ViewR (..))
 
 type WalletName = String
 
@@ -164,8 +166,7 @@ instance GYTxQueryMonad GYTxMonadRun where
 
     utxoAtTxOutRef ref = do
         mUtxosWithoutRefScripts   <- liftRun $ gets mockUtxos
-        mRefScripts <- liftRun $ gets mockRefScripts  -- IMPORTANT: as the fate would have it, our fork because of being old, doesn't contain these inside `mockUtxos` (which is not the case for original)
-        let m = mUtxosWithoutRefScripts <> mRefScripts
+        let m = mUtxosWithoutRefScripts
         mScripts <- liftRun $ gets mockScripts
         nid <- networkId
         return $ do
@@ -179,8 +180,8 @@ instance GYTxQueryMonad GYTxMonadRun where
             let s = do
                   sh <- Plutus.txOutReferenceScript o
                   vs <- Map.lookup sh mScripts
-                  if | isV1 vs   -> Just (Some $ scriptFromPlutus @'PlutusV1 (versioned'content vs))
-                     | isV2 vs   -> Just (Some $ scriptFromPlutus @'PlutusV2 (versioned'content vs))
+                  if | isV1 vs   -> Just (Some $ scriptFromSerialisedScript @'PlutusV1 (coerce $ versioned'content vs))
+                     | isV2 vs   -> Just (Some $ scriptFromSerialisedScript @'PlutusV2 (coerce $ versioned'content vs))
                      | otherwise -> Nothing
 
             return GYUTxO
@@ -268,10 +269,13 @@ sendSkeleton' skeleton ws = do
         logInfo $ show tx5
         sendTx tx5
     case e of
-        Left _         -> fail ""
-        Right (_, tid) -> case txIdFromPlutus tid of
-            Nothing   -> fail $ printf "invalid tid %s" $ show tid
-            Just tid' -> return (tx5, tid')
+        Left fr -> fail $ show fr
+        Right _ -> do
+          mtxs <- liftRun $ gets mockTxs
+          let tid = case viewr (unLog mtxs) of EmptyR -> error "Absurd (sendSkeleton'): Sequence can't be empty"; (_ :> a) -> txStatId $ snd a in
+            case txIdFromPlutus tid of
+              Left e'   -> fail $ printf "invalid tid %s, error: %s" (show tid) (show e')
+              Right tid' -> return (tx5, tid')
 
   where
     walletSignatures =
@@ -282,7 +286,7 @@ sendSkeleton' skeleton ws = do
 
     -- Updates the wallet state.
     -- Updates extra lovelace required for fees & minimum ada requirements against the wallet sending this transaction.
-    updateWalletState :: Wallet -> Api.S.ProtocolParameters -> GYTxBody -> GYTxRunState -> GYTxRunState
+    updateWalletState :: Wallet -> Api.BundledProtocolParameters Api.BabbageEra -> GYTxBody -> GYTxRunState -> GYTxRunState
     updateWalletState w@Wallet {..} pp body GYTxRunState {..} = GYTxRunState $ Map.insertWith mappend walletName v walletExtraLovelace
       where
         v = ( coerce $ txBodyFee body
@@ -338,7 +342,7 @@ sendSkeleton' skeleton ws = do
                     GYTxInWitnessScript s d r -> do
                         (vs, forRef) <- case s of
                             GYInScript v      -> return (Just (validatorToVersioned v), mempty)
-                            GYInReference refScriptORef gyScriptV2 -> return (Nothing, toExtra (mempty {Fork.txReferenceInputs = Set.singleton $ Fork.TxIn (txOutRefToPlutus refScriptORef) Nothing, Fork.txScripts = Map.singleton (scriptPlutusHash gyScriptV2) (Versioned Ledger.PlutusV2 $ scriptToPlutus gyScriptV2)}))
+                            GYInReference refScriptORef gyScriptV2 -> return (Nothing, toExtra (mempty {Fork.txReferenceInputs = Set.singleton $ Fork.TxIn (txOutRefToPlutus refScriptORef) Nothing, Fork.txScripts = Map.singleton (scriptPlutusHash gyScriptV2) (Versioned Ledger.PlutusV2 $ coerce $ scriptToSerialisedScript gyScriptV2)}))
                         return $ tx <> toExtra (mempty
                             { Fork.txInputs = Set.singleton $ Fork.TxIn ref' $ Just $ Fork.ConsumeScriptAddress
                                 vs
@@ -380,7 +384,7 @@ sendSkeleton' skeleton ws = do
                 Nothing       -> return Map.empty
                 Just (Some s) -> do
                     let sh = scriptPlutusHash s
-                        v = Versioned Ledger.PlutusV2 $ scriptToPlutus s
+                        v = Versioned Ledger.PlutusV2 $ coerce $ scriptToSerialisedScript s
                     return $ Map.singleton sh v
 
         return $ tx <> toExtra mempty
@@ -413,15 +417,15 @@ sendSkeleton' skeleton ws = do
                 | hashDatum d == dh -> return d
                 | otherwise         -> go os
 
-    validatorToVersioned :: GYValidator v -> Versioned Plutus.Validator
+    validatorToVersioned :: GYValidator v -> Versioned Fork.Validator
     validatorToVersioned v = case validatorVersion v of
-        SingPlutusV1 -> Versioned Ledger.PlutusV1 $ validatorToPlutus v
-        SingPlutusV2 -> Versioned Ledger.PlutusV2 $ validatorToPlutus v
+        SingPlutusV1 -> Versioned Ledger.PlutusV1 $ coerce $ validatorToSerialisedScript v
+        SingPlutusV2 -> Versioned Ledger.PlutusV2 $ coerce $ validatorToSerialisedScript v
 
-    mintingPolicyToVersioned :: GYMintScript v -> Versioned Plutus.MintingPolicy
+    mintingPolicyToVersioned :: GYMintScript v -> Versioned Fork.MintingPolicy
     mintingPolicyToVersioned v = case mintingPolicyVersionFromWitness v of
-        PlutusV1 -> Versioned Ledger.PlutusV1 $ mintingPolicyToPlutusFromWitness v
-        PlutusV2 -> Versioned Ledger.PlutusV2 $ mintingPolicyToPlutusFromWitness v
+        PlutusV1 -> Versioned Ledger.PlutusV1 $ coerce $ gyMintScriptToSerialisedScript v
+        PlutusV2 -> Versioned Ledger.PlutusV2 $ coerce $ gyMintScriptToSerialisedScript v
 
 skeletonToTxBody :: GYTxSkeleton v -> GYTxMonadRun GYTxBody
 skeletonToTxBody skeleton = do
@@ -450,12 +454,12 @@ slotConfig' = liftRun $ do
 systemStart :: GYTxMonadRun Api.SystemStart
 systemStart = gyscSystemStart <$> slotConfig
 
-protocolParameters :: GYTxMonadRun Api.S.ProtocolParameters
+protocolParameters :: GYTxMonadRun (Api.S.BundledProtocolParameters Api.S.BabbageEra)
 protocolParameters = do
     pparams <- liftRun $ gets $ mockConfigProtocol . mockConfig
     return $ case pparams of
-        AlonzoParams  p -> Api.S.fromLedgerPParams Api.ShelleyBasedEraAlonzo  p
-        BabbageParams p -> Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage p
+        AlonzoParams  _ -> error "Run.hs/protocolParameters: Only support babbage era parameters"
+        BabbageParams p -> Api.BundleAsShelleyBasedProtocolParameters Api.ShelleyBasedEraBabbage (Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage p) p
 
 stakePools :: GYTxMonadRun (Set Api.S.PoolId)
 stakePools = do
@@ -463,8 +467,8 @@ stakePools = do
     foldM f Set.empty pids
   where
     f :: Set Api.S.PoolId -> PoolId -> GYTxMonadRun (Set Api.S.PoolId)
-    f s pid = maybe
-        (throwError $ GYConversionException $ GYLedgerToCardanoError $ DeserialiseRawBytesError "stakePools")
+    f s pid = either
+        (\e -> throwError $ GYConversionException $ GYLedgerToCardanoError $ DeserialiseRawBytesError ("stakePools, error: " <> fromString (show e)))
         (\pid' -> return $ Set.insert pid' s)
         $ Api.deserialiseFromRawBytes (Api.AsHash Api.AsStakePoolKey) bs
       where

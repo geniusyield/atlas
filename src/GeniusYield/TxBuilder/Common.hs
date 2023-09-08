@@ -63,7 +63,7 @@ buildTxCore
     :: forall m f v. (GYTxQueryMonad m, MonadRandom m, Traversable f)
     => Api.SystemStart
     -> Api.EraHistory Api.CardanoMode
-    -> Api.S.ProtocolParameters
+    -> Api.S.BundledProtocolParameters Api.S.BabbageEra
     -> Set Api.S.PoolId
     -> GYCoinSelectionStrategy
     -> (GYTxBody -> GYUTxOs -> GYUTxOs)

@@ -12,22 +12,18 @@ module GeniusYield.OnChain.TestToken.Compiled (
     originalTestTokenPolicy,
 ) where
 
-import           Plutus.V1.Ledger.Api
-
-import qualified PlutusTx
-
 import           GeniusYield.OnChain.TestToken
+import qualified PlutusLedgerApi.V2
+import qualified PlutusTx
+import PlutusCore.Version (plcVersion100)
 
 originalTestTokenPolicy
-    :: Integer          -- ^ count
-    -> TokenName        -- ^ token name (e.g. @GOLD@)
-    -> TxOutRef         -- ^ utxo to base token on
-    -> MintingPolicy
-originalTestTokenPolicy count tn utxo = mkMintingPolicyScript
-    $ $$(PlutusTx.compile [|| mkTestTokenPolicy ||])
-    `PlutusTx.applyCode`
-     PlutusTx.liftCode count
-    `PlutusTx.applyCode`
-     PlutusTx.liftCode tn
-    `PlutusTx.applyCode`
-     PlutusTx.liftCode utxo
+  :: Integer                       -- ^ Count.
+  -> PlutusLedgerApi.V2.TokenName  -- ^ Token name (e.g. @GOLD@).
+  -> PlutusLedgerApi.V2.TxOutRef   -- ^ UTxO to base token on.
+  -> PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ())
+originalTestTokenPolicy count tn utxo =
+    $$(PlutusTx.compile [|| mkTestTokenPolicy ||])
+    `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 count
+    `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 tn
+    `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 utxo

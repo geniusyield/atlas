@@ -14,11 +14,9 @@ module GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
     , Guess (..)
     ) where
 
-import           Plutus.V2.Ledger.Api
 import qualified PlutusTx
 
 import           GeniusYield.Test.OnChain.GuessRefInputDatum
 
-guessRefInputDatumValidator :: Validator
-guessRefInputDatumValidator = mkValidatorScript
-    $$(PlutusTx.compile [|| mkGuessRefInputDatumValidator ||])
+guessRefInputDatumValidator :: PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ())
+guessRefInputDatumValidator = $$(PlutusTx.compile [|| mkGuessRefInputDatumValidator ||])

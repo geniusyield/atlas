@@ -36,11 +36,11 @@ simpleProviders era nid nodeSocket mKey logging = do
     mEnv <- X.networkIdToMaestroEnv mKey nid
 
     return GYProviders
-      { gyLookupDatum   = maestroLookupDatum mEnv
+      { gyLookupDatum      = maestroLookupDatum mEnv
       , gyAwaitTxConfirmed = maestroAwaitTxConfirmed mEnv
-      , gySubmitTx      = nodeSubmitTx info
-      , gySlotActions   = nodeSlotActions info
-      , gyGetParameters = nodeGetParameters era info
-      , gyQueryUTxO     = nodeQueryUTxO era info
-      , gyLog'          = logging
+      , gySubmitTx         = nodeSubmitTx info
+      , gySlotActions      = nodeSlotActions info
+      , gyGetParameters    = nodeGetParameters era info
+      , gyQueryUTxO        = nodeQueryUTxO era info
+      , gyLog'             = logging
       }

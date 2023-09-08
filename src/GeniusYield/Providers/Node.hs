@@ -74,6 +74,7 @@ nodeQueryUTxO era info = GYQueryUTxO
     , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ nodeUtxosAtAddress era info
     , gyQueryUtxosAtAddresses'           = gyQueryUtxoAtAddressesDefault $ nodeUtxosAtAddress era info
     , gyQueryUtxosAtAddressesWithDatums' = Nothing  -- Will use the default implementation.
+    , gyQueryUtxosAtPaymentCredential'   = Nothing
     }
 
 nodeUtxosAtAddress :: GYEra -> Api.LocalNodeConnectInfo Api.CardanoMode -> GYAddress -> IO GYUTxOs
@@ -131,5 +132,5 @@ networkIdToLocalNodeConnectInfo :: GYNetworkId                              -- ^
 networkIdToLocalNodeConnectInfo nid nodeSocket = Api.LocalNodeConnectInfo
     { localConsensusModeParams = Api.CardanoModeParams $ networkIdToEpochSlots nid
     , localNodeNetworkId       = networkIdToApi nid
-    , localNodeSocketPath      = nodeSocket
+    , localNodeSocketPath      = Api.File nodeSocket
     }

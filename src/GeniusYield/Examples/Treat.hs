@@ -13,14 +13,16 @@ Therefore V1 version is invalid.
 module GeniusYield.Examples.Treat (
     -- * Scripts
     treatValidatorV1,
-    treatValidatorV2, 
+    treatValidatorV2,
 ) where
 
+import           GeniusYield.Examples.Common
 import           GeniusYield.Types
 
-import qualified Plutus.V1.Ledger.Scripts          as Plutus
-import qualified PlutusCore                        as PLC
-import qualified UntypedPlutusCore                 as UPLC
+import qualified PlutusCore                  as PLC
+import qualified PlutusCore.Version          as PLC
+import qualified PlutusLedgerApi.Common      as Plutus
+import qualified UntypedPlutusCore           as UPLC
 
 -------------------------------------------------------------------------------
 -- Script
@@ -43,27 +45,14 @@ treatScript
     scName       = UPLC.Name "sc" (UPLC.Unique 2)
 
 treatScript' :: UPLC.Term UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
-treatScript' = case UPLC.deBruijnTerm treatScript of
-    Left exc    -> error $ "Converting to deBruijn " ++ show (exc :: UPLC.FreeVariableError)
-    Right term' -> renameUPLC (\(UPLC.NamedDeBruijn _ i) -> UPLC.DeBruijn i) term'
+treatScript' = toDeBruijn treatScript
 
-renameUPLC :: (name -> name') -> UPLC.Term name uni fun ann -> UPLC.Term name' uni fun ann
-renameUPLC rnm = go where
-    go (UPLC.Var ann n       ) = UPLC.Var ann (rnm n)
-    go (UPLC.LamAbs ann n t  ) = UPLC.LamAbs ann (rnm n) (go t)
-    go (UPLC.Apply ann t1 t2 ) = UPLC.Apply ann (go t1) (go t2)
-    go (UPLC.Delay ann t     ) = UPLC.Delay ann (go t)
-    go (UPLC.Force ann t     ) = UPLC.Force ann (go t)
-    go (UPLC.Constant ann con) = UPLC.Constant ann con
-    go (UPLC.Builtin ann bn  ) = UPLC.Builtin ann bn
-    go (UPLC.Error ann       ) = UPLC.Error ann
-
-treatValidatorPlutus :: Plutus.Validator
-treatValidatorPlutus = Plutus.Validator $ Plutus.Script $
-    UPLC.Program () (PLC.defaultVersion ()) treatScript'
+treatValidatorPlutusSerialised :: Plutus.SerialisedScript
+treatValidatorPlutusSerialised = Plutus.serialiseUPLC $
+    UPLC.Program () PLC.plcVersion100 treatScript'
 
 treatValidatorV1 :: GYValidator 'PlutusV1
-treatValidatorV1 = validatorFromPlutus treatValidatorPlutus
+treatValidatorV1 = validatorFromSerialisedScript treatValidatorPlutusSerialised
 
 treatValidatorV2 :: GYValidator 'PlutusV2
-treatValidatorV2 = validatorFromPlutus treatValidatorPlutus
+treatValidatorV2 = validatorFromSerialisedScript treatValidatorPlutusSerialised

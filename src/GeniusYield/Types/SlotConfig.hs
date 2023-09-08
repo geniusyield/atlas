@@ -19,7 +19,9 @@ module GeniusYield.Types.SlotConfig (
 ) where
 
 import           Control.Monad                        (unless, (<$!>))
-import           Control.Monad.Except                 (Except, MonadError (throwError), runExcept)
+import           Control.Monad.Except                 (Except,
+                                                       MonadError (throwError),
+                                                       runExcept)
 import           Data.Fixed                           (div')
 import           Data.Foldable                        (toList)
 import           Data.Functor                         (($>))
@@ -33,9 +35,9 @@ import           Data.Word                            (Word64)
 import qualified Cardano.Api                          as Api
 import qualified Cardano.Slotting.Slot                as CSlot
 import qualified Cardano.Slotting.Time                as CSlot
+import qualified Data.SOP.Counting                    as Ouroboros
 import qualified Ouroboros.Consensus.BlockchainTime   as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
-import qualified Ouroboros.Consensus.Util.Counting    as Ouroboros
 
 import           GeniusYield.CardanoApi.EraHistory
 import           GeniusYield.Types.Slot

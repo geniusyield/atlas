@@ -17,10 +17,10 @@ module GeniusYield.Types.Ada (
   , lovelaceValueOf
 ) where
 
-import Data.Fixed (Fixed (MkFixed), Micro)
+import           Data.Fixed               (Fixed (MkFixed), Micro)
 
-import Plutus.V1.Ledger.Api (Value, adaSymbol, adaToken)
-import qualified Plutus.V1.Ledger.Value as Value
+import           PlutusLedgerApi.V1.Value (Value, adaSymbol, adaToken)
+import qualified PlutusLedgerApi.V1.Value as Value
 
 -- | Ada represented with a 'Micro' value.
 newtype Ada = Ada Micro

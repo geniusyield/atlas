@@ -29,9 +29,9 @@ import           Cardano.Slotting.Time                          (SystemStart (..
                                                                  mkSlotLength)
 import           Data.ByteString                                (ByteString)
 import           Data.Maybe                                     (listToMaybe)
+import           Data.Scientific                                (Scientific)
 import           Data.SOP.BasicFunctors                         (K (..))
 import           Data.SOP.Strict                                (NP (..))
-import           Data.Scientific                                (Scientific)
 import qualified Data.Text                                      as Txt
 import           Data.Word                                      (Word64)
 import           Type.Reflection                                (Typeable,
@@ -55,13 +55,13 @@ import qualified Database.PostgreSQL.Simple.FromField           as PQ (Conversio
 import qualified Database.PostgreSQL.Simple.Newtypes            as PQ
 import qualified Database.PostgreSQL.Simple.ToField             as PQ
 
+import qualified Data.SOP.Counting                              as Ouroboros
 import qualified Ouroboros.Consensus.Block.Abstract             as Ouroboros
 import qualified Ouroboros.Consensus.Cardano.Block              as Ouroboros
 import qualified Ouroboros.Consensus.Config.SecurityParam       as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History.EraParams as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History.Qry       as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History.Summary   as Ouroboros
-import qualified Ouroboros.Consensus.Util.Counting              as Ouroboros
 
 
 import           Database.PostgreSQL.Simple                     (ResultError (UnexpectedNull))
@@ -82,12 +82,7 @@ type QueryUtxo' = (RawBytes Api.TxId, Integer, GYAddressBech32, Integer, PQ.Aeso
      Maybe GYDatumHash, Maybe GYDatum, Maybe (Some GYScript))
 
 openDbSyncConn :: PQ.ConnectInfo -> IO CardanoDbSyncConn
-openDbSyncConn ci = coerce $ Pool.createPool
-    (PQ.connect ci)
-    PQ.close
-    1  -- strip
-    30 -- seconds to keep connections open
-    5  -- connections per strip.
+openDbSyncConn ci = coerce $ Pool.newPool (Pool.setNumStripes (Just 1) $ Pool.defaultPoolConfig (PQ.connect ci) PQ.close 30 5)
 
 newtype CardanoDbSyncException = CardanoDbSyncException String
   deriving stock (Show)
@@ -143,7 +138,7 @@ dbSyncLookupDatum (Conn pool) dh = Pool.withResource pool $ \conn -> do
         [PQ.Only (PQ.Aeson (SD sd))] -> return $ Just $ datumFromApi' sd
         _anyOtherMatch               -> return Nothing
 
-newtype SD = SD Api.ScriptData
+newtype SD = SD Api.HashableScriptData
   deriving Show
 
 instance FromJSON SD where
@@ -163,6 +158,7 @@ dbSyncQueryUtxo conn = GYQueryUTxO
     , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ dbSyncQueryUtxosAtAddress conn
     , gyQueryUtxosAtAddresses'           = dbSyncQueryUtxosAtAddresses conn
     , gyQueryUtxosAtAddressesWithDatums' = Nothing  -- Will use the default implementation.
+    , gyQueryUtxosAtPaymentCredential'   = Nothing
     }
 
 gyDatumFromId :: PQ.Connection -> Integer -> IO (Maybe GYDatum)
@@ -307,7 +303,7 @@ instance FromJSON MA where
             Hex tn' <- obj Aeson..: "name"
             amt     <- obj Aeson..: "quantity"
 
-            pn     <- maybe (fail "invalid policy")    return $ Api.deserialiseFromRawBytes Api.AsPolicyId pn'
+            pn     <- either (\e -> fail $ "invalid policy: " <> show e)    return $ Api.deserialiseFromRawBytes Api.AsPolicyId pn'
             tn     <- maybe (fail "invalid tokenname") return $ tokenNameFromBS tn'
             return (GYToken (mintingPolicyIdFromApi pn) tn, amt)
 
@@ -358,8 +354,8 @@ dbSyncGetProtocolParameters (Conn pool) = Pool.withResource pool $ \conn -> do
             , protocolParamMaxBlockHeaderSize  = unN ppBHSize
             , protocolParamMaxBlockBodySize    = unN ppBlockSize
             , protocolParamMaxTxSize           = unN ppMaxTxSize
-            , protocolParamTxFeeFixed          = unN ppTxFeeFixed
-            , protocolParamTxFeePerByte        = unN ppTxFeePerByte
+            , protocolParamTxFeeFixed          = Api.Lovelace $ toInteger $ unN ppTxFeeFixed
+            , protocolParamTxFeePerByte        = Api.Lovelace $ toInteger $ unN ppTxFeePerByte
             , protocolParamMinUTxOValue        = Nothing
             , protocolParamStakeAddressDeposit = Api.Lovelace (unSI ppStakeAddressDeposit)
             , protocolParamStakePoolDeposit    = Api.Lovelace (unSI ppStakePoolDeposit)
@@ -376,11 +372,17 @@ dbSyncGetProtocolParameters (Conn pool) = Pool.withResource pool $ \conn -> do
             , protocolParamMaxValueSize        = Just (unSN ppMaxValueSize)
             , protocolParamCollateralPercent   = Just (unSN ppMaxCollateralPercent)
             , protocolParamMaxCollateralInputs = Just (unSN ppMaxCollateralInputs)
-            , protocolParamCostModels          = Map.mapKeys coerce (coerce ppCosts)
+            , protocolParamCostModels          =
+                let
+                  ppCosts' :: Map PlutusScriptVersion CostModel = coerce ppCosts
+                  ppCosts'' :: Map PlutusScriptVersion Api.CostModel = fmap (coerce . Map.elems) ppCosts'
+                in Map.mapKeys coerce ppCosts''
             , protocolParamUTxOCostPerByte     = Just $ Api.Lovelace (unSI ppUTxOCostPerWord `div` 8)
             }
 
         _ -> throwIO $ CardanoDbSyncException "dbSyncGetProtocolParameters: zero or multiple SQL results"
+
+type CostModel = (Map Text Integer)
 
 data PP = PP
     { ppMaj                  :: !N
@@ -409,7 +411,7 @@ data PP = PP
     , ppMaxValueSize         :: !SN
     , ppMaxCollateralPercent :: !SN
     , ppMaxCollateralInputs  :: !SN
-    , ppCosts                :: !(PQ.Aeson (Map PlutusScriptVersion Api.CostModel))
+    , ppCosts                :: !(PQ.Aeson (Map PlutusScriptVersion CostModel))
     }
   deriving (Generic)
 
@@ -462,6 +464,7 @@ dbSyncGetEraHistory (Conn pool) =  Pool.withResource pool $ \conn -> do
             K (mkEraParams 500 0.1 300) :*
             K (mkEraParams 500 0.1 300) :*
             K (mkEraParams 500 0.1 300) :*
+            K (mkEraParams 500 0.1 300) :*
             Nil
 
         -- privatenet eras don't use defaultEraParams
@@ -490,8 +493,8 @@ instance (Api.SerialiseAsRawBytes a, Api.HasTypeProxy a, Typeable a) => PQ.FromF
     fromField f bs = do
         PQ.Binary bs' <- PQ.fromField f bs
         case Api.deserialiseFromRawBytes (Api.proxyToAsType (Proxy @a)) bs' of
-            Just x  -> return (RawBytes x)
-            Nothing -> PQ.returnError PQ.ConversionFailed f $ "does not unserialise: " ++ show (typeRep @a)
+            Right x -> return (RawBytes x)
+            Left e  -> PQ.returnError PQ.ConversionFailed f $ "does not unserialise: " <> show (typeRep @a) <> ", error: " <> show e
 
 instance Api.SerialiseAsRawBytes a => PQ.ToField (RawBytes a) where
     toField (RawBytes x) = PQ.toField (PQ.Binary (Api.serialiseToRawBytes x))

@@ -98,7 +98,7 @@ makeSetup' DbSyncOpts {..} privnetPath = do
         info = Api.LocalNodeConnectInfo
             { Api.localConsensusModeParams = Api.CardanoModeParams $ Api.EpochSlots 500
             , Api.localNodeNetworkId       = networkIdToApi GYPrivnet
-            , Api.localNodeSocketPath      = pathNodeSocket paths
+            , Api.localNodeSocketPath      = Api.File $ pathNodeSocket paths
             }
 
     -- ask current slot, so we know local node connection works
@@ -198,7 +198,7 @@ generateUser UserPaths {..} =
     existing `catchIOException` const new
   where
     existing = do
-        skey <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsPaymentKey) pathUserSKey >>=
+        skey <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsPaymentKey) (Api.File pathUserSKey) >>=
           \case
           Right skey -> return $ paymentSigningKeyFromApi skey
           Left err   -> throwIO $ userError $ show err
@@ -231,7 +231,7 @@ runAddressKeyGen
     -> IO (Api.SigningKey Api.PaymentKey)
 runAddressKeyGen skeyPath = do
       skey <- Api.generateSigningKey Api.AsPaymentKey
-      res <- Api.writeFileTextEnvelope skeyPath (Just skeyDesc) skey
+      res <- Api.writeFileTextEnvelope (Api.File skeyPath) (Just skeyDesc) skey
       case res of
           Right () -> return skey
           Left err -> do

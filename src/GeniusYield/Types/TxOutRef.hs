@@ -39,11 +39,12 @@ import qualified Data.Swagger.Lens                ()
 import qualified Data.Text                        as T
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as TE
-import qualified Plutus.V1.Ledger.Api             as Plutus
+import qualified PlutusLedgerApi.V1               as Plutus (TxOutRef (..), TxId (..))
 import qualified PlutusTx.Builtins.Internal       as Plutus
 import qualified Text.Printf                      as Printf
 import qualified Web.HttpApiData                  as Web
 
+import           Data.Either.Combinators          (mapLeft)
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.Tx
@@ -52,7 +53,7 @@ import           GeniusYield.Types.Tx
 --
 -- >>> :set -XOverloadedStrings -XTypeApplications
 -- >>> import qualified Data.Csv                   as Csv
--- >>> import qualified Plutus.V1.Ledger.Api       as Plutus
+-- >>> import qualified PlutusLedgerApi.V1         as Plutus
 -- >>> import qualified Web.HttpApiData            as Web
 --
 
@@ -76,7 +77,7 @@ instance Hashable GYTxOutRef where
 -- Right (GYTxOutRef (TxIn "4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189" (TxIx 12)))
 --
 -- >>> txOutRefFromPlutus $ Plutus.TxOutRef "ae" 12
--- Left (UnknownPlutusToCardanoError {ptceTag = "txOutRefFromPlutus: invalid txOutRefId ae"})
+-- Left (UnknownPlutusToCardanoError {ptceTag = "txOutRefFromPlutus: invalid txOutRefId ae, error: SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise TxId\"}"})
 --
 -- >>> txOutRefFromPlutus $ Plutus.TxOutRef "4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189" (-2)
 -- Left (UnknownPlutusToCardanoError {ptceTag = "txOutRefFromPlutus: negative txOutRefIdx -2"})
@@ -88,9 +89,7 @@ txOutRefFromPlutus :: Plutus.TxOutRef -> Either PlutusToCardanoError GYTxOutRef
 txOutRefFromPlutus (Plutus.TxOutRef tid@(Plutus.TxId (Plutus.BuiltinByteString bs)) ix) = coerce . Api.TxIn <$> etid <*> eix
   where
     etid :: Either PlutusToCardanoError Api.TxId
-    etid = maybe
-        (Left $ UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: invalid txOutRefId " ++ show tid)
-        Right
+    etid = mapLeft (\e -> UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: invalid txOutRefId " <> show tid <> ", error: " <> show e)
         $ Api.deserialiseFromRawBytes Api.AsTxId bs
 
     eix :: Either PlutusToCardanoError Api.TxIx
@@ -146,7 +145,7 @@ instance Web.FromHttpApiData GYTxOutRef where
             tx  <- Base16.decodeLenient <$> Atto.takeWhile1 isHexDigit
             _   <- Atto.char '#'
             ix  <- Atto.decimal
-            tx' <- maybe (fail $ "not txid bytes: " ++ show tx) return $ Api.deserialiseFromRawBytes Api.AsTxId tx
+            tx' <- either (\e -> fail $ "not txid bytes: " <> show tx <> " , error: " <> show e) pure $ Api.deserialiseFromRawBytes Api.AsTxId tx
             return (GYTxOutRef (Api.TxIn tx' (Api.TxIx ix)))
 
 instance Web.ToHttpApiData GYTxOutRef where
@@ -226,7 +225,7 @@ instance Web.FromHttpApiData GYTxOutRefCbor where
       unless (LBS.null rest) $ Left "Left overs in input"
       case cbor of
           CBOR.TList [CBOR.TList [CBOR.TBytes tx, CBOR.TInt ix], _] -> do
-              tx' <- maybe (Left $ T.pack $ "not txid bytes: " ++ show tx) return $ Api.deserialiseFromRawBytes Api.AsTxId tx
+              tx' <- mapLeft (\e -> T.pack $ "not txid bytes: " ++ show tx <> ", error: " <> show e) $ Api.deserialiseFromRawBytes Api.AsTxId tx
               unless (ix >= 0) $ Left "negative ix"
               return (GYTxOutRefCbor (GYTxOutRef (Api.TxIn tx' (Api.TxIx (fromIntegral ix)))))
           _ -> Left "Invalid TxIn CBOR structure"

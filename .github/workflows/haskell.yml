@@ -103,8 +103,8 @@ jobs:
     - name: Setup haskell tooling
       uses: haskell/actions/setup@v2
       with:
-        ghc-version: '8.10.7'
-        cabal-version: '3.8'
+        ghc-version: '9.2.8'
+        cabal-version: '3.10.1.0'
         enable-stack: true
         stack-version: '2.9'
     - name: Setup cache
@@ -122,7 +122,7 @@ jobs:
       run: |
         git clone https://github.com/input-output-hk/libsodium
         cd libsodium
-        git checkout 66f017f1
+        git checkout dbb48cc
         ./autogen.sh
         ./configure
         make
@@ -151,7 +151,7 @@ jobs:
         # Install docspec and run doctests.
         echo "=========================[ INSTALL DOCSPEC ]========================"
         echo " -> Started at $(date --iso-8601=seconds --utc)."
-        curl -sL https://github.com/phadej/cabal-extras/releases/download/cabal-docspec-0.0.0.20211114/cabal-docspec-0.0.0.20211114.xz > ./cabal-docspec.xz
+        curl -sL https://github.com/phadej/cabal-extras/releases/download/cabal-docspec-0.0.0.20230517/cabal-docspec-0.0.0.20230517-x86_64-linux.xz > ./cabal-docspec.xz
         xz -d < ./cabal-docspec.xz > ./cabal-docspec
         rm -f ./cabal-docspec.xz
         chmod a+x ./cabal-docspec
@@ -175,7 +175,7 @@ jobs:
     - name: Upload haddock documentation
       uses: actions/upload-pages-artifact@v1.0.8
       with:
-        path: ./dist-newstyle/build/x86_64-linux/ghc-8.10.7/${{env.ATLAS_VERSION}}/doc/html/atlas-cardano/
+        path: ./dist-newstyle/build/x86_64-linux/ghc-9.2.8/${{env.ATLAS_VERSION}}/doc/html/atlas-cardano/
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:

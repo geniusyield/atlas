@@ -37,11 +37,11 @@ import qualified Data.Set                             as Set
 import qualified Data.Text                            as Text
 import qualified Data.Text.Encoding                   as Text
 import qualified Data.Time                            as Time
-import           GHC.Natural                          (wordToNatural)
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
 import           GeniusYield.Providers.SubmitApi      (SubmitTxException (..))
 import           GeniusYield.Types
+import           GHC.Natural                          (wordToNatural)
 import qualified Maestro.Client.V1                    as Maestro
 import qualified Maestro.Types.V1                     as Maestro
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
@@ -50,7 +50,7 @@ import qualified Web.HttpApiData                      as Web
 
 -- | Convert our representation of Network ID to Maestro's.
 networkIdToMaestroEnv :: Text -> GYNetworkId -> IO (Maestro.MaestroEnv 'Maestro.V1)
-networkIdToMaestroEnv key nid = Maestro.mkMaestroEnv @'Maestro.V1 key $ fromMaybe (error "Only preprod and mainnet networks are supported by Maestro") $ M.lookup nid $ M.fromList [(GYMainnet, Maestro.Mainnet), (GYTestnetPreprod, Maestro.Preprod)]
+networkIdToMaestroEnv key nid = Maestro.mkMaestroEnv @'Maestro.V1 key $ fromMaybe (error "Only preview, preprod and mainnet networks are supported by Maestro") $ M.lookup nid $ M.fromList [(GYMainnet, Maestro.Mainnet), (GYTestnetPreprod, Maestro.Preprod), (GYTestnetPreview, Maestro.Preview)]
 
 -- | Exceptions.
 data MaestroProviderException
@@ -168,7 +168,7 @@ datumHashFromMaestro = first (DeserializeErrorHex . Text.pack) . datumHashFromHe
 datumFromMaestroCBOR :: Text -> Either SomeDeserializeError GYDatum
 datumFromMaestroCBOR d = do
   bs  <- fromEither $ BS16.decode $ Text.encodeUtf8 d
-  api <- fromEither $ Api.deserialiseFromCBOR Api.AsScriptData bs
+  api <- fromEither $ Api.deserialiseFromCBOR Api.AsHashableScriptData bs
   return $ datumFromApi' api
   where
     e = DeserializeErrorHex d
@@ -271,6 +271,20 @@ maestroUtxosAtAddressesWithDatums env addrs = do
   where
     locationIdent = "AddressesUtxosWithDatums"
 
+-- | Query UTxOs present at payment credential.
+maestroUtxosAtPaymentCredential :: Maestro.MaestroEnv 'Maestro.V1 -> GYPaymentCredential -> IO GYUTxOs
+maestroUtxosAtPaymentCredential env paymentCredential = do
+  let paymentCredentialBech32 :: Maestro.Bech32StringOf Maestro.PaymentCredentialAddress = coerce $ paymentCredentialToBech32 paymentCredential
+  -- Here one would not get `MaestroNotFound` error.
+  utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages $ Maestro.utxosByPaymentCredential env paymentCredentialBech32 (Just False) (Just False)
+
+  either
+    (throwIO . MspvDeserializeFailure locationIdent)
+    pure
+    $ utxosFromList <$> traverse utxoFromMaestro utxos
+  where
+    locationIdent = "PaymentCredentialUtxos"
+
 -- | Returns a list containing all 'GYTxOutRef' for a given 'GYAddress'.
 maestroRefsAtAddress :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> IO [GYTxOutRef]
 maestroRefsAtAddress env addr = do
@@ -351,6 +365,7 @@ maestroQueryUtxo env = GYQueryUTxO
   , gyQueryUtxoAtTxOutRef'             = maestroUtxoAtTxOutRef env
   , gyQueryUtxoRefsAtAddress'          = maestroRefsAtAddress env
   , gyQueryUtxosAtAddressesWithDatums' = Just $ maestroUtxosAtAddressesWithDatums env
+  , gyQueryUtxosAtPaymentCredential'   = Just $ maestroUtxosAtPaymentCredential env
   }
 
 -------------------------------------------------------------------------------
@@ -369,8 +384,8 @@ maestroProtocolParams env = do
       , protocolParamMaxBlockHeaderSize  = _protocolParametersMaxBlockHeaderSize
       , protocolParamMaxBlockBodySize    = _protocolParametersMaxBlockBodySize
       , protocolParamMaxTxSize           = _protocolParametersMaxTxSize
-      , protocolParamTxFeeFixed          = _protocolParametersMinFeeConstant
-      , protocolParamTxFeePerByte        = _protocolParametersMinFeeCoefficient
+      , protocolParamTxFeeFixed          = Api.Lovelace $ toInteger _protocolParametersMinFeeConstant
+      , protocolParamTxFeePerByte        = Api.Lovelace $ toInteger _protocolParametersMinFeeCoefficient
       , protocolParamMinUTxOValue        = Nothing -- Deprecated in Alonzo.
       , protocolParamStakeAddressDeposit = Api.Lovelace $ toInteger _protocolParametersStakeKeyDeposit
       , protocolParamStakePoolDeposit    = Api.Lovelace $ toInteger _protocolParametersPoolDeposit
@@ -394,10 +409,10 @@ maestroProtocolParams env = do
       , protocolParamMaxCollateralInputs = Just _protocolParametersMaxCollateralInputs
       , protocolParamCostModels          = M.fromList
                                               [ ( Api.S.AnyPlutusScriptVersion Api.PlutusScriptV1
-                                                , coerce $ Maestro._costModelsPlutusV1 _protocolParametersCostModels
+                                                , Api.CostModel $ M.elems $ coerce $ Maestro._costModelsPlutusV1 _protocolParametersCostModels
                                                 )
                                               , ( Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2
-                                                , coerce $ Maestro._costModelsPlutusV2 _protocolParametersCostModels
+                                                , Api.CostModel $ M.elems $ coerce $ Maestro._costModelsPlutusV2 _protocolParametersCostModels
                                                 )
                                               ]
       , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ toInteger _protocolParametersCoinsPerUtxoByte

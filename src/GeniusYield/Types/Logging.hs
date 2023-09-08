@@ -35,7 +35,8 @@ import           GeniusYield.Imports
 import           GeniusYield.Providers.GCP    (gcpFormatter)
 import qualified GeniusYield.Providers.Sentry as Sentry
 import qualified Katip                        as K
-import           Network.URI                  (URI (..), URIAuth (..), parseURIReference)
+import           Network.URI                  (URI (..), URIAuth (..),
+                                               parseURIReference)
 import           System.IO                    (stderr, stdout)
 import qualified Text.Printf                  as Printf
 
@@ -175,7 +176,7 @@ instance Aeson.ToJSON LogSrc where
 
 instance Aeson.FromJSON LogSrc where
   parseJSON = Aeson.withText "LogSrc" $ \s -> do
-      case parseURIReference $Text.unpack s of
+      case parseURIReference $ Text.unpack s of
         Just u -> pure $ LogSrc u
         _      -> fail $ "Invalid URI: " <> show s
 

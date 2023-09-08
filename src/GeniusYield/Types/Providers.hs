@@ -242,7 +242,7 @@ data GYSlotActions = GYSlotActions
     , gyWaitUntilSlot'         :: !(GYSlot -> IO GYSlot)
     }
 
--- | Wait for the next slot
+-- | Wait for the next block.
 --
 -- 'threadDelay' until current slot getter returns another value.
 gyWaitForNextBlockDefault :: IO GYSlot -> IO GYSlot

@@ -17,7 +17,6 @@ module GeniusYield.Providers.CardanoDbSync (
     -- * Slot number
     dbSyncSlotNumber,
     dbSyncWaitUntilSlot,
-    dbSyncSlotActions,
     -- * Datum lookup
     dbSyncLookupDatum,
     -- * Query UTxO
@@ -127,15 +126,6 @@ dbSyncSlotNumber (Conn pool) = Pool.withResource pool $ \conn -> do
 -- | Wait until 'CardanoDbSyncConn' has processed a given slot.
 dbSyncWaitUntilSlot :: CardanoDbSyncConn -> GYSlot -> IO GYSlot
 dbSyncWaitUntilSlot conn = gyWaitUntilSlotDefault (dbSyncSlotNumber conn)
-
-dbSyncSlotActions :: CardanoDbSyncConn -> GYSlotActions
-dbSyncSlotActions conn = GYSlotActions
-    { gyGetCurrentSlot'   = get
-    , gyWaitForNextBlock' = gyWaitForNextBlockDefault get
-    , gyWaitUntilSlot'    = gyWaitUntilSlotDefault get
-    }
-  where
-    get = dbSyncSlotNumber conn
 
 -------------------------------------------------------------------------------
 -- Datum lookup provider

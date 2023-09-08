@@ -17,7 +17,7 @@ module GeniusYield.Types.Providers
     , GYAwaitTxException (..)
       -- * Get current slot
     , GYSlotActions (..)
-    , gyGetCurrentSlot
+    , gyGetSlotOfCurrentBlock
     , gyWaitForNextBlock
     , gyWaitForNextBlock_
     , gyWaitForNextBlockDefault
@@ -123,8 +123,8 @@ data GYProviders = GYProviders
     , gyLog'             :: !GYLog
     }
 
-gyGetCurrentSlot :: GYProviders -> IO GYSlot
-gyGetCurrentSlot = gyGetCurrentSlot' . gySlotActions
+gyGetSlotOfCurrentBlock :: GYProviders -> IO GYSlot
+gyGetSlotOfCurrentBlock = gyGetSlotOfCurrentBlock' . gySlotActions
 
 gyWaitForNextBlock :: GYProviders -> IO GYSlot
 gyWaitForNextBlock = gyWaitForNextBlock' . gySlotActions
@@ -135,7 +135,7 @@ gyWaitUntilSlot providers = gyWaitUntilSlot' (gySlotActions providers)
 -- | 'gyWaitForNextBlock' variant which doesn't return current slot.
 --
 gyWaitForNextBlock_ :: GYProviders -> IO ()
-gyWaitForNextBlock_ = void . gyWaitForNextBlock' . gySlotActions
+gyWaitForNextBlock_ = void . gyWaitForNextBlock
 
 gyQueryUtxosAtAddress :: GYProviders -> GYAddress -> IO GYUTxOs
 gyQueryUtxosAtAddress = gyQueryUtxosAtAddress' . gyQueryUTxO
@@ -208,11 +208,11 @@ type GYAwaitTx = GYAwaitTxParameters -> GYTxId -> IO ()
 
 -- | Await transaction parameters
 data GYAwaitTxParameters = GYAwaitTxParameters
-                           { maxAttempts   :: Int
+                           { maxAttempts   :: !Int
                            -- ^ Max number of attempts before give up.
-                           , checkInterval :: Int
+                           , checkInterval :: !Int
                            -- ^ Wait time for each attempt (in microseconds).
-                           , confirmations :: Int
+                           , confirmations :: !Int
                            -- ^ Min number of block confirmation.
                            }
     deriving stock (Show)
@@ -237,23 +237,23 @@ instance Show GYAwaitTxException where
 
 -- | How to get current slot?
 data GYSlotActions = GYSlotActions
-    { gyGetCurrentSlot'   :: !(IO GYSlot)
-    , gyWaitForNextBlock' :: !(IO GYSlot)
-    , gyWaitUntilSlot'    :: !(GYSlot -> IO GYSlot)
+    { gyGetSlotOfCurrentBlock' :: !(IO GYSlot)
+    , gyWaitForNextBlock'      :: !(IO GYSlot)
+    , gyWaitUntilSlot'         :: !(GYSlot -> IO GYSlot)
     }
 
--- | Wait for the next block
+-- | Wait for the next block.
 --
 -- 'threadDelay' until current slot getter returns another value.
 gyWaitForNextBlockDefault :: IO GYSlot -> IO GYSlot
-gyWaitForNextBlockDefault getCurrentSlot = do
-    s <- getCurrentSlot
+gyWaitForNextBlockDefault getSlotOfCurrentBlock = do
+    s <- getSlotOfCurrentBlock
     go s
   where
     go :: GYSlot -> IO GYSlot
     go s = do
         threadDelay 100_000
-        t <- getCurrentSlot
+        t <- getSlotOfCurrentBlock
         if t > s
             then return t
             else go s
@@ -262,11 +262,11 @@ gyWaitForNextBlockDefault getCurrentSlot = do
 --
 -- Returns the new current slot, which might be larger.
 gyWaitUntilSlotDefault :: IO GYSlot -> GYSlot -> IO GYSlot
-gyWaitUntilSlotDefault getCurrentSlot s = loop
+gyWaitUntilSlotDefault getSlotOfCurrentBlock s = loop
   where
     loop :: IO GYSlot
     loop = do
-        t <- getCurrentSlot
+        t <- getSlotOfCurrentBlock
         if t >= s
             then return t
             else do
@@ -276,7 +276,7 @@ gyWaitUntilSlotDefault getCurrentSlot s = loop
 -- | Contains the data, alongside the time after which it should be refetched.
 data GYSlotStore = GYSlotStore !UTCTime !GYSlot
 
-{- | Construct efficient 'GYSlotActions' methods by ensuring the supplied getCurrentSlot is only made after
+{- | Construct efficient 'GYSlotActions' methods by ensuring the supplied getSlotOfCurrentBlock is only made after
 a given duration of time has passed.
 
 This uses IO to set up some mutable references used for caching.
@@ -286,19 +286,19 @@ makeSlotActions :: NominalDiffTime
                 -> IO GYSlot
                 -- ^ Getting current slot directly from the provider
                 -> IO GYSlotActions
-makeSlotActions t getCurrentSlot = do
+makeSlotActions t getSlotOfCurrentBlock = do
     slotRefetchTime <- addUTCTime t <$> getCurrentTime
-    initSlot        <- getCurrentSlot
+    initSlot        <- getSlotOfCurrentBlock
     slotStoreRef    <- newMVar $ GYSlotStore slotRefetchTime initSlot
-    let gcs = getCurrentSlot' slotStoreRef
+    let gcs = getSlotOfCurrentBlock' slotStoreRef
     pure GYSlotActions
-        { gyGetCurrentSlot'   = gcs
-        , gyWaitForNextBlock' = gyWaitForNextBlockDefault gcs
-        , gyWaitUntilSlot'    = gyWaitUntilSlotDefault gcs
+        { gyGetSlotOfCurrentBlock' = gcs
+        , gyWaitForNextBlock'      = gyWaitForNextBlockDefault gcs
+        , gyWaitUntilSlot'         = gyWaitUntilSlotDefault gcs
         }
   where
-    getCurrentSlot' :: MVar GYSlotStore -> IO GYSlot
-    getCurrentSlot' var = do
+    getSlotOfCurrentBlock' :: MVar GYSlotStore -> IO GYSlot
+    getSlotOfCurrentBlock' var = do
         -- See note: [Caching and concurrently accessible MVars].
         modifyMVar var $ \(GYSlotStore slotRefetchTime slotData) -> do
             now <- getCurrentTime
@@ -306,7 +306,7 @@ makeSlotActions t getCurrentSlot = do
                 -- Return unmodified.
                 pure (GYSlotStore slotRefetchTime slotData, slotData)
             else do
-                newSlot <- getCurrentSlot
+                newSlot <- getSlotOfCurrentBlock
                 newNow <- getCurrentTime
                 let newSlotRefetchTime = addUTCTime t newNow
                 pure (GYSlotStore newSlotRefetchTime newSlot, newSlot)
@@ -342,7 +342,7 @@ makeGetParameters :: IO GYSlot
                 -> IO (Set Api.S.PoolId)
                 -- ^ Getting stake pools
                 -> IO GYGetParameters
-makeGetParameters getCurrentSlot getProtParams getSysStart getEraHist getStkPools = do
+makeGetParameters getSlotOfCurrentBlock getProtParams getSysStart getEraHist getStkPools = do
     sysStart       <- getSysStart
     let getSlotConf = makeSlotConfigIO sysStart
     initProtParams <- getProtParams
@@ -376,7 +376,7 @@ makeGetParameters getCurrentSlot getProtParams getSysStart getEraHist getStkPool
     mkMethod dataRefreshF dataRef = do
         -- See note: [Caching and concurrently accessible MVars].
         modifyMVar dataRef $ \(GYParameterStore eraEndSlot a) -> do
-            currSlot <- getCurrentSlot
+            currSlot <- getSlotOfCurrentBlock
             if beforeEnd currSlot eraEndSlot then
                 pure (GYParameterStore eraEndSlot a, a)
             else do

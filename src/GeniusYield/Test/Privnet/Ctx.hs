@@ -19,7 +19,7 @@ module GeniusYield.Test.Privnet.Ctx (
     ctxRunC,
     ctxRunF,
     ctxRunFWithCollateral,
-    ctxCurrentSlot,
+    ctxSlotOfCurrentBlock,
     ctxWaitNextSlot,
     ctxWaitUntilSlot,
     ctxProviders,
@@ -133,9 +133,9 @@ ctxRunC = coerce (ctxRunF @(Const a))
 ctxRunI :: Ctx -> User -> GYTxMonadNode (GYTxSkeleton v) -> IO GYTxBody
 ctxRunI = coerce (ctxRunF @Identity)
 
-ctxCurrentSlot :: Ctx -> IO GYSlot
-ctxCurrentSlot (ctxProviders -> providers) =
-    gyGetCurrentSlot providers
+ctxSlotOfCurrentBlock :: Ctx -> IO GYSlot
+ctxSlotOfCurrentBlock (ctxProviders -> providers) =
+    gyGetSlotOfCurrentBlock providers
 
 ctxWaitNextSlot :: Ctx -> IO ()
 ctxWaitNextSlot ctx@(ctxProviders -> providers) = do
@@ -174,7 +174,7 @@ submitTx ctx@Ctx { ctxInfo } User {..} txBody = do
     txId <- nodeSubmitTx ctxInfo tx
     -- printf "Submitted transaction %s\n" (show txId)
 
-    ctxWaitNextSlot ctx
+    gyAwaitTxConfirmed (ctxProviders ctx) (GYAwaitTxParameters { maxAttempts = 30, checkInterval = 1_000_000, confirmations = 1 }) txId
     return txId
 
 -- | Function to find for the first locked output in the given `GYTxBody` at the given `GYAddress`.

@@ -20,28 +20,28 @@ module GeniusYield.GYConfig
     , isDbSync
     ) where
 
-import           Control.Exception                      (SomeException, bracket,
-                                                         try)
-import qualified Data.Aeson                             as Aeson
+import           Control.Exception                   (SomeException, bracket,
+                                                      try)
+import qualified Data.Aeson                          as Aeson
 import           Data.Aeson.TH
 import           Data.Aeson.Types
-import qualified Data.ByteString.Lazy                   as LBS
-import           Data.Char                              (toLower)
-import qualified Data.Text                              as T
-import           Data.Time                              (NominalDiffTime)
-import qualified Database.PostgreSQL.Simple             as PQ
-import qualified Database.PostgreSQL.Simple.URL         as PQ
+import qualified Data.ByteString.Lazy                as LBS
+import           Data.Char                           (toLower)
+import qualified Data.Text                           as T
+import           Data.Time                           (NominalDiffTime)
+import qualified Database.PostgreSQL.Simple          as PQ
+import qualified Database.PostgreSQL.Simple.URL      as PQ
 
-import qualified Cardano.Api                            as Api
+import qualified Cardano.Api                         as Api
 
 import           GeniusYield.Imports
-import qualified GeniusYield.Providers.Blockfrost       as Blockfrost
-import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
-import qualified GeniusYield.Providers.CardanoDbSync    as DbSync
-import qualified GeniusYield.Providers.Katip            as Katip
-import qualified GeniusYield.Providers.Maestro          as MaestroApi
-import qualified GeniusYield.Providers.Node             as Node
-import qualified GeniusYield.Providers.SubmitApi        as SubmitApi
+import qualified GeniusYield.Providers.Blockfrost    as Blockfrost
+-- import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
+import qualified GeniusYield.Providers.CardanoDbSync as DbSync
+import qualified GeniusYield.Providers.Katip         as Katip
+import qualified GeniusYield.Providers.Maestro       as MaestroApi
+import qualified GeniusYield.Providers.Node          as Node
+import qualified GeniusYield.Providers.SubmitApi     as SubmitApi
 import           GeniusYield.Types
 
 -- | How many seconds to keep slots cached, before refetching the data.
@@ -138,10 +138,10 @@ In JSON format, this essentially corresponds to:
 = { coreProvider: GYCoreProviderInfo, networkId: NetworkId, logging: [GYLogScribeConfig], utxoCacheEnable: boolean }
 -}
 data GYCoreConfig = GYCoreConfig
-  { cfgCoreProvider    :: !GYCoreProviderInfo
-  , cfgNetworkId       :: !GYNetworkId
-  , cfgLogging         :: ![GYLogScribeConfig]
-  , cfgUtxoCacheEnable :: !Bool
+  { cfgCoreProvider :: !GYCoreProviderInfo
+  , cfgNetworkId    :: !GYNetworkId
+  , cfgLogging      :: ![GYLogScribeConfig]
+  -- , cfgUtxoCacheEnable :: !Bool
   }
   deriving stock (Show)
 
@@ -168,7 +168,6 @@ withCfgProviders
     { cfgCoreProvider
     , cfgNetworkId
     , cfgLogging
-    , cfgUtxoCacheEnable
     }
     ns
     f =
@@ -178,7 +177,7 @@ withCfgProviders
           let info = nodeConnectInfo path cfgNetworkId
               era = networkIdToEra cfgNetworkId
           mEnv <- MaestroApi.networkIdToMaestroEnv key cfgNetworkId
-          nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetCurrentSlot info
+          nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetSlotOfCurrentBlock info
           pure
             ( Node.nodeGetParameters era info
             , nodeSlotActions
@@ -203,12 +202,12 @@ withCfgProviders
         GYMaestro (Confidential apiToken) -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
           maestroGetParams <- makeGetParameters
-            (MaestroApi.maestroGetCurrentSlot maestroApiEnv)
+            (MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv)
             (MaestroApi.maestroProtocolParams maestroApiEnv)
             (MaestroApi.maestroSystemStart maestroApiEnv)
             (MaestroApi.maestroEraHistory maestroApiEnv)
             (MaestroApi.maestroStakePools maestroApiEnv)
-          maestroSlotActions <- makeSlotActions slotCachingTime $ MaestroApi.maestroGetCurrentSlot maestroApiEnv
+          maestroSlotActions <- makeSlotActions slotCachingTime $ MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv
           pure
             ( maestroGetParams
             , maestroSlotActions
@@ -220,12 +219,12 @@ withCfgProviders
         GYBlockfrost (Confidential key) -> do
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
           blockfrostGetParams <- makeGetParameters
-            (Blockfrost.blockfrostGetCurrentSlot proj)
+            (Blockfrost.blockfrostGetSlotOfCurrentBlock proj)
             (Blockfrost.blockfrostProtocolParams proj)
             (Blockfrost.blockfrostSystemStart proj)
             (Blockfrost.blockfrostEraHistory proj)
             (Blockfrost.blockfrostStakePools proj)
-          blockfrostSlotActions <- makeSlotActions slotCachingTime $ Blockfrost.blockfrostGetCurrentSlot proj
+          blockfrostSlotActions <- makeSlotActions slotCachingTime $ Blockfrost.blockfrostGetSlotOfCurrentBlock proj
           pure
             ( blockfrostGetParams
             , blockfrostSlotActions
@@ -237,13 +236,13 @@ withCfgProviders
 
       bracket (Katip.mkKatipLog ns cfgLogging) logCleanUp $ \gyLog' -> do
         (gyQueryUTxO, gySlotActions) <-
-            if cfgUtxoCacheEnable
+            {-if cfgUtxoCacheEnable
             then do
                 (gyQueryUTxO, purgeCache) <- CachedQuery.makeCachedQueryUTxO gyQueryUTxO' gyLog'
                 -- waiting for the next block will purge the utxo cache.
                 let gySlotActions = gySlotActions' { gyWaitForNextBlock' = purgeCache >> gyWaitForNextBlock' gySlotActions'}
                 pure (gyQueryUTxO, gySlotActions)
-            else pure (gyQueryUTxO', gySlotActions')
+            else-} pure (gyQueryUTxO', gySlotActions')
         e <- try $ f GYProviders {..}
         case e of
             Right a                     -> pure a

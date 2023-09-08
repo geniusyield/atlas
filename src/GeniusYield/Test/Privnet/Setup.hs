@@ -102,8 +102,8 @@ makeSetup' DbSyncOpts {..} privnetPath = do
             }
 
     -- ask current slot, so we know local node connection works
-    slot <- nodeGetCurrentSlot info
-    debug $ printf "currentSlot = %s\n" slot
+    slot <- nodeGetSlotOfCurrentBlock info
+    debug $ printf "slotOfCurrentBlock = %s\n" slot
 
     lci <- newLCIClient info []
 

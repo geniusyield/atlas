@@ -64,7 +64,7 @@ main = do
                       info "No db sync connection"
 
           , testCaseSteps "SlotConfig" $ \info -> withSetup setup info $ \ctx -> do
-              slot <- ctxCurrentSlot ctx
+              slot <- ctxSlotOfCurrentBlock ctx
               info $ printf "Slot %s" slot
 
               sc <- ctxSlotConfig ctx

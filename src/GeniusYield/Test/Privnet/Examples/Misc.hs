@@ -9,20 +9,20 @@ Stability   : develop
 
 module GeniusYield.Test.Privnet.Examples.Misc (tests) where
 
-import           Control.Concurrent               (threadDelay)
-import           Test.Tasty                       (TestTree, testGroup)
-import           Test.Tasty.HUnit                 (testCaseSteps)
+import           Control.Concurrent                     (threadDelay)
+import           Test.Tasty                             (TestTree, testGroup)
+import           Test.Tasty.HUnit                       (testCaseSteps)
 
 import           GeniusYield.Imports
 import           GeniusYield.Scripts.TestToken
 import           GeniusYield.Types
 
+import           GeniusYield.Examples.Limbo             (addRefScript)
 import           GeniusYield.Test.Privnet.Asserts
 import           GeniusYield.Test.Privnet.Ctx
+import           GeniusYield.Test.Privnet.Examples.Gift (resolveRefScript)
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder.Class
-import           GeniusYield.Examples.Limbo (addRefScript)
-import           GeniusYield.Test.Privnet.Examples.Gift (resolveRefScript)
 
 tests :: IO Setup -> TestTree
 tests setup = testGroup "misc"
@@ -31,7 +31,7 @@ tests setup = testGroup "misc"
         utxoAsParam <- ctxRunC ctx (ctxUser2 ctx) $ someUTxO PlutusV1
         let amt    = 1
             tn     = "mintByRef"
-            policy = testTokenPolicy amt (tokenNameToPlutus tn) utxoAsParam
+            policy = testTokenPolicy amt tn utxoAsParam
             policyAsScript = mintingPolicyToScript policy
             ac = GYToken (mintingPolicyId policy) tn
 

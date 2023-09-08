@@ -1,26 +1,25 @@
 module Main (main) where
 
-import qualified Cardano.Api                       as Api
-import qualified Cardano.Api.SerialiseTextEnvelope as TextEnv
-import qualified Data.ByteString                   as BS
-import qualified Data.ByteString.Lazy              as LBS
-import           System.Directory                  (doesFileExist)
-import           System.FilePath                   ((</>))
-import           Test.Tasty                        (defaultMain, testGroup)
-import           Test.Tasty.Golden                 (goldenVsString)
-import           Test.Tasty.HUnit                  (assertEqual, testCase,
-                                                    (@=?))
+import qualified Cardano.Api                    as Api
+import qualified Data.ByteString                as BS
+import qualified Data.ByteString.Lazy           as LBS
+import           System.Directory               (doesFileExist)
+import           System.FilePath                ((</>))
+import           Test.Tasty                     (defaultMain, testGroup)
+import           Test.Tasty.Golden              (goldenVsString)
+import           Test.Tasty.HUnit               (assertEqual, testCase, (@=?))
 
 import           GeniusYield.Examples.Gift
-import           GeniusYield.GYConfig              (coreConfigIO, findMaestroTokenAndNetId)
+import           GeniusYield.GYConfig           (coreConfigIO,
+                                                 findMaestroTokenAndNetId)
 import           GeniusYield.Imports
-import           GeniusYield.Test.CoinSelection    (coinSelectionTests)
-import           GeniusYield.Test.Config           (configTests)
-import           GeniusYield.Test.GYTxBody         (gyTxBodyTests)
-import           GeniusYield.Test.GYTxSkeleton     (gyTxSkeletonTests)
-import           GeniusYield.Test.Providers        (providersTests)
-import           GeniusYield.Test.RefInput         (refInputTests)
-import           GeniusYield.Test.SlotConfig       (slotConversionTests)
+import           GeniusYield.Test.CoinSelection (coinSelectionTests)
+import           GeniusYield.Test.Config        (configTests)
+import           GeniusYield.Test.GYTxBody      (gyTxBodyTests)
+import           GeniusYield.Test.GYTxSkeleton  (gyTxSkeletonTests)
+import           GeniusYield.Test.RefInput      (refInputTests)
+import           GeniusYield.Test.Providers     (providersTests)
+import           GeniusYield.Test.SlotConfig    (slotConversionTests)
 import           GeniusYield.Types
 
 -------------------------------------------------------------------------------
@@ -47,17 +46,17 @@ main = do
 
         , testGroup "textEnvelope"
             [ goldenVsString "serialized-v1"  (rootDir </> "fixtures" </> "script-env-v1.json") $ do
-                return $ TextEnv.textEnvelopeToJSON Nothing simpleScriptAPIv1
+                return $ Api.textEnvelopeToJSON Nothing simpleScriptAPIv1
             , goldenVsString "serialized-v2"  (rootDir </> "fixtures" </> "script-env-v2.json") $ do
-                return $ TextEnv.textEnvelopeToJSON Nothing simpleScriptAPIv2
+                return $ Api.textEnvelopeToJSON Nothing simpleScriptAPIv2
 
             -- we can deserialize v1 as v1.
             , testCase "deserialize v1" $ do
-                e <- TextEnv.readFileTextEnvelope (Api.proxyToAsType Proxy) (rootDir </> "fixtures" </> "script-env-v1.json")
+                e <- Api.readFileTextEnvelope (Api.proxyToAsType Proxy) (Api.File $ rootDir </> "fixtures" </> "script-env-v1.json")
                 Right simpleScriptAPIv1 @=? first show e
 
             , testCase "deserialize v1" $ do
-                e <- TextEnv.readFileTextEnvelope (Api.proxyToAsType Proxy) (rootDir </> "fixtures" </> "script-env-v1.json")
+                e <- Api.readFileTextEnvelope (Api.proxyToAsType Proxy) (Api.File $ rootDir </> "fixtures" </> "script-env-v1.json")
 
                 let expected :: Either String (Api.PlutusScript Api.PlutusScriptV2)
                     expected = Left "(TextEnvelopeTypeError [TextEnvelopeType \"PlutusScriptV2\"] (TextEnvelopeType \"PlutusScriptV1\"))"
@@ -66,11 +65,11 @@ main = do
             ]
         , slotConversionTests
         , coinSelectionTests
-        , providersTests configs providerToken netId
+        , gyTxBodyTests
         , configTests
         , gyTxSkeletonTests
-        , gyTxBodyTests
         , refInputTests
+        , providersTests configs providerToken netId
         ]
 
 -------------------------------------------------------------------------------

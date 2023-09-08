@@ -29,9 +29,10 @@ import           Data.Text.Class                               (ToText (toText),
 
 import qualified Cardano.Api                                   as Api
 import qualified Cardano.Api.Shelley                           as Api.S
-import qualified Cardano.Binary                                as CBOR
 import qualified Cardano.CoinSelection.Balance                 as CBalance
 import qualified Cardano.CoinSelection.Context                 as CCoinSelection
+import           Cardano.Ledger.Babbage                        (Babbage)
+import qualified Cardano.Ledger.Binary                         as CBOR
 
 import qualified Cardano.Tx.Balance.Internal.CoinSelection     as CBalanceInternal
 import qualified Cardano.Wallet.Primitive.Types.Address        as CWallet
@@ -46,6 +47,7 @@ import qualified Cardano.Wallet.Primitive.Types.Tx.TxIn        as CWallet
 import qualified Cardano.Wallet.Primitive.Types.UTxOIndex      as CWallet
 import qualified Cardano.Wallet.Primitive.Types.UTxOSelection  as CWallet
 
+import           Cardano.Ledger.Alonzo.Core                    (eraProtVerHigh)
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.Common
 import           GeniusYield.Types
@@ -198,7 +200,6 @@ selectInputs
             For simplicity, we simply use the extraLovelace parameter.
             -}
             , computeMinimumCost = const $ CWallet.Coin extraLovelace
-            , computeSelectionLimit = const CBalance.NoLimit
             , maximumLengthChangeAddress = toCWalletAddress changeAddr  -- Since our change address is fixed.
             , nullAddress = CWallet.Address ""
             , maximumOutputAdaQuantity = CWallet.txOutMaxCoin
@@ -221,7 +222,7 @@ selectInputs
 
 computeTokenBundleSerializedLengthBytes :: CTokenBundle.TokenBundle -> CWallet.TxSize
 computeTokenBundleSerializedLengthBytes = CWallet.TxSize . safeCast
-    . BS.length . CBOR.serialize' . Api.S.toMaryValue . toCardanoValue
+    . BS.length . CBOR.serialize' (eraProtVerHigh @Babbage) . Api.S.toMaryValue . toCardanoValue
   where
     safeCast :: Int -> Natural
     safeCast = fromIntegral
@@ -300,16 +301,17 @@ toCardanoValue tb = Api.S.valueFromList $
     toCardanoAssetId (CTokenBundle.AssetId pid name) =
         Api.S.AssetId (toCardanoPolicyId pid) (toCardanoAssetName name)
 
-    toCardanoAssetName (CWallet.UnsafeTokenName name) =
-        fromMaybe (error "toCardanoValue: unable to desrialise")
-        $ Api.S.deserialiseFromRawBytes Api.S.AsAssetName name
+    toCardanoAssetName :: CWallet.TokenName -> Api.S.AssetName
+    toCardanoAssetName (CWallet.UnsafeTokenName tn) =
+        either (\e -> error $ "toCardanoValue: unable to deserialise, error: " <> show e) id
+        $ Api.S.deserialiseFromRawBytes Api.S.AsAssetName tn
 
     coinToQuantity = fromIntegral . CWallet.unCoin
     toQuantity = fromIntegral . CWallet.unTokenQuantity
 
 toCardanoPolicyId :: CWallet.TokenPolicyId -> Api.S.PolicyId
 toCardanoPolicyId (CWallet.UnsafeTokenPolicyId (CWallet.Hash pid)) =
-    fromMaybe (error "toCardanoPolicyId: unable to desrialise")
+    either (\e -> error $ "toCardanoPolicyId: unable to deserialise, error: " <> show e) id
     $ Api.S.deserialiseFromRawBytes Api.S.AsPolicyId pid
 
 toTokenMap :: GYValue -> CWTokenMap.TokenMap
@@ -379,9 +381,9 @@ toCWalletAddress :: GYAddress -> CWallet.Address
 toCWalletAddress = CWallet.Address . Api.serialiseToRawBytes . addressToApi
 
 fromCWalletAddress :: CWallet.Address -> GYAddress
-fromCWalletAddress (CWallet.Address bs) = maybe customError addressFromApi $ Api.deserialiseFromRawBytes Api.AsAddressAny bs
+fromCWalletAddress (CWallet.Address bs) = either customError addressFromApi $ Api.deserialiseFromRawBytes Api.AsAddressAny bs
   where
-    customError = error "fromCWalletAddress: unable to deserialize"
+    customError e = error $ "fromCWalletAddress: unable to deserialize, error: " <> show e
 
 toCWalletTxIn :: GYTxOutRef -> CWallet.TxIn
 toCWalletTxIn ref = CWallet.TxIn{ inputId = nTxId
@@ -399,11 +401,9 @@ fromCWalletTxIn CWallet.TxIn { inputId, inputIx } = txOutRefFromTuple (txId, fro
     customError = error "fromCWalletTxIn: unable to deserialise txId"
 
 fromCWalletBalancingError :: CBalanceInternal.SelectionBalanceError ctx -> BalancingError
-fromCWalletBalancingError (CBalance.BalanceInsufficient (CBalance.BalanceInsufficientError _ v)) =
-    BalancingErrorInsufficientFunds $ fromTokenBundle v
-fromCWalletBalancingError (CBalance.SelectionLimitReached _) =
-    -- This should never happen. We specified NoLimit in SelectionConstraints.
-    error "fromCWalletBalancingError: absurd (limit reached with nolimit specified)"
+fromCWalletBalancingError (CBalance.BalanceInsufficient (CBalance.BalanceInsufficientError _ _ delta)) =
+    BalancingErrorInsufficientFunds $ fromTokenBundle delta
+
 fromCWalletBalancingError (CBalance.UnableToConstructChange (CBalance.UnableToConstructChangeError _ n)) =
     BalancingErrorChangeShortFall $ CWallet.unCoin n
 fromCWalletBalancingError CBalance.EmptyUTxO = BalancingErrorEmptyOwnUTxOs

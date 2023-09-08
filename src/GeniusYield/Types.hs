@@ -15,6 +15,7 @@ import           Numeric.Natural                 (Natural)
 
 import           GeniusYield.Types.Ada           as X
 import           GeniusYield.Types.Address       as X
+import           GeniusYield.Types.Credential    as X
 import           GeniusYield.Types.Datum         as X
 import           GeniusYield.Types.Era           as X
 import           GeniusYield.Types.Key           as X

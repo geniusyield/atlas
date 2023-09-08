@@ -3,7 +3,8 @@ module GeniusYield.Types.Wallet where
 import           Cardano.Address.Derivation
 import qualified Cardano.Address.Style.Shelley as S
 import           Cardano.Api
-import           Cardano.Mnemonic              (MkSomeMnemonicError (..), mkSomeMnemonic)
+import           Cardano.Mnemonic              (MkSomeMnemonicError (..),
+                                                mkSomeMnemonic)
 import qualified Data.Text                     as T
 
 type Mnemonic = [T.Text]
@@ -59,7 +60,7 @@ writeExtendedPaymentSigningKeyTextEnvelope mnemonic fPath = do
   case walletKeysFromMnemonic mnemonic of
     Left err -> error err
     Right WalletKeys{wkPaymentKey} -> do
-      e <- writeFileTextEnvelope fPath Nothing $ PaymentExtendedSigningKey wkPaymentKey
+      e <- writeFileTextEnvelope (File fPath) Nothing $ PaymentExtendedSigningKey wkPaymentKey
       either (error . show) pure e
 
 -- | writes TextEnvelope with type `StakeExtendedSigningKeyShelley_ed25519_bip32` from mnemonic
@@ -69,5 +70,5 @@ writeStakeSigningKeyTextEnvelope mnemonic fPath = do
   case walletKeysFromMnemonic mnemonic of
     Left err -> error err
     Right WalletKeys{wkStakeKey} -> do
-      e <- writeFileTextEnvelope fPath Nothing $ StakeExtendedSigningKey wkStakeKey
+      e <- writeFileTextEnvelope (File fPath) Nothing $ StakeExtendedSigningKey wkStakeKey
       either (error . show) pure e

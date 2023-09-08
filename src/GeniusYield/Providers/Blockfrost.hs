@@ -183,6 +183,7 @@ blockfrostQueryUtxo proj = GYQueryUTxO
     , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddresses'           = gyQueryUtxoAtAddressesDefault $ blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddressesWithDatums' = Nothing  -- Will use the default implementation.
+    , gyQueryUtxosAtPaymentCredential'   = Nothing
     }
 
 blockfrostUtxosAtAddress :: Blockfrost.Project -> GYAddress -> IO GYUTxOs
@@ -352,8 +353,8 @@ blockfrostProtocolParams proj = do
   where
     toApiCostModel = Map.fromList
         . Map.foldlWithKey (\acc k x -> case k of
-            Blockfrost.PlutusV1 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV1, Api.CostModel x) : acc
-            Blockfrost.PlutusV2 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2, Api.CostModel x) : acc
+            Blockfrost.PlutusV1 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV1, Api.CostModel $ Map.elems x) : acc
+            Blockfrost.PlutusV2 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2, Api.CostModel $ Map.elems x) : acc
             -- Don't care about non plutus cost models.
             Blockfrost.Timelock -> acc
         )
@@ -448,7 +449,7 @@ datumHashFromBlockfrost = first (DeserializeErrorHex . Text.pack) . datumHashFro
 datumFromBlockfrostCBOR :: Blockfrost.ScriptDatumCBOR -> Either SomeDeserializeError GYDatum
 datumFromBlockfrostCBOR d = do
     bs  <- fromEither $ BS16.decode $ Text.encodeUtf8 t
-    api <- fromEither $ Api.deserialiseFromCBOR Api.AsScriptData bs
+    api <- fromEither $ Api.deserialiseFromCBOR Api.AsHashableScriptData bs
     return $ datumFromApi' api
   where
     t = Blockfrost._scriptDatumCborCbor d
@@ -477,8 +478,8 @@ lookupScriptHash h = do
                 Nothing   -> return Nothing
                 Just cbor -> return $
                     if t == Blockfrost.PlutusV1
-                        then Some <$> scriptFromCBOR @PlutusV1 cbor
-                        else Some <$> scriptFromCBOR @PlutusV2 cbor
+                        then Some <$> scriptFromCBOR @'PlutusV1 cbor
+                        else Some <$> scriptFromCBOR @'PlutusV2 cbor
 
 lookupScriptHashIO :: Blockfrost.Project -> Maybe Blockfrost.ScriptHash -> IO (Maybe (Some GYScript))
 lookupScriptHashIO _ Nothing  = return Nothing

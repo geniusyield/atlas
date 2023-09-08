@@ -32,20 +32,22 @@ module GeniusYield.Types.Key
     , generatePaymentSigningKey
 ) where
 
-import qualified Cardano.Api                  as Api
-import qualified Data.Aeson                   as Aeson
-import qualified Cardano.Ledger.Crypto        as Ledger
-import qualified Cardano.Ledger.Keys          as Ledger
-import qualified Data.ByteString.Base16       as BS16
-import qualified Data.ByteString.Char8        as BS8
-import qualified Data.ByteString.Lazy         as LBS
-import qualified Data.Csv                     as Csv
-import qualified Data.Text                    as T
-import qualified Data.Text.Encoding           as TE
-import qualified Text.Printf                  as Printf
+import qualified Cardano.Api                      as Api
+import qualified Cardano.Ledger.Crypto            as Ledger
+import qualified Cardano.Ledger.Keys              as Ledger
+import qualified Data.Aeson                       as Aeson
+import qualified Data.ByteString.Base16           as BS16
+import qualified Data.ByteString.Char8            as BS8
+import qualified Data.ByteString.Lazy             as LBS
+import qualified Data.Csv                         as Csv
+import qualified Data.Text                        as T
+import qualified Data.Text.Encoding               as TE
+import qualified Test.Cardano.Ledger.Core.KeyPair as TLedger
+import qualified Text.Printf                      as Printf
 
 import           GeniusYield.Imports
-import           GeniusYield.Types.Key.Class  (ToShelleyWitnessSigningKey, toShelleyWitnessSigningKey)
+import           GeniusYield.Types.Key.Class      (ToShelleyWitnessSigningKey,
+                                                   toShelleyWitnessSigningKey)
 import           GeniusYield.Types.PubKeyHash
 
 -- $setup
@@ -187,21 +189,21 @@ paymentSigningKeyToApi = coerce
 paymentSigningKeyToLedger :: GYPaymentSigningKey -> Ledger.SignKeyDSIGN Ledger.StandardCrypto
 paymentSigningKeyToLedger = coerce
 
-paymentSigningKeyToLedgerKeyPair :: GYPaymentSigningKey -> Ledger.KeyPair r Ledger.StandardCrypto
-paymentSigningKeyToLedgerKeyPair skey = Ledger.KeyPair
-    { Ledger.vKey = paymentVerificationKeyToLedger $ paymentVerificationKey skey
-    , Ledger.sKey = paymentSigningKeyToLedger skey
+paymentSigningKeyToLedgerKeyPair :: GYPaymentSigningKey -> TLedger.KeyPair r Ledger.StandardCrypto
+paymentSigningKeyToLedgerKeyPair skey = TLedger.KeyPair
+    { TLedger.vKey = paymentVerificationKeyToLedger $ paymentVerificationKey skey
+    , TLedger.sKey = paymentSigningKeyToLedger skey
     }
 
-paymentSigningKeyFromLedgerKeyPair :: Ledger.KeyPair r Ledger.StandardCrypto -> GYPaymentSigningKey
-paymentSigningKeyFromLedgerKeyPair = coerce . Ledger.sKey
+paymentSigningKeyFromLedgerKeyPair :: TLedger.KeyPair r Ledger.StandardCrypto -> GYPaymentSigningKey
+paymentSigningKeyFromLedgerKeyPair = coerce . TLedger.sKey
 
 
 -- | Reads a payment signing key from a file.
 --
 readPaymentSigningKey :: FilePath -> IO GYPaymentSigningKey
 readPaymentSigningKey fp = do
-    s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsPaymentKey) fp
+    s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsPaymentKey) (Api.File fp)
     case s of
         Left err -> fail (show err) --- throws IOError
         Right x  -> return (GYPaymentSigningKey x)
@@ -210,7 +212,7 @@ readPaymentSigningKey fp = do
 --
 readExtendedPaymentSigningKey :: FilePath -> IO GYExtendedPaymentSigningKey
 readExtendedPaymentSigningKey fp = do
-    s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsPaymentExtendedKey) fp
+    s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsPaymentExtendedKey) (Api.File fp)
     case s of
         Left err -> fail (show err) --- throws IOError
         Right x  -> return $ GYExtendedPaymentSigningKey x
@@ -219,7 +221,7 @@ readExtendedPaymentSigningKey fp = do
 --
 writePaymentSigningKey :: FilePath -> GYPaymentSigningKey -> IO ()
 writePaymentSigningKey file key = do
-    e <- Api.writeFileTextEnvelope file (Just "Payment Signing Key") $ paymentSigningKeyToApi key
+    e <- Api.writeFileTextEnvelope (Api.File file) (Just "Payment Signing Key") $ paymentSigningKeyToApi key
     case e of
         Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
         Right ()                       -> return ()
@@ -286,7 +288,7 @@ readSomeSigningKey file = do
     e <- Api.readFileTextEnvelopeAnyOf
         [ Api.FromSomeType (Api.AsSigningKey Api.AsPaymentKey)         $ GYSomeSigningKey . paymentSigningKeyFromApi
         , Api.FromSomeType (Api.AsSigningKey Api.AsPaymentExtendedKey) $ GYSomeSigningKey . extendedPaymentSigningKeyFromApi
-        ] file
+        ] (Api.File file)
     case e of
         Left err   -> throwIO $ userError $ show err
         Right skey -> return skey

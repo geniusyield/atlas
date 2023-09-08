@@ -12,7 +12,7 @@ import           Test.Tasty                           (TestTree, testGroup)
 import           Test.Tasty.HUnit                     (Assertion, testCase,
                                                        (@?=))
 
-import           Plutus.Model.Fork.Ledger.TimeSlot    (scSlotLength,
+import           Cardano.Simple.Ledger.TimeSlot       (scSlotLength,
                                                        scSlotZeroTime)
 import           Plutus.Model.Mock.MockConfig         (defaultSlotConfig)
 import           Plutus.Model.Mock.ProtocolParameters (PParams (BabbageParams),
@@ -163,8 +163,8 @@ mockTxOutRef = "4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189
 mockAsset :: GYTokenName -> GYAssetClass
 mockAsset = GYToken "005eaf690cba88f441494e42f5edce9bd7f595c56f99687e2fa0aad4"
 
-mockProtocolParams :: Api.S.ProtocolParameters
-mockProtocolParams = Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage params
+mockProtocolParams :: Api.BundledProtocolParameters Api.S.BabbageEra
+mockProtocolParams = Api.BundleAsShelleyBasedProtocolParameters Api.ShelleyBasedEraBabbage (Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage params) params
  where
     params = case defaultBabbageParams of
         BabbageParams p -> p

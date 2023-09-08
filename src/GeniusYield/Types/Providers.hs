@@ -40,6 +40,7 @@ module GeniusYield.Types.Providers
     , gyQueryUtxosAtAddressesWithDatums
     , gyQueryUtxosAtAddress'
     , gyQueryUtxosAtAddress
+    , gyQueryUtxosAtPaymentCredential
     , gyQueryUtxosAtTxOutRefs
     , gyQueryUtxosAtTxOutRefsWithDatums
     , gyQueryUtxoAtTxOutRef
@@ -73,6 +74,7 @@ import           GeniusYield.CardanoApi.EraHistory (getEraEndSlot)
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types.Address
+import           GeniusYield.Types.Credential      (GYPaymentCredential)
 import           GeniusYield.Types.Datum
 import           GeniusYield.Types.Logging
 import           GeniusYield.Types.Slot
@@ -140,6 +142,12 @@ gyQueryUtxosAtAddress = gyQueryUtxosAtAddress' . gyQueryUTxO
 
 gyQueryUtxosAtAddresses :: GYProviders -> [GYAddress] -> IO  GYUTxOs
 gyQueryUtxosAtAddresses = gyQueryUtxosAtAddresses' . gyQueryUTxO
+
+gyQueryUtxosAtPaymentCredential :: GYProviders -> GYPaymentCredential -> IO (Maybe GYUTxOs)
+gyQueryUtxosAtPaymentCredential p =
+  case gyQueryUtxosAtPaymentCredential' (gyQueryUTxO p) of
+    Nothing -> const $ pure Nothing
+    Just f  -> fmap Just . f
 
 gyQueryUtxosAtAddressesWithDatums :: GYProviders -> [GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]
 gyQueryUtxosAtAddressesWithDatums provider addrs =
@@ -392,6 +400,7 @@ data GYQueryUTxO = GYQueryUTxO
     , gyQueryUtxoRefsAtAddress'          :: !(GYAddress -> IO [GYTxOutRef])
     , gyQueryUtxosAtAddresses'           :: !([GYAddress] -> IO GYUTxOs)
     , gyQueryUtxosAtAddressesWithDatums' :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))
+    , gyQueryUtxosAtPaymentCredential'   :: !(Maybe (GYPaymentCredential -> IO GYUTxOs))
     -- ^ `gyQueryUtxosAtAddressesWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
     }
 

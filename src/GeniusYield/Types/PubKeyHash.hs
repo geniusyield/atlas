@@ -25,7 +25,8 @@ import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
 import           GeniusYield.Types.Ledger
-import qualified Plutus.V1.Ledger.Api         as Plutus
+import qualified PlutusLedgerApi.V1.Crypto    as Plutus
+import qualified PlutusTx.Builtins            as Plutus
 import qualified PlutusTx.Builtins.Internal   as Plutus
 import qualified Text.Printf                  as Printf
 
@@ -47,13 +48,13 @@ newtype GYPubKeyHash = GYPubKeyHash (Api.Hash Api.PaymentKey)
 -- Right (GYPubKeyHash "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d")
 --
 -- >>> pubKeyHashFromPlutus "abcd"
--- Left (DeserialiseRawBytesError {ptceTag = "pubKeyHashFromPlutus \"\\171\\205\""})
+-- Left (DeserialiseRawBytesError {ptceTag = "pubKeyHashFromPlutus \"\\171\\205\", error: SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise Hash PaymentKey\"}"})
 --
 pubKeyHashFromPlutus :: Plutus.PubKeyHash -> Either PlutusToCardanoError GYPubKeyHash
 pubKeyHashFromPlutus (Plutus.PubKeyHash (Plutus.BuiltinByteString h)) =
-    maybe
-        (Left $ DeserialiseRawBytesError $ Text.pack $ "pubKeyHashFromPlutus " ++ show h)
-        (Right . GYPubKeyHash)
+    bimap
+        (\e -> DeserialiseRawBytesError $ Text.pack $ "pubKeyHashFromPlutus " ++ show h ++ ", error: " ++ show e)
+        GYPubKeyHash
     $ Api.deserialiseFromRawBytes (Api.AsHash Api.AsPaymentKey) h
 
 

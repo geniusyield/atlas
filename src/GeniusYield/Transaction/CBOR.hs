@@ -46,7 +46,6 @@ We as of now, only modify @transaction_body@ (terms are as defined in [CDDL](htt
 The modifications done is as follows:-
 
 * All indefinite-length items are made definite.
-* @transaction_output@ is put up into @legacy_transaction_output@ format when possible.
 * Wherever map occurs, it's keys are sorted as required by [CIP 21](https://cips.cardano.org/cips/cip21/).
 
 -}
@@ -57,7 +56,7 @@ simplifyTxCbor tx = do
   when (leftOver /= mempty) $ Left $ TransactionHasLeftOver $ TE.decodeUtf8 $ BS16.encode $ LBS.toStrict leftOver
   case term of
     TList (txBody : otherFields) -> do
-      txBody' <- simplifyTxBodyCbor txBody
+      let txBody' = simplifyTxBodyCbor txBody
       first (ModifiedTransactionDoesntDeserialise . T.pack)  $ txFromCBOR $ toStrictByteString $ encodeTerm $ TList (txBody' : otherFields)
     _other                       -> Left $ TransactionIsAbsurd "Transaction is defined as list but received otherwise"
 
@@ -82,41 +81,15 @@ recursiveTermModification f term =
         Just termMod -> if term == termMod then nothingHandler else recursiveTermModification f termMod
 
 -- | See `simplifyTxCbor`.
-simplifyTxBodyCbor :: Term -> Either CborSimplificationError Term
-simplifyTxBodyCbor txBody = do
+simplifyTxBodyCbor :: Term -> Term
+simplifyTxBodyCbor txBody =
       -- First, we'll make indefinite-length items, definite.
-  let txBodyDefinite = recursiveTermModification makeTermsDefinite txBody in
-    case txBodyDefinite of
-      TMap keyVals ->
-        let
-            -- Second we'll simplify the outputs.
-            txBodySimplifiedOutputs = TMap $ findAndSimplifyOutputs keyVals
-            -- Third, we'll sort keys in any map.
-            txBodySortedKeys = recursiveTermModification sortMapKeys txBodySimplifiedOutputs
-            txBodyFinal = txBodySortedKeys
-        in pure txBodyFinal
-      _otherwise -> Left $ TransactionIsAbsurd "Transaction body must be of type 'map'"
+  let txBodyDefinite = recursiveTermModification makeTermsDefinite txBody
+      -- Second, we'll sort keys in any map.
+      txBodySortedKeys = recursiveTermModification sortMapKeys txBodyDefinite
+  in txBodySortedKeys
 
   where
-
-    findAndSimplifyOutputs :: [(Term, Term)] -> [(Term, Term)]
-    findAndSimplifyOutputs [] = []
-    findAndSimplifyOutputs ((key, value) : remainingKeyVals) =
-      (key,
-            if key == TInt 1 then simplifyOutputs value
-            else if key == TInt 16 then simplifyOutput value
-            else value
-      ) : findAndSimplifyOutputs remainingKeyVals
-      where
-
-        simplifyOutputs :: Term -> Term
-        simplifyOutputs (TList outputs) = TList $ map simplifyOutput outputs
-        simplifyOutputs notAList        = notAList  -- We can return error here.
-
-        simplifyOutput :: Term -> Term
-        simplifyOutput (TMap [(TInt 0, addr), (TInt 1, amount)]) = TList [addr, amount]
-        simplifyOutput (TMap [(TInt 0, addr), (TInt 1, amount), (TInt 2, TList [TInt 0, datumHash])]) = TList [addr, amount, datumHash]
-        simplifyOutput ow = ow
 
     sortMapKeys :: Term -> Maybe Term
     sortMapKeys (TMap keyValsToSort) =

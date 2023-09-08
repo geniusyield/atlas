@@ -359,7 +359,7 @@ sendSkeleton' skeleton ws = do
                    Nothing       -> Map.empty
                    Just (Some s) ->
                        let sh = scriptPlutusHash s
-                           v = Versioned Ledger.PlutusV2 $ scriptToPlutus s
+                           v = Versioned Ledger.PlutusV2 $ coerce $ scriptToSerialisedScript s
                        in Map.singleton sh v
 
       case utxoOutDatum utxo of

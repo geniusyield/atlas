@@ -11,11 +11,11 @@ module GeniusYield.OnChain.Examples.ReadOracle
     ( mkReadOracleValidator
     ) where
 
-import           Plutus.V2.Ledger.Api
-import           PlutusTx.Prelude     as PlutusTx
+import           PlutusLedgerApi.V2
+import           PlutusTx.Prelude   as PlutusTx
 
 {-# INLINABLE mkReadOracleValidator #-}
--- | Fail if there are no reference inputs with input datums
+-- | Fail if there are no reference inputs with input datums.
 mkReadOracleValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
 mkReadOracleValidator _ _ ctx'
     | any (hasOutputDatum . txOutDatum) refins = ()

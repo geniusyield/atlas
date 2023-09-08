@@ -17,7 +17,6 @@ module GeniusYield.Utils
 
 import           Cardano.Api          (SerialiseAsRawBytes (serialiseToRawBytes))
 import           Codec.Binary.Bech32  as Bech32
-import           Control.Arrow        ((>>>))
 import           Control.Monad.Except (ExceptT (..))
 import           Data.Char            (toLower)
 

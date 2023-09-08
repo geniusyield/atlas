@@ -312,9 +312,13 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
     pp          <- gyGetProtocolParameters providers
     ps          <- gyGetStakePools providers
 
+    bpp <- case Api.bundleProtocolParams Api.BabbageEra pp of
+                Left e     -> throwIO $ BuildTxPPConversionError e
+                Right bpp' -> pure bpp'
+
     collateral' <- obtainCollateral
 
-    e <- unGYTxMonadNode (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral' loggedAction) GYTxNodeEnv
+    e <- unGYTxMonadNode (buildTxCore ss eh bpp ps cstrat ownUtxoUpdateF addrs change collateral' loggedAction) GYTxNodeEnv
             { envNid           = nid
             , envProviders     = providers
             , envAddrs         = addrs

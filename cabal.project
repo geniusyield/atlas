@@ -1,4 +1,3 @@
-
 repository cardano-haskell-packages
   url: https://input-output-hk.github.io/cardano-haskell-packages
   secure: True
@@ -10,87 +9,24 @@ repository cardano-haskell-packages
     c00aae8461a256275598500ea0e187588c35a5d5d7454fb57eac18d9edb86a56
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
+-- repeating the index-state for hackage to work around hackage.nix parsing limitation
+index-state: 2023-06-06T00:00:00Z
 
-index-state: 2022-09-26T22:25:36Z
-index-state: 
-  , hackage.haskell.org      2022-09-26T22:25:36Z
-  , cardano-haskell-packages 2022-10-25T17:33:07Z
+index-state:
+  , hackage.haskell.org 2023-06-06T00:00:00Z
+  , cardano-haskell-packages 2023-06-05T06:39:32Z
 
 packages: .
 
-tests: True
+-- TODO: Default value should be @direct@ in upcoming 3.10 version of cabal, omit this line then.
+test-show-details: direct
 
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
 
--- Using RDRAND instead of /dev/urandom as an entropy source for key
--- generation is dubious. Set the flag so we use /dev/urandom by default.
-package cryptonite
-  flags: -support_rdrand
-
-test-show-details: direct
-
--- ---------------------------------------------------------
--- Main repositories:
--- * cardano-node
--- * cardano-wallet
--- * cardano-addresses
-
-source-repository-package
-    type: git
-    location: https://github.com/input-output-hk/cardano-node
-    tag: 1.35.4
-    --sha256: 1j01m2cp2vdcl26zx9xmipr551v3b2rz9kfn9ik8byfwj1z7652r
-    subdir:
-      cardano-api
-      cardano-git-rev
-      cardano-cli
-      cardano-node
-      cardano-node-chairman
-      trace-dispatcher
-      trace-resources
-      trace-forward
-
-source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/cardano-wallet
-  tag: v2022-12-14
-  --sha256: sha256-lz3bi711qORionkcfduC+AXGP6Ii+uWiVHRmRZmvfb8=
-  subdir:
-    lib/balance-tx
-    lib/coin-selection
-    lib/dbvar
-    lib/launcher
-    lib/numeric
-    lib/primitive
-    lib/strict-non-empty-containers
-    lib/test-utils
-    lib/text-class
-    lib/wai-middleware-logging
-    lib/wallet
-
--- Using 0.7.1.0, which is already on hackage; but bumping the index state will break everything.
-source-repository-package
-  type: git
-  location: https://github.com/blockfrost/blockfrost-haskell
-  tag: v0.7.1.0
-  --sha256: sha256-hCT0yp3dnNTm7PRDXqrW9zYyUtALMqQNMxS7IZsNoe4=
-  subdir:
-    blockfrost-api
-    blockfrost-client
-    blockfrost-client-core
-
-allow-newer:
-  , cardano-wallet:blockfrost-api
-  , cardano-wallet:blockfrost-client
-  , cardano-wallet:blockfrost-client-core
-
--- Using an in house fork as upstream lacks desired capabilities and uses incompatible dependencies.
-source-repository-package
-  type: git
-  location: https://github.com/geniusyield/plutus-simple-model
-  tag: 7ba435b3522f56fb1ab5db491b7821b68d7e0682
-  --sha256: sha256-rorwvnN8qkaO4/WgtvJVqg7EW09Z6e1bXnfFu0fu/aU=
+-- TODO: This is fixed for in their later version, omit this when we update to it.
+package strict-containers
+  ghc-options: -Wwarn=noncanonical-monad-instances
 
 source-repository-package
   type: git
@@ -98,14 +34,71 @@ source-repository-package
   tag: 3c4efccb00df8e9fe0313dfb5228e294caa1807d
   --sha256: sha256-H7SsK0ri7cmE9d9cUhFZu24s1FWrvMuVlKzplFfBe+4=
 
--- Everything below is essentially copied from cardano-wallet's cabal.project.
+-- Unfortunately, cardano-node 8.1.2 is constrained with plutus-ledger-api 1.5.0.0 and we would like at least 1.6.0.0.
+-- This is done in accordance with changes in https://github.com/input-output-hk/cardano-ledger/pull/3430/files.
+constraints:
+    plutus-ledger-api == 1.6.0.0
+  , plutus-core == 1.6.0.0
 
+allow-newer:
+  , cardano-ledger-alonzo:plutus-ledger-api
+  , cardano-ledger-alonzo:plutus-core
+  , cardano-ledger-alonzo-test:plutus-ledger-api
+  , cardano-ledger-alonzo-test:plutus-ledger-api-testlib
+  , cardano-ledger-babbage:plutus-ledger-api
+  , cardano-ledger-conway:plutus-ledger-api
+  , cardano-ledger-binary:plutus-ledger-api
+  , cardano-api:plutus-ledger-api
+  , cardano-api:plutus-ledger-api-testlib
+  , cardano-api:prettyprinter-configurable
+
+source-repository-package
+  type: git
+  location: https://github.com/geniusyield/plutus-simple-model
+  tag: e50689784c6adc6d04507ce537c2d850bc7d07ae
+  --sha256: sha256-FZ7Ctff0Vg4MykfB3ZzGWhrWrB3Ht0smkgIVY8AlxWg=
+  subdir:
+    cardano-simple
+    psm
+
+-- Everything below is essentially copied from cardano-wallet's cabal.project.
+-------- Begin contents from @cardano-wallet@'s @cabal.project@ file. --------
+
+source-repository-package
+  type: git
+  location: https://github.com/input-output-hk/cardano-wallet
+  tag: v2023-07-18
+  --sha256: sha256-ijflgIw+1FpLoxM4Rksf4MJvNqnEPAv3gNWE8zMuefU=
+  subdir:
+    lib/balance-tx/
+    lib/coin-selection/
+    lib/delta-store/
+    lib/delta-table
+    lib/delta-types/
+    lib/launcher/
+    lib/numeric/
+    lib/primitive/
+    lib/test-utils/
+    lib/text-class/
+    lib/wai-middleware-logging/
+    lib/wallet/
+    lib/wallet-benchmarks/
+
+-- Using RDRAND instead of /dev/urandom as an entropy source for key
+-- generation is dubious. Set the flag so we use /dev/urandom by default.
+package cryptonite
+  flags: -support_rdrand
+
+-- Using a fork until our patches can be merged upstream
+
+-- TODO: ADP-1713
 source-repository-package
   type: git
   location: https://github.com/biocad/servant-openapi3
   tag: 4165b837d3a71debd1059c3735460075840000b5
   --sha256: 1dngrr353kjhmwhn0b289jzqz5rf32llwcv79zcyq15ldpqpbib9
 
+-- TODO: ADP-1713
 source-repository-package
   type: git
   location: https://github.com/paolino/openapi3
@@ -115,20 +108,13 @@ source-repository-package
 source-repository-package
     type: git
     location: https://github.com/input-output-hk/cardano-addresses
-    tag: 5094fb9d304ed69adedc99513634a00cbf850fca
-    --sha256: 1zhi8kvr2yhn50dm3dwwb1jlm5yl0y6c6hg39cs6abbxqmsj5jlv
-    subdir:
-      command-line
-      core
+    tag: 6b55f96d57a181f898eb2a50531d3ae4280c549c
+    --sha256: 0yygam995i3mawk6hfgxb6v918phvqzyipzhjflff0l6zfrldy7f
+    subdir: command-line
+            core
 
-source-repository-package
-    type: git
-    location: https://github.com/input-output-hk/bech32
-    tag: ab61914443e5f53624d3b2995767761b3f68e576
-    --sha256: 0isqh5s6rdhmqa3jhvc32zb3kvzy149hmzddx1ld9f9jhls4f3wg
-    subdir:
-      bech32
-      bech32-th
+package cardano-addresses
+  ghc-options: -Wno-incomplete-uni-patterns
 
 source-repository-package
     type: git
@@ -137,26 +123,11 @@ source-repository-package
     --sha256: 1ia8vlqghis92cla8qmqa6kh8f3jn29b01fshyk5hmgy5373s684
 
 source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/ekg-forward
-  tag: 297cd9db5074339a2fb2e5ae7d0780debb670c63
-  --sha256: 1zcwry3y5rmd9lgxy89wsb3k4kpffqji35dc7ghzbz603y1gy24g
-
-source-repository-package
     type: git
-    location: https://github.com/input-output-hk/cardano-crypto
-    tag: f73079303f663e028288f9f4a9e08bcca39a923e
-    --sha256: 1n87i15x54s0cjkh3nsxs4r1x016cdw1fypwmr68936n3xxsjn6q
-
-source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/io-sim
-  tag: 57e888b1894829056cb00b7b5785fdf6a74c3271
-  --sha256: 1kv8lwmrw1c0g03jy3i3fgk3c8d47ihjcslg295djqj442y95y2f
-  subdir:
-    io-classes
-    io-sim
-    strict-stm
+    location: https://github.com/input-output-hk/bech32.git
+    tag: e341e7f83d7b73f10baa87e946818b2c493cc5f5
+    --sha256: 1d891bpc1q1m1gqj02b4iv3kr4g9w7knlkq43hwbl9dn5k78aydc
+    subdir: bech32
 
 -- -------------------------------------------------------------------------
 -- Constraints tweaking
@@ -168,18 +139,13 @@ source-repository-package
 allow-newer:
     hjsonschema:*
   , hjsonpointer:*
-  , cardano-sl-x509:ip
   , *:aeson
+  , *:hashable
+  , async-timer:unliftio-core
+  , ekg:*
+  , ntp-client:*
+  , libsystemd-journal:base
   , size-based:template-haskell
-
--- Copied from (copied from cardano-node/cabal.project)
-allow-newer:
-  *:aeson,
-  monoidal-containers:aeson,
-  size-based:template-haskell
-
-allow-newer:
-  async-timer:unliftio-core
 
 constraints:
     bimap >= 0.4.0
@@ -194,47 +160,30 @@ constraints:
   , Cabal >= 3.4.0.0
   , async-timer >= 0.2.0.0
   , unliftio-core >= 0.2.0.1
-  , cardano-api == 1.35.4
-  , cardano-node == 1.35.4
-  , generic-arbitrary == 0.2.2
+  , generic-arbitrary >= 0.2.2
   , iohk-monitoring >= 0.1.11
 
-  -- Could probably be bumped with minor work in the wallet
-  , resource-pool == 0.2.3.2
+  -- lower versions of katip won't build with the Win32-2.12.0.1
+  -- which is shipped with the ghc-9.2.8
+  , katip >= 0.8.7.4
+
+  -- Cardano Node dependencies:
+  , cardano-api ^>=8.2
+  , cardano-slotting >= 0.1
+  , ouroboros-network ^>= 0.8.1.0
 
   -- TH Name shadowing warnings need to be addressed when bumping to 2.13.3.5
   , persistent == 2.13.3.3
 
-  -- Copied from cardano-node's cabal.project (omitting duplicates):
-  , HSOpenSSL >= 0.11.7.2
-  , algebraic-graphs < 0.7
-  , protolude < 0.3.1
-  , cardano-prelude == 0.1.0.0
-  , base-deriving-via == 0.1.0.0
-  , cardano-binary  == 1.5.0
-  , cardano-binary-test == 1.3.0
-  , cardano-crypto-class  == 2.0.0.0.1
-  , cardano-crypto-praos  == 2.0.0.0.1
-  , cardano-crypto-tests  == 2.0.0.0.1
-  , cardano-slotting  == 0.1.0.0
-  , measures == 0.1.0.0
-  , orphans-deriving-via == 0.1.0.0
-  , strict-containers == 0.1.0.0
-  , plutus-core == 1.0.0.1
-  , plutus-ledger-api == 1.0.0.1
-  , plutus-tx == 1.0.0.0
-  , plutus-tx-plugin == 1.0.0.0
-  , prettyprinter-configurable == 0.1.0.0
-  , plutus-ghc-stub == 8.6.5
-  , word-array == 0.1.0.0
-  , word-array == 0.1.0.0
+  -- Haddock is broken in this release. Waiting for the next release
 
 -- ----------------------------------------------------------------
 -- Flags for dependencies
 
 package cardano-config
-  flags: +systemd
+  flags: -systemd
 package cardano-node
-  flags: +systemd
+  flags: -systemd
 
 -- -------------------------------------------------------------------------
+-------- End contents from @cardano-wallet@'s @cabal.project@ file. --------

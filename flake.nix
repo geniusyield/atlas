@@ -1,15 +1,14 @@
 {
   description = "atlas-cardano";
-inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
+ inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
   inputs.nixpkgs.follows = "haskellNix/nixpkgs-unstable";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
-  inputs.plutus.url = "github:input-output-hk/plutus?ref=a56c96598b4b25c9e28215214d25189331087244"; # used for libsodium-vrf
   inputs.CHaP = {
       url = "github:input-output-hk/cardano-haskell-packages?ref=repo";
       flake = false;
     };
-  outputs = { self, nixpkgs, flake-utils, haskellNix, plutus, CHaP }:
+  outputs = { self, nixpkgs, flake-utils, haskellNix, CHaP }:
     let
       supportedSystems = [
         "x86_64-linux"	"x86_64-darwin"	"aarch64-darwin"
@@ -17,21 +16,12 @@ inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
     in
       flake-utils.lib.eachSystem supportedSystems (system:
       let
-        plutusPkgs = (import plutus { inherit system; }).pkgs;
         overlays = [ haskellNix.overlay
           (final: prev: {
             hixProject =
               final.haskell-nix.hix.project {
                 src = ./.;
                 evalSystem = system;
-                modules = [{
-                  packages = {
-                    cardano-crypto-praos.components.library.pkgconfig =
-                      nixpkgs.lib.mkForce [ [ plutusPkgs.libsodium-vrf ] ];
-                    cardano-crypto-class.components.library.pkgconfig =
-                      nixpkgs.lib.mkForce [ [ plutusPkgs.libsodium-vrf plutusPkgs.secp256k1 ] ];
-                  };
-                }];
                 inputMap = { "https://input-output-hk.github.io/cardano-haskell-packages" = CHaP; };
               };
           })

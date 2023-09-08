@@ -16,10 +16,13 @@ module GeniusYield.Types.Redeemer (
     nothingRedeemer,
 ) where
 
-import qualified Cardano.Api          as Api
-import qualified Plutus.V1.Ledger.Api as Plutus
+import qualified Cardano.Api         as Api
+import qualified Cardano.Api.Shelley as Api
+import           GeniusYield.Imports ((>>>))
+import qualified PlutusLedgerApi.V1  as PlutusV1
+import qualified PlutusTx
 
-newtype GYRedeemer = GYRedeemer Plutus.BuiltinData
+newtype GYRedeemer = GYRedeemer PlutusTx.BuiltinData
   deriving (Eq)
 
 instance Show GYRedeemer where
@@ -29,17 +32,20 @@ instance Show GYRedeemer where
         . shows x
         . showString "))"
 
-redeemerToPlutus :: GYRedeemer -> Plutus.Redeemer
-redeemerToPlutus (GYRedeemer x) = Plutus.Redeemer x
+redeemerToPlutus :: GYRedeemer -> PlutusV1.Redeemer
+redeemerToPlutus (GYRedeemer x) = PlutusV1.Redeemer x
 
-redeemerFromPlutus' :: Plutus.BuiltinData -> GYRedeemer
+redeemerToPlutus' :: GYRedeemer -> PlutusTx.BuiltinData
+redeemerToPlutus' (GYRedeemer x) = x
+
+redeemerFromPlutus' :: PlutusTx.BuiltinData -> GYRedeemer
 redeemerFromPlutus' = GYRedeemer
 
-redeemerFromPlutusData :: Plutus.ToData a => a -> GYRedeemer
-redeemerFromPlutusData = GYRedeemer . Plutus.toBuiltinData
+redeemerFromPlutusData :: PlutusTx.ToData a => a -> GYRedeemer
+redeemerFromPlutusData = GYRedeemer . PlutusTx.toBuiltinData
 
-redeemerToApi :: GYRedeemer -> Api.ScriptData
-redeemerToApi (GYRedeemer (Plutus.BuiltinData x)) = dataToScriptData x
+redeemerToApi :: GYRedeemer -> Api.HashableScriptData
+redeemerToApi = redeemerToPlutus' >>> PlutusTx.builtinDataToData >>> Api.fromPlutusData >>> Api.unsafeHashableScriptData
 
 -- | Unit redeemer
 --
@@ -60,10 +66,3 @@ unitRedeemer = redeemerFromPlutusData ()
 --
 nothingRedeemer :: GYRedeemer
 nothingRedeemer = redeemerFromPlutusData (Nothing @())
-
-dataToScriptData :: Plutus.Data -> Api.ScriptData
-dataToScriptData (Plutus.Constr n xs) = Api.ScriptDataConstructor n $ dataToScriptData <$> xs
-dataToScriptData (Plutus.Map xs)      = Api.ScriptDataMap [(dataToScriptData x, dataToScriptData y) | (x, y) <- xs]
-dataToScriptData (Plutus.List xs)     = Api.ScriptDataList $ dataToScriptData <$> xs
-dataToScriptData (Plutus.I n)         = Api.ScriptDataNumber n
-dataToScriptData (Plutus.B bs)        = Api.ScriptDataBytes bs

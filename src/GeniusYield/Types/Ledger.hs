@@ -8,9 +8,9 @@ Stability   : develop
 -}
 module GeniusYield.Types.Ledger (PlutusToCardanoError (..)) where
 
-import           Data.Text            (Text)
+import           Data.Text                  (Text)
 
-import qualified Plutus.V1.Ledger.Api as Plutus
+import qualified PlutusLedgerApi.V1.Address as Plutus
 
 {- | 'PlutusToCardanoError' is raised when using Plutus to Cardano API type conversion functions
 from plutus-ledger. It is a focused version of "Ledger.Tx.CardanoAPI.ToCardanoError".

@@ -240,7 +240,7 @@ valueTotalAssets (GYValue v) = Map.size v
 -- |
 --
 -- >>> Printf.printf "value = %s" (valueFromList [])
--- value =
+-- value = 
 --
 -- >>> Printf.printf "value = %s" (valueFromList [(GYLovelace, 1000)])
 -- value = 1000 lovelace

@@ -103,17 +103,8 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                 let ref = gyTxInTxOutRef gyTxIn
                 case utxosLookup ref gyInUtxos of
                     Nothing                                                           -> throwError . GYQueryUTxOException $ GYNoUtxoAtRef ref
-                    Just GYUTxO {utxoAddress, utxoValue, utxoRefScript, utxoOutDatum} ->
-                      if checkDatumMatch utxoOutDatum $ gyTxInWitness gyTxIn then
-                        pure $
-                          GYTxInDetailed gyTxIn utxoAddress utxoValue utxoOutDatum utxoRefScript
-                      else throwError $ GYDatumMismatch utxoOutDatum gyTxIn
-                      where
-                        checkDatumMatch _ GYTxInWitnessKey = True
-                        checkDatumMatch ud (GYTxInWitnessScript _ wd _) = case ud of
-                          GYOutDatumNone       -> False
-                          GYOutDatumHash h     -> h == hashDatum wd
-                          GYOutDatumInline uid -> uid == wd
+                    Just GYUTxO {utxoAddress, utxoValue, utxoRefScript, utxoOutDatum} -> pure $
+                        GYTxInDetailed gyTxIn utxoAddress utxoValue utxoRefScript (isInlineDatum utxoOutDatum)
 
             let refIns =
                     gyTxSkeletonRefInsToList gytxRefIns

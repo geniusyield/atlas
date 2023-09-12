@@ -415,8 +415,8 @@ buildInps ext own = go (ext ++ own)
             (GYTxIn (txOutRefFromTuple (mockTxId1, i)) GYTxInWitnessKey)
             mockInpAddress
             v
-            GYOutDatumNone
             Nothing
+            False
         )
         [0..]
 

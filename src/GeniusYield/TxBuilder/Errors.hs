@@ -28,9 +28,8 @@ import           GeniusYield.Types.Ledger   (PlutusToCardanoError (..))
 import           GeniusYield.Types.Slot     (GYSlot)
 import           GeniusYield.Types.Time     (GYTime)
 import           GeniusYield.Types.TxOutRef (GYTxOutRef)
-import           GeniusYield.Types.UTxO     (GYUTxO, GYOutDatum)
+import           GeniusYield.Types.UTxO     (GYUTxO)
 import           GeniusYield.Types.Value    (GYFromPlutusValueError)
-import           GeniusYield.Types.TxIn     (GYTxIn)
 
 -------------------------------------------------------------------------------
 -- Exception
@@ -97,8 +96,6 @@ data GYTxMonadException :: Type where
     GYTimeUnderflowException :: SystemStart -> GYTime -> GYTxMonadException
     -- | Raised during fetching/parsing datums.
     GYQueryDatumException ::  GYQueryDatumError -> GYTxMonadException
-    -- | When actual datum in the UTxO is different than what is mentioned for in witness.
-    GYDatumMismatch :: GYOutDatum -> GYTxIn v -> GYTxMonadException
     {- | Wildcard user application specific errors. This is the "plug-in" point where an application
     using the GY framework, can raise its own protocol specific errors within 'GeniusYield.TxBuilder.Class.GYTxMonad'. -}
     GYApplicationException :: (Exception e, IsGYApiError e) => e -> GYTxMonadException

@@ -12,10 +12,11 @@ module GeniusYield.Providers.CardanoDbSync (
     -- * cardano-db-sync connection
     CardanoDbSyncConn,
     openDbSyncConn,
+    -- * Await Tx confirmed
+    dbSyncAwaitTxConfirmed,
     -- * Slot number
     dbSyncSlotNumber,
     dbSyncWaitUntilSlot,
-    dbSyncSlotActions,
     -- * Datum lookup
     dbSyncLookupDatum,
     -- * Query UTxO
@@ -38,6 +39,7 @@ import           Type.Reflection                                (Typeable,
 
 import qualified Cardano.Api                                    as Api
 import qualified Cardano.Api.Shelley                            as Api.S
+import           Control.Concurrent                             (threadDelay)
 import qualified Data.Aeson                                     as Aeson
 import qualified Data.Aeson.Types                               as Aeson
 import qualified Data.ByteString.Base16                         as Base16
@@ -87,6 +89,27 @@ newtype CardanoDbSyncException = CardanoDbSyncException String
   deriving anyclass (Exception)
 
 -------------------------------------------------------------------------------
+-- Await tx confirmation
+-------------------------------------------------------------------------------
+
+-- | Awaits for the confirmation of a given 'GYTxId'
+dbSyncAwaitTxConfirmed :: CardanoDbSyncConn -> GYAwaitTx
+dbSyncAwaitTxConfirmed (Conn pool) p@GYAwaitTxParameters{..} txId =
+    Pool.withResource pool $ dbSyncAwaitTx 0
+  where
+    dbSyncAwaitTx :: Int -> PQ.Connection -> IO ()
+    dbSyncAwaitTx attempt _ | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
+    dbSyncAwaitTx attempt conn = do
+        res <- PQ.query conn "SELECT (mtable.max - block_no) as confirmations FROM block, ( SELECT MAX(block_no) as max FROM block ) as mtable, ( SELECT block_id, hash FROM tx WHERE hash = ? ) AS b WHERE block.id = b.block_id;" (PQ.Only txId)
+        case res of
+            [PQ.Only (blockConfirmations :: Int)] ->
+                when (blockConfirmations < confirmations) $
+                threadDelay checkInterval >> dbSyncAwaitTx (attempt + 1) conn
+            [] | attempt + 1 == maxAttempts -> throwIO $ GYAwaitTxException p
+            [] -> threadDelay checkInterval >> dbSyncAwaitTx (attempt + 1) conn
+            _anyOtherMatch -> throwIO $ CardanoDbSyncException "dbSyncAwaitTxConfirmed: zero or multiple SQL results"
+
+-------------------------------------------------------------------------------
 -- Slot number
 -------------------------------------------------------------------------------
 
@@ -103,15 +126,6 @@ dbSyncSlotNumber (Conn pool) = Pool.withResource pool $ \conn -> do
 -- | Wait until 'CardanoDbSyncConn' has processed a given slot.
 dbSyncWaitUntilSlot :: CardanoDbSyncConn -> GYSlot -> IO GYSlot
 dbSyncWaitUntilSlot conn = gyWaitUntilSlotDefault (dbSyncSlotNumber conn)
-
-dbSyncSlotActions :: CardanoDbSyncConn -> GYSlotActions
-dbSyncSlotActions conn = GYSlotActions
-    { gyGetCurrentSlot'   = get
-    , gyWaitForNextBlock' = gyWaitForNextBlockDefault get
-    , gyWaitUntilSlot'    = gyWaitUntilSlotDefault get
-    }
-  where
-    get = dbSyncSlotNumber conn
 
 -------------------------------------------------------------------------------
 -- Datum lookup provider

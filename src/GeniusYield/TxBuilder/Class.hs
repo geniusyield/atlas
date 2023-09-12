@@ -92,7 +92,7 @@ import           GeniusYield.Types
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), (utxosAtAddress | utxosAtAddresses), utxosAtPaymentCredential, slotConfig, currentSlot, logMsg #-}
+    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), (utxosAtAddress | utxosAtAddresses), utxosAtPaymentCredential, slotConfig, slotOfCurrentBlock, logMsg #-}
 
     -- | Get the network id
     networkId :: m GYNetworkId
@@ -148,8 +148,10 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     -}
     slotConfig :: m GYSlotConfig
 
-    -- | Lookup the current 'GYSlot'.
-    currentSlot :: m GYSlot
+    -- | This is expected to give the slot of the latest block. We say "expected" as we cache the result for 5 seconds, that is to say, suppose slot was cached at time @T@, now if query for current block's slot comes within time duration @(T, T + 5)@, then we'll return the cached slot but if say, query happened at time @(T + 5, T + 21)@ where @21@ was taken as an arbitrary number above 5, then we'll query the chain tip and get the slot of the latest block seen by the provider and then store it in our cache, thus new cached value would be served for requests coming within time interval of @(T + 21, T + 26)@.
+    --
+    -- __NOTE:__ It's behaviour is slightly different, solely for our plutus simple model provider where it actually returns the value of the @currentSlot@ variable maintained inside plutus simple model library.
+    slotOfCurrentBlock :: m GYSlot
 
     -- | Log a message with specified namespace and severity.
     logMsg :: HasCallStack => GYLogNamespace -> GYLogSeverity -> String -> m ()
@@ -183,7 +185,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     slotConfig = lift slotConfig
-    currentSlot = lift currentSlot
+    slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (RandT g m) where
@@ -204,7 +206,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     slotConfig = lift slotConfig
-    currentSlot = lift currentSlot
+    slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ReaderT g m) where
@@ -225,7 +227,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     slotConfig = lift slotConfig
-    currentSlot = lift currentSlot
+    slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ExceptT GYTxMonadException m) where

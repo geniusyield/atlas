@@ -100,8 +100,8 @@ instance GYTxQueryMonad GYTxQueryMonadNode where
     slotConfig = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyGetSlotConfig providers
 
-    currentSlot = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
-        gyGetCurrentSlot providers
+    slotOfCurrentBlock = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+        gyGetSlotOfCurrentBlock providers
 
     logMsg ns s msg = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyLog providers ns s msg

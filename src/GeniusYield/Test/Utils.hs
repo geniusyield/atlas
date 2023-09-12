@@ -293,7 +293,7 @@ waitNSlotsGYTxMonad = liftRun . waitNSlots . Fork.Slot
 -- Fails if the given slot is greater than the current slot.
 waitUntilSlot :: GYSlot -> GYTxMonadRun ()
 waitUntilSlot slot = do
-    now <- currentSlot
+    now <- slotOfCurrentBlock
     let d = slotToInteger slot - slotToInteger now
     if | d < 0     -> fail $ printf "can't wait for slot %d, because current slot is %d" (slotToInteger slot) (slotToInteger now)
        | d == 0    -> return ()

@@ -5,6 +5,7 @@ module GeniusYield.Test.Providers.Mashup
 import qualified Cardano.Api           as Api
 import           Control.Concurrent    (threadDelay)
 import           Control.Exception     (handle)
+import           Data.Default          (def)
 import           Data.List             (isInfixOf)
 import           Data.Maybe            (fromJust)
 import qualified Data.Set              as Set (fromList)
@@ -14,7 +15,7 @@ import           GeniusYield.Providers (SubmitTxException)
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 import           Test.Tasty            (TestTree, testGroup)
-import           Test.Tasty.HUnit      (assertBool, testCase)
+import           Test.Tasty.HUnit      (assertBool, testCase, assertFailure)
 
 providersMashupTests :: [GYCoreConfig] -> TestTree
 providersMashupTests configs =
@@ -83,8 +84,7 @@ providersMashupTests configs =
         skey <- readPaymentSigningKey "preprod-submit-test-wallet.skey"
         let nid = GYTestnetPreprod
             senderAddress = addressFromPubKeyHash GYTestnetPreprod $ pubKeyHash $ paymentVerificationKey skey
-        let totalConfigs = length configs
-        forM_ (zip [1 ..] configs) $ \(i, config) -> withCfgProviders config mempty $ \provider@GYProviders {..} -> do
+        forM_ configs $ \config -> withCfgProviders config mempty $ \provider@GYProviders {..} -> do
           threadDelay 1_000_000
           senderUTxOs <- runGYTxQueryMonadNode nid provider $ utxosAtAddress senderAddress
           threadDelay 1_000_000
@@ -97,6 +97,14 @@ providersMashupTests configs =
           printf "Signed tx: %s\n" (txToHex signedTxBody)
           tid    <- gySubmitTx signedTxBody
           printf "Submitted tx: %s\n" tid
-          unless (i == totalConfigs) $ threadDelay $ 120 * 1_000_000  -- Wait for 2 minutes so that transaction is seen onchain.
+          gyAwaitTxConfirmed (GYAwaitTxParameters {maxAttempts = 20, confirmations = 1, checkInterval = 10_000_000}) tid
+    , testCase "Await Tx Confirmed - Submitted Tx" $
+        forM_ configs $ \config -> withCfgProviders config mempty $
+            \GYProviders {..} -> gyAwaitTxConfirmed def "8b50152cc5cfca6a842f32b1e886a3ffdc1a1704fa87a15a88837996b6a9df36"
+    , testCase "Await Tx Confirmed - Timeout for non-existing Tx" $ do
+        let handleAwaitTxException (GYAwaitTxException _) = return ()
+        forM_ configs $ \config -> withCfgProviders config mempty $
+          \GYProviders {..} -> handle handleAwaitTxException $ do
+              gyAwaitTxConfirmed def{maxAttempts = 2, checkInterval = 1_000_000} "9b50152cc5cfca6a842f32b1e886a3ffdc1a1704fa87a15a88837996b6a9df36"  -- <-- A non-existing transaction id.
+              assertFailure "Exepected GYAwaitTxException to be raised"
     ]
-

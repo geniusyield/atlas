@@ -96,15 +96,7 @@ data GYBuildTxEnv = GYBuildTxEnv
     }
 
 utxoFromTxInDetailed :: GYTxInDetailed v -> GYUTxO
-utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref witns) addr val ms useInline) = GYUTxO ref addr val (toOutDatum witns) ms
-  where
-    toOutDatum GYTxInWitnessKey = GYOutDatumNone
-    toOutDatum
-        (GYTxInWitnessScript
-            _
-            gyTxInDatumValue
-            _
-        ) = (if useInline then GYOutDatumInline else GYOutDatumHash . hashDatum) gyTxInDatumValue
+utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref _witns) addr val d ms) = GYUTxO ref addr val d ms
 
 data BuildTxException
     = BuildTxBalancingError !BalancingError
@@ -340,7 +332,7 @@ finalizeGYBalancedTx
     outs' = txOutToApi <$> outs
 
     ins' :: [(Api.TxIn, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxTxIn Api.BabbageEra))]
-    ins' = [ txInToApi (gyTxInDetInlineDat i) (gyTxInDet i) |  i <- ins ]
+    ins' = [ txInToApi (isInlineDatum $ gyTxInDetDatum i) (gyTxInDet i) |  i <- ins ]
 
     collaterals' :: Api.TxInsCollateral Api.BabbageEra
     collaterals' = case utxosRefs collaterals of

@@ -12,8 +12,7 @@ import           GeniusYield.GYConfig
 -- | These tests check that we can parse configs
 configTests :: TestTree
 configTests = testGroup "Config"
-    [ testCase "core-local"      $ testParseResult isNodeChainIx "core-local.json"
-    , testCase "core-dbsync"     $ testParseResult isDbSync      "core-dbsync.json"
+    [ testCase "core-local"      $ testParseResult isNodeKupo    "core-local.json"
     , testCase "core-maestro"    $ testParseResult isMaestro     "core-maestro.json"
     , testCase "core-blockfrost" $ testParseResult isBlockfrost  "core-blockfrost.json"
     ]

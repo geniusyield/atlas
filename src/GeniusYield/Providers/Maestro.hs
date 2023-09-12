@@ -19,6 +19,7 @@ module GeniusYield.Providers.Maestro
   , maestroSystemStart
   , maestroEraHistory
   , maestroLookupDatum
+  , maestroUtxosAtAddressesWithDatums
   ) where
 
 import qualified Cardano.Api                          as Api
@@ -29,17 +30,14 @@ import           Control.Concurrent                   (threadDelay)
 import           Control.Exception                    (try)
 import           Control.Monad                        ((<=<))
 import qualified Data.Aeson                           as Aeson
-import qualified Data.ByteString.Base16               as BS16
 import           Data.Either.Combinators              (maybeToRight)
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe                           (fromJust)
 import qualified Data.Set                             as Set
 import qualified Data.Text                            as Text
-import qualified Data.Text.Encoding                   as Text
 import qualified Data.Time                            as Time
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
-import           GeniusYield.Providers.SubmitApi      (SubmitTxException (..))
 import           GeniusYield.Types
 import           GHC.Natural                          (wordToNatural)
 import qualified Maestro.Client.V1                    as Maestro
@@ -164,18 +162,6 @@ maestroGetSlotOfCurrentBlock env =
 datumHashFromMaestro :: Text -> Either SomeDeserializeError GYDatumHash
 datumHashFromMaestro = first (DeserializeErrorHex . Text.pack) . datumHashFromHexE . Text.unpack
 
--- | Get datum from bytes.
-datumFromMaestroCBOR :: Text -> Either SomeDeserializeError GYDatum
-datumFromMaestroCBOR d = do
-  bs  <- fromEither $ BS16.decode $ Text.encodeUtf8 d
-  api <- fromEither $ Api.deserialiseFromCBOR Api.AsHashableScriptData bs
-  return $ datumFromApi' api
-  where
-    e = DeserializeErrorHex d
-
-    fromEither :: Either e a -> Either SomeDeserializeError a
-    fromEither = first $ const e
-
 -- | Get datum from JSON representation. Though we don't make use of it.
 _datumFromMaestroJSON :: Aeson.Value -> Either SomeDeserializeError GYDatum
 _datumFromMaestroJSON datumJson = datumFromPlutus' <$> fromJson @Plutus.BuiltinData (Aeson.encode datumJson)
@@ -188,7 +174,7 @@ outDatumFromMaestro (Just Maestro.DatumOption {..}) =
     Maestro.Hash -> GYOutDatumHash <$> datumHashFromMaestro _datumOptionHash
     Maestro.Inline -> case _datumOptionBytes of
       Nothing                     -> Left $ DeserializeErrorImpossibleBranch "Datum type is inline but datum bytestring is missing"
-      Just db -> GYOutDatumInline <$> datumFromMaestroCBOR db
+      Just db -> GYOutDatumInline <$> datumFromCBOR db
 
 -- | Convert Maestro's asset class to our GY type.
 assetClassFromMaestro :: Maestro.AssetUnit -> Either SomeDeserializeError GYAssetClass
@@ -240,7 +226,7 @@ utxoFromMaestroWithDatum u = do
       case Maestro._datumOptionBytes $ fromJust (Maestro.getDatum u) of
         Nothing -> pure (gyUtxo, Nothing)
         Just db -> do
-          d <- datumFromMaestroCBOR db
+          d <- datumFromCBOR db
           pure (gyUtxo, Just d)
 
 -- | Query UTxOs present at multiple addresses.
@@ -469,8 +455,8 @@ maestroEraHistory env = do
 -- | Given a 'GYDatumHash' returns the corresponding 'GYDatum' if found.
 maestroLookupDatum :: Maestro.MaestroEnv 'Maestro.V1 -> GYLookupDatum
 maestroLookupDatum env dh = do
-  datumMaybe <- handler =<< try (Maestro.getTimestampedData <$> (Maestro.getDatumByHash env . coerce . Text.pack . show $ datumHashToPlutus dh))
-  sequence $ datumMaybe <&> \(Maestro.Datum datumBytes _datumJson) -> case datumFromMaestroCBOR datumBytes of  -- NOTE: `datumFromMaestroJSON datumJson` also gives the same result.
+  datumMaybe <- handler =<< try (Maestro.getTimestampedData <$> (Maestro.getDatumByHash env . coerce . Api.serialiseToRawBytesHexText $ datumHashToApi dh))
+  sequence $ datumMaybe <&> \(Maestro.Datum datumBytes _datumJson) -> case datumFromCBOR datumBytes of  -- NOTE: `datumFromMaestroJSON datumJson` also gives the same result.
     Left err -> throwIO $ MspvDeserializeFailure locationIdent err
     Right bd -> pure bd
   where

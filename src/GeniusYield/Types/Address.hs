@@ -398,7 +398,7 @@ instance Swagger.ToSchema GYAddress where
 -- "addr_test1qrsuhwqdhz0zjgnf46unas27h93amfghddnff8lpc2n28rgmjv8f77ka0zshfgssqr5cnl64zdnde5f8q2xt923e7ctqu49mg5"
 --
 newtype GYAddressBech32 = GYAddressBech32 GYAddress
-  deriving newtype (Show, Printf.PrintfArg)
+  deriving newtype (Show, Eq, Ord, Printf.PrintfArg)
 
 addressToBech32 :: GYAddress -> GYAddressBech32
 addressToBech32 = coerce

@@ -20,7 +20,7 @@ module GeniusYield.Test.Privnet.Ctx (
     ctxRunF,
     ctxRunFWithCollateral,
     ctxSlotOfCurrentBlock,
-    ctxWaitNextSlot,
+    ctxWaitNextBlock,
     ctxWaitUntilSlot,
     ctxProviders,
     ctxSlotConfig,
@@ -33,20 +33,18 @@ module GeniusYield.Test.Privnet.Ctx (
     addRefInputCtx,
 ) where
 
-import           Test.Tasty.HUnit                     (assertFailure)
+import           Test.Tasty.HUnit           (assertFailure)
 
-import qualified Cardano.Api                          as Api
-import qualified Data.Map.Strict                      as Map
+import qualified Cardano.Api                as Api
+import qualified Data.Map.Strict            as Map
 
 import           GeniusYield.Imports
-import           GeniusYield.Providers.CardanoDbSync
-import           GeniusYield.Providers.LiteChainIndex
 import           GeniusYield.Providers.Node
 import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
-import qualified GeniusYield.Examples.Limbo           as Limbo
+import qualified GeniusYield.Examples.Limbo as Limbo
 
 data User = User
     { userSKey :: !GYPaymentSigningKey
@@ -62,8 +60,6 @@ userPkh = pubKeyHash . paymentVerificationKey . userSKey
 data Ctx = Ctx
     { ctxEra              :: !GYEra
     , ctxInfo             :: !(Api.LocalNodeConnectInfo Api.CardanoMode)
-    , ctxLCI              :: !LCIClient
-    , ctxDbSync           :: !(Maybe CardanoDbSyncConn)
     , ctxUserF            :: !User  -- ^ Funder. All other users begin with same status of funds.
     , ctxUser2            :: !User
     , ctxUser3            :: !User
@@ -137,17 +133,11 @@ ctxSlotOfCurrentBlock :: Ctx -> IO GYSlot
 ctxSlotOfCurrentBlock (ctxProviders -> providers) =
     gyGetSlotOfCurrentBlock providers
 
-ctxWaitNextSlot :: Ctx -> IO ()
-ctxWaitNextSlot ctx@(ctxProviders -> providers) = do
-    slot <- gyWaitForNextBlock providers
-    _ <- lciWaitUntilSlot (ctxLCI ctx) slot
-    forM_ (ctxDbSync ctx) $ \dbSync -> dbSyncWaitUntilSlot dbSync slot
+ctxWaitNextBlock :: Ctx -> IO ()
+ctxWaitNextBlock (ctxProviders -> providers) = void $ gyWaitForNextBlock providers
 
 ctxWaitUntilSlot :: Ctx -> GYSlot -> IO ()
-ctxWaitUntilSlot ctx@(ctxProviders -> providers) slot = do
-    slot' <- gyWaitUntilSlot providers slot
-    _ <- lciWaitUntilSlot (ctxLCI ctx) slot'
-    forM_ (ctxDbSync ctx) $ \dbSync -> dbSyncWaitUntilSlot dbSync slot
+ctxWaitUntilSlot (ctxProviders -> providers) slot = void $ gyWaitUntilSlot providers slot
 
 ctxSlotConfig :: Ctx -> IO GYSlotConfig
 ctxSlotConfig (ctxProviders -> providers) = gyGetSlotConfig providers

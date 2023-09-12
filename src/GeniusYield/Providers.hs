@@ -12,8 +12,7 @@ module GeniusYield.Providers
 
 import           GeniusYield.Providers.Blockfrost       as X
 import           GeniusYield.Providers.CachedQueryUTxOs as X
-import           GeniusYield.Providers.CardanoDbSync    as X
 import           GeniusYield.Providers.Katip            as X
+import           GeniusYield.Providers.Kupo             as X
 import           GeniusYield.Providers.Maestro          as X
 import           GeniusYield.Providers.Node             as X
-import           GeniusYield.Providers.SubmitApi        as X

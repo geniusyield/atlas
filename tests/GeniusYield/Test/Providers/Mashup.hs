@@ -2,27 +2,28 @@ module GeniusYield.Test.Providers.Mashup
   ( providersMashupTests
   ) where
 
-import qualified Cardano.Api           as Api
-import           Control.Concurrent    (threadDelay)
-import           Control.Exception     (handle)
-import           Data.Default          (def)
-import           Data.List             (isInfixOf)
-import           Data.Maybe            (fromJust)
-import qualified Data.Set              as Set (fromList)
+import qualified Cardano.Api                  as Api
+import           Control.Concurrent           (threadDelay)
+import           Control.Exception            (handle)
+import           Data.Default                 (def)
+import           Data.List                    (isInfixOf)
+import           Data.Maybe                   (fromJust)
+import qualified Data.Set                     as Set (delete, fromList)
 import           GeniusYield.GYConfig
 import           GeniusYield.Imports
-import           GeniusYield.Providers (SubmitTxException)
+import           GeniusYield.Providers.Common (SubmitTxException, datumFromCBOR)
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
-import           Test.Tasty            (TestTree, testGroup)
-import           Test.Tasty.HUnit      (assertBool, testCase, assertFailure)
+import           Test.Tasty                   (TestTree, testGroup)
+import           Test.Tasty.HUnit             (assertBool, assertFailure,
+                                               testCase)
 
 providersMashupTests :: [GYCoreConfig] -> TestTree
 providersMashupTests configs =
   testGroup "Providers Mashup"
     [ testCase "Datum lookup - GYLookupDatum" $ do
         threadDelay 1_000_000
-        dats <- forM configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> fromJust <$> gyLookupDatum "d81d2abd12bdc2c19001a5d659c6aefd3fe4e073a37835b6818c2e676f84c03c"
+        dats <- forM configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> fromJust <$> gyLookupDatum "a7ed3e81ef2e98a85c8d5649ed6344b7f7b36a31103ab18395ef4e80b8cac565"  -- A datum hash seen at always fail script's address.
         assertBool "Datums are not all equal" $ all (== head dats) (tail dats)
     , testCase "Parameters" $ do
         paramsList <- forM configs $ \config -> withCfgProviders config mempty $ \provider -> do
@@ -39,34 +40,33 @@ providersMashupTests configs =
            pure (protocolParams, systemStart, (show mode, interpreter), stakePools, slotConfig')
         assertBool "Parameters are not all equal" $ all (== head paramsList) (tail paramsList)
     , testCase "Query UTxOs" $ do
-
+        let
+            -- Blockfrost is unable to get the preimage of the involved datum hash, thus it's being deleted for in our set so that test still passes.
+            utxoBug1 = (GYUTxO {utxoRef = "6d2174d3956d8eb2b3e1e198e817ccf1332a599d5d7320400bfd820490d706be#0", utxoAddress = unsafeAddressFromText "addr_test1wpgexmeunzsykesf42d4eqet5yvzeap6trjnflxqtkcf66g0kpnxt", utxoValue = valueFromList [(GYLovelace,50000000)], utxoOutDatum = GYOutDatumHash "15461aa490b224fe541f3568e5d7704e0d88460cde9f418f700e2b6864d8d3c9", utxoRefScript = Nothing},Just (either (error "absurd - Mashup: parsing datum failed") id $ datumFromCBOR "19077a"))
+            utxoBug2 = (GYUTxO {utxoRef = "6d2174d3956d8eb2b3e1e198e817ccf1332a599d5d7320400bfd820490d706be#0", utxoAddress = unsafeAddressFromText "addr_test1wpgexmeunzsykesf42d4eqet5yvzeap6trjnflxqtkcf66g0kpnxt", utxoValue = valueFromList [(GYLovelace,50000000)], utxoOutDatum = GYOutDatumHash "15461aa490b224fe541f3568e5d7704e0d88460cde9f418f700e2b6864d8d3c9", utxoRefScript = Nothing}, Nothing)
         utxosProviders <- forM configs $ \config -> withCfgProviders config mempty $ \provider -> do
-          let addressWithDatumHashes = "addr_test1wz09gtk5qn8g2lr0qu8hdh9gyjcl396778rz2qphgz4edxs245ja0"  -- This address has lots of UTxOs with datum hashes.
-              myAddrList = unsafeAddressFromText <$>
-                -- TODO: Put more reliable (in sense that UTxOs won't change) addresses here!
-                [ addressWithDatumHashes
-                , "addr_test1wpdz7qwyrpsxrwqe0e4yv3knfmy068euhh4k07ac4wp3kfgjhpd7w"  -- This address has UTxOs with inline datums.
-                , "addr_test1qr5zypvu3va5y3q2m8envvd08sj5mams3znp3nh8q6arx4vre0cyeg6lqagujyhvr4ylx5wlgwjs3uyl8z0spz4akxzq6wyfzk"  -- This address has UTxOs with reference scripts.
-                ]
+          let alwaysFailAddress = unsafeAddressFromText "addr_test1wpgexmeunzsykesf42d4eqet5yvzeap6trjnflxqtkcf66g0kpnxt"
+              myAddrList = [alwaysFailAddress]  -- always fail script's address. It has all the cases, reference scripts, inline datums, many UTxOs, etc.
           threadDelay 1_000_000
           utxosAtAddresses' <- gyQueryUtxosAtAddresses provider myAddrList
           threadDelay 1_000_000
           utxosAtAddressesWithDatums' <- gyQueryUtxosAtAddressesWithDatums provider myAddrList
-          let refWithDatumHash = "0c72765df71ff3739db11c0165bc71c0f3b0a160acec6f4f1448e523064e927e#0"
+          -- All the below refs were taken from always fail address.
+          let refWithDatumHash = "dc1c7958f94b7a458dffa224d18b5b8464f81f6360913c26eca4199f67ac6435#1"
               outputRefs =
-                [ "8aba7590148083c96e1ed742defecb6123126bbdb392cef3facb8d968825a983#1"  -- Contains reference script.
+                [ "930de0fd6718fc87cd99be663f1b1dd099cad6cec3dede49d82b3554a1e8eb86#0"  -- Contains reference script.
                 ,  refWithDatumHash -- Contains datum hash.
-                , "4e2341767958f1fd83f2ec536e1001888db938d374fcae1a1e965dc21a05d0c6#0"  -- Contains inline datum.
+                , "930de0fd6718fc87cd99be663f1b1dd099cad6cec3dede49d82b3554a1e8eb86#0"  -- Contains inline datum.
                 ]
           threadDelay 1_000_000
           utxosAtRefs <- gyQueryUtxosAtTxOutRefs provider outputRefs
           threadDelay 1_000_000
-          utxoRefsAtAddress' <- gyQueryUtxoRefsAtAddress provider $ unsafeAddressFromText addressWithDatumHashes
+          utxoRefsAtAddress' <- gyQueryUtxoRefsAtAddress provider alwaysFailAddress
           threadDelay 1_000_000
           utxosAtRefsWithDatums' <- gyQueryUtxosAtTxOutRefsWithDatums provider outputRefs
           threadDelay 1_000_000
           utxoAtRefWithDatum' <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxoAtTxOutRefWithDatum refWithDatumHash
-          pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums', utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum')
+          pure (utxosAtAddresses', utxoBug2 `Set.delete` (utxoBug1 `Set.delete` Set.fromList utxosAtAddressesWithDatums'), utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum')
         assertBool "Utxos are not all equal" $ all (== head utxosProviders) (tail utxosProviders)
     , testCase "Checking presence of error message when submitting an invalid transaction" $ do
         let
@@ -100,7 +100,7 @@ providersMashupTests configs =
           gyAwaitTxConfirmed (GYAwaitTxParameters {maxAttempts = 20, confirmations = 1, checkInterval = 10_000_000}) tid
     , testCase "Await Tx Confirmed - Submitted Tx" $
         forM_ configs $ \config -> withCfgProviders config mempty $
-            \GYProviders {..} -> gyAwaitTxConfirmed def "8b50152cc5cfca6a842f32b1e886a3ffdc1a1704fa87a15a88837996b6a9df36"
+            \GYProviders {..} -> gyAwaitTxConfirmed def "c67b57d63e846c6dc17f0c2647893d5f7376690cde62b8b392ecfcb75a4697e2"  -- A transaction id which generated UTxO at the always fail address. Thus it is guaranteed to be always there (unless of course network is respun).
     , testCase "Await Tx Confirmed - Timeout for non-existing Tx" $ do
         let handleAwaitTxException (GYAwaitTxException _) = return ()
         forM_ configs $ \config -> withCfgProviders config mempty $

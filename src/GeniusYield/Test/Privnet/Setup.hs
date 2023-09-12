@@ -9,27 +9,26 @@ Stability   : develop
 -}
 module GeniusYield.Test.Privnet.Setup (
     makeSetup,
-    closeSetup,
     Setup,
     withSetup,
 ) where
 
-import           Control.Exception                    (IOException)
-import           System.Environment                   (lookupEnv)
-import           System.Exit                          (exitFailure)
-import           System.FilePath                      ((</>))
+import           Control.Exception              (IOException)
+import           System.Environment             (lookupEnv)
+import           System.Exit                    (exitFailure)
+import           System.FilePath                ((</>))
 
-import qualified Cardano.Api                          as Api
+import qualified Cardano.Api                    as Api
 
-import qualified Data.Vector.Fixed                    as V
+import qualified Data.Vector.Fixed              as V
 
-import qualified GeniusYield.Api.TestTokens           as GY.TestTokens
+import qualified GeniusYield.Api.TestTokens     as GY.TestTokens
 import           GeniusYield.Imports
-import           GeniusYield.Providers.CardanoDbSync
-import           GeniusYield.Providers.LiteChainIndex
+import           GeniusYield.Providers.Kupo     (kupoAwaitTxConfirmed,
+                                                 kupoLookupDatum, kupoQueryUtxo,
+                                                 newKupoApiEnv)
 import           GeniusYield.Providers.Node
 import           GeniusYield.Test.Privnet.Ctx
-import           GeniusYield.Test.Privnet.Options
 import           GeniusYield.Test.Privnet.Paths
 import           GeniusYield.Test.Privnet.Utils
 import           GeniusYield.TxBuilder
@@ -43,32 +42,33 @@ era = GYBabbage
 -- Setup
 -------------------------------------------------------------------------------
 
-data Setup = Setup (IO ()) ((String -> IO ()) -> (Ctx -> IO ()) -> IO ())
+newtype Setup = Setup  ((String -> IO ()) -> (Ctx -> IO ()) -> IO ())
 
 withSetup :: IO Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
 withSetup ioSetup putLog kont = do
-    Setup _ cokont <- ioSetup
+    Setup cokont <- ioSetup
     cokont putLog kont
 
-makeSetup :: DbSyncOpts -> IO Setup
-makeSetup x = do
-    privnetPath' <- lookupEnv "GENIUSYIELD_PRIVNET_DIR"
+makeSetup :: IO Setup
+makeSetup = do
+    let gyPrivDirVar = "GENIUSYIELD_PRIVNET_DIR"
+        kupoUrlVar   = "KUPO_URL"
+    privnetPath' <- lookupEnv gyPrivDirVar
+    kupoUrl      <- lookupEnv kupoUrlVar
     case privnetPath' of
-        Nothing -> return $ Setup (return ()) $ \info _kont -> do
-            info "GENIUSYIELD_PRIVNET_DIR envvar is not set"
+        Nothing -> communicateError gyPrivDirVar
 
-        Just privnetPath -> makeSetup' x privnetPath
-
-closeSetup :: Setup -> IO ()
-closeSetup (Setup close _) = close
+        Just privnetPath -> maybe (communicateError kupoUrlVar) (makeSetup' privnetPath) kupoUrl
+    where
+      communicateError e = return $ Setup $ \info _kont -> info $ e <> " is not set"
 
 debug :: String -> IO ()
 -- FIXME: change me to debug setup code.
 -- debug = putStrLn
 debug _ = return ()
 
-makeSetup' :: DbSyncOpts -> FilePath -> IO Setup
-makeSetup' DbSyncOpts {..} privnetPath = do
+makeSetup' :: FilePath -> String -> IO Setup
+makeSetup' privnetPath kupoUrl = do
     -- init paths
     paths <- initPaths privnetPath
 
@@ -105,37 +105,25 @@ makeSetup' DbSyncOpts {..} privnetPath = do
     slot <- nodeGetSlotOfCurrentBlock info
     debug $ printf "slotOfCurrentBlock = %s\n" slot
 
-    lci <- newLCIClient info []
-
-    dbSync <- traverse openDbSyncConn dbSyncConnInfo
+    kupoEnv <- newKupoApiEnv kupoUrl
 
     let localLookupDatum :: GYLookupDatum
-        localLookupDatum = case dbSync of
-            Just dbSync' | dbSyncOptsLookupDatum -> dbSyncLookupDatum dbSync'
-            _                                    -> lciLookupDatum lci
+        localLookupDatum = kupoLookupDatum kupoEnv
 
     let localAwaitTxConfirmed :: GYAwaitTx
-        localAwaitTxConfirmed = case dbSync of
-            Just dbSync' | dbSyncOptsAwaitTx -> dbSyncAwaitTxConfirmed dbSync'
-            _                                -> lciAwaitTxConfirmed lci
+        localAwaitTxConfirmed = kupoAwaitTxConfirmed kupoEnv
 
     let localQueryUtxo :: GYQueryUTxO
-        localQueryUtxo = case dbSync of
-            Just dbSync' | dbSyncOptsQueryUtxos -> dbSyncQueryUtxo dbSync'
-            _                                   -> nodeQueryUTxO era info
+        localQueryUtxo = kupoQueryUtxo kupoEnv
 
     let localGetParams :: GYGetParameters
-        localGetParams = case dbSync of
-            Just dbSync' | dbSyncOptsGetParameters -> dbSyncGetParameters dbSync'
-            _                                      -> nodeGetParameters era info
+        localGetParams = nodeGetParameters era info
 
     -- context used for tests
     let ctx0 :: Ctx
         ctx0 = Ctx
             { ctxEra              = era
             , ctxInfo             = info
-            , ctxLCI              = lci
-            , ctxDbSync           = dbSync
             , ctxUserF            = User userFskey userFaddr
             , ctxUser2            = uncurry User (V.index userSkeyAddr (Proxy @0))
             , ctxUser3            = uncurry User (V.index userSkeyAddr (Proxy @1))
@@ -186,7 +174,6 @@ makeSetup' DbSyncOpts {..} privnetPath = do
       ) userBalances
 
     return $ Setup
-        (closeLCIClient lci)
         (\putLog kont -> kont $ ctx { ctxLog = simpleConsoleLogging putLog })
 
 -------------------------------------------------------------------------------

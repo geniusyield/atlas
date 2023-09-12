@@ -1,4 +1,4 @@
-cabal-version:      3.8
+cabal-version:      3.6
 name:               atlas-cardano
 version:            0.3.0
 synopsis:           Application backend for Plutus smart contracts on Cardano
@@ -74,15 +74,13 @@ library
     GeniusYield.Providers
     GeniusYield.Providers.Blockfrost
     GeniusYield.Providers.CachedQueryUTxOs
-    GeniusYield.Providers.CardanoDbSync
     GeniusYield.Providers.Common
     GeniusYield.Providers.GCP
     GeniusYield.Providers.Katip
-    GeniusYield.Providers.LiteChainIndex
+    GeniusYield.Providers.Kupo
     GeniusYield.Providers.Maestro
     GeniusYield.Providers.Node
     GeniusYield.Providers.Sentry
-    GeniusYield.Providers.SubmitApi
     GeniusYield.Scripts.TestToken
     GeniusYield.Test.Privnet.Asserts
     GeniusYield.Test.Privnet.Ctx
@@ -91,7 +89,6 @@ library
     GeniusYield.Test.Privnet.Examples.Misc
     GeniusYield.Test.Privnet.Examples.Oracle
     GeniusYield.Test.Privnet.Examples.Treat
-    GeniusYield.Test.Privnet.Options
     GeniusYield.Test.Privnet.Paths
     GeniusYield.Test.Privnet.Setup
     GeniusYield.Test.Privnet.Utils
@@ -152,6 +149,7 @@ library
     , cborg                  ^>=0.2.9.0
     , containers             ^>=0.6.5.1
     , data-default           ^>=0.7.1.1
+    , deriving-aeson         ^>=0.2.9
     , directory              ^>=1.3.6.2
     , either                 ^>=5.0.2
     , filepath               ^>=1.4.2.2

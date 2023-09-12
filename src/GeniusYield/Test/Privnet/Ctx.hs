@@ -164,7 +164,7 @@ submitTx ctx@Ctx { ctxInfo } User {..} txBody = do
     txId <- nodeSubmitTx ctxInfo tx
     -- printf "Submitted transaction %s\n" (show txId)
 
-    gyAwaitTxConfirmed (ctxProviders ctx) (GYAwaitTxParameters { maxAttempts = 30, checkInterval = 1_000_000, confirmations = 1 }) txId
+    gyAwaitTxConfirmed (ctxProviders ctx) (GYAwaitTxParameters { maxAttempts = 30, checkInterval = 1_000_000, confirmations = 0 }) txId
     return txId
 
 -- | Function to find for the first locked output in the given `GYTxBody` at the given `GYAddress`.

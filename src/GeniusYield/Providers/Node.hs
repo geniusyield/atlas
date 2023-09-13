@@ -29,6 +29,7 @@ import qualified Data.Text                                         as Txt
 import           Ouroboros.Network.Protocol.LocalTxSubmission.Type (SubmitResult (..))
 
 import           GeniusYield.CardanoApi.Query
+import           GeniusYield.Providers.Common                      (SubmitTxException (SubmitTxException))
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
 
@@ -42,7 +43,7 @@ nodeSubmitTx info tx = do
     res <- Api.submitTxToNodeLocal info $ Api.TxInMode (txToApi tx) Api.BabbageEraInCardanoMode
     case res of
         SubmitSuccess  -> return $ txIdFromApi $ Api.getTxId $ Api.getTxBody $ txToApi tx
-        SubmitFail err -> throwIO $ userError $ show err
+        SubmitFail err -> throwIO $ SubmitTxException $ Txt.pack $ show err
 
 -------------------------------------------------------------------------------
 -- Current slot

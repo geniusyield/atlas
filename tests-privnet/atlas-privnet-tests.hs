@@ -10,33 +10,21 @@ module Main (main) where
 
 import           GeniusYield.Imports
 
-import           Test.Tasty                           (defaultIngredients,
-                                                       defaultMainWithIngredients,
-                                                       includingOptions,
-                                                       testGroup, withResource)
-import           Test.Tasty.HUnit                     (testCaseSteps)
-import           Test.Tasty.Ingredients               (Ingredient)
+import           Test.Tasty                        (defaultMain, testGroup,
+                                                    withResource)
+import           Test.Tasty.HUnit                  (testCaseSteps)
 
 import           GeniusYield.CardanoApi.EraHistory
-import           GeniusYield.Providers.CardanoDbSync
-import           GeniusYield.Providers.LiteChainIndex
 import           GeniusYield.Types
 
 import           GeniusYield.Test.Privnet.Ctx
 import qualified GeniusYield.Test.Privnet.Examples
-import           GeniusYield.Test.Privnet.Options
 import           GeniusYield.Test.Privnet.Setup
-
-ingredients :: [Ingredient]
-ingredients =
-    includingOptions optionDescriptions :
-    defaultIngredients
 
 main :: IO ()
 main = do
-    defaultMainWithIngredients ingredients $
-      askDbSyncOpts $ \dbSyncOpts ->
-      withResource (makeSetup dbSyncOpts) (const mempty) $ \setup ->
+    defaultMain $
+      withResource makeSetup (const mempty) $ \setup ->
       testGroup "atlas-privnet-tests"
           [ testCaseSteps "Balances" $ \info -> withSetup setup info $ \ctx -> do
               forM_ (zip [(1 :: Integer) ..] (ctxUserF ctx : ctxUsers ctx))
@@ -49,20 +37,6 @@ main = do
                       ]
 
                 )
-          , testCaseSteps "Chain index stats" $ \info -> withSetup setup info $ \ctx -> do
-              ctxWaitNextSlot ctx
-              (slot''', ndatums) <- lciStats $ ctxLCI ctx
-              info $ printf "chain index @ slot %s with %d datum hashes known\n" slot''' ndatums
-
-          , testCaseSteps "DB Sync slot" $ \info -> withSetup setup info $ \ctx -> do
-              case ctxDbSync ctx of
-                  Just dbSync -> do
-                      slot <- dbSyncSlotNumber dbSync
-                      info $ printf "db sync slot %s" slot
-
-                  Nothing ->
-                      info "No db sync connection"
-
           , testCaseSteps "SlotConfig" $ \info -> withSetup setup info $ \ctx -> do
               slot <- ctxSlotOfCurrentBlock ctx
               info $ printf "Slot %s" slot
@@ -79,7 +53,6 @@ main = do
               stakePools <- gyGetStakePools providers
               info $ printf "Stake pools: %s" (show stakePools)
 
-              -- TODO: how to select?
               eraHistory <- gyGetEraHistory providers
               info $ showEraSummaries eraHistory
 

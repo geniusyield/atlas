@@ -7,7 +7,9 @@ Stability   : develop
 
 -}
 module GeniusYield.Providers.Common (
-    SomeDeserializeError (..)
+      SomeDeserializeError (..)
+    , SubmitTxException (..)
+    , datumFromCBOR
     , newServantClientEnv
     , fromJson
     , parseEraHist
@@ -18,10 +20,12 @@ module GeniusYield.Providers.Common (
 ) where
 
 import qualified Data.Aeson                           as Aeson
+import qualified Data.ByteString.Base16               as BS16
 import qualified Data.ByteString.Lazy                 as LBS
 import           Data.Maybe                           (fromJust)
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
+import qualified Data.Text.Encoding                   as Text
 
 import qualified Network.HTTP.Client                  as HttpClient
 import qualified Network.HTTP.Client.TLS              as HttpClientTLS
@@ -33,10 +37,12 @@ import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api
 import           Cardano.Slotting.Time                (RelativeTime (RelativeTime),
                                                        mkSlotLength)
+import           Control.Exception                    (Exception)
 import           Data.Bifunctor                       (first)
 import           Data.SOP.Counting                    (NonEmpty (NonEmptyCons, NonEmptyOne))
 import qualified Ouroboros.Consensus.Cardano.Block    as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
+import           GeniusYield.Types.Datum              (GYDatum, datumFromApi')
 
 data SomeDeserializeError
     = DeserializeErrorBech32 !Api.Bech32DecodeError
@@ -49,6 +55,22 @@ data SomeDeserializeError
     | DeserializeErrorAddress
     | DeserializeErrorImpossibleBranch !Text
     deriving stock (Eq, Show)
+
+newtype SubmitTxException = SubmitTxException Text
+  deriving stock    (Show)
+  deriving anyclass (Exception)
+
+-- | Get datum from bytes.
+datumFromCBOR :: Text -> Either SomeDeserializeError GYDatum
+datumFromCBOR d = do
+  bs  <- fromEither $ BS16.decode $ Text.encodeUtf8 d
+  api <- fromEither $ Api.deserialiseFromCBOR Api.AsHashableScriptData bs
+  return $ datumFromApi' api
+  where
+    e = DeserializeErrorHex d
+
+    fromEither :: Either e a -> Either SomeDeserializeError a
+    fromEither = first $ const e
 
 {- | Remove request headers info from returned ClientError.
 

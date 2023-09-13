@@ -33,6 +33,11 @@ module GeniusYield.Types.Script (
     validatorHashFromApi,
     validatorHashFromPlutus,
 
+    -- * ScriptHash
+    GYScriptHash,
+    scriptHashFromApi,
+    scriptHashToApi,
+
     -- * MintingPolicy
     GYMintingPolicy,
     mintingPolicyId,
@@ -115,11 +120,11 @@ import qualified Text.Printf                      as Printf
 import qualified Web.HttpApiData                  as Web
 
 import           Data.ByteString                  (ByteString)
+import           Data.ByteString.Short            (ShortByteString)
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger         (PlutusToCardanoError (..))
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.TxOutRef       (GYTxOutRef, txOutRefToApi)
-import           Data.ByteString.Short            (ShortByteString)
 
 -- $setup
 --
@@ -229,6 +234,38 @@ validatorHashFromPlutus vh@(PlutusV1.ScriptHash ibs) =
         (\e -> DeserialiseRawBytesError $ Text.pack $ "validatorHashFromPlutus: " <> show vh <> ", error: " <> show e)
         validatorHashFromApi
     $ Api.deserialiseFromRawBytes Api.AsScriptHash $ PlutusTx.fromBuiltin ibs
+
+newtype GYScriptHash = GYScriptHash Api.ScriptHash
+  deriving stock (Show, Eq, Ord)
+  deriving newtype (FromJSON, ToJSON)
+
+-- |
+--
+-- >>> "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYScriptHash
+-- GYScriptHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
+--
+instance IsString GYScriptHash where
+    fromString = GYScriptHash . fromString
+
+-- |
+--
+-- >>> printf "%s" ("cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYScriptHash)
+-- cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0
+--
+instance Printf.PrintfArg GYScriptHash where
+    formatArg (GYScriptHash h) = formatArg $ init $ tail $ show h
+
+-- >>> Web.toUrlPiece (GYScriptHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0")
+-- "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
+--
+instance Web.ToHttpApiData GYScriptHash where
+    toUrlPiece = Api.serialiseToRawBytesHexText . scriptHashToApi
+
+scriptHashToApi :: GYScriptHash -> Api.ScriptHash
+scriptHashToApi = coerce
+
+scriptHashFromApi :: Api.ScriptHash -> GYScriptHash
+scriptHashFromApi = coerce
 
 -------------------------------------------------------------------------------
 -- Minting Policy

@@ -10,6 +10,7 @@ module GeniusYield.Types.Credential (
     GYPaymentCredential (..)
   , paymentCredentialToApi
   , paymentCredentialFromApi
+  , paymentCredentialToHexText
   , paymentCredentialToBech32
   ) where
 
@@ -43,6 +44,13 @@ paymentCredentialToApi (GYPaymentCredentialByScript sh) = Api.PaymentCredentialB
 paymentCredentialFromApi :: Api.PaymentCredential -> GYPaymentCredential
 paymentCredentialFromApi (Api.PaymentCredentialByKey pkh) = GYPaymentCredentialByKey (pubKeyHashFromApi pkh)
 paymentCredentialFromApi (Api.PaymentCredentialByScript sh) = GYPaymentCredentialByScript (validatorHashFromApi sh)
+
+-- | Get hexadecimal value of payment credential.
+paymentCredentialToHexText :: GYPaymentCredential -> Text
+paymentCredentialToHexText =
+  \case
+    GYPaymentCredentialByKey pkh -> Api.serialiseToRawBytesHexText (pubKeyHashToApi pkh)
+    GYPaymentCredentialByScript sh -> Api.serialiseToRawBytesHexText (validatorHashToApi sh)
 
 -- | Get the bech32 encoding for the given credential.
 paymentCredentialToBech32 :: GYPaymentCredential -> Text

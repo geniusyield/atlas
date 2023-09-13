@@ -125,7 +125,8 @@ data GYFromPlutusValueError
 
 -- | Value: a (total) map from asset classes ('GYAssetClass') to amount ('Integer').
 newtype GYValue = GYValue (Map.Map GYAssetClass Integer)
-  deriving (Eq)
+  deriving Eq
+  deriving newtype Ord
 
 -- | Check the 'GYValue' representation invariants.
 --
@@ -284,7 +285,7 @@ assetPairToKV ac i = K.fromText (f ac) .= i
 -- >>> Aeson.decode @GYValue "{\"ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.474f4c44\":101,\"lovelace\":22}"
 -- Just (valueFromList [(GYLovelace,22),(GYToken "ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef" "GOLD",101)])
 --
-instance Aeson.FromJSON GYValue where
+instance Aeson.FromJSON GYValue where  -- TODO: Do we need this? Can't this be derived from newtype?
   parseJSON = Aeson.withObject "GYValue" $ \km ->
     case KM.toList km of
         [] -> pure $ valueMake mempty

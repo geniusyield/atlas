@@ -37,7 +37,6 @@ import qualified Web.HttpApiData                      as Web
 
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
-import           GeniusYield.Providers.SubmitApi      (SubmitTxException (..))
 import           GeniusYield.Types
 
 data BlockfrostProviderException

@@ -162,6 +162,7 @@ txToHex = BS8.unpack . txToHexBS
 -- | Transaction hash/id of a particular transaction.
 newtype GYTxId = GYTxId Api.TxId
     deriving (Eq, Ord)
+    deriving newtype (FromJSON)  -- TODO: Also derive ToJSON?
 
 instance PQ.ToField GYTxId where
     toField (GYTxId txId) = PQ.toField (PQ.Binary (Api.serialiseToRawBytes txId))

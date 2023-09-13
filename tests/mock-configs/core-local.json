@@ -1,4 +1,4 @@
 {
-    "socketPath": "testnet/node.socket",
-    "maestroToken": "someapikey"
+  "socketPath": "testnet/node.socket",
+  "kupoUrl": "http://localhost:1442"
 }

@@ -9,39 +9,35 @@ Stability   : develop
 -}
 module GeniusYield.GYConfig
     ( GYCoreConfig (..)
+    , Confidential (..)
     , GYCoreProviderInfo (..)
     , withCfgProviders
     , coreConfigIO
     , coreProviderIO
     , findMaestroTokenAndNetId
-    , isNodeChainIx
+    , isNodeKupo
     , isMaestro
     , isBlockfrost
-    , isDbSync
     ) where
 
-import           Control.Exception                   (SomeException, bracket,
-                                                      try)
-import qualified Data.Aeson                          as Aeson
+import           Control.Exception                (SomeException, bracket, try)
+import qualified Data.Aeson                       as Aeson
 import           Data.Aeson.TH
 import           Data.Aeson.Types
-import qualified Data.ByteString.Lazy                as LBS
-import           Data.Char                           (toLower)
-import qualified Data.Text                           as T
-import           Data.Time                           (NominalDiffTime)
-import qualified Database.PostgreSQL.Simple          as PQ
-import qualified Database.PostgreSQL.Simple.URL      as PQ
+import qualified Data.ByteString.Lazy             as LBS
+import           Data.Char                        (toLower)
+import qualified Data.Text                        as Text
+import           Data.Time                        (NominalDiffTime)
 
-import qualified Cardano.Api                         as Api
+import qualified Cardano.Api                      as Api
 
 import           GeniusYield.Imports
-import qualified GeniusYield.Providers.Blockfrost    as Blockfrost
+import qualified GeniusYield.Providers.Blockfrost as Blockfrost
 -- import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
-import qualified GeniusYield.Providers.CardanoDbSync as DbSync
-import qualified GeniusYield.Providers.Katip         as Katip
-import qualified GeniusYield.Providers.Maestro       as MaestroApi
-import qualified GeniusYield.Providers.Node          as Node
-import qualified GeniusYield.Providers.SubmitApi     as SubmitApi
+import qualified GeniusYield.Providers.Katip      as Katip
+import qualified GeniusYield.Providers.Kupo       as KupoApi
+import qualified GeniusYield.Providers.Maestro    as MaestroApi
+import qualified GeniusYield.Providers.Node       as Node
 import           GeniusYield.Types
 
 -- | How many seconds to keep slots cached, before refetching the data.
@@ -55,15 +51,6 @@ newtype Confidential a = Confidential a
 instance Show (Confidential a) where
   showsPrec _ _ = showString "<Confidential>"
 
-newtype PQConnInf = PQConnInf PQ.ConnectInfo
-  deriving newtype (Show)
-
-instance FromJSON PQConnInf where
-  parseJSON = Aeson.withText "ConnectInfo URL" $ \t ->
-    case PQConnInf <$> PQ.parseDatabaseUrl (T.unpack t) of
-      Nothing -> fail "Invalid PostgreSQL URL"
-      Just ci -> pure ci
-
 {- |
 The supported providers. The options are:
 
@@ -73,16 +60,14 @@ The supported providers. The options are:
 
 In JSON format, this essentially corresponds to:
 
-= { socketPath: FilePath, maestroToken: string }
-| { cardanoDbSync: PQ.ConnectInfo, cardanoSubmitApiUrl: string }
+= { socketPath: FilePath, kupoUrl: string }
 | { maestroToken: string }
 | { blockfrostKey: string }
 
 The constructor tags don't need to appear in the JSON.
 -}
 data GYCoreProviderInfo
-  = GYNodeChainIx {cpiSocketPath :: !FilePath, cpiMaestroToken :: !(Confidential Text)}
-  | GYDbSync {cpiCardanoDbSync :: !PQConnInf, cpiCardanoSubmitApiUrl :: !String}
+  = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text}
   | GYMaestro {cpiMaestroToken :: !(Confidential Text)}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock (Show)
@@ -102,21 +87,17 @@ coreProviderIO filePath = do
     Left err  -> throwIO $ userError err
     Right cfg -> pure cfg
 
-isNodeChainIx :: GYCoreProviderInfo -> Bool
-isNodeChainIx GYNodeChainIx{} = True
-isNodeChainIx _               = False
-
-isDbSync :: GYCoreProviderInfo -> Bool
-isDbSync GYDbSync{} = True
-isDbSync _          = False
+isNodeKupo :: GYCoreProviderInfo -> Bool
+isNodeKupo GYNodeKupo {} = True
+isNodeKupo _             = False
 
 isMaestro :: GYCoreProviderInfo -> Bool
-isMaestro GYMaestro{} = True
-isMaestro _           = False
+isMaestro GYMaestro {} = True
+isMaestro _            = False
 
 isBlockfrost :: GYCoreProviderInfo -> Bool
-isBlockfrost GYBlockfrost{} = True
-isBlockfrost _              = False
+isBlockfrost GYBlockfrost {} = True
+isBlockfrost _               = False
 
 findMaestroTokenAndNetId :: [GYCoreConfig] -> IO (Text, GYNetworkId)
 findMaestroTokenAndNetId configs = do
@@ -173,31 +154,18 @@ withCfgProviders
     f =
     do
       (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed) <- case cfgCoreProvider of
-        GYNodeChainIx path (Confidential key) -> do
+        GYNodeKupo path kupoUrl -> do
           let info = nodeConnectInfo path cfgNetworkId
               era = networkIdToEra cfgNetworkId
-          mEnv <- MaestroApi.networkIdToMaestroEnv key cfgNetworkId
+          kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
           nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetSlotOfCurrentBlock info
           pure
             ( Node.nodeGetParameters era info
             , nodeSlotActions
-            , Node.nodeQueryUTxO era info
-            , MaestroApi.maestroLookupDatum mEnv
+            , KupoApi.kupoQueryUtxo kEnv
+            , KupoApi.kupoLookupDatum kEnv
             , Node.nodeSubmitTx info
-            , MaestroApi.maestroAwaitTxConfirmed mEnv
-            )
-        GYDbSync (PQConnInf ci) submitUrl -> do
-          -- NOTE: This provider generally does not support anything other than private testnets.
-          conn              <- DbSync.openDbSyncConn ci
-          submitApiEnv      <- SubmitApi.newSubmitApiEnv submitUrl
-          dbSyncSlotActions <- makeSlotActions slotCachingTime $ DbSync.dbSyncSlotNumber conn
-          pure
-            ( DbSync.dbSyncGetParameters conn
-            , dbSyncSlotActions
-            , DbSync.dbSyncQueryUtxo conn
-            , DbSync.dbSyncLookupDatum conn
-            , SubmitApi.submitApiSubmitTxDefault submitApiEnv
-            , DbSync.dbSyncAwaitTxConfirmed conn
+            , KupoApi.kupoAwaitTxConfirmed kEnv
             )
         GYMaestro (Confidential apiToken) -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId

@@ -279,7 +279,7 @@ kupoQueryUtxo env =
     , gyQueryUtxoAtTxOutRef' = kupoUtxoAtTxOutRef env
     , gyQueryUtxoRefsAtAddress' = gyQueryUtxoRefsAtAddressDefault $ kupoUtxosAtAddress env
     , gyQueryUtxosAtAddressesWithDatums' = Nothing
-    , gyQueryUtxosAtPaymentCredential' = Just $ kupoUtxosAtPaymentCredential env
+    , gyQueryUtxosAtPaymentCredential' = kupoUtxosAtPaymentCredential env
     }
 
 kupoAwaitTxConfirmed :: KupoApiEnv -> GYAwaitTx

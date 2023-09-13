@@ -10,11 +10,12 @@ Stability   : develop
 module GeniusYield.Providers.Node
     ( nodeSubmitTx
     , nodeSlotActions
-    , nodeQueryUTxO
     , nodeGetParameters
     -- * Low-level
     , nodeGetSlotOfCurrentBlock
     , nodeUtxosAtAddress
+    , nodeUtxoAtTxOutRef
+    , nodeUtxosAtTxOutRefs
     -- * Auxiliary
     , networkIdToLocalNodeConnectInfo
     ) where
@@ -66,17 +67,6 @@ nodeSlotActions info = GYSlotActions
 -------------------------------------------------------------------------------
 -- UTxO query
 -------------------------------------------------------------------------------
-
-nodeQueryUTxO :: GYEra -> Api.LocalNodeConnectInfo Api.CardanoMode -> GYQueryUTxO
-nodeQueryUTxO era info = GYQueryUTxO
-    { gyQueryUtxosAtTxOutRefs'           = nodeUtxosAtTxOutRefs era info
-    , gyQueryUtxosAtTxOutRefsWithDatums' = Nothing  -- Will use the default implementation.
-    , gyQueryUtxoAtTxOutRef'             = nodeUtxoAtTxOutRef era info
-    , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ nodeUtxosAtAddress era info
-    , gyQueryUtxosAtAddresses'           = gyQueryUtxoAtAddressesDefault $ nodeUtxosAtAddress era info
-    , gyQueryUtxosAtAddressesWithDatums' = Nothing  -- Will use the default implementation.
-    , gyQueryUtxosAtPaymentCredential'   = Nothing
-    }
 
 nodeUtxosAtAddress :: GYEra -> Api.LocalNodeConnectInfo Api.CardanoMode -> GYAddress -> IO GYUTxOs
 nodeUtxosAtAddress era info addr = queryUTxO era info $ Api.QueryUTxOByAddress $ Set.singleton $ addressToApi addr

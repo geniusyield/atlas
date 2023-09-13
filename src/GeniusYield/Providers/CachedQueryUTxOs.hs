@@ -17,19 +17,21 @@ import           GeniusYield.Imports
 import           GeniusYield.Types
 
 data CachedQueryUTxO = CachedQueryUTxO
-    { _cquAddrCache :: !(Cache.Cache GYAddress GYUTxOs)
-    , _cquRefCache  :: !(Cache.Cache GYTxOutRef (Maybe GYUTxO))
-    , _cquInfo      :: !GYQueryUTxO
-    , _cquLog       :: !GYLog
+    { _cquAddrCache        :: !(Cache.Cache GYAddress GYUTxOs)
+    , _cquRefCache         :: !(Cache.Cache GYTxOutRef (Maybe GYUTxO))
+    , _cquPaymentCredCache :: !(Cache.Cache GYPaymentCredential GYUTxOs)
+    , _cquInfo             :: !GYQueryUTxO
+    , _cquLog              :: !GYLog
     }
 
 -- | Return a cached 'GYQueryUTxO' and a cache clearing function.
 makeCachedQueryUTxO :: GYQueryUTxO -> GYLog -> IO (GYQueryUTxO, IO ())
 makeCachedQueryUTxO query log' = do
-    addrCache <- Cache.newCache Nothing
-    refCache  <- Cache.newCache Nothing
-    let purge = Cache.purge addrCache >> Cache.purge refCache
-    return (cachedQueryUTxO $ CachedQueryUTxO addrCache refCache query log', purge)
+    addrCache        <- Cache.newCache Nothing
+    refCache         <- Cache.newCache Nothing
+    paymentCredCache <- Cache.newCache Nothing
+    let purge = Cache.purge addrCache >> Cache.purge refCache >> Cache.purge paymentCredCache
+    return (cachedQueryUTxO $ CachedQueryUTxO addrCache refCache paymentCredCache query log', purge)
 
 cachedQueryUTxO :: CachedQueryUTxO -> GYQueryUTxO
 cachedQueryUTxO q = GYQueryUTxO
@@ -39,14 +41,14 @@ cachedQueryUTxO q = GYQueryUTxO
     (gyQueryUtxoRefsAtAddressDefault $ cachedUtxosAtAddress q)
     (gyQueryUtxoAtAddressesDefault $ cachedUtxosAtAddress q)
     Nothing  -- Will use the default implementation.
-    Nothing
+    (cachedUtxosAtPaymentCred q)
 
 -------------------------------------------------------------------------------
 -- Queries & caching
 -------------------------------------------------------------------------------
 
 cachedUtxoAtTxOutRef :: CachedQueryUTxO -> GYTxOutRef -> IO (Maybe GYUTxO)
-cachedUtxoAtTxOutRef (CachedQueryUTxO _ cache q _) ref = do
+cachedUtxoAtTxOutRef (CachedQueryUTxO _ cache _ q _) ref = do
   m <- Cache.lookup' cache ref
   case m of
     Nothing -> do
@@ -58,7 +60,7 @@ cachedUtxoAtTxOutRef (CachedQueryUTxO _ cache q _) ref = do
       return res
 
 cachedUtxosAtTxOutRefs :: CachedQueryUTxO -> [GYTxOutRef] -> IO GYUTxOs
-cachedUtxosAtTxOutRefs ctx@(CachedQueryUTxO _ cache q (GYLog log' _)) refs = do
+cachedUtxosAtTxOutRefs ctx@(CachedQueryUTxO _ cache _ q (GYLog log' _)) refs = do
     step1 <- forM refs $ \ref -> (ref, ) <$> Cache.lookup' cache ref
 
     -- refs with no results in cache.
@@ -79,15 +81,15 @@ cachedUtxosAtTxOutRefs ctx@(CachedQueryUTxO _ cache q (GYLog log' _)) refs = do
 -- When we query complete UTxOs,
 -- we can store the pieces of resulting UTxOs in per-txoutref cache.
 storeCacheUTxO :: CachedQueryUTxO -> GYUTxOs -> IO ()
-storeCacheUTxO (CachedQueryUTxO _ cache _ _) utxos = forUTxOs_ utxos $ \utxo ->
+storeCacheUTxO (CachedQueryUTxO _ cache _ _ _) utxos = forUTxOs_ utxos $ \utxo ->
     let ref = utxoRef utxo
     in  Cache.insert cache ref (Just utxo)
 
 cachedUtxosAtAddress :: CachedQueryUTxO -> GYAddress -> IO GYUTxOs
-cachedUtxosAtAddress ctx@(CachedQueryUTxO cache _ q (GYLog log' _)) addr = do
+cachedUtxosAtAddress ctx@(CachedQueryUTxO cache _ _ q (GYLog log' _)) addr = do
   m <- Cache.lookup' cache addr
   case m of
-    Nothing    -> do
+    Nothing  -> do
       log' mempty GYDebug $ "address not cached: " <> show addr
       res <- gyQueryUtxosAtAddress' q addr
       Cache.insert cache addr res
@@ -95,4 +97,18 @@ cachedUtxosAtAddress ctx@(CachedQueryUTxO cache _ q (GYLog log' _)) addr = do
       return  res
     Just res -> do
       log' mempty GYDebug $ "address cached:"  <> show addr
+      return res
+
+cachedUtxosAtPaymentCred :: CachedQueryUTxO -> GYPaymentCredential -> IO GYUTxOs
+cachedUtxosAtPaymentCred ctx@(CachedQueryUTxO _ _ cache q (GYLog log' _)) cred = do
+  m <- Cache.lookup' cache cred
+  case m of
+    Nothing    -> do
+      log' mempty GYDebug $ "payment credential not cached: " <> show cred
+      res <- gyQueryUtxosAtPaymentCredential' q cred
+      Cache.insert cache cred res
+      storeCacheUTxO ctx res
+      return  res
+    Just res -> do
+      log' mempty GYDebug $ "payment credential cached:"  <> show cred
       return res

@@ -140,7 +140,7 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     utxoRefsAtAddress :: GYAddress -> m [GYTxOutRef]
     utxoRefsAtAddress = fmap (Map.keys . mapUTxOs id) . utxosAtAddress
 
-    utxosAtPaymentCredential :: GYPaymentCredential -> m (Maybe GYUTxOs)
+    utxosAtPaymentCredential :: GYPaymentCredential -> m GYUTxOs
 
     {- | Obtain the slot config for the network.
 

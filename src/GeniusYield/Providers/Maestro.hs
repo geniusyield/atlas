@@ -351,7 +351,7 @@ maestroQueryUtxo env = GYQueryUTxO
   , gyQueryUtxoAtTxOutRef'             = maestroUtxoAtTxOutRef env
   , gyQueryUtxoRefsAtAddress'          = maestroRefsAtAddress env
   , gyQueryUtxosAtAddressesWithDatums' = Just $ maestroUtxosAtAddressesWithDatums env
-  , gyQueryUtxosAtPaymentCredential'   = Just $ maestroUtxosAtPaymentCredential env
+  , gyQueryUtxosAtPaymentCredential'   = maestroUtxosAtPaymentCredential env
   }
 
 -------------------------------------------------------------------------------

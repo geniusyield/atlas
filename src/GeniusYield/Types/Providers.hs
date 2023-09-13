@@ -146,11 +146,8 @@ gyQueryUtxosAtAddress = gyQueryUtxosAtAddress' . gyQueryUTxO
 gyQueryUtxosAtAddresses :: GYProviders -> [GYAddress] -> IO  GYUTxOs
 gyQueryUtxosAtAddresses = gyQueryUtxosAtAddresses' . gyQueryUTxO
 
-gyQueryUtxosAtPaymentCredential :: GYProviders -> GYPaymentCredential -> IO (Maybe GYUTxOs)
-gyQueryUtxosAtPaymentCredential p =
-  case gyQueryUtxosAtPaymentCredential' (gyQueryUTxO p) of
-    Nothing -> const $ pure Nothing
-    Just f  -> fmap Just . f
+gyQueryUtxosAtPaymentCredential :: GYProviders -> GYPaymentCredential -> IO GYUTxOs
+gyQueryUtxosAtPaymentCredential = gyQueryUtxosAtPaymentCredential' . gyQueryUTxO
 
 gyQueryUtxosAtAddressesWithDatums :: GYProviders -> [GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]
 gyQueryUtxosAtAddressesWithDatums provider addrs =
@@ -403,7 +400,7 @@ data GYQueryUTxO = GYQueryUTxO
     , gyQueryUtxoRefsAtAddress'          :: !(GYAddress -> IO [GYTxOutRef])
     , gyQueryUtxosAtAddresses'           :: !([GYAddress] -> IO GYUTxOs)
     , gyQueryUtxosAtAddressesWithDatums' :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))
-    , gyQueryUtxosAtPaymentCredential'   :: !(Maybe (GYPaymentCredential -> IO GYUTxOs))
+    , gyQueryUtxosAtPaymentCredential'   :: !(GYPaymentCredential -> IO GYUTxOs)
     -- ^ `gyQueryUtxosAtAddressesWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
     }
 

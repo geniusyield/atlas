@@ -55,11 +55,22 @@ allow-newer:
 source-repository-package
   type: git
   location: https://github.com/geniusyield/plutus-simple-model
-  tag: e50689784c6adc6d04507ce537c2d850bc7d07ae
-  --sha256: sha256-FZ7Ctff0Vg4MykfB3ZzGWhrWrB3Ht0smkgIVY8AlxWg=
+  tag: 0cb63af903a835c73aec662092eb67d228bba9b0
+  --sha256: sha256-H56EyRFNdDvLDo9FVeGZyQZ92itQPG39TkMVyEC/xqM=
   subdir:
     cardano-simple
     psm
+
+-- Temporary until the changes are merged upstream. Delete this afterwards.
+source-repository-package
+  type: git
+  location: https://github.com/sourabhxyz/blockfrost-haskell
+  tag: d1ace8d71512a70f37131e4d4c4d5ba67a6324c9
+  --sha256: sha256-GXKuRyBnpITjxRDHauJwpjQu8qX4UPLud/opc+Mi9Fg=
+  subdir:
+    blockfrost-api
+    blockfrost-client-core
+    blockfrost-client
 
 -- Everything below is essentially copied from cardano-wallet's cabal.project.
 -------- Begin contents from @cardano-wallet@'s @cabal.project@ file. --------

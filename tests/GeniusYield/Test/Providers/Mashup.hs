@@ -66,7 +66,11 @@ providersMashupTests configs =
           utxosAtRefsWithDatums' <- gyQueryUtxosAtTxOutRefsWithDatums provider outputRefs
           threadDelay 1_000_000
           utxoAtRefWithDatum' <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxoAtTxOutRefWithDatum refWithDatumHash
-          pure (utxosAtAddresses', utxoBug2 `Set.delete` (utxoBug1 `Set.delete` Set.fromList utxosAtAddressesWithDatums'), utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum')
+          threadDelay 1_000_000
+          utxosAtScriptCredential <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxosAtPaymentCredential $ GYPaymentCredentialByScript "51936f3c98a04b6609aa9b5c832ba1182cf43a58e534fcc05db09d69"  -- Credential of always fail script address.
+          threadDelay 1_000_000
+          utxosAtKeyCredential <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxosAtPaymentCredential $ GYPaymentCredentialByKey "07fb2b78b3917d3f6bfa3a59de61f3c225cbf0d5564a1cbc6f96d6eb"  -- Credential of CI wallet.
+          pure (utxosAtAddresses', utxoBug2 `Set.delete` (utxoBug1 `Set.delete` Set.fromList utxosAtAddressesWithDatums'), utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum', utxosAtScriptCredential <> utxosAtKeyCredential)
         assertBool "Utxos are not all equal" $ all (== head utxosProviders) (tail utxosProviders)
     , testCase "Checking presence of error message when submitting an invalid transaction" $ do
         let

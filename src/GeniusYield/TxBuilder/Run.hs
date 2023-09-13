@@ -22,46 +22,48 @@ module GeniusYield.TxBuilder.Run
     , networkIdRun
     ) where
 
-import qualified Cardano.Api                          as Api
-import qualified Cardano.Api.Shelley                  as Api.S
-import qualified Cardano.Ledger.Alonzo.Language       as Ledger
-import qualified Cardano.Ledger.BaseTypes             as Ledger
-import           Cardano.Slotting.Time                (RelativeTime (RelativeTime),
-                                                       mkSlotLength)
+import qualified Cardano.Api                               as Api
+import qualified Cardano.Api.Shelley                       as Api.S
+import qualified Cardano.Ledger.Alonzo.Language            as Ledger
+import qualified Cardano.Ledger.BaseTypes                  as Ledger
+import qualified Cardano.Simple.Ledger.Slot                as Fork
+import qualified Cardano.Simple.Ledger.TimeSlot            as Fork
+import qualified Cardano.Simple.Ledger.Tx                  as Fork
+import           Cardano.Slotting.Time                     (RelativeTime (RelativeTime),
+                                                            mkSlotLength)
 import           Control.Monad.Except
 import           Control.Monad.Random
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Data.Foldable                        (foldMap')
-import           Data.List                            ((\\))
-import           Data.List.NonEmpty                   (NonEmpty (..))
-import qualified Data.Map.Strict                      as Map
-import           Data.Semigroup                       (Sum (..))
-import qualified Data.Set                             as Set
-import           Data.Time.Clock                      (NominalDiffTime, UTCTime)
-import           Data.Time.Clock.POSIX                (posixSecondsToUTCTime)
-import qualified Ouroboros.Consensus.Cardano.Block    as Ouroboros
-import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
-import           Data.SOP.Counting    (NonEmpty (NonEmptyCons, NonEmptyOne))
+import           Data.Foldable                             (foldMap')
+import           Data.List                                 ((\\))
+import           Data.List.NonEmpty                        (NonEmpty (..))
+import qualified Data.Map.Strict                           as Map
+import           Data.Semigroup                            (Sum (..))
+import qualified Data.Set                                  as Set
+import           Data.SOP.Counting                         (NonEmpty (NonEmptyCons, NonEmptyOne))
+import           Data.Time.Clock                           (NominalDiffTime,
+                                                            UTCTime)
+import           Data.Time.Clock.POSIX                     (posixSecondsToUTCTime)
+import qualified Ouroboros.Consensus.Cardano.Block         as Ouroboros
+import qualified Ouroboros.Consensus.HardFork.History      as Ouroboros
 import           Plutus.Model
-import qualified Cardano.Simple.Ledger.Slot           as Fork
-import qualified Cardano.Simple.Ledger.TimeSlot       as Fork
-import qualified Cardano.Simple.Ledger.Tx             as Fork
 import           Plutus.Model.Mock.ProtocolParameters
 import           Plutus.Model.Stake
-import qualified PlutusLedgerApi.V1.Interval          as Plutus
-import qualified PlutusLedgerApi.V2                   as Plutus
-import qualified PlutusTx.Builtins.Internal           as Plutus
+import qualified PlutusLedgerApi.V1.Interval               as Plutus
+import qualified PlutusLedgerApi.V2                        as Plutus
+import qualified PlutusTx.Builtins.Internal                as Plutus
 
+import qualified Cardano.Simple.PlutusLedgerApi.V1.Scripts as Fork
+import           Data.Sequence                             (ViewR (..), viewr)
 import           GeniusYield.Imports
-import           GeniusYield.Transaction              (GYCoinSelectionStrategy (GYRandomImproveMultiAsset))
-import           GeniusYield.Transaction.Common       (adjustTxOut, minimumUTxO)
+import           GeniusYield.Transaction                   (GYCoinSelectionStrategy (GYRandomImproveMultiAsset))
+import           GeniusYield.Transaction.Common            (adjustTxOut,
+                                                            minimumUTxO)
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
-import qualified Cardano.Simple.PlutusLedgerApi.V1.Scripts as Fork
-import           Data.Sequence                        (viewr, ViewR (..))
 
 type WalletName = String
 
@@ -162,7 +164,17 @@ instance GYTxQueryMonad GYTxMonadRun where
                 Left _     -> return Nothing
                 Right ref' -> utxoAtTxOutRef ref'
 
-    utxosAtPaymentCredential = const $ pure Nothing
+    utxosAtPaymentCredential cred = do
+        refs  <- liftRun $ txOutRefAtPaymentCred $ paymentCredentialToPlutus cred
+        utxos <- wither f refs
+        return $ utxosFromList utxos
+      where
+        f :: Plutus.TxOutRef -> GYTxMonadRun (Maybe GYUTxO)
+        f ref = do
+            case txOutRefFromPlutus ref of
+                Left _     -> return Nothing
+                Right ref' -> utxoAtTxOutRef ref'
+
 
     utxoAtTxOutRef ref = do
         mUtxosWithoutRefScripts   <- liftRun $ gets mockUtxos

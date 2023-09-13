@@ -36,7 +36,7 @@ import           Control.Monad.Random
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.Foldable                             (foldMap')
-import           Data.List                                 ((\\))
+import           Data.List                                 ((\\), singleton)
 import           Data.List.NonEmpty                        (NonEmpty (..))
 import qualified Data.Map.Strict                           as Map
 import           Data.Semigroup                            (Sum (..))

@@ -181,6 +181,21 @@ blockfrostQueryUtxo proj = GYQueryUTxO
     , gyQueryUtxosAtPaymentCredential'   = blockfrostUtxosAtPaymentCredential proj
     }
 
+transformUtxo :: (Blockfrost.AddressUtxo, Maybe (Some GYScript)) -> Either SomeDeserializeError GYUTxO
+transformUtxo (Blockfrost.AddressUtxo {..}, ms) = do
+    val  <- bimap DeserializeErrorAssetClass fold $ traverse amountToValue _addressUtxoAmount
+    addr <- maybeToRight DeserializeErrorAddress $ addressFromTextMaybe $ Blockfrost.unAddress _addressUtxoAddress
+    ref  <- first DeserializeErrorHex . Web.parseUrlPiece
+                $ Blockfrost.unTxHash _addressUtxoTxHash <> Text.pack ('#' : show _addressUtxoOutputIndex)
+    d    <- outDatumFromBlockfrost _addressUtxoDataHash _addressUtxoInlineDatum
+    pure GYUTxO
+        { utxoRef       = ref
+        , utxoAddress   = addr
+        , utxoValue     = val
+        , utxoOutDatum  = d
+        , utxoRefScript = ms
+        }
+
 blockfrostUtxosAtAddress :: Blockfrost.Project -> GYAddress -> IO GYUTxOs
 blockfrostUtxosAtAddress proj addr = do
     {- 'Blockfrost.getAddressUtxos' doesn't return all utxos at that address, only the first 100 or so.
@@ -193,19 +208,6 @@ blockfrostUtxosAtAddress proj addr = do
       Left err -> throwIO $ BlpvDeserializeFailure locationIdent err
       Right x  -> pure $ utxosFromList x
   where
-    transformUtxo :: (Blockfrost.AddressUtxo, Maybe (Some GYScript)) -> Either SomeDeserializeError GYUTxO
-    transformUtxo (Blockfrost.AddressUtxo {..}, ms) = do
-        val  <- bimap DeserializeErrorAssetClass fold $ traverse amountToValue _addressUtxoAmount
-        ref  <- first DeserializeErrorHex . Web.parseUrlPiece
-                    $ Blockfrost.unTxHash _addressUtxoTxHash <> Text.pack ('#' : show _addressUtxoOutputIndex)
-        d    <- outDatumFromBlockfrost _addressUtxoDataHash _addressUtxoInlineDatum
-        pure GYUTxO
-            { utxoRef       = ref
-            , utxoAddress   = addr
-            , utxoValue     = val
-            , utxoOutDatum  = d
-            , utxoRefScript = ms
-            }
     locationIdent = "AddressUtxos"
     -- This particular error is fine in this case, we can just return empty list.
     handler (Left Blockfrost.BlockfrostNotFound) = pure []
@@ -223,21 +225,7 @@ blockfrostUtxosAtPaymentCredential proj cred = do
       Left err -> throwIO $ BlpvDeserializeFailure locationIdent err
       Right x  -> pure $ utxosFromList x
   where
-    transformUtxo :: (Blockfrost.AddressUtxo, Maybe (Some GYScript)) -> Either SomeDeserializeError GYUTxO
-    transformUtxo (Blockfrost.AddressUtxo {..}, ms) = do
-        val  <- bimap DeserializeErrorAssetClass fold $ traverse amountToValue _addressUtxoAmount
-        addr <- maybeToRight DeserializeErrorAddress $ addressFromTextMaybe $ Blockfrost.unAddress _addressUtxoAddress
-        ref  <- first DeserializeErrorHex . Web.parseUrlPiece
-                    $ Blockfrost.unTxHash _addressUtxoTxHash <> Text.pack ('#' : show _addressUtxoOutputIndex)
-        d    <- outDatumFromBlockfrost _addressUtxoDataHash _addressUtxoInlineDatum
-        pure GYUTxO
-            { utxoRef       = ref
-            , utxoAddress   = addr
-            , utxoValue     = val
-            , utxoOutDatum  = d
-            , utxoRefScript = ms
-            }
-    locationIdent = "AddressUtxos"
+    locationIdent = "PaymentCredentialUtxos"
     -- This particular error is fine in this case, we can just return empty list.
     handler (Left Blockfrost.BlockfrostNotFound) = pure []
     handler other                                = handleBlockfrostError locationIdent other

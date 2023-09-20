@@ -61,6 +61,7 @@ module GeniusYield.Transaction (
 
 import           Control.Monad.Trans.Except            (runExceptT, throwE)
 import           Data.Foldable                         (for_)
+import           Data.List                             ((\\), delete)
 import qualified Data.Map                              as Map
 import           Data.Ratio                            ((%))
 
@@ -117,6 +118,7 @@ data BuildTxException
     | BuildTxNoSuitableCollateral
     -- ^ Couldn't find a UTxO to use as collateral.
     | BuildTxCborSimplificationError !CborSimplificationError
+    | BuildTxCollapseExtraOutError !Api.TxBodyError
   deriving stock    Show
   deriving anyclass (Exception, IsGYApiError)
 
@@ -443,7 +445,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
         Nothing
 
     -- We should call `makeTransactionBodyAutoBalance` again with updated values of collaterals so as to get slightly lower fee estimate.
-    Api.BalancedTxBody _ txBody _ _ <- if collaterals == mempty then return bodyBeforeCollUpdate else
+    Api.BalancedTxBody txBodyContent txBody extraOut _ <- if collaterals == mempty then return bodyBeforeCollUpdate else
 
       let
 
@@ -488,4 +490,34 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
         {- Technically, this doesn't compare with the _final_ tx size, because of signers that will be
         added later. But signing witnesses are only a few bytes, so it's unlikely to be an issue -}
         Left (BuildTxSizeTooBig maxTxSize txSize)
-    first BuildTxCborSimplificationError $ simplifyGYTxBodyCbor $ txBodyFromApi txBody
+
+    collapsedBody <- first BuildTxCollapseExtraOutError $ collapseExtraOut extraOut txBodyContent
+
+    first BuildTxCborSimplificationError $ simplifyGYTxBodyCbor $ txBodyFromApi collapsedBody
+
+collapseExtraOut
+  :: forall era
+  . Api.S.IsCardanoEra era
+  => Api.TxOut Api.S.CtxTx era
+  -> Api.TxBodyContent Api.S.BuildTx era
+  -> Either Api.S.TxBodyError (Api.S.TxBody era)
+collapseExtraOut apiOut@(Api.TxOut outAddr outVal _ _) (bodyContent@(Api.TxBodyContent {txOuts})) =
+    case delete apiOut cOuts of
+        [] -> Api.S.createAndValidateTransactionBody bodyContent
+        -- sOut == selected Out == A cOut != eOut that will merge with eOut
+        (sOut@(Api.TxOut sOutAddr sOutVal sOutDat sOutRefScript):_) -> let
+
+            nOutVal = case sOutVal of
+                Api.TxOutAdaOnly oasie l -> Api.TxOutAdaOnly oasie $ Api.txOutValueToLovelace outVal <> l
+                Api.TxOutValue masie val -> Api.TxOutValue masie $ Api.txOutValueToValue outVal <> val
+
+            -- nOut == new Out == The merging of both eOut and sOut
+            nOut = Api.TxOut sOutAddr nOutVal sOutDat sOutRefScript
+            -- nOuts == new Outs == The new list of all old outs mins eOut and sOut plus the nOut
+            nOuts = (txOuts \\ [apiOut, sOut]) ++ [nOut]
+
+            in
+                Api.S.createAndValidateTransactionBody $ bodyContent { Api.txOuts = nOuts }
+  where
+    -- cOuts == change Outs == outs with the change address
+    cOuts = filter (\(Api.TxOut addr _ _ _) -> addr == outAddr) txOuts

@@ -61,12 +61,12 @@ source-repository-package
     cardano-simple
     psm
 
--- Temporary until the changes are merged upstream. Delete this afterwards.
+-- This should be present for in hackage index state >= 18th of september, 23. Remove it when we update to it.
 source-repository-package
   type: git
-  location: https://github.com/sourabhxyz/blockfrost-haskell
-  tag: d1ace8d71512a70f37131e4d4c4d5ba67a6324c9
-  --sha256: sha256-GXKuRyBnpITjxRDHauJwpjQu8qX4UPLud/opc+Mi9Fg=
+  location: https://github.com/blockfrost/blockfrost-haskell
+  tag: 206e1a0f62e2a7cc08d05db8d62cef8dc2fbd98e
+  --sha256: sha256-R6BP3hwrOBmlRabA3prUuOGkYzETmQIM+K+Oh+fczEY=
   subdir:
     blockfrost-api
     blockfrost-client-core

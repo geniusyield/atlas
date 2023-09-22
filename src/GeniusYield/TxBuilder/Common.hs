@@ -23,6 +23,7 @@ import           Control.Applicative            ((<|>))
 import           Data.List.NonEmpty             (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty             as NE
 import qualified Data.Map.Strict                as Map
+import           Data.Ratio                     ((%))
 import qualified Data.Set                       as Set
 
 import           GeniusYield.Imports
@@ -133,12 +134,13 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                     find
                       (\u ->
                         let v = utxoValue u
+                            maximumRequiredCollateralValue' = maximumRequiredCollateralValue $ Api.S.unbundleProtocolParams pp
                             -- Following depends on that we allow unsafe, i.e., negative coins count below. In future, we can take magnitude instead.
-                            vWithoutMaxCollPledge = v `valueMinus` maximumRequiredCollateralValue
+                            vWithoutMaxCollPledge = v `valueMinus` maximumRequiredCollateralValue'
                             worstCaseCollOutput = mkGYTxOutNoDatum change vWithoutMaxCollPledge
                             -- @vWithoutMaxCollPledge@ should satisfy minimum ada requirement.
                         in
-                            v `valueGreaterOrEqual` maximumRequiredCollateralValue
+                            v `valueGreaterOrEqual` maximumRequiredCollateralValue'
                           && minimumUTxO pp worstCaseCollOutput <= fromInteger (valueAssetClass vWithoutMaxCollPledge GYLovelace)
                       )  -- Keeping it simple.
                       (utxosToList ownUtxos')
@@ -209,14 +211,26 @@ collateralLovelace = 5_000_000
 collateralValue :: GYValue
 collateralValue = valueFromLovelace collateralLovelace
 
--- | See `maximumRequiredCollateralValue`.
-maximumRequiredCollateralLovelace :: Integer
-maximumRequiredCollateralLovelace = 3_700_000
-
+{-# INLINABLE maximumRequiredCollateralLovelace #-}
 -- | What is the maximum possible collateral requirement as per current protocol parameters?
---
--- __NOTE:__ This value would need to be updated if we ever see update in protocol parameters.
---
--- Currently this is set to @3.7@ ada as maximum transaction fees possible currently is \(44 \times 16384 + 155381 + 10000000000 \times (721 / 10000000) + 14000000 \times (577 / 10000)  = 2405077\). Multiplying this by \(1.5\) (for collateral percentage) and taking ceil, gives us \(3607616\) lovelaces.
-maximumRequiredCollateralValue :: GYValue
-maximumRequiredCollateralValue = valueFromLovelace maximumRequiredCollateralLovelace
+maximumRequiredCollateralLovelace :: Api.S.ProtocolParameters -> Integer
+maximumRequiredCollateralLovelace pp@Api.S.ProtocolParameters {..} = ceiling $ fromIntegral (maximumFee pp) * maybe 0 (% 100) protocolParamCollateralPercent
+
+{-# INLINABLE maximumFee #-}
+-- | Compute the maximum fee possible for any transaction.
+maximumFee :: Api.S.ProtocolParameters -> Integer
+maximumFee Api.S.ProtocolParameters {..} =
+  let txFee :: Integer
+      txFee = fromIntegral $ protocolParamTxFeeFixed + protocolParamTxFeePerByte * fromIntegral protocolParamMaxTxSize
+      executionFee :: Rational
+      executionFee =
+        case (protocolParamPrices, protocolParamMaxTxExUnits) of
+          (Just Api.S.ExecutionUnitPrices{..}, Just Api.S.ExecutionUnits{..}) ->
+            priceExecutionSteps * fromIntegral executionSteps + priceExecutionMemory * fromIntegral executionMemory
+          _ -> 0
+   in txFee + ceiling executionFee
+
+{-# INLINABLE maximumRequiredCollateralValue #-}
+-- | See `maximumRequiredCollateralLovelace`.
+maximumRequiredCollateralValue :: Api.S.ProtocolParameters -> GYValue
+maximumRequiredCollateralValue pp = valueFromLovelace $ maximumRequiredCollateralLovelace pp

@@ -510,7 +510,7 @@ collapseExtraOut
   -- ^ The outputs that we don't want to modify
   -> Either Api.S.TxBodyError (Api.S.TxBody Api.S.BabbageEra)
   -- ^ The updated body with the collapsed outputs
-collapseExtraOut apiOut@(Api.TxOut outAddr outVal _ _) bodyContent@(Api.TxBodyContent {txOuts}) outsOld
+collapseExtraOut apiOut@(Api.TxOut outAddr outVal _ _) bodyContent@Api.TxBodyContent {txOuts} outsOld
  | Api.txOutValueToLovelace outVal == 0 = Api.S.createAndValidateTransactionBody bodyContent
  | otherwise =
     case delete apiOut cOuts of

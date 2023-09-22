@@ -19,6 +19,7 @@ module GeniusYield.TxBuilder.Common
 
 import qualified Cardano.Api                    as Api
 import qualified Cardano.Api.Shelley            as Api.S
+import           Control.Applicative            ((<|>))
 import           Data.List.NonEmpty             (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty             as NE
 import qualified Data.Map.Strict                as Map
@@ -69,7 +70,7 @@ buildTxCore
     -> (GYTxBody -> GYUTxOs -> GYUTxOs)
     -> [GYAddress]
     -> GYAddress
-    -> Maybe GYTxOutRef  -- ^ Is `Nothing` if there was no 5 ada collateral returned by browser wallet.
+    -> Maybe GYUTxO  -- ^ Is `Nothing` if there was no 5 ada collateral returned by browser wallet.
     -> m [f (GYTxSkeleton v)]
     -> m (Either BuildTxException (GYTxBuildResult f))
 buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral action = do
@@ -81,7 +82,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
             , gyBTxEnvEraHistory     = eh
             , gyBTxEnvProtocolParams = pp
             , gyBTxEnvPools          = ps
-            , gyBTxEnvOwnUtxos       = utxosRemoveTxOutRefs refIns $ utxosRemoveRefScripts $ maybe ownUtxos' (`utxosRemoveTxOutRef` ownUtxos') reservedCollateral
+            , gyBTxEnvOwnUtxos       = utxosRemoveTxOutRefs refIns $ utxosRemoveRefScripts $ maybe ownUtxos' ((`utxosRemoveTxOutRef` ownUtxos') . utxoRef) reservedCollateral
             , gyBTxEnvChangeAddr     = change
             , gyBTxEnvCollateral     = collateralUtxo
             }
@@ -97,11 +98,21 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                         , [(mp, redeemer) | (mp, (_, redeemer)) <- itoList gytxMint]
                         )
 
-            -- Convert the 'GYTxIn's to 'GYTxInDetailed's by fetching chain information about them.
-            gyInUtxos       <- utxosAtTxOutRefs $ gyTxInTxOutRef <$> gytxIns
+            let refIns =
+                     gyTxSkeletonRefInsToList gytxRefIns
+                  <> [r | GYTxIn { gyTxInWitness = GYTxInWitnessScript (GYInReference r _) _ _ } <- gytxIns]
+                  <> [r | GYMintReference r _ <- Map.keys gytxMint]
+            allRefUtxos <- utxosAtTxOutRefs $
+                 (gyTxInTxOutRef <$> gytxIns)
+              <> refIns
+            refInsUtxos <- forM refIns $ \refIn -> do
+              case utxosLookup refIn allRefUtxos of
+                Nothing -> throwError . GYQueryUTxOException $ GYNoUtxoAtRef refIn
+                Just u  -> pure u
+            -- Convert the 'GYTxIn's to 'GYTxInDetailed's from fetched chain information about them.
             gyTxInsDetailed <- forM gytxIns $ \gyTxIn -> do
                 let ref = gyTxInTxOutRef gyTxIn
-                case utxosLookup ref gyInUtxos of
+                case utxosLookup ref allRefUtxos of
                     Nothing                                                           -> throwError . GYQueryUTxOException $ GYNoUtxoAtRef ref
                     Just GYUTxO {utxoAddress, utxoValue, utxoRefScript, utxoOutDatum} ->
                       if checkDatumMatch utxoOutDatum $ gyTxInWitness gyTxIn then
@@ -115,17 +126,10 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                           GYOutDatumHash h     -> h == hashDatum wd
                           GYOutDatumInline uid -> uid == wd
 
-            let refIns =
-                    gyTxSkeletonRefInsToList gytxRefIns
-                  <> [r | GYTxIn { gyTxInWitness = GYTxInWitnessScript (GYInReference r _) _ _ } <- gytxIns]
-                  <> [r | GYMintReference r _ <- Map.keys gytxMint]
-            -- TODO: Merge this call of @utxosAtTxOutRefs refIns@ with earlier call to get for @gyInUtxos@. Issue tracked at https://github.com/geniusyield/atlas/issues/215.
-            refInsUtxos <- utxosAtTxOutRefs refIns
 
             -- This operation is `O(n)` where `n` denotes the number of UTxOs in `ownUtxos'`.
-            mCollateralUtxo <-
-              maybe
-                ( return $
+            let mCollateralUtxo =
+                  reservedCollateral <|>
                     find
                       (\u ->
                         let v = utxoValue u
@@ -134,12 +138,10 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                             worstCaseCollOutput = mkGYTxOutNoDatum change vWithoutMaxCollPledge
                             -- @vWithoutMaxCollPledge@ should satisfy minimum ada requirement.
                         in
-                             v `valueGreaterOrEqual` maximumRequiredCollateralValue
+                            v `valueGreaterOrEqual` maximumRequiredCollateralValue
                           && minimumUTxO pp worstCaseCollOutput <= fromInteger (valueAssetClass vWithoutMaxCollPledge GYLovelace)
                       )  -- Keeping it simple.
                       (utxosToList ownUtxos')
-
-                ) (fmap Just . utxoAtTxOutRef') reservedCollateral
 
             case mCollateralUtxo of
               Nothing -> return (Left BuildTxNoSuitableCollateral)
@@ -150,7 +152,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                     cstrat
                     gyTxInsDetailed
                     gytxOuts
-                    refInsUtxos
+                    (utxosFromList refInsUtxos)
                     gytxMint'
                     gytxInvalidBefore
                     gytxInvalidAfter

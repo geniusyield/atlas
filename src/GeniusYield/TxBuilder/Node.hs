@@ -61,7 +61,7 @@ data GYTxNodeEnv = GYTxNodeEnv
     , envProviders     :: !GYProviders
     , envAddrs         :: ![GYAddress]
     , _envChangeAddr   :: !GYAddress
-    , envCollateral    :: !(Maybe GYTxOutRef)
+    , envCollateral    :: !(Maybe GYUTxO)
     , envUsedSomeUTxOs :: !(Set GYTxOutRef)
     }
 
@@ -124,7 +124,7 @@ instance GYTxMonad GYTxMonadNode where
         mCollateral   <- getCollateral
         usedSomeUTxOs <- getUsedSomeUTxOs
         utxos         <- utxosAtAddresses addrs
-        return $ utxosRemoveTxOutRefs (maybe usedSomeUTxOs (`Set.insert` usedSomeUTxOs) mCollateral) utxos
+        return $ utxosRemoveTxOutRefs (maybe usedSomeUTxOs ((`Set.insert` usedSomeUTxOs) . utxoRef) mCollateral) utxos
       where
         getCollateral    = GYTxMonadNode $ return . envCollateral
         getUsedSomeUTxOs = GYTxMonadNode $ return . envUsedSomeUTxOs
@@ -331,14 +331,12 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
         Right res -> return res
 
     where
-      obtainCollateral :: IO (Maybe GYTxOutRef)
+      obtainCollateral :: IO (Maybe GYUTxO)
       obtainCollateral = runMaybeT $ do
         (collateralRef, toCheck) <- hoistMaybe collateral
-        if not toCheck then return collateralRef
-        else do
-          collateralUtxo <- liftIO $ runGYTxQueryMonadNode nid providers $ utxoAtTxOutRef' collateralRef
-          if utxoValue collateralUtxo == collateralValue then return collateralRef
-          else hoistMaybe Nothing
+        collateralUtxo <- liftIO $ runGYTxQueryMonadNode nid providers $ utxoAtTxOutRef' collateralRef
+        if not toCheck || (utxoValue collateralUtxo == collateralValue) then return collateralUtxo
+        else hoistMaybe Nothing
 
       loggedAction :: GYTxMonadNode [f (GYTxSkeleton v)]
       loggedAction = action >>= \skeletons -> logSkeletons skeletons

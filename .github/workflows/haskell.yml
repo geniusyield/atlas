@@ -160,7 +160,7 @@ jobs:
         ./cabal-docspec
         echo " ============================[ FINISHED ]============================"
     - name: Run privnet tests
-      run: bash run-privnet-tests.sh
+      run: bash scripts/run-privnet-tests.sh
     - name: Run checks (cabal)
       run: cabal check
     - name: Create source distribution file (cabal)

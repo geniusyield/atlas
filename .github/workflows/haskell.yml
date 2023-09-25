@@ -138,59 +138,52 @@ jobs:
         make
         sudo make install
         sudo ldconfig
+    - name: Update dependencies (cabal)
+      run: cabal v2-update
+    - name: Build dependencies (cabal)
+      run: cabal v2-build --only-dependencies --enable-tests --enable-benchmarks
+    - name: Build all targets (cabal)
+      run: cabal v2-build --enable-tests --enable-benchmarks all
+    - name: Run all tests (cabal)
+      run: cabal v2-run atlas-tests -- -j1 --hide-successes
+    - name: Run doctest (docspec)
+      run: |
+        # Install docspec and run doctests.
+        echo "=========================[ INSTALL DOCSPEC ]========================"
+        echo " -> Started at $(date --iso-8601=seconds --utc)."
+        curl -sL https://github.com/phadej/cabal-extras/releases/download/cabal-docspec-0.0.0.20230517/cabal-docspec-0.0.0.20230517-x86_64-linux.xz > ./cabal-docspec.xz
+        xz -d < ./cabal-docspec.xz > ./cabal-docspec
+        rm -f ./cabal-docspec.xz
+        chmod a+x ./cabal-docspec
+        echo " -> Docspec has been installed."
+        echo "===========================[ RUN DOCSPEC ]==========================="
+        ./cabal-docspec
+        echo " ============================[ FINISHED ]============================"
     - name: Install cardano-node
       run: |
         curl -sL https://github.com/input-output-hk/cardano-node/releases/download/8.1.2/cardano-node-8.1.2-linux.tar.gz > ./cardano-node.tar.gz
         tar xf ./cardano-node.tar.gz -C $HOME/.local/bin
-    - name: Test cardano-node installation
+    - name: Run privnet tests
+      run: bash scripts/run-privnet-tests.sh
+    - name: Run checks (cabal)
+      run: cabal check
+    - name: Create source distribution file (cabal)
+      run: cabal sdist
+    - name: Identify atlas version (cabal)
+      id: get_atlas_version
       run: |
-        cardano-cli --version
-    # - name: Update dependencies (cabal)
-    #   run: cabal v2-update
-    # - name: Build dependencies (cabal)
-    #   run: cabal v2-build --only-dependencies --enable-tests --enable-benchmarks
-    # - name: Build all targets (cabal)
-    #   run: cabal v2-build --enable-tests --enable-benchmarks all
-    # - name: Run all tests (cabal)
-    #   run: cabal v2-run atlas-tests -- -j1 --hide-successes
-    # - name: Run doctest (docspec)
-    #   run: |
-    #     # Install docspec and run doctests.
-    #     echo "=========================[ INSTALL DOCSPEC ]========================"
-    #     echo " -> Started at $(date --iso-8601=seconds --utc)."
-    #     curl -sL https://github.com/phadej/cabal-extras/releases/download/cabal-docspec-0.0.0.20230517/cabal-docspec-0.0.0.20230517-x86_64-linux.xz > ./cabal-docspec.xz
-    #     xz -d < ./cabal-docspec.xz > ./cabal-docspec
-    #     rm -f ./cabal-docspec.xz
-    #     chmod a+x ./cabal-docspec
-    #     echo " -> Docspec has been installed."
-    #     echo "===========================[ RUN DOCSPEC ]==========================="
-    #     ./cabal-docspec
-    #     echo " ============================[ FINISHED ]============================"
-    # - name: Install cardano-node
-    #   run: |
-    #     curl -sL https://github.com/input-output-hk/cardano-node/releases/download/8.1.2/cardano-node-8.1.2-linux.tar.gz > ./cardano-node.tar.gz
-    #     tar xf ./cardano-node.tar.gz -C $HOME/.local/bin
-    # - name: Run privnet tests
-    #   run: bash scripts/run-privnet-tests.sh
-    # - name: Run checks (cabal)
-    #   run: cabal check
-    # - name: Create source distribution file (cabal)
-    #   run: cabal sdist
-    # - name: Identify atlas version (cabal)
-    #   id: get_atlas_version
-    #   run: |
-    #     export ATLAS_VERSION=$(cabal info . | awk '{print $2 ;exit}') ;
-    #     echo "ATLAS_VERSION: $ATLAS_VERSION"
-    #     echo "ATLAS_VERSION=${ATLAS_VERSION}" >> $GITHUB_ENV
-    #     echo "ATLAS_VERSION=${ATLAS_VERSION}" >> $GITHUB_OUTPUT
-    # - name: Generate documentation (cabal haddock)
-    #   run: cabal haddock --html --hyperlink-source --haddock-options="--use-unicode" --haddock-quickjump
-    # - name: Upload haddock documentation
-    #   uses: actions/upload-pages-artifact@v1.0.8
-    #   with:
-    #     path: ./dist-newstyle/build/x86_64-linux/ghc-9.2.8/${{env.ATLAS_VERSION}}/doc/html/atlas-cardano/
-    # - name: Upload artifacts
-    #   uses: actions/upload-artifact@v3
-    #   with:
-    #     name: source-distribution-file
-    #     path: ./dist-newstyle/sdist/${{env.ATLAS_VERSION}}.tar.gz
+        export ATLAS_VERSION=$(cabal info . | awk '{print $2 ;exit}') ;
+        echo "ATLAS_VERSION: $ATLAS_VERSION"
+        echo "ATLAS_VERSION=${ATLAS_VERSION}" >> $GITHUB_ENV
+        echo "ATLAS_VERSION=${ATLAS_VERSION}" >> $GITHUB_OUTPUT
+    - name: Generate documentation (cabal haddock)
+      run: cabal haddock --html --hyperlink-source --haddock-options="--use-unicode" --haddock-quickjump
+    - name: Upload haddock documentation
+      uses: actions/upload-pages-artifact@v1.0.8
+      with:
+        path: ./dist-newstyle/build/x86_64-linux/ghc-9.2.8/${{env.ATLAS_VERSION}}/doc/html/atlas-cardano/
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: source-distribution-file
+        path: ./dist-newstyle/sdist/${{env.ATLAS_VERSION}}.tar.gz

@@ -34,10 +34,12 @@ module GeniusYield.Types.Providers
     , makeGetParameters
       -- * Query UTxO
     , gyQueryUtxosAtAddressesWithDatumsDefault
+    , gyQueryUtxosAtPaymentCredWithDatumsDefault
     , gyQueryUtxosAtTxOutRefsWithDatumsDefault
     , GYQueryUTxO (..)
     , gyQueryUtxosAtAddresses
     , gyQueryUtxosAtAddressesWithDatums
+    , gyQueryUtxosAtPaymentCredWithDatums
     , gyQueryUtxosAtAddress'
     , gyQueryUtxosAtAddress
     , gyQueryUtxosAtPaymentCredential
@@ -154,6 +156,12 @@ gyQueryUtxosAtAddressesWithDatums provider addrs =
   case gyQueryUtxosAtAddressesWithDatums' $ gyQueryUTxO provider of
     Nothing -> gyQueryUtxosAtAddressesWithDatumsDefault (gyQueryUtxosAtAddresses provider) (gyLookupDatum provider) addrs
     Just f  -> f addrs
+
+gyQueryUtxosAtPaymentCredWithDatums :: GYProviders -> GYPaymentCredential -> IO [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtPaymentCredWithDatums provider cred =
+  case gyQueryUtxosAtPaymentCredWithDatums' $ gyQueryUTxO provider of
+    Nothing -> gyQueryUtxosAtPaymentCredWithDatumsDefault (gyQueryUtxosAtPaymentCredential provider) (gyLookupDatum provider) cred
+    Just f  -> f cred
 
 gyQueryUtxosAtTxOutRefs :: GYProviders -> [GYTxOutRef] -> IO GYUTxOs
 gyQueryUtxosAtTxOutRefs = gyQueryUtxosAtTxOutRefs' . gyQueryUTxO
@@ -394,14 +402,17 @@ makeGetParameters getSlotOfCurrentBlock getProtParams getSysStart getEraHist get
 
 -- | How to query utxos?
 data GYQueryUTxO = GYQueryUTxO
-    { gyQueryUtxosAtTxOutRefs'           :: !([GYTxOutRef] -> IO GYUTxOs)
-    , gyQueryUtxosAtTxOutRefsWithDatums' :: !(Maybe ([GYTxOutRef] -> IO [(GYUTxO, Maybe GYDatum)]))
-    , gyQueryUtxoAtTxOutRef'             :: !(GYTxOutRef -> IO (Maybe GYUTxO))
-    , gyQueryUtxoRefsAtAddress'          :: !(GYAddress -> IO [GYTxOutRef])
-    , gyQueryUtxosAtAddresses'           :: !([GYAddress] -> IO GYUTxOs)
-    , gyQueryUtxosAtAddressesWithDatums' :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))
-    , gyQueryUtxosAtPaymentCredential'   :: !(GYPaymentCredential -> IO GYUTxOs)
-    -- ^ `gyQueryUtxosAtAddressesWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
+    { gyQueryUtxosAtTxOutRefs'             :: !([GYTxOutRef] -> IO GYUTxOs)
+    , gyQueryUtxosAtTxOutRefsWithDatums'   :: !(Maybe ([GYTxOutRef] -> IO [(GYUTxO, Maybe GYDatum)]))
+    -- ^ `gyQueryUtxosAtTxOutRefsWithDatu  ms'` is as `Maybe` so that if an implementation is not given, a default one is used.
+    , gyQueryUtxoAtTxOutRef'               :: !(GYTxOutRef -> IO (Maybe GYUTxO))
+    , gyQueryUtxoRefsAtAddress'            :: !(GYAddress -> IO [GYTxOutRef])
+    , gyQueryUtxosAtAddresses'             :: !([GYAddress] -> IO GYUTxOs)
+    , gyQueryUtxosAtAddressesWithDatums'   :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))
+    -- ^ `gyQueryUtxosAtAddressesWithDatu  ms'` is as `Maybe` so that if an implementation is not given, a default one is used.
+    , gyQueryUtxosAtPaymentCredential'     :: !(GYPaymentCredential -> IO GYUTxOs)
+    , gyQueryUtxosAtPaymentCredWithDatums' :: !(Maybe (GYPaymentCredential -> IO [(GYUTxO, Maybe GYDatum)]))
+    -- ^ `gyQueryUtxosAtPaymentCredWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
     }
 
 gyQueryUtxosAtAddress' :: GYQueryUTxO -> GYAddress -> IO GYUTxOs
@@ -426,7 +437,19 @@ gyQueryUtxosAtTxOutRefsDefault queryUtxoAtTxOutRef orefs = do
 -- | Lookup UTxOs at zero or more 'GYAddress' with their datums. This is a default implementation using `utxosAtAddresses` and `lookupDatum`.
 gyQueryUtxosAtAddressesWithDatumsDefault :: Monad m => ([GYAddress] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYAddress] -> m [(GYUTxO, Maybe GYDatum)]
 gyQueryUtxosAtAddressesWithDatumsDefault utxosAtAddressesFun lookupDatumFun addrs = do
-  utxosWithoutDatumResolutions <- utxosToList <$> utxosAtAddressesFun addrs
+  utxosWithoutDatumResolutions <- utxosAtAddressesFun addrs
+  utxosDatumResolver utxosWithoutDatumResolutions lookupDatumFun
+
+-- | Lookup UTxOs at given 'GYPaymentCredential' with their datums. This is a default implementation using `utxosAtPaymentCredential` and `lookupDatum`.
+gyQueryUtxosAtPaymentCredWithDatumsDefault :: Monad m => (GYPaymentCredential -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> GYPaymentCredential -> m [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtPaymentCredWithDatumsDefault utxosAtPaymentCredFun lookupDatumFun cred = do
+  utxosWithoutDatumResolutions <- utxosAtPaymentCredFun cred
+  utxosDatumResolver utxosWithoutDatumResolutions lookupDatumFun
+
+-- | Append UTxO information with their fetched datum.
+utxosDatumResolver :: Monad m => GYUTxOs -> (GYDatumHash -> m (Maybe GYDatum)) -> m [(GYUTxO, Maybe GYDatum)]
+utxosDatumResolver utxos lookupDatumFun = do
+  let utxosWithoutDatumResolutions = utxosToList utxos
   forM utxosWithoutDatumResolutions $ \utxo -> do
     case utxoOutDatum utxo of
       GYOutDatumNone     -> return (utxo, Nothing)

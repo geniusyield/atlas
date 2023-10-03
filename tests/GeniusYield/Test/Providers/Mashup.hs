@@ -8,7 +8,7 @@ import           Control.Exception            (handle)
 import           Data.Default                 (def)
 import           Data.List                    (isInfixOf)
 import           Data.Maybe                   (fromJust)
-import qualified Data.Set                     as Set (delete, fromList)
+import qualified Data.Set                     as Set (difference, fromList)
 import           GeniusYield.GYConfig
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common (SubmitTxException, datumFromCBOR)
@@ -44,8 +44,10 @@ providersMashupTests configs =
             -- Blockfrost is unable to get the preimage of the involved datum hash, thus it's being deleted for in our set so that test still passes.
             utxoBug1 = (GYUTxO {utxoRef = "6d2174d3956d8eb2b3e1e198e817ccf1332a599d5d7320400bfd820490d706be#0", utxoAddress = unsafeAddressFromText "addr_test1wpgexmeunzsykesf42d4eqet5yvzeap6trjnflxqtkcf66g0kpnxt", utxoValue = valueFromList [(GYLovelace,50000000)], utxoOutDatum = GYOutDatumHash "15461aa490b224fe541f3568e5d7704e0d88460cde9f418f700e2b6864d8d3c9", utxoRefScript = Nothing},Just (either (error "absurd - Mashup: parsing datum failed") id $ datumFromCBOR "19077a"))
             utxoBug2 = (GYUTxO {utxoRef = "6d2174d3956d8eb2b3e1e198e817ccf1332a599d5d7320400bfd820490d706be#0", utxoAddress = unsafeAddressFromText "addr_test1wpgexmeunzsykesf42d4eqet5yvzeap6trjnflxqtkcf66g0kpnxt", utxoValue = valueFromList [(GYLovelace,50000000)], utxoOutDatum = GYOutDatumHash "15461aa490b224fe541f3568e5d7704e0d88460cde9f418f700e2b6864d8d3c9", utxoRefScript = Nothing}, Nothing)
+            utxoBugSet = Set.fromList [utxoBug1, utxoBug2]
         utxosProviders <- forM configs $ \config -> withCfgProviders config mempty $ \provider -> do
           let alwaysFailAddress = unsafeAddressFromText "addr_test1wpgexmeunzsykesf42d4eqet5yvzeap6trjnflxqtkcf66g0kpnxt"
+              alwaysFailCredential = GYPaymentCredentialByScript "51936f3c98a04b6609aa9b5c832ba1182cf43a58e534fcc05db09d69"  -- Credential of always fail script address.
               myAddrList = [alwaysFailAddress]  -- always fail script's address. It has all the cases, reference scripts, inline datums, many UTxOs, etc.
           delayBySecond
           utxosAtAddresses' <- gyQueryUtxosAtAddresses provider myAddrList
@@ -67,10 +69,12 @@ providersMashupTests configs =
           delayBySecond
           utxoAtRefWithDatum' <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxoAtTxOutRefWithDatum refWithDatumHash
           delayBySecond
-          utxosAtScriptCredential <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxosAtPaymentCredential $ GYPaymentCredentialByScript "51936f3c98a04b6609aa9b5c832ba1182cf43a58e534fcc05db09d69"  -- Credential of always fail script address.
+          utxosAtScriptCredential <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxosAtPaymentCredential alwaysFailCredential
           delayBySecond
           utxosAtKeyCredential <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxosAtPaymentCredential $ GYPaymentCredentialByKey "07fb2b78b3917d3f6bfa3a59de61f3c225cbf0d5564a1cbc6f96d6eb"  -- Credential of CI wallet.
-          pure (utxosAtAddresses', utxoBug2 `Set.delete` (utxoBug1 `Set.delete` Set.fromList utxosAtAddressesWithDatums'), utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum', utxosAtScriptCredential <> utxosAtKeyCredential)
+          delayBySecond
+          utxosAtScriptCredentialWithDatums <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxosAtPaymentCredentialWithDatums alwaysFailCredential
+          pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums' `Set.difference` utxoBugSet, utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum', utxosAtScriptCredential <> utxosAtKeyCredential, Set.fromList utxosAtScriptCredentialWithDatums `Set.difference` utxoBugSet)
         assertBool "Utxos are not all equal" $ all (== head utxosProviders) (tail utxosProviders)
     , testCase "Checking presence of error message when submitting an invalid transaction" $ do
         let

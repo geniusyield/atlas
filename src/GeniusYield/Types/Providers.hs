@@ -404,7 +404,7 @@ makeGetParameters getSlotOfCurrentBlock getProtParams getSysStart getEraHist get
 data GYQueryUTxO = GYQueryUTxO
     { gyQueryUtxosAtTxOutRefs'             :: !([GYTxOutRef] -> IO GYUTxOs)
     , gyQueryUtxosAtTxOutRefsWithDatums'   :: !(Maybe ([GYTxOutRef] -> IO [(GYUTxO, Maybe GYDatum)]))
-    -- ^ `gyQueryUtxosAtTxOutRefsWithDatu  ms'` is as `Maybe` so that if an implementation is not given, a default one is used.
+    -- ^ `gyQueryUtxosAtTxOutRefsWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
     , gyQueryUtxoAtTxOutRef'               :: !(GYTxOutRef -> IO (Maybe GYUTxO))
     , gyQueryUtxoRefsAtAddress'            :: !(GYAddress -> IO [GYTxOutRef])
     , gyQueryUtxosAtAddresses'             :: !([GYAddress] -> IO GYUTxOs)

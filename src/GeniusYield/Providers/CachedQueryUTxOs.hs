@@ -42,6 +42,7 @@ cachedQueryUTxO q = GYQueryUTxO
     (gyQueryUtxoAtAddressesDefault $ cachedUtxosAtAddress q)
     Nothing  -- Will use the default implementation.
     (cachedUtxosAtPaymentCred q)
+    Nothing  -- Will use the default implementation.
 
 -------------------------------------------------------------------------------
 -- Queries & caching

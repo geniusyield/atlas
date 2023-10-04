@@ -269,6 +269,20 @@ maestroUtxosAtPaymentCredential env paymentCredential = do
     pure
     $ utxosFromList <$> traverse utxoFromMaestro utxos
   where
+    locationIdent = "PaymentCredentialUtxosWithDatums"
+
+-- | Query UTxOs present at payment credential with their associated datum fetched (under best effort basis).
+maestroUtxosAtPaymentCredentialWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> GYPaymentCredential -> IO [(GYUTxO, Maybe GYDatum)]
+maestroUtxosAtPaymentCredentialWithDatums env paymentCredential = do
+  let paymentCredentialBech32 :: Maestro.Bech32StringOf Maestro.PaymentCredentialAddress = coerce $ paymentCredentialToBech32 paymentCredential
+  -- Here one would not get `MaestroNotFound` error.
+  utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages $ Maestro.utxosByPaymentCredential env paymentCredentialBech32 (Just True) (Just False)
+
+  either
+    (throwIO . MspvDeserializeFailure locationIdent)
+    pure
+    $ traverse utxoFromMaestroWithDatum utxos
+  where
     locationIdent = "PaymentCredentialUtxos"
 
 -- | Returns a list containing all 'GYTxOutRef' for a given 'GYAddress'.
@@ -345,13 +359,14 @@ maestroUtxosAtTxOutRefsWithDatums env refs = do
 -- | Definition of 'GYQueryUTxO' for the Maestro provider.
 maestroQueryUtxo :: Maestro.MaestroEnv 'Maestro.V1 -> GYQueryUTxO
 maestroQueryUtxo env = GYQueryUTxO
-  { gyQueryUtxosAtAddresses'           = maestroUtxosAtAddresses env
-  , gyQueryUtxosAtTxOutRefs'           = maestroUtxosAtTxOutRefs env
-  , gyQueryUtxosAtTxOutRefsWithDatums' = Just $ maestroUtxosAtTxOutRefsWithDatums env
-  , gyQueryUtxoAtTxOutRef'             = maestroUtxoAtTxOutRef env
-  , gyQueryUtxoRefsAtAddress'          = maestroRefsAtAddress env
-  , gyQueryUtxosAtAddressesWithDatums' = Just $ maestroUtxosAtAddressesWithDatums env
-  , gyQueryUtxosAtPaymentCredential'   = maestroUtxosAtPaymentCredential env
+  { gyQueryUtxosAtAddresses'             = maestroUtxosAtAddresses env
+  , gyQueryUtxosAtTxOutRefs'             = maestroUtxosAtTxOutRefs env
+  , gyQueryUtxosAtTxOutRefsWithDatums'   = Just $ maestroUtxosAtTxOutRefsWithDatums env
+  , gyQueryUtxoAtTxOutRef'               = maestroUtxoAtTxOutRef env
+  , gyQueryUtxoRefsAtAddress'            = maestroRefsAtAddress env
+  , gyQueryUtxosAtAddressesWithDatums'   = Just $ maestroUtxosAtAddressesWithDatums env
+  , gyQueryUtxosAtPaymentCredential'     = maestroUtxosAtPaymentCredential env
+  , gyQueryUtxosAtPaymentCredWithDatums' = Just $ maestroUtxosAtPaymentCredentialWithDatums env
   }
 
 -------------------------------------------------------------------------------

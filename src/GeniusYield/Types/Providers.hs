@@ -409,7 +409,7 @@ data GYQueryUTxO = GYQueryUTxO
     , gyQueryUtxoRefsAtAddress'            :: !(GYAddress -> IO [GYTxOutRef])
     , gyQueryUtxosAtAddresses'             :: !([GYAddress] -> IO GYUTxOs)
     , gyQueryUtxosAtAddressesWithDatums'   :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))
-    -- ^ `gyQueryUtxosAtAddressesWithDatu  ms'` is as `Maybe` so that if an implementation is not given, a default one is used.
+    -- ^ `gyQueryUtxosAtAddressesWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
     , gyQueryUtxosAtPaymentCredential'     :: !(GYPaymentCredential -> IO GYUTxOs)
     , gyQueryUtxosAtPaymentCredWithDatums' :: !(Maybe (GYPaymentCredential -> IO [(GYUTxO, Maybe GYDatum)]))
     -- ^ `gyQueryUtxosAtPaymentCredWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.

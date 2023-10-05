@@ -163,7 +163,7 @@ slotToBeginPOSIXTime' (GYSlotConfig sysStart slotConfs) slot = Time.utcTimeToPOS
         `CSlot.addRelativeTime` gyEraSlotZeroTime
     GYEraSlotConfig { gyEraSlotZeroTime, gyEraSlotStart, gyEraSlotLength } = findSlotConf slotConfs
     {- Finds the slot config for the given slot. Essentially, the chosen slot config must have its starting slot
-    greater than, or equal to, the given slot. Furthermore, the chosen slot config's end slot, i.e next slot config's
+    less than, or equal to, the given slot. Furthermore, the chosen slot config's end slot, i.e next slot config's
     starting slot (or unbounded if final era), should be greater than the given slot.
     -}
     findSlotConf (x :| []) = x

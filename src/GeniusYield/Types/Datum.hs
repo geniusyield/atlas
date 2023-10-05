@@ -139,8 +139,6 @@ unsafeDatumHashFromPlutus :: Plutus.DatumHash -> GYDatumHash
 unsafeDatumHashFromPlutus =
     either (error . ("unsafeDatumHashFromPlutus: " ++) . show) id . datumHashFromPlutus
 
--- TODO: remove me #27
---       (https://github.com/geniusyield/atlas/issues/27)
 datumHashToPlutus :: GYDatumHash -> Plutus.DatumHash
 datumHashToPlutus h = Plutus.DatumHash (PlutusTx.toBuiltin (Api.serialiseToRawBytes (datumHashToApi h)))
 

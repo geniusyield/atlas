@@ -206,7 +206,8 @@ tests setup = testGroup "gift"
 
     , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error when no UTxO is greater than or equal to maximum possible total collateral" $ \info -> withSetup setup info $ \ctx -> do
         ----------- Create a new user and fund it
-        let newUserValue = maximumRequiredCollateralValue `valueMinus` valueFromLovelace 1
+        pp <- gyGetProtocolParameters (ctxProviders ctx)
+        let newUserValue = maximumRequiredCollateralValue pp `valueMinus` valueFromLovelace 1
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
 
         info $ printf "UTxOs at this new user"
@@ -215,8 +216,9 @@ tests setup = testGroup "gift"
         assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
     , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error when UTxO is greater than or equal to maximum possible total collateral but resulting return collateral doesn't satisfy minimum ada requirement" $ \info -> withSetup setup info $ \ctx -> do
+        pp <- gyGetProtocolParameters (ctxProviders ctx)
         ----------- Create a new user and fund it
-        let newUserValue = maximumRequiredCollateralValue <> valueFromLovelace 0_500_000
+        let newUserValue = maximumRequiredCollateralValue pp <> valueFromLovelace 0_500_000
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
 
         info $ printf "UTxOs at this new user"
@@ -225,8 +227,9 @@ tests setup = testGroup "gift"
         assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
     , testCaseSteps "No 'BuildTxNoSuitableCollateral' error is thrown when collateral input is sufficient" $ \info -> withSetup setup info $ \ctx -> do
+        pp <- gyGetProtocolParameters (ctxProviders ctx)
         ----------- Create a new user and fund it
-        let newUserValue = maximumRequiredCollateralValue <> valueFromLovelace 1_500_000
+        let newUserValue = maximumRequiredCollateralValue pp <> valueFromLovelace 1_500_000
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
 
         info $ printf "UTxOs at this new user"
@@ -457,13 +460,6 @@ tests setup = testGroup "gift"
         -- i.e. words we need to make the previous test "inline datums V1+V2" not work:
         -- - we cannot consume V1 script utxos (we know the version!)
         -- - and create outputs with inline datums in the same transaction.
-        --
-        -- TODO: change gyTxOutDatumInline field to a GADT which can be "true" only when transaction is "V2 scripts only" #25
-        --       (https://github.com/geniusyield/atlas/issues/25)
-        --
-        -- TODO: later these tests fail due NonOutputSupplimentaryDatums. The reason is wrong grabGifts.
-        --       We should use GyTxInDatum True there for datums #26
-        --       (https://github.com/geniusyield/atlas/issues/26)
         --
         let ironAC = ctxIron ctx
 

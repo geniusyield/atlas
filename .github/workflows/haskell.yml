@@ -139,13 +139,13 @@ jobs:
         sudo make install
         sudo ldconfig
     - name: Update dependencies (cabal)
-      run: cabal v2-update
+      run: cabal update
     - name: Build dependencies (cabal)
-      run: cabal v2-build --only-dependencies --enable-tests --enable-benchmarks
+      run: cabal build --only-dependencies --enable-tests --enable-benchmarks
     - name: Build all targets (cabal)
-      run: cabal v2-build --enable-tests --enable-benchmarks all
+      run: cabal build --enable-tests --enable-benchmarks all
     - name: Run all tests (cabal)
-      run: cabal v2-run atlas-tests -- -j1 --hide-successes
+      run: cabal run atlas-tests -- -j1 --hide-successes
     - name: Run doctest (docspec)
       run: |
         # Install docspec and run doctests.
@@ -157,8 +157,14 @@ jobs:
         chmod a+x ./cabal-docspec
         echo " -> Docspec has been installed."
         echo "===========================[ RUN DOCSPEC ]==========================="
-        ./cabal-docspec
+        ./cabal-docspec -q --ignore-trailing-space
         echo " ============================[ FINISHED ]============================"
+    - name: Install cardano-node
+      run: |
+        curl -sL https://github.com/input-output-hk/cardano-node/releases/download/8.1.2/cardano-node-8.1.2-linux.tar.gz > ./cardano-node.tar.gz
+        tar xf ./cardano-node.tar.gz -C $HOME/.local/bin
+    - name: Run privnet tests
+      run: bash scripts/run-privnet-tests.sh
     - name: Run checks (cabal)
       run: cabal check
     - name: Create source distribution file (cabal)

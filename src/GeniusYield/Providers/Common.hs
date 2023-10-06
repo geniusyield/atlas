@@ -120,9 +120,10 @@ parseEraHist mkEra [byronEra, shelleyEra, allegraEra, maryEra, alonzoEra, babbag
 parseEraHist _ _ = Nothing
 
 {- | Hardcoded era history for preprod.
-FIXME: Remove this hack as it shouldn't be hardcoded.
 
-See: "GeniusYield.CardanoApi.EraHistory.showEraHistory"
+__NOTE:__ This is only to be used for testing.
+
+Also see: "GeniusYield.CardanoApi.EraHistory.showEraHistory"
 -}
 preprodEraHist :: Ouroboros.Interpreter (Ouroboros.CardanoEras Ouroboros.StandardCrypto)
 preprodEraHist = Ouroboros.mkInterpreter . Ouroboros.Summary

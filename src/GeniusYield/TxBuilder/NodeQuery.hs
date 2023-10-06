@@ -77,6 +77,11 @@ instance GYTxQueryMonad GYTxQueryMonadNode where
       GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyQueryUtxosAtAddressesWithDatums providers addrs
 
+    utxosAtPaymentCredentialWithDatums cred = do
+      logMsg mempty GYInfo $ printf "Querying utxos (with datums) at credential: \n %s" (show cred)
+      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+        gyQueryUtxosAtPaymentCredWithDatums providers cred
+
     utxoRefsAtAddress addr = do
       logMsg mempty GYInfo $ printf "Querying UtxoRefs At Address: %s"  addr
       GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->

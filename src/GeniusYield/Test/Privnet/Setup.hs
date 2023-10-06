@@ -42,7 +42,10 @@ era = GYBabbage
 -- Setup
 -------------------------------------------------------------------------------
 
-newtype Setup = Setup  ((String -> IO ()) -> (Ctx -> IO ()) -> IO ())
+-- | This setup represents a two argument function where first argument is for logging & second represents for continuation, in need of `Ctx`.
+--
+-- Once these two arguments are given to this function, it will give `Ctx` to the continuation, where the logging part (the `ctxLog`) of `Ctx` would be obtained from first argument of this function.
+newtype Setup = Setup ((String -> IO ()) -> (Ctx -> IO ()) -> IO ())
 
 withSetup :: IO Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
 withSetup ioSetup putLog kont = do

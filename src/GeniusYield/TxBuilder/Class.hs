@@ -48,9 +48,11 @@ module GeniusYield.TxBuilder.Class
     , utxosDatums
     , utxosDatumsPure
     , utxoDatum
+    , utxoDatumPure
     , utxoDatumHushed
     , utxoDatumPureHushed
     , utxoDatum'
+    , utxoDatumPure'
     , mustHaveInput
     , mustHaveRefInput
     , mustHaveOutput
@@ -140,7 +142,12 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     utxoRefsAtAddress :: GYAddress -> m [GYTxOutRef]
     utxoRefsAtAddress = fmap (Map.keys . mapUTxOs id) . utxosAtAddress
 
+    -- | Lookup 'GYUTxOs' at 'GYPaymentCredential'.
     utxosAtPaymentCredential :: GYPaymentCredential -> m GYUTxOs
+
+    -- | Lookup UTxOs at given 'GYPaymentCredential' with their datums. This has a default implementation using `utxosAtPaymentCredential` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
+    utxosAtPaymentCredentialWithDatums :: GYPaymentCredential -> m [(GYUTxO, Maybe GYDatum)]
+    utxosAtPaymentCredentialWithDatums = gyQueryUtxosAtPaymentCredWithDatumsDefault utxosAtPaymentCredential lookupDatum
 
     {- | Obtain the slot config for the network.
 
@@ -184,6 +191,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
+    utxosAtPaymentCredentialWithDatums = lift . utxosAtPaymentCredentialWithDatums
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
@@ -205,6 +213,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
+    utxosAtPaymentCredentialWithDatums = lift . utxosAtPaymentCredentialWithDatums
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
@@ -226,6 +235,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
+    utxosAtPaymentCredentialWithDatums = lift . utxosAtPaymentCredentialWithDatums
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
@@ -561,10 +571,24 @@ utxoDatumPureHushed (_utxo, Nothing) = Nothing
 utxoDatumPureHushed (GYUTxO {..}, Just d) =
   datumToPlutus' d & Plutus.fromBuiltinData <&> \d' -> (utxoRef, (utxoAddress, utxoValue, d'))
 
+-- | Pure variant of `utxoDatum`.
+utxoDatumPure :: Plutus.FromData a => (GYUTxO, Maybe GYDatum) -> Either GYQueryDatumError (GYAddress, GYValue, a)
+utxoDatumPure (utxo, Nothing) = Left $ GYNoDatumHash utxo
+utxoDatumPure (GYUTxO {..}, Just d) =
+  case Plutus.fromBuiltinData $ datumToPlutus' d of
+    Nothing -> Left $ GYInvalidDatum d
+    Just a  -> Right (utxoAddress, utxoValue, a)
+
 -- | Version of 'utxoDatum' that throws 'GYTxMonadException'.
 utxoDatum' :: (GYTxQueryMonad m, Plutus.FromData a) => GYUTxO -> m (GYAddress, GYValue, a)
 utxoDatum' utxo = do
     x <- utxoDatum utxo
+    liftEither $ first GYQueryDatumException x
+
+-- | Version of 'utxoDatumPure' that throws 'GYTxMonadException'.
+utxoDatumPure' :: (MonadError GYTxMonadException m, Plutus.FromData a) => (GYUTxO, Maybe GYDatum) -> m (GYAddress, GYValue, a)
+utxoDatumPure' utxoWithDatum = do
+    let x = utxoDatumPure utxoWithDatum
     liftEither $ first GYQueryDatumException x
 
 utxoDatumHushed :: (GYTxQueryMonad m, Plutus.FromData a) => GYUTxO -> m (Maybe (GYAddress, GYValue, a))

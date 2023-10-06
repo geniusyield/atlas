@@ -90,7 +90,7 @@ data GYUTxO = GYUTxO
     , utxoAddress   :: !GYAddress
     , utxoValue     :: !GYValue
     , utxoOutDatum  :: !GYOutDatum
-    , utxoRefScript :: !(Maybe (Some GYScript)) -- TODO: change to GYScriptHash? #31, but then we won't be able to convert faithfully back to Api.UTxO (https://github.com/geniusyield/atlas/issues/31)
+    , utxoRefScript :: !(Maybe (Some GYScript))
     } deriving stock (Eq, Show)
 
 instance Ord GYUTxO where

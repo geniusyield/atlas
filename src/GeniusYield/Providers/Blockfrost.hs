@@ -172,13 +172,14 @@ blockfrostGetSlotOfCurrentBlock proj = do
 
 blockfrostQueryUtxo :: Blockfrost.Project -> GYQueryUTxO
 blockfrostQueryUtxo proj = GYQueryUTxO
-    { gyQueryUtxosAtTxOutRefs'           = blockfrostUtxosAtTxOutRefs proj
-    , gyQueryUtxosAtTxOutRefsWithDatums' = Nothing  -- Will use the default implementation.
-    , gyQueryUtxoAtTxOutRef'             = blockfrostUtxosAtTxOutRef proj
-    , gyQueryUtxoRefsAtAddress'          = gyQueryUtxoRefsAtAddressDefault $ blockfrostUtxosAtAddress proj
-    , gyQueryUtxosAtAddresses'           = gyQueryUtxoAtAddressesDefault $ blockfrostUtxosAtAddress proj
-    , gyQueryUtxosAtAddressesWithDatums' = Nothing  -- Will use the default implementation.
-    , gyQueryUtxosAtPaymentCredential'   = blockfrostUtxosAtPaymentCredential proj
+    { gyQueryUtxosAtTxOutRefs'             = blockfrostUtxosAtTxOutRefs proj
+    , gyQueryUtxosAtTxOutRefsWithDatums'   = Nothing  -- Will use the default implementation.
+    , gyQueryUtxoAtTxOutRef'               = blockfrostUtxosAtTxOutRef proj
+    , gyQueryUtxoRefsAtAddress'            = gyQueryUtxoRefsAtAddressDefault $ blockfrostUtxosAtAddress proj
+    , gyQueryUtxosAtAddresses'             = gyQueryUtxoAtAddressesDefault $ blockfrostUtxosAtAddress proj
+    , gyQueryUtxosAtAddressesWithDatums'   = Nothing  -- Will use the default implementation.
+    , gyQueryUtxosAtPaymentCredential'     = blockfrostUtxosAtPaymentCredential proj
+    , gyQueryUtxosAtPaymentCredWithDatums' = Nothing  -- Will use the default implementation.
     }
 
 transformUtxo :: (Blockfrost.AddressUtxo, Maybe (Some GYScript)) -> Either SomeDeserializeError GYUTxO

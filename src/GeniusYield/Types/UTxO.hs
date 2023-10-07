@@ -21,6 +21,8 @@ module GeniusYield.Types.UTxO (
     utxosRemoveTxOutRef,
     utxosRemoveTxOutRefs,
     utxosRemoveRefScripts,
+    utxosRemoveUTxO,
+    utxosRemoveUTxOs,
     utxosLookup,
     someTxOutRef,
     randomTxOutRef,
@@ -199,6 +201,14 @@ utxosRemoveTxOutRefs orefs (GYUTxOs m) = GYUTxOs $ Map.withoutKeys m orefs
 -- | Remove UTxOs containing reference scripts inside them from 'GYUTxOs'.
 utxosRemoveRefScripts :: GYUTxOs -> GYUTxOs
 utxosRemoveRefScripts = filterUTxOs $ isNothing . utxoRefScript
+
+-- | Remove particular 'GYUTxO' from 'GYUTxOs'.
+utxosRemoveUTxO :: GYUTxO -> GYUTxOs -> GYUTxOs
+utxosRemoveUTxO utxo = utxosRemoveTxOutRef (utxoRef utxo)
+
+-- | Given two 'GYUTxOs', returns elements from the first one, not present in the second one.
+utxosRemoveUTxOs :: GYUTxOs -> GYUTxOs -> GYUTxOs
+utxosRemoveUTxOs (GYUTxOs m) (GYUTxOs m') = GYUTxOs $ m Map.\\ m'
 
 -- | Lookup a UTxO given a ref.
 utxosLookup :: GYTxOutRef -> GYUTxOs -> Maybe GYUTxO

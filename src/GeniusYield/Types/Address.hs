@@ -14,6 +14,7 @@ module GeniusYield.Types.Address (
     addressFromApi',
     addressToPlutus,
     addressFromPlutus,
+    addressToPaymentCredential,
     addressFromPubKeyHash,
     addressFromValidator,
     addressFromValidatorHash,
@@ -65,6 +66,8 @@ import qualified Text.Printf                          as Printf
 import qualified Web.HttpApiData                      as Web
 
 import           GeniusYield.Imports
+import           GeniusYield.Types.Credential         (GYPaymentCredential,
+                                                       paymentCredentialFromApi)
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.NetworkId
 import           GeniusYield.Types.PubKeyHash
@@ -209,6 +212,15 @@ addressFromPlutus nid addr =
         | n < 0                            = Nothing
         | n > toInteger (maxBound @Word64) = Nothing
         | otherwise                        = Just $ fromInteger n
+
+-- | If an address is a shelley address, then we'll return payment credential wrapped in `Just`, `Nothing` otherwise.
+addressToPaymentCredential :: GYAddress -> Maybe GYPaymentCredential
+addressToPaymentCredential (addressToApi -> Api.AddressShelley addr) = Just $ getShelleyAddressPaymentCredential addr
+addressToPaymentCredential _byron = Nothing
+
+-- | Get payment credential part of a shelley address.
+getShelleyAddressPaymentCredential :: Api.S.Address Api.ShelleyAddr -> GYPaymentCredential
+getShelleyAddressPaymentCredential (Api.S.ShelleyAddress _network credential _stake) = Api.S.fromShelleyPaymentCredential credential & paymentCredentialFromApi
 
 -- | Create address from 'GYPubKeyHash'.
 --

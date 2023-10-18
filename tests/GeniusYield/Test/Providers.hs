@@ -65,25 +65,25 @@ maestroTests token netId =
         [ testCase "Invalid Address" $ do
             let expected = Left DeserializeErrorAddress
                 res = utxoFromMaestro $ Maestro.UtxoWithBytes
-                                        { _utxoWithBytesTxHash          = mockTxId
-                                        , _utxoWithBytesIndex           = mockTxIx
-                                        , _utxoWithBytesAssets          = []
-                                        , _utxoWithBytesAddress         = "invalidaddress"
-                                        , _utxoWithBytesDatum           = Nothing
-                                        , _utxoWithBytesReferenceScript = Nothing
-                                        , _utxoWithBytesTxoutCbor       = Nothing
+                                        { utxoWithBytesTxHash          = mockTxId
+                                        , utxoWithBytesIndex           = mockTxIx
+                                        , utxoWithBytesAssets          = []
+                                        , utxoWithBytesAddress         = "invalidaddress"
+                                        , utxoWithBytesDatum           = Nothing
+                                        , utxoWithBytesReferenceScript = Nothing
+                                        , utxoWithBytesTxoutCbor       = Nothing
                                         }
             res @?= expected
         , testCase "Invalid UTxORef" $ do
             let expected = Left (DeserializeErrorHex "GYTxOutRef: Failed reading: takeWhile1")
                 res = utxoFromMaestro $ Maestro.UtxoWithBytes
-                                        { _utxoWithBytesTxHash          = "invalidhash"
-                                        , _utxoWithBytesIndex           = mockTxIx
-                                        , _utxoWithBytesAssets          = []
-                                        , _utxoWithBytesAddress         = mockAddressB32
-                                        , _utxoWithBytesDatum           = Nothing
-                                        , _utxoWithBytesReferenceScript = Nothing
-                                        , _utxoWithBytesTxoutCbor       = Nothing
+                                        { utxoWithBytesTxHash          = "invalidhash"
+                                        , utxoWithBytesIndex           = mockTxIx
+                                        , utxoWithBytesAssets          = []
+                                        , utxoWithBytesAddress         = mockAddressB32
+                                        , utxoWithBytesDatum           = Nothing
+                                        , utxoWithBytesReferenceScript = Nothing
+                                        , utxoWithBytesTxoutCbor       = Nothing
                                         }
             res @?= expected
         , testCase "Simplest Case" $ do
@@ -231,13 +231,13 @@ mockQueryTxIx = 0
 
 mockMaestroUtxo :: [Maestro.Asset] -> Maybe Maestro.DatumOption -> Maybe Maestro.Script -> Maestro.UtxoWithBytes
 mockMaestroUtxo assets mDat mRefScript = Maestro.UtxoWithBytes
-  { _utxoWithBytesTxHash          = mockTxId
-  , _utxoWithBytesIndex           = mockTxIx
-  , _utxoWithBytesAssets          = assets
-  , _utxoWithBytesAddress         = mockAddressB32
-  , _utxoWithBytesDatum           = mDat
-  , _utxoWithBytesReferenceScript = mRefScript
-  , _utxoWithBytesTxoutCbor       = Nothing
+  { utxoWithBytesTxHash          = mockTxId
+  , utxoWithBytesIndex           = mockTxIx
+  , utxoWithBytesAssets          = assets
+  , utxoWithBytesAddress         = mockAddressB32
+  , utxoWithBytesDatum           = mDat
+  , utxoWithBytesReferenceScript = mRefScript
+  , utxoWithBytesTxoutCbor       = Nothing
   }
 
 mockTxId :: Maestro.TxHash
@@ -257,18 +257,18 @@ mockAddress = unsafeAddressFromText $ coerce mockAddressB32
 
 maestroDatumHash :: Maestro.DatumOption
 maestroDatumHash = Maestro.DatumOption
-  { _datumOptionType  = Maestro.Hash
-  , _datumOptionHash  = mockDatumHashHex
-  , _datumOptionBytes = Nothing
-  , _datumOptionJson  = Nothing
+  { datumOptionType  = Maestro.Hash
+  , datumOptionHash  = mockDatumHashHex
+  , datumOptionBytes = Nothing
+  , datumOptionJson  = Nothing
   }
 
 maestroInlineDatum :: Maestro.DatumOption
 maestroInlineDatum = Maestro.DatumOption
-  { _datumOptionType  = Maestro.Inline
-  , _datumOptionHash  = mockDatumHashHex
-  , _datumOptionBytes = Just mockDatumBtyes
-  , _datumOptionJson  = Just mockScriptDataDetailed
+  { datumOptionType  = Maestro.Inline
+  , datumOptionHash  = mockDatumHashHex
+  , datumOptionBytes = Just mockDatumBtyes
+  , datumOptionJson  = Just mockScriptDataDetailed
   }
 
 mockDatumBtyes :: Text.Text
@@ -281,18 +281,18 @@ mockScriptDataDetailed :: Aeson.Value
 mockScriptDataDetailed = fromJust $ Aeson.decode "{\"fields\": [{\"fields\": [{\"int\": 48}],\"constructor\": 0}],\"constructor\": 0}"
 
 maestroAssetFromLovelace :: Integer -> Maestro.Asset
-maestroAssetFromLovelace n = Maestro.Asset { _assetAmount = fromIntegral n
-                                           , _assetUnit = Maestro.Lovelace
+maestroAssetFromLovelace n = Maestro.Asset { assetAmount = fromIntegral n
+                                           , assetUnit = Maestro.Lovelace
                                            }
 
 maestroAssetSingleton :: GYAssetClass -> Integer -> Maestro.Asset
 maestroAssetSingleton GYLovelace n = Maestro.Asset
-                                           { _assetAmount = fromIntegral n
-                                           , _assetUnit = Maestro.Lovelace
+                                           { assetAmount = fromIntegral n
+                                           , assetUnit = Maestro.Lovelace
                                            }
 maestroAssetSingleton (GYToken policyId tokenName) n = Maestro.Asset
-                                           { _assetAmount = fromIntegral n
-                                           , _assetUnit = Maestro.UserMintedToken (Maestro.NonAdaNativeToken (coerce $ mintingPolicyIdToText policyId) (coerce $ tokenNameToHex tokenName))
+                                           { assetAmount = fromIntegral n
+                                           , assetUnit = Maestro.UserMintedToken (Maestro.NonAdaNativeToken (coerce $ mintingPolicyIdToText policyId) (coerce $ tokenNameToHex tokenName))
                                            }
 
 mockAssetA :: GYAssetClass
@@ -303,10 +303,10 @@ mockAssetEmptyName = GYToken "005eaf690cba88f441494e42f5edce9bd7f595c56f99687e2f
 
 mockMaestroScript :: Maestro.Script
 mockMaestroScript = Maestro.Script
-  { _scriptType  = Maestro.PlutusV2
-  , _scriptHash  = "90dbacba2758d72a3e0d75c56fbe393da91cc474a4bffbb59c3baeb6"
-  , _scriptBytes = Just mockScriptCBOR
-  , _scriptJson  = Nothing
+  { scriptType  = Maestro.PlutusV2
+  , scriptHash  = "90dbacba2758d72a3e0d75c56fbe393da91cc474a4bffbb59c3baeb6"
+  , scriptBytes = Just mockScriptCBOR
+  , scriptJson  = Nothing
   }
 
 mockScriptCBOR :: Text.Text

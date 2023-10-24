@@ -40,7 +40,6 @@ module GeniusYield.Types.Providers
     , gyQueryUtxosAtAddresses
     , gyQueryUtxosAtAddressesWithDatums
     , gyQueryUtxosAtPaymentCredWithDatums
-    , gyQueryUtxosAtAddress'
     , gyQueryUtxosAtAddress
     , gyQueryUtxosAtPaymentCredential
     , gyQueryUtxosAtTxOutRefs
@@ -86,6 +85,7 @@ import           GeniusYield.Types.SlotConfig
 import           GeniusYield.Types.Tx
 import           GeniusYield.Types.TxOutRef
 import           GeniusYield.Types.UTxO
+import           GeniusYield.Types.Value           (GYAssetClass)
 
 {- Note [Caching and concurrently accessible MVars]
 
@@ -142,7 +142,7 @@ gyWaitUntilSlot providers = gyWaitUntilSlot' (gySlotActions providers)
 gyWaitForNextBlock_ :: GYProviders -> IO ()
 gyWaitForNextBlock_ = void . gyWaitForNextBlock
 
-gyQueryUtxosAtAddress :: GYProviders -> GYAddress -> IO GYUTxOs
+gyQueryUtxosAtAddress :: GYProviders -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
 gyQueryUtxosAtAddress = gyQueryUtxosAtAddress' . gyQueryUTxO
 
 gyQueryUtxosAtAddresses :: GYProviders -> [GYAddress] -> IO  GYUTxOs
@@ -407,6 +407,7 @@ data GYQueryUTxO = GYQueryUTxO
     -- ^ `gyQueryUtxosAtTxOutRefsWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
     , gyQueryUtxoAtTxOutRef'               :: !(GYTxOutRef -> IO (Maybe GYUTxO))
     , gyQueryUtxoRefsAtAddress'            :: !(GYAddress -> IO [GYTxOutRef])
+    , gyQueryUtxosAtAddress'               :: !(GYAddress -> Maybe GYAssetClass -> IO GYUTxOs)
     , gyQueryUtxosAtAddresses'             :: !([GYAddress] -> IO GYUTxOs)
     , gyQueryUtxosAtAddressesWithDatums'   :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))
     -- ^ `gyQueryUtxosAtAddressesWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
@@ -415,17 +416,14 @@ data GYQueryUTxO = GYQueryUTxO
     -- ^ `gyQueryUtxosAtPaymentCredWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
     }
 
-gyQueryUtxosAtAddress' :: GYQueryUTxO -> GYAddress -> IO GYUTxOs
-gyQueryUtxosAtAddress' q = gyQueryUtxosAtAddresses' q . return
-
 -- | Query Utxo Refs at address (default implementation)
-gyQueryUtxoRefsAtAddressDefault :: (GYAddress -> IO GYUTxOs) -> GYAddress -> IO [GYTxOutRef]
-gyQueryUtxoRefsAtAddressDefault queryUtxosAtAddress = fmap utxosRefs . queryUtxosAtAddress
+gyQueryUtxoRefsAtAddressDefault :: (GYAddress -> Maybe GYAssetClass -> IO GYUTxOs) -> GYAddress -> IO [GYTxOutRef]
+gyQueryUtxoRefsAtAddressDefault queryUtxosAtAddress = fmap utxosRefs . (`queryUtxosAtAddress` Nothing)
 
 -- | Query Utxo for address (default implementation)
-gyQueryUtxoAtAddressesDefault :: (GYAddress -> IO GYUTxOs) -> [GYAddress] -> IO GYUTxOs
+gyQueryUtxoAtAddressesDefault :: (GYAddress -> Maybe GYAssetClass -> IO GYUTxOs) -> [GYAddress] -> IO GYUTxOs
 gyQueryUtxoAtAddressesDefault queryUtxosAtAddress addrs = do
-  utxos <- traverse queryUtxosAtAddress addrs
+  utxos <- traverse (`queryUtxosAtAddress` Nothing) addrs
   pure $ mconcat utxos
 
 -- | Query Utxos at output refs (default implementation).

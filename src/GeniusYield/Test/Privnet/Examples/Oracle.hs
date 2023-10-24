@@ -10,7 +10,8 @@ module GeniusYield.Test.Privnet.Examples.Oracle (tests) where
 
 import           Control.Lens                                     ((.~))
 import qualified Data.Map.Strict                                  as Map
-import           Test.Tasty                                       (TestTree, testGroup)
+import           Test.Tasty                                       (TestTree,
+                                                                   testGroup)
 import           Test.Tasty.HUnit                                 (testCaseSteps)
 
 import           GeniusYield.Examples.Gift
@@ -41,7 +42,7 @@ tests setup = testGroup "oracle"
         -- fails: no reference input with datum
         assertThrown isTxBodyErrorAutoBalance $ ctxRunI ctx (ctxUserF ctx) $ do
             addr <- scriptAddress readOracleValidatorV2
-            utxo <- utxosAtAddress addr
+            utxo <- utxosAtAddress addr Nothing
             datums <- utxosDatums utxo
             return (mconcat
                 [ mustHaveInput GYTxIn
@@ -82,7 +83,7 @@ tests setup = testGroup "oracle"
 
         txBodyConsume <- ctxRunI ctx (ctxUserF ctx) $ do
             addr <- scriptAddress readOracleValidatorV2
-            utxo <- utxosAtAddress addr
+            utxo <- utxosAtAddress addr Nothing
             datums <- utxosDatums utxo
             return (mconcat $
                 [ mustHaveInput GYTxIn

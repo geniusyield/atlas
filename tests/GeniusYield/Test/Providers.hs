@@ -157,7 +157,7 @@ maestroTests token netId =
     getUTxOsAtAddress :: GYAddress -> Text.Text -> IO (Api.UTxO Api.BabbageEra)
     getUTxOsAtAddress addr pToken = do
         queryUtxo <- getQueryUtxo pToken
-        utxos <- gyQueryUtxosAtAddress' queryUtxo addr
+        utxos <- gyQueryUtxosAtAddress' queryUtxo addr Nothing
         return $ utxosToApi utxos
 
     getUTxOsAtAddresses :: [GYAddress] -> Text.Text -> IO (Api.UTxO Api.BabbageEra)

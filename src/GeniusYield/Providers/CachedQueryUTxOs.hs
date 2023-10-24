@@ -17,7 +17,7 @@ import           GeniusYield.Imports
 import           GeniusYield.Types
 
 data CachedQueryUTxO = CachedQueryUTxO
-    { _cquAddrCache        :: !(Cache.Cache GYAddress GYUTxOs)
+    { _cquAddrCache        :: !(Cache.Cache (GYAddress, Maybe GYAssetClass) GYUTxOs)
     , _cquRefCache         :: !(Cache.Cache GYTxOutRef (Maybe GYUTxO))
     , _cquPaymentCredCache :: !(Cache.Cache GYPaymentCredential GYUTxOs)
     , _cquInfo             :: !GYQueryUTxO
@@ -39,6 +39,7 @@ cachedQueryUTxO q = GYQueryUTxO
     Nothing  -- Will use the default implementation.
     (cachedUtxoAtTxOutRef q)
     (gyQueryUtxoRefsAtAddressDefault $ cachedUtxosAtAddress q)
+    (cachedUtxosAtAddress q)
     (gyQueryUtxoAtAddressesDefault $ cachedUtxosAtAddress q)
     Nothing  -- Will use the default implementation.
     (cachedUtxosAtPaymentCred q)
@@ -86,14 +87,14 @@ storeCacheUTxO (CachedQueryUTxO _ cache _ _ _) utxos = forUTxOs_ utxos $ \utxo -
     let ref = utxoRef utxo
     in  Cache.insert cache ref (Just utxo)
 
-cachedUtxosAtAddress :: CachedQueryUTxO -> GYAddress -> IO GYUTxOs
-cachedUtxosAtAddress ctx@(CachedQueryUTxO cache _ _ q (GYLog log' _)) addr = do
-  m <- Cache.lookup' cache addr
+cachedUtxosAtAddress :: CachedQueryUTxO -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
+cachedUtxosAtAddress ctx@(CachedQueryUTxO cache _ _ q (GYLog log' _)) addr mAssetClass = do
+  m <- Cache.lookup' cache (addr, mAssetClass)
   case m of
     Nothing  -> do
       log' mempty GYDebug $ "address not cached: " <> show addr
-      res <- gyQueryUtxosAtAddress' q addr
-      Cache.insert cache addr res
+      res <- gyQueryUtxosAtAddress' q addr mAssetClass
+      Cache.insert cache (addr, mAssetClass) res
       storeCacheUTxO ctx res
       return  res
     Just res -> do

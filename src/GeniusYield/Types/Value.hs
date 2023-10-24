@@ -96,6 +96,7 @@ import qualified Web.HttpApiData                  as Web
 
 
 import           Data.Either.Combinators          (mapLeft)
+import           Data.Hashable                    (Hashable (..))
 import qualified GeniusYield.Imports              as TE
 import qualified GeniusYield.Types.Ada            as Ada
 import           GeniusYield.Types.Script
@@ -414,6 +415,9 @@ isEmptyValue (GYValue m) = Map.null m
 --
 data GYAssetClass = GYLovelace | GYToken GYMintingPolicyId GYTokenName
   deriving stock (Show, Eq, Ord, Generic)
+
+instance Hashable GYAssetClass where
+    hashWithSalt salt ac = hashWithSalt salt $ Web.toUrlPiece ac
 
 instance Aeson.ToJSONKey GYAssetClass where
     toJSONKey = Aeson.toJSONKeyText Web.toUrlPiece

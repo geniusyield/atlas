@@ -161,7 +161,7 @@ tests setup = testGroup "gift"
         threadDelay 1_000_000
 
         info $ printf "UTxOs at this new user"
-        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
         forUTxOs_ newUserUtxos (info . show)
 
         ---------- New user tries to grab it, since interacting with script, needs to give collateral
@@ -193,7 +193,7 @@ tests setup = testGroup "gift"
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue True
 
         info $ printf "UTxOs at this new user"
-        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
         forUTxOs_ newUserUtxos (info . show)
         fiveAdaUtxo <- case find (\u -> utxoValue u == collateralValue) (utxosToList newUserUtxos) of
                          Nothing           -> fail "Couldn't find a 5-ada-only UTxO"
@@ -211,7 +211,7 @@ tests setup = testGroup "gift"
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
 
         info $ printf "UTxOs at this new user"
-        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
         forUTxOs_ newUserUtxos (info . show)
         assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
@@ -222,7 +222,7 @@ tests setup = testGroup "gift"
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
 
         info $ printf "UTxOs at this new user"
-        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
         forUTxOs_ newUserUtxos (info . show)
         assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
@@ -233,7 +233,7 @@ tests setup = testGroup "gift"
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
 
         info $ printf "UTxOs at this new user"
-        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
         forUTxOs_ newUserUtxos (info . show)
         void $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
@@ -244,7 +244,7 @@ tests setup = testGroup "gift"
         txBody <- ctxRunI ctx (ctxUserF ctx) $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 8_000_000)
         void $ submitTx ctx (ctxUserF ctx) txBody
         info $ printf "UTxOs at this new user"
-        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser)
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
         forUTxOs_ newUserUtxos (info . show)
         eightAdaUtxo <- case find (\u -> utxoValue u == valueFromLovelace 8_000_000) (utxosToList newUserUtxos) of
                           Nothing -> fail "Couldn't find a 8-ada-only UTxO"
@@ -570,7 +570,7 @@ grabGifts
     -> m (Maybe (GYTxSkeleton u))
 grabGifts validator = do
     addr <- scriptAddress validator
-    utxo <- utxosAtAddress addr
+    utxo <- utxosAtAddress addr Nothing
     datums <- utxosDatums utxo
 
     if null datums
@@ -594,7 +594,7 @@ grabGiftsRef
     -> m (Maybe (GYTxSkeleton 'PlutusV2))
 grabGiftsRef ref validator = do
     addr <- scriptAddress validator
-    utxo <- utxosAtAddress addr
+    utxo <- utxosAtAddress addr Nothing
     datums <- utxosDatums utxo
 
     if null datums

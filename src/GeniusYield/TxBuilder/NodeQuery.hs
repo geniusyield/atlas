@@ -57,10 +57,10 @@ instance GYTxQueryMonad GYTxQueryMonadNode where
       GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyLookupDatum providers h
 
-    utxosAtAddress addr = do
+    utxosAtAddress addr mAssetClass = do
       logMsg mempty GYInfo $ printf "Querying utxo At Address: %s" addr
       GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
-        gyQueryUtxosAtAddress providers addr
+        gyQueryUtxosAtAddress providers addr mAssetClass
 
     utxosAtPaymentCredential cred = do
       logMsg mempty GYInfo $ printf "Querying UTxOs at payment credential: %s" cred

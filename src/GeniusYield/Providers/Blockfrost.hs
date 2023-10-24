@@ -177,6 +177,7 @@ blockfrostQueryUtxo proj = GYQueryUTxO
     , gyQueryUtxoAtTxOutRef'               = blockfrostUtxosAtTxOutRef proj
     , gyQueryUtxoRefsAtAddress'            = gyQueryUtxoRefsAtAddressDefault $ blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddresses'             = gyQueryUtxoAtAddressesDefault $ blockfrostUtxosAtAddress proj
+    , gyQueryUtxosAtAddress'               = blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddressesWithDatums'   = Nothing  -- Will use the default implementation.
     , gyQueryUtxosAtPaymentCredential'     = blockfrostUtxosAtPaymentCredential proj
     , gyQueryUtxosAtPaymentCredWithDatums' = Nothing  -- Will use the default implementation.
@@ -197,13 +198,16 @@ transformUtxo (Blockfrost.AddressUtxo {..}, ms) = do
         , utxoRefScript = ms
         }
 
-blockfrostUtxosAtAddress :: Blockfrost.Project -> GYAddress -> IO GYUTxOs
-blockfrostUtxosAtAddress proj addr = do
+blockfrostUtxosAtAddress :: Blockfrost.Project -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
+blockfrostUtxosAtAddress proj addr mAssetClass = do
+    let extractedAssetClass = extractAssetClass mAssetClass
     {- 'Blockfrost.getAddressUtxos' doesn't return all utxos at that address, only the first 100 or so.
     Have to handle paging manually for all. -}
     addrUtxos  <- handler <=< Blockfrost.runBlockfrost proj
         . Blockfrost.allPages $ \paged ->
-            Blockfrost.getAddressUtxos' (gyAddressToBlockfrost addr) paged Blockfrost.Ascending
+            case extractedAssetClass of
+                Nothing -> Blockfrost.getAddressUtxos' (gyAddressToBlockfrost addr) paged Blockfrost.Ascending
+                Just (ac, tn) -> Blockfrost.getAddressUtxosAsset' (gyAddressToBlockfrost addr) (Blockfrost.mkAssetId $ ac <> tn) paged Blockfrost.Ascending
     addrUtxos' <- mapM (\x -> lookupScriptHashIO proj (Blockfrost._addressUtxoReferenceScriptHash x) >>= \mrs -> return (x, mrs)) addrUtxos
     case traverse transformUtxo addrUtxos' of
       Left err -> throwIO $ BlpvDeserializeFailure locationIdent err

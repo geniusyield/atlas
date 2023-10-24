@@ -26,10 +26,10 @@ import qualified Data.Text                    as Text
 import           Data.Word                    (Word64)
 import           Deriving.Aeson
 import           GeniusYield.Imports
-import           GeniusYield.Providers.Common (datumFromCBOR,
+import           GeniusYield.Providers.Common (datumFromCBOR, extractAssetClass,
                                                newServantClientEnv)
 import           GeniusYield.Types            (GYAddress, GYAddressBech32,
-                                               GYAwaitTx,
+                                               GYAssetClass (..), GYAwaitTx,
                                                GYAwaitTxException (GYAwaitTxException),
                                                GYAwaitTxParameters (..),
                                                GYDatum, GYDatumHash,
@@ -51,7 +51,7 @@ import           GeniusYield.Types            (GYAddress, GYAddressBech32,
 import qualified GeniusYield.Types            as GYTypes (PlutusVersion (..))
 import           Servant.API                  (Capture, Get, Header,
                                                Headers (getResponse), JSON,
-                                               QueryFlag,
+                                               QueryFlag, QueryParam,
                                                ResponseHeader (Header),
                                                lookupResponseHeader,
                                                type (:<|>) (..), (:>))
@@ -182,7 +182,7 @@ data KupoUtxo = KupoUtxo
 
 findDatumByHash :: GYDatumHash -> ClientM KupoDatum
 findScriptByHash :: GYScriptHash -> ClientM KupoScript
-fetchUtxosByPattern :: Pattern -> Bool -> ClientM (Headers '[Header "X-Most-Recent-Checkpoint" Word64] [KupoUtxo])
+fetchUtxosByPattern :: Pattern -> Bool -> Maybe Text -> Maybe Text -> ClientM (Headers '[Header "X-Most-Recent-Checkpoint" Word64] [KupoUtxo])
 
 type KupoApi =
          "datums"
@@ -194,6 +194,8 @@ type KupoApi =
     :<|> "matches"
       :> Capture "pattern" Pattern
       :> QueryFlag "unspent"
+      :> QueryParam "policy_id" Text
+      :> QueryParam "asset_name" Text
       :> Get '[JSON] (Headers '[Header "X-Most-Recent-Checkpoint" Word64] [KupoUtxo])
 
 findDatumByHash :<|> findScriptByHash :<|> fetchUtxosByPattern = client @KupoApi Proxy
@@ -215,11 +217,15 @@ kupoLookupScript env sh = do
   pure ms
 
 -- | Find UTxOs at a given address.
-kupoUtxosAtAddress :: KupoApiEnv -> GYAddress -> IO GYUTxOs
-kupoUtxosAtAddress env addr = do
+kupoUtxosAtAddress :: KupoApiEnv -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
+kupoUtxosAtAddress env addr mAssetClass = do
+  let extractedAssetClass = extractAssetClass mAssetClass
+      commonRequestPart = fetchUtxosByPattern (addressToText addr) True
   addrUtxos <-
     handleKupoError locationIdent <=< runKupoClient env $
-      fetchUtxosByPattern (addressToText addr) True
+      case extractedAssetClass of
+        Nothing       -> commonRequestPart Nothing Nothing
+        Just (mp, tn) -> commonRequestPart (Just mp) (Just tn)
   utxosFromList <$> traverse (transformUtxo env) (getResponse addrUtxos)
   where
     locationIdent = "AddressesUtxo"
@@ -229,7 +235,7 @@ kupoUtxoAtTxOutRef env oref = do
   let (txId, utxoIdx) = txOutRefToTuple' oref
   utxo <-
     handleKupoError locationIdent <=< runKupoClient env $
-      fetchUtxosByPattern (Text.pack (show utxoIdx) <> "@" <> txId) True
+      fetchUtxosByPattern (Text.pack (show utxoIdx) <> "@" <> txId) True Nothing Nothing
   listToMaybe <$> traverse (transformUtxo env) (getResponse utxo)
  where
   locationIdent = "UtxoByRef"
@@ -238,7 +244,7 @@ kupoUtxosAtPaymentCredential :: KupoApiEnv -> GYPaymentCredential -> IO GYUTxOs
 kupoUtxosAtPaymentCredential env cred = do
   credUtxos <-
     handleKupoError locationIdent <=< runKupoClient env $
-      fetchUtxosByPattern (paymentCredentialToHexText cred <> "/*") True
+      fetchUtxosByPattern (paymentCredentialToHexText cred <> "/*") True Nothing Nothing
   utxosFromList <$> traverse (transformUtxo env) (getResponse credUtxos)
  where
   locationIdent = "PaymentCredentialUtxos"
@@ -273,7 +279,8 @@ transformUtxo env KupoUtxo {..} = do
 kupoQueryUtxo :: KupoApiEnv -> GYQueryUTxO
 kupoQueryUtxo env =
   GYQueryUTxO
-    { gyQueryUtxosAtAddresses' = gyQueryUtxoAtAddressesDefault $ kupoUtxosAtAddress env
+    { gyQueryUtxosAtAddress' = kupoUtxosAtAddress env
+    , gyQueryUtxosAtAddresses' = gyQueryUtxoAtAddressesDefault $ kupoUtxosAtAddress env
     , gyQueryUtxosAtTxOutRefs' = gyQueryUtxosAtTxOutRefsDefault $ kupoUtxoAtTxOutRef env
     , gyQueryUtxosAtTxOutRefsWithDatums' = Nothing
     , gyQueryUtxoAtTxOutRef' = kupoUtxoAtTxOutRef env
@@ -291,7 +298,7 @@ kupoAwaitTxConfirmed env p@GYAwaitTxParameters{..} txId = go 0
       | otherwise = do
           utxos <-
             handleKupoError locationIdent <=< runKupoClient env $
-              fetchUtxosByPattern (Text.pack $ "*@" <> show txId) False  -- We don't require for only @unspent@. Kupo with @--prune-utxo@ option would still keep spent UTxOs until their spent record is truly immutable (see Kupo docs for more details).
+              fetchUtxosByPattern (Text.pack $ "*@" <> show txId) False Nothing Nothing  -- We don't require for only @unspent@. Kupo with @--prune-utxo@ option would still keep spent UTxOs until their spent record is truly immutable (see Kupo docs for more details).
           case listToMaybe (getResponse utxos) of
             Nothing -> threadDelay checkInterval >> go (attempt + 1)
             Just u  -> do

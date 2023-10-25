@@ -85,6 +85,9 @@ instance GYTxQueryMonad GYTxMonadNode where
     utxosAtAddresses addrs = GYTxMonadNode $ \env ->
         gyQueryUtxosAtAddresses (envProviders env) addrs
 
+    utxosAtAddressWithDatums addr mAssetClass = GYTxMonadNode $ \env ->
+        gyQueryUtxosAtAddressWithDatums (envProviders env) addr mAssetClass
+
     utxosAtPaymentCredential cred = GYTxMonadNode $ \env ->
         gyQueryUtxosAtPaymentCredential (envProviders env) cred
 

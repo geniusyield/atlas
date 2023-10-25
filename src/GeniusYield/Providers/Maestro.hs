@@ -243,6 +243,21 @@ maestroUtxosAtAddress env addr mAssetClass = do
   where
     locationIdent = "AddressUtxos"
 
+-- | Query UTxOs present at given address with datums.
+maestroUtxosAtAddressWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]
+maestroUtxosAtAddressWithDatums env addr mAssetClass = do
+  let addrAsText = addressToText addr
+      extractedAssetClass = extractAssetClass mAssetClass
+  -- Here one would not get `MaestroNotFound` error.
+  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (Maestro.utxosAtAddress env (coerce addrAsText) (Just True) (Just False) (fmap (\(mp, tn) -> Maestro.NonAdaNativeToken (coerce mp) (coerce tn)) extractedAssetClass))
+
+  either
+    (throwIO . MspvDeserializeFailure locationIdent)
+    pure
+    $ traverse utxoFromMaestroWithDatum addrUtxos
+  where
+    locationIdent = "AddressUtxosWithDatums"
+
 -- | Query UTxOs present at multiple addresses.
 maestroUtxosAtAddresses :: Maestro.MaestroEnv 'Maestro.V1 -> [GYAddress] -> IO GYUTxOs
 maestroUtxosAtAddresses env addrs = do
@@ -375,6 +390,7 @@ maestroQueryUtxo :: Maestro.MaestroEnv 'Maestro.V1 -> GYQueryUTxO
 maestroQueryUtxo env = GYQueryUTxO
   { gyQueryUtxosAtAddresses'             = maestroUtxosAtAddresses env
   , gyQueryUtxosAtAddress'               = maestroUtxosAtAddress env
+  , gyQueryUtxosAtAddressWithDatums'     = Just $ maestroUtxosAtAddressWithDatums env
   , gyQueryUtxosAtTxOutRefs'             = maestroUtxosAtTxOutRefs env
   , gyQueryUtxosAtTxOutRefsWithDatums'   = Just $ maestroUtxosAtTxOutRefsWithDatums env
   , gyQueryUtxoAtTxOutRef'               = maestroUtxoAtTxOutRef env

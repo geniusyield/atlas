@@ -76,7 +76,9 @@ providersMashupTests configs =
           utxosAtScriptCredentialWithDatums <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxosAtPaymentCredentialWithDatums alwaysFailCredential
           delayBySecond
           utxosAtScriptAddressWithAsset <- gyQueryUtxosAtAddress provider alwaysFailAddress (Just "6d24161a60592755dcbcc2c1330bbe968f913acc15ec40f0be3873ee.61757468")  -- An asset I saw by random chance.
-          pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums' `Set.difference` utxoBugSet, utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum', utxosAtScriptCredential <> utxosAtKeyCredential, Set.fromList utxosAtScriptCredentialWithDatums `Set.difference` utxoBugSet, utxosAtScriptAddressWithAsset)
+          delayBySecond
+          utxosAtScriptAddressWithAssetAndDatums <- gyQueryUtxosAtAddressWithDatums provider (unsafeAddressFromText "addr_test1wz2mzj532enpgu5vgwxuh249fpknx5ft9wxse2876z0mp2q89ye7k") (Just "c6e65ba7878b2f8ea0ad39287d3e2fd256dc5c4160fc19bdf4c4d87e.7447454e53")
+          pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums' `Set.difference` utxoBugSet, utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum', utxosAtScriptCredential <> utxosAtKeyCredential, Set.fromList utxosAtScriptCredentialWithDatums `Set.difference` utxoBugSet, utxosAtScriptAddressWithAsset, utxosAtScriptAddressWithAssetAndDatums)
         assertBool "Utxos are not all equal" $ all (== head utxosProviders) (tail utxosProviders)
     , testCase "Checking presence of error message when submitting an invalid transaction" $ do
         let

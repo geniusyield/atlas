@@ -178,6 +178,7 @@ blockfrostQueryUtxo proj = GYQueryUTxO
     , gyQueryUtxoRefsAtAddress'            = gyQueryUtxoRefsAtAddressDefault $ blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddresses'             = gyQueryUtxoAtAddressesDefault $ blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddress'               = blockfrostUtxosAtAddress proj
+    , gyQueryUtxosAtAddressWithDatums'     = Nothing
     , gyQueryUtxosAtAddressesWithDatums'   = Nothing  -- Will use the default implementation.
     , gyQueryUtxosAtPaymentCredential'     = blockfrostUtxosAtPaymentCredential proj
     , gyQueryUtxosAtPaymentCredWithDatums' = Nothing  -- Will use the default implementation.

@@ -33,11 +33,13 @@ module GeniusYield.Types.Providers
     , gyGetSlotConfig
     , makeGetParameters
       -- * Query UTxO
+    , gyQueryUtxosAtAddressWithDatumsDefault
     , gyQueryUtxosAtAddressesWithDatumsDefault
     , gyQueryUtxosAtPaymentCredWithDatumsDefault
     , gyQueryUtxosAtTxOutRefsWithDatumsDefault
     , GYQueryUTxO (..)
     , gyQueryUtxosAtAddresses
+    , gyQueryUtxosAtAddressWithDatums
     , gyQueryUtxosAtAddressesWithDatums
     , gyQueryUtxosAtPaymentCredWithDatums
     , gyQueryUtxosAtAddress
@@ -150,6 +152,12 @@ gyQueryUtxosAtAddresses = gyQueryUtxosAtAddresses' . gyQueryUTxO
 
 gyQueryUtxosAtPaymentCredential :: GYProviders -> GYPaymentCredential -> IO GYUTxOs
 gyQueryUtxosAtPaymentCredential = gyQueryUtxosAtPaymentCredential' . gyQueryUTxO
+
+gyQueryUtxosAtAddressWithDatums :: GYProviders -> GYAddress -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtAddressWithDatums provider addr mAssetClass =
+  case gyQueryUtxosAtAddressWithDatums' $ gyQueryUTxO provider of
+    Nothing -> gyQueryUtxosAtAddressWithDatumsDefault (gyQueryUtxosAtAddress provider) (gyLookupDatum provider) addr mAssetClass
+    Just f  -> f addr mAssetClass
 
 gyQueryUtxosAtAddressesWithDatums :: GYProviders -> [GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]
 gyQueryUtxosAtAddressesWithDatums provider addrs =
@@ -408,6 +416,7 @@ data GYQueryUTxO = GYQueryUTxO
     , gyQueryUtxoAtTxOutRef'               :: !(GYTxOutRef -> IO (Maybe GYUTxO))
     , gyQueryUtxoRefsAtAddress'            :: !(GYAddress -> IO [GYTxOutRef])
     , gyQueryUtxosAtAddress'               :: !(GYAddress -> Maybe GYAssetClass -> IO GYUTxOs)
+    , gyQueryUtxosAtAddressWithDatums'     :: !(Maybe (GYAddress -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]))
     , gyQueryUtxosAtAddresses'             :: !([GYAddress] -> IO GYUTxOs)
     , gyQueryUtxosAtAddressesWithDatums'   :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))
     -- ^ `gyQueryUtxosAtAddressesWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
@@ -431,6 +440,12 @@ gyQueryUtxosAtTxOutRefsDefault :: (GYTxOutRef -> IO (Maybe GYUTxO)) -> [GYTxOutR
 gyQueryUtxosAtTxOutRefsDefault queryUtxoAtTxOutRef orefs = do
   utxos <- traverse queryUtxoAtTxOutRef orefs
   pure $ utxosFromList $ catMaybes utxos
+
+-- | Lookup UTxOs at given 'GYAddress' with their datums. This is a default implementation using `utxosAtAddress` and `lookupDatum`.
+gyQueryUtxosAtAddressWithDatumsDefault :: Monad m => (GYAddress -> Maybe GYAssetClass -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> GYAddress -> Maybe GYAssetClass -> m [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtAddressWithDatumsDefault utxosAtAddressFun lookupDatumFun addr mAssetClass = do
+  utxosWithoutDatumResolutions <- utxosAtAddressFun addr mAssetClass
+  utxosDatumResolver utxosWithoutDatumResolutions lookupDatumFun
 
 -- | Lookup UTxOs at zero or more 'GYAddress' with their datums. This is a default implementation using `utxosAtAddresses` and `lookupDatum`.
 gyQueryUtxosAtAddressesWithDatumsDefault :: Monad m => ([GYAddress] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYAddress] -> m [(GYUTxO, Maybe GYDatum)]

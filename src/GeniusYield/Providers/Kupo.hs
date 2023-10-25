@@ -280,6 +280,7 @@ kupoQueryUtxo :: KupoApiEnv -> GYQueryUTxO
 kupoQueryUtxo env =
   GYQueryUTxO
     { gyQueryUtxosAtAddress' = kupoUtxosAtAddress env
+    , gyQueryUtxosAtAddressWithDatums' = Nothing
     , gyQueryUtxosAtAddresses' = gyQueryUtxoAtAddressesDefault $ kupoUtxosAtAddress env
     , gyQueryUtxosAtTxOutRefs' = gyQueryUtxosAtTxOutRefsDefault $ kupoUtxoAtTxOutRef env
     , gyQueryUtxosAtTxOutRefsWithDatums' = Nothing

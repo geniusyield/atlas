@@ -74,7 +74,7 @@ utxoToRefMap utxo = Map.fromList
 getRefInfos :: GYTxQueryMonad m => m (Map (Some GYScript) GYTxOutRef)
 getRefInfos = do
     addr <- scriptAddress limboValidatorV2
-    utxo <- utxosAtAddress addr
+    utxo <- utxosAtAddress addr Nothing
     return $ utxoToRefMap utxo
 
 -- | Create UTxO with a reference script.
@@ -86,7 +86,7 @@ getRefInfos = do
 addRefScript :: GYTxMonad m => GYScript 'PlutusV2 -> m (Either GYTxOutRef (GYTxSkeleton v))
 addRefScript sc = do
     addr <- scriptAddress limboValidatorV2
-    utxo <- utxosAtAddress addr
+    utxo <- utxosAtAddress addr Nothing
 
     let refs :: Map (Some GYScript) GYTxOutRef
         refs = utxoToRefMap utxo

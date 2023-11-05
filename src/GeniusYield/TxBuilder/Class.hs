@@ -94,7 +94,7 @@ import           GeniusYield.Types
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), (utxosAtAddress | utxosAtAddresses), utxosAtPaymentCredential, slotConfig, slotOfCurrentBlock, logMsg #-}
+    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, slotConfig, slotOfCurrentBlock, logMsg #-}
 
     -- | Get the network id
     networkId :: m GYNetworkId
@@ -124,15 +124,18 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     utxosAtTxOutRefsWithDatums = gyQueryUtxosAtTxOutRefsWithDatumsDefault utxosAtTxOutRefs lookupDatum
 
     -- | Lookup 'GYUTxOs' at 'GYAddress'.
-    utxosAtAddress :: GYAddress -> m GYUTxOs
-    utxosAtAddress = utxosAtAddresses . return
+    utxosAtAddress :: GYAddress -> Maybe GYAssetClass -> m GYUTxOs
+
+    -- | Lookup 'GYUTxO' at given 'GYAddress' with their datums. This has a default implementation using `utxosAtAddress` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
+    utxosAtAddressWithDatums :: GYAddress -> Maybe GYAssetClass -> m [(GYUTxO, Maybe GYDatum)]
+    utxosAtAddressWithDatums = gyQueryUtxosAtAddressWithDatumsDefault utxosAtAddress lookupDatum
 
     -- | Lookup 'GYUTxOs' at zero or more 'GYAddress'.
     utxosAtAddresses :: [GYAddress] -> m GYUTxOs
     utxosAtAddresses = foldM f mempty
       where
         f :: GYUTxOs -> GYAddress -> m GYUTxOs
-        f utxos addr = (<> utxos) <$> utxosAtAddress addr
+        f utxos addr = (<> utxos) <$> utxosAtAddress addr Nothing
 
     -- | Lookup UTxOs at zero or more 'GYAddress' with their datums. This has a default implementation using `utxosAtAddresses` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
     utxosAtAddressesWithDatums :: [GYAddress] -> m [(GYUTxO, Maybe GYDatum)]
@@ -140,7 +143,7 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
 
     -- | Lookup the `[GYTxOutRef]`s at a `GYAddress`
     utxoRefsAtAddress :: GYAddress -> m [GYTxOutRef]
-    utxoRefsAtAddress = fmap (Map.keys . mapUTxOs id) . utxosAtAddress
+    utxoRefsAtAddress = fmap (Map.keys . mapUTxOs id) . flip utxosAtAddress Nothing
 
     -- | Lookup 'GYUTxOs' at 'GYPaymentCredential'.
     utxosAtPaymentCredential :: GYPaymentCredential -> m GYUTxOs
@@ -186,7 +189,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
     utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
-    utxosAtAddress = lift . utxosAtAddress
+    utxosAtAddress addr = lift . utxosAtAddress addr
+    utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
@@ -208,7 +212,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
     utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
-    utxosAtAddress = lift . utxosAtAddress
+    utxosAtAddress addr = lift . utxosAtAddress addr
+    utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
@@ -230,7 +235,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     utxoAtTxOutRef = lift . utxoAtTxOutRef
     utxosAtTxOutRefs = lift . utxosAtTxOutRefs
     utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
-    utxosAtAddress = lift . utxosAtAddress
+    utxosAtAddress addr = lift . utxosAtAddress addr
+    utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress

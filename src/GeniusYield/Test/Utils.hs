@@ -39,21 +39,21 @@ module GeniusYield.Test.Utils
     , pattern (:=)
     ) where
 
+import qualified Cardano.Simple.Ledger.Slot as Fork
+import qualified Cardano.Simple.Ledger.Tx   as Fork
 import           Control.Monad.Random
 import           Control.Monad.State
-import           Data.List                     (findIndex)
-import qualified Data.Map.Strict               as Map
-import           Data.Maybe                    (fromJust)
-import           Data.Semigroup                (Sum (..))
+import           Data.List                  (findIndex)
+import qualified Data.Map.Strict            as Map
+import           Data.Maybe                 (fromJust)
+import           Data.Semigroup             (Sum (..))
 import           Data.Typeable
-import           Plutus.Model                  hiding (currentSlot)
-import qualified Cardano.Simple.Ledger.Slot    as Fork
-import qualified Cardano.Simple.Ledger.Tx      as Fork
-import qualified PlutusLedgerApi.V1.Value      as Plutus
-import qualified PlutusLedgerApi.V2            as Plutus2
-import qualified Test.Tasty                    as Tasty
-import qualified Test.Tasty.QuickCheck         as Tasty
-import qualified Test.Tasty.Runners            as Tasty
+import           Plutus.Model               hiding (currentSlot)
+import qualified PlutusLedgerApi.V1.Value   as Plutus
+import qualified PlutusLedgerApi.V2         as Plutus2
+import qualified Test.Tasty                 as Tasty
+import qualified Test.Tasty.QuickCheck      as Tasty
+import qualified Test.Tasty.Runners         as Tasty
 
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
@@ -195,7 +195,7 @@ balance a = do
     case addressFromPlutus nid $ toAddress a of
         Left err   -> fail $ show err
         Right addr -> do
-            utxos <- utxosAtAddress addr
+            utxos <- utxosAtAddress addr Nothing
             return $ foldMapUTxOs utxoValue utxos
 
 {- | Computes a `GYTxMonadRun` action and returns the result and how this action

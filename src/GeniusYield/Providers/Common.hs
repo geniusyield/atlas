@@ -17,6 +17,7 @@ module GeniusYield.Providers.Common (
     , previewEraHist
     , mainnetEraHist
     , silenceHeadersClientError
+    , extractAssetClass
 ) where
 
 import qualified Data.Aeson                           as Aeson
@@ -40,9 +41,12 @@ import           Cardano.Slotting.Time                (RelativeTime (RelativeTim
 import           Control.Exception                    (Exception)
 import           Data.Bifunctor                       (first)
 import           Data.SOP.Counting                    (NonEmpty (NonEmptyCons, NonEmptyOne))
+import           GeniusYield.Types.Datum              (GYDatum, datumFromApi')
+import           GeniusYield.Types.Script             (mintingPolicyIdToText)
+import           GeniusYield.Types.Value              (GYAssetClass (..),
+                                                       tokenNameToHex)
 import qualified Ouroboros.Consensus.Cardano.Block    as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
-import           GeniusYield.Types.Datum              (GYDatum, datumFromApi')
 
 data SomeDeserializeError
     = DeserializeErrorBech32 !Api.Bech32DecodeError
@@ -262,3 +266,9 @@ mainnetEraHist = Ouroboros.mkInterpreter . Ouroboros.Summary
             , eraEnd = Ouroboros.EraUnbounded
             , eraParams = Ouroboros.EraParams {eraEpochSize = 432000, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 129600}
             }
+
+-- | Extract currency symbol & token name part of an `GYAssetClass` when it is of such a form. When input is @Just GYLovelace@ or @Nothing@, this function returns @Nothing@.
+extractAssetClass :: Maybe GYAssetClass -> Maybe (Text, Text)
+extractAssetClass Nothing = Nothing
+extractAssetClass (Just GYLovelace) = Nothing
+extractAssetClass (Just (GYToken pid tn)) = Just (mintingPolicyIdToText pid, tokenNameToHex tn)

@@ -79,11 +79,14 @@ instance GYTxQueryMonad GYTxMonadNode where
     lookupDatum h = GYTxMonadNode $ \env ->
         gyLookupDatum (envProviders env) h
 
-    utxosAtAddress addr = GYTxMonadNode $ \env ->
-        gyQueryUtxosAtAddress (envProviders env) addr
+    utxosAtAddress addr mAssetClass = GYTxMonadNode $ \env ->
+        gyQueryUtxosAtAddress (envProviders env) addr mAssetClass
 
     utxosAtAddresses addrs = GYTxMonadNode $ \env ->
         gyQueryUtxosAtAddresses (envProviders env) addrs
+
+    utxosAtAddressWithDatums addr mAssetClass = GYTxMonadNode $ \env ->
+        gyQueryUtxosAtAddressWithDatums (envProviders env) addr mAssetClass
 
     utxosAtPaymentCredential cred = GYTxMonadNode $ \env ->
         gyQueryUtxosAtPaymentCredential (envProviders env) cred

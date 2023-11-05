@@ -36,7 +36,7 @@ import           Control.Monad.Random
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.Foldable                             (foldMap')
-import           Data.List                                 ((\\), singleton)
+import           Data.List                                 (singleton, (\\))
 import           Data.List.NonEmpty                        (NonEmpty (..))
 import qualified Data.Map.Strict                           as Map
 import           Data.Semigroup                            (Sum (..))
@@ -153,10 +153,14 @@ instance GYTxQueryMonad GYTxMonadRun where
             d <- Map.lookup (datumHashToPlutus h) mdh
             return $ datumFromPlutus d
 
-    utxosAtAddress addr = do
+    utxosAtAddress addr mAssetClass = do
         refs  <- liftRun $ txOutRefAt $ addressToPlutus addr
         utxos <- wither f refs
-        return $ utxosFromList utxos
+        let utxos' =
+              case mAssetClass of
+                Nothing -> utxos
+                Just ac -> filter (\GYUTxO {..} -> valueAssetClass utxoValue ac > 0) utxos
+        return $ utxosFromList utxos'
       where
         f :: Plutus.TxOutRef -> GYTxMonadRun (Maybe GYUTxO)
         f ref = do

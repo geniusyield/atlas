@@ -88,7 +88,7 @@ grabTreats
     -> m (Maybe (GYTxSkeleton u))
 grabTreats validator = do
     addr <- scriptAddress validator
-    utxo <- utxosAtAddress addr
+    utxo <- utxosAtAddress addr Nothing
     datums <- utxosDatums utxo
 
     if null datums

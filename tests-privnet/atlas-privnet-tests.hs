@@ -29,7 +29,7 @@ main = do
           [ testCaseSteps "Balances" $ \info -> withSetup setup info $ \ctx -> do
               forM_ (zip [(1 :: Integer) ..] (ctxUserF ctx : ctxUsers ctx))
                 (\(i, ctxUser) -> do
-                  userIutxos <- gyQueryUtxosAtAddress (ctxProviders ctx) (userAddr ctxUser)
+                  userIutxos <- gyQueryUtxosAtAddress (ctxProviders ctx) (userAddr ctxUser) Nothing
                   info $ unlines $
                       printf "User%s:" (if i == 1 then "F" else show i) :
                       [ printf "%s: %s" (utxoRef utxo) (utxoValue utxo)

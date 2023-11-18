@@ -21,5 +21,8 @@
     buildInputs = with pkgs; [
       jq
     ];
+    shellHook = ''
+      export CABAL_DIR=$(pwd)/.cabal
+    '';
   };
 }

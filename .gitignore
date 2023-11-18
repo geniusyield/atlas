@@ -25,3 +25,4 @@ cabal.project.local~
 maestro-config.json
 blockfrost-config.json
 *.skey
+.cabal

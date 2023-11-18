@@ -51,7 +51,7 @@ common plutus-ghc-options
 
   -- expose all unfoldings, so plutustx compiler can do its job
   ghc-options:
-    -fexpose-all-unfoldings -fobject-code 
+    -fexpose-all-unfoldings -fobject-code
     -fplugin-opt PlutusTx.Plugin:defer-errors
 
   -- set target plutus-core version
@@ -315,3 +315,38 @@ test-suite atlas-privnet-tests
     , base
     , tasty
     , tasty-hunit
+
+test-suite suite
+  import:         common
+  type:           exitcode-stdio-1.0
+  -- ghc-options:    -threaded -rtsopts
+  ghc-options:
+    -fno-ignore-interface-pragmas
+    -fno-omit-interface-pragmas
+    -Wno-partial-type-signatures
+  -- expose all unfoldings, so plutustx compiler can do its job
+    -fexpose-all-unfoldings
+    -fobject-code
+    -fplugin-opt PlutusTx.Plugin:defer-errors
+  hs-source-dirs: suite
+  main-is:        suite.hs
+  other-modules:
+    OnChain.BetRef
+    OnChain.Compiled
+    BetRef.Operations
+    BetRef.Tests.PlaceBet
+    BetRef.Tests.TakePot
+  -- Dependencies inherited from the library. No need to specify bounds.
+  build-depends:
+    , atlas-cardano
+    , base
+    , containers
+    , tasty
+    , tasty-hunit
+    , mtl
+    , plutus-simple-model
+    -- OnChain
+    , plutus-core
+    , plutus-ledger-api
+    , plutus-tx
+    , plutus-tx-plugin

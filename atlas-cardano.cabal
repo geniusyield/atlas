@@ -116,6 +116,7 @@ library
     GeniusYield.Types.Key.Class
     GeniusYield.Types.Ledger
     GeniusYield.Types.Logging
+    GeniusYield.Types.Natural
     GeniusYield.Types.NetworkId
     GeniusYield.Types.PlutusVersion
     GeniusYield.Types.Providers

@@ -550,7 +550,7 @@ genCoinSelectionParams extraLovelace = do
         extIns   <- listOf genGYValue
         ownIns   <- listOf genGYValue
         ownUtxos <- listOf genGYValue
-        minted   <- frequency [(3, genAssetValue), (1, elements [mempty])]
+        minted   <- frequency [(3, genAssetValue), (1, return mempty)]
         let assetsMinted = snd $ valueSplitAda minted
         return (extIns, ownIns, ownUtxos, assetsMinted)
 

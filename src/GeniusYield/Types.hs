@@ -31,6 +31,7 @@ import           GeniusYield.Types.Redeemer      as X
 import           GeniusYield.Types.Script        as X
 import           GeniusYield.Types.Slot          as X
 import           GeniusYield.Types.SlotConfig    as X
+import           GeniusYield.Types.StakeKeyHash  as X
 import           GeniusYield.Types.Time          as X
 import           GeniusYield.Types.Tx            as X
 import           GeniusYield.Types.TxBody        as X

@@ -37,8 +37,8 @@ module GeniusYield.Types.Address (
     unsafeStakeAddressFromText,
     stakeAddressToText,
     stakeAddressCredential,
+    GYStakeKeyHashString,
     stakeKeyFromAddress,
-
 ) where
 
 import qualified Cardano.Api                          as Api
@@ -581,12 +581,15 @@ stakeAddressToText = Api.serialiseAddress . stakeAddressToApi
 stakeAddressCredential :: GYStakeAddress -> GYStakeCredential
 stakeAddressCredential = stakeCredentialFromApi . Api.stakeAddressCredential . stakeAddressToApi
 
+type GYStakeKeyHashString = String
+
 -- |
 --
 -- >>> stakeKeyFromAddress addr
 -- Just "1b930e9f7add78a174a21000e989ff551366dcd127028cb2aa39f616"
-stakeKeyFromAddress :: GYAddress -> Maybe Text
-stakeKeyFromAddress addr = addressToStakeCredential addr >>= Just . stakeCredentialToHexText
+--
+stakeKeyFromAddress :: GYAddress -> Maybe GYStakeKeyHashString
+stakeKeyFromAddress addr = addressToStakeCredential addr >>= Just . Text.unpack . stakeCredentialToHexText
 
 instance Show GYStakeAddress where
     showsPrec d rewAddr = showParen (d > 10) $

@@ -99,13 +99,15 @@ instance Aeson.ToJSON GYNetworkId where
 
 -- |
 --
--- >>> Aeson.eitherDecode @GYNetworkId <$> ["\"mainnet\"", "\"testnet-preprod\"", "\"testnet-preview\"", "\"testnet\"", "\"privnet\"", "\"no-such-net\""]
--- [Right GYMainnet,Right GYTestnetPreprod,Right GYTestnetPreview,Right GYTestnetLegacy,Right GYPrivnet,Left "Error in $: Expected mainnet, testnet-preprod, testnet-preview, testnet or privnet"]
+-- >>> Aeson.eitherDecode @GYNetworkId <$> ["\"mainnet\"", "\"testnet-preprod\"", "\"preprod\"", "\"testnet-preview\"", "\"preview\"", "\"testnet\"", "\"privnet\"", "\"no-such-net\""]
+-- [Right GYMainnet,Right GYTestnetPreprod,Right GYTestnetPreprod,Right GYTestnetPreview,Right GYTestnetPreview,Right GYTestnetLegacy,Right GYPrivnet,Left "Error in $: Expected mainnet, testnet-preprod, preprod, testnet-preview, preview, testnet or privnet"]
 --
 instance Aeson.FromJSON GYNetworkId where
     parseJSON "mainnet"         = pure GYMainnet
     parseJSON "testnet-preprod" = pure GYTestnetPreprod
+    parseJSON "preprod"         = pure GYTestnetPreprod
     parseJSON "testnet-preview" = pure GYTestnetPreview
+    parseJSON "preview"         = pure GYTestnetPreview
     parseJSON "testnet"         = pure GYTestnetLegacy
     parseJSON "privnet"         = pure GYPrivnet
-    parseJSON _                 = fail "Expected mainnet, testnet-preprod, testnet-preview, testnet or privnet"
+    parseJSON _                 = fail "Expected mainnet, testnet-preprod, preprod, testnet-preview, preview, testnet or privnet"

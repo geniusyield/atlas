@@ -17,6 +17,7 @@ module GeniusYield.Types.Address (
     addressToPaymentCredential,
     addressFromPubKeyHash,
     addressFromValidator,
+    addressFromCredential,
     addressFromValidatorHash,
     addressToText,
     addressFromTextMaybe,
@@ -27,8 +28,15 @@ module GeniusYield.Types.Address (
     GYAddressBech32,
     addressToBech32,
     addressFromBech32,
-    stakeKeyFromAddress,
-    GYStakeKeyHash
+    -- * Stake address.
+    GYStakeAddress,
+    stakeAddressFromApi,
+    stakeAddressToApi,
+    stakeAddressFromTextMaybe,
+    unsafeStakeAddressFromText,
+    stakeAddressToText,
+    stakeAddressCredential,
+
 ) where
 
 import qualified Cardano.Api                          as Api
@@ -67,14 +75,15 @@ import qualified Web.HttpApiData                      as Web
 
 import           GeniusYield.Imports
 import           GeniusYield.Types.Credential         (GYPaymentCredential,
-                                                       paymentCredentialFromApi)
+                                                       GYStakeCredential,
+                                                       paymentCredentialFromApi,
+                                                       paymentCredentialToApi,
+                                                       stakeCredentialFromApi,
+                                                       stakeCredentialToApi)
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.NetworkId
 import           GeniusYield.Types.PubKeyHash
 import           GeniusYield.Types.Script
-import           PlutusLedgerApi.V1.Address           (stakingCredential)
-import           PlutusLedgerApi.V1.Credential        (Credential (..),
-                                                       StakingCredential (..))
 
 -- $setup
 --
@@ -90,6 +99,7 @@ import           PlutusLedgerApi.V1.Credential        (Credential (..),
 -- >>> let addrScript = unsafeAddressFromText "addr_test1wqtcz4vq80zxr3dskdcuw7wtfq0vwssd7rrpnnvcvrjhp5sx7leew"
 -- >>> let addrByron1 = unsafeAddressFromText "Ae2tdPwUPEYwFx4dmJheyNPPYXtvHbJLeCaA96o6Y2iiUL18cAt7AizN2zG"
 -- >>> let addrByron2 = unsafeAddressFromText "DdzFFzCqrhsn2RLCG6ogRgDxUUpkM3yNqyaSB3jq9YuuX1zARCJerbCoghG4PGiqwR1h8o4Jk7Mjgu3qhNixep5QAA8QgG9Dp2oE4eit"
+-- >>> let stakeAddr = unsafeStakeAddressFromText "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3"
 
 -- | Addresses on the blockchain.
 newtype GYAddress = GYAddress Api.AddressAny
@@ -257,6 +267,13 @@ addressFromValidatorHash nid vh = addressFromApi $ Api.AddressShelley $ Api.S.ma
     (networkIdToApi nid)
     (Api.S.PaymentCredentialByScript (validatorHashToApi vh))
     Api.S.NoStakeAddress
+
+-- | Create an address from payment & optionally, a stake credential.
+addressFromCredential :: GYNetworkId -> GYPaymentCredential -> Maybe GYStakeCredential -> GYAddress
+addressFromCredential nid pc sc = addressFromApi $ Api.AddressShelley $ Api.S.makeShelleyAddress
+    (networkIdToApi nid)
+    (paymentCredentialToApi pc)
+    (maybe Api.S.NoStakeAddress (Api.S.StakeAddressByValue . stakeCredentialToApi) sc)
 
 -- | Create address from 'GYValidator'.
 --
@@ -446,7 +463,7 @@ instance IsString GYAddressBech32 where
 -- Right (unsafeAddressFromText "addr_test1qrsuhwqdhz0zjgnf46unas27h93amfghddnff8lpc2n28rgmjv8f77ka0zshfgssqr5cnl64zdnde5f8q2xt923e7ctqu49mg5")
 --
 instance Web.FromHttpApiData GYAddressBech32 where
-    parseUrlPiece t = case Api.deserialiseAddress Api.AsAddressAny t of
+    parseUrlPiece t = case addressFromTextMaybe t of
         Just addr -> Right $ coerce addr
         Nothing   -> Left $ "Not an address: " <> t
 
@@ -494,12 +511,162 @@ instance Swagger.ToParamSchema GYAddressBech32 where
                   & Swagger.type_  ?~ Swagger.SwaggerString
                   & Swagger.format ?~ "bech32"
 
-type GYStakeKeyHash = String
+-------------------------------------------------------------------------------
+-- Stake Address
+-------------------------------------------------------------------------------
 
--- | Extract stakeKey Hash from Address
+-- | Stake Address.
+newtype GYStakeAddress = GYStakeAddress Api.StakeAddress
+  deriving (Eq, Ord, Generic)
+
+-- | Get @GY@ type from corresponding type in @cardano-api@ library.
+stakeAddressFromApi :: Api.StakeAddress -> GYStakeAddress
+stakeAddressFromApi = coerce
+
+-- | Convert @GY@ type to corresponding type in @cardano-api@ library.
+stakeAddressToApi :: GYStakeAddress -> Api.StakeAddress
+stakeAddressToApi = coerce
+
+-- | Obtain `GYStakeAddress` from bech32 encoding of stake address.
 --
-stakeKeyFromAddress :: GYAddress -> Maybe GYStakeKeyHash
-stakeKeyFromAddress addr =
-  case stakingCredential $ addressToPlutus addr of
-    Just (StakingHash (PubKeyCredential key)) -> Just $ show key
-    _withoutStakeKey                          -> Nothing
+-- >>> stakeAddressFromTextMaybe "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3"
+-- Just (unsafeStakeAddressFromText "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3")
+-- >>> stakeAddressFromTextMaybe "e07a77d120b9e86addc7388dbbb1bd2350490b7d140ab234038632334d"
+-- Nothing
+--
+stakeAddressFromTextMaybe :: Text.Text -> Maybe GYStakeAddress
+stakeAddressFromTextMaybe = coerce (Api.deserialiseAddress Api.AsStakeAddress)
+
+-- | Like `stakeAddressFromTextMaybe` but errors on `Nothing` case.
+unsafeStakeAddressFromText :: Text.Text -> GYStakeAddress
+unsafeStakeAddressFromText t = fromMaybe
+    (error $ "Not a stake address: " ++ show t)
+    (stakeAddressFromTextMaybe t)
+
+-- | Serialises `GYStakeAddress` to it's bech32 representation.
+--
+-- >>> stakeAddressToText stakeAddr
+-- "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3"
+--
+stakeAddressToText :: GYStakeAddress -> Text.Text
+stakeAddressToText = Api.serialiseAddress . stakeAddressToApi
+
+-- | Get a stake credential from a stake address. This drops the network information.
+stakeAddressCredential :: GYStakeAddress -> GYStakeCredential
+stakeAddressCredential = stakeCredentialFromApi . Api.stakeAddressCredential . stakeAddressToApi
+
+instance Show GYStakeAddress where
+    showsPrec d rewAddr = showParen (d > 10) $
+        showString "unsafeStakeAddressFromText " .
+        showsPrec 11 (stakeAddressToText rewAddr)
+
+instance Hashable GYStakeAddress where
+    hashWithSalt salt  = hashWithSalt salt . Api.serialiseToRawBytes . stakeAddressToApi
+
+-- | In JSON context, stake addresses are represented in hex.
+--
+-- >>> Aeson.decode @GYStakeAddress "\"e07a77d120b9e86addc7388dbbb1bd2350490b7d140ab234038632334d\""
+-- Just (unsafeStakeAddressFromText "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3")
+--
+instance Aeson.FromJSON GYStakeAddress where
+    parseJSON = Aeson.withText "GYStakeAddress" $ \t ->
+        case Web.parseUrlPiece t of
+            Left err   -> fail $ Text.unpack err
+            Right addr -> return addr
+
+-- |
+--
+-- >>> LBS8.putStrLn $ Aeson.encode stakeAddr
+-- "e07a77d120b9e86addc7388dbbb1bd2350490b7d140ab234038632334d"
+--
+instance Aeson.ToJSON GYStakeAddress where
+    toJSON = Aeson.String . Web.toUrlPiece
+
+-------------------------------------------------------------------------------
+-- http-api-data
+-------------------------------------------------------------------------------
+
+-- | In an HTTP context, stake addresses are represented in hex.
+--
+-- >>> Web.toUrlPiece stakeAddr
+-- "e07a77d120b9e86addc7388dbbb1bd2350490b7d140ab234038632334d"
+instance Web.ToHttpApiData GYStakeAddress where
+    toUrlPiece = TE.decodeLatin1 . Api.serialiseToRawBytesHex . stakeAddressToApi
+
+-- |
+--
+-- >>> Web.parseUrlPiece @GYStakeAddress "e07a77d120b9e86addc7388dbbb1bd2350490b7d140ab234038632334d"
+-- Right (unsafeStakeAddressFromText "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3")
+--
+-- >>> Web.parseUrlPiece @GYStakeAddress "00"
+-- Left "Not a stake address: 00; Reason: RawBytesHexErrorRawBytesDecodeFail \"00\" StakeAddress (SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise StakeAddress\"})"
+--
+instance Web.FromHttpApiData GYStakeAddress where
+    parseUrlPiece t = case Api.deserialiseFromRawBytesHex Api.AsStakeAddress (TE.encodeUtf8 t) of
+        Right addr -> Right $ stakeAddressFromApi addr
+        Left x     -> Left $ "Not a stake address: " <> t <> "; Reason: " <> Text.pack (show x)
+
+-------------------------------------------------------------------------------
+-- CSV
+-------------------------------------------------------------------------------
+
+-- |
+--
+-- >>> Csv.toField stakeAddr
+-- "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3"
+--
+instance Csv.ToField GYStakeAddress where
+    toField = encodeUtf8 . stakeAddressToText
+
+-- |
+--
+-- >>> Csv.runParser $ Csv.parseField @GYStakeAddress "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3"
+-- Right (unsafeStakeAddressFromText "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3")
+--
+-- >>> Csv.runParser $ Csv.parseField @GYStakeAddress "not a stake address"
+-- Left "Not a stake address: not a stake address"
+--
+instance Csv.FromField GYStakeAddress where
+    parseField f =
+      let t = decodeUtf8Lenient f
+      in maybe (fail $ "Not a stake address: " <> Text.unpack t) return $ stakeAddressFromTextMaybe t
+
+-- |
+--
+-- >>> Csv.encodeWith (Csv.defaultEncodeOptions {Csv.encUseCrLf = False}) [stakeAddr]
+-- "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3\n"
+--
+instance Csv.ToRecord GYStakeAddress where
+    toRecord = Vector.singleton . Csv.toField
+
+-- |
+--
+-- >>> Csv.decode @GYStakeAddress Csv.NoHeader "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3\n"
+-- Right [unsafeStakeAddressFromText "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs9tydqrscerxnghfq4t3"]
+--
+-- >>> Csv.decode @GYStakeAddress Csv.NoHeader "not a stake address\n"
+-- Left "parse error (Failed reading: conversion error: Not a stake address: not a stake address) at \"\\n\""
+--
+-- >>> Csv.decode @GYStakeAddress Csv.NoHeader "not, a, stake address\n"
+-- Left "parse error (Failed reading: conversion error: expected exactly one field, but got: [\"not\",\" a\",\" stake address\"]) at \"\\n\""
+--
+instance Csv.FromRecord GYStakeAddress where
+    parseRecord v = case Vector.toList v of
+        [bs] -> Csv.parseField bs
+        _    -> fail $ printf "expected exactly one field, but got: %s" $ show v
+
+-------------------------------------------------------------------------------
+-- swagger schema
+-------------------------------------------------------------------------------
+
+instance Swagger.ToParamSchema GYStakeAddress where
+  toParamSchema _ = mempty
+                  & Swagger.type_     ?~ Swagger.SwaggerString
+                  & Swagger.format    ?~ "cbor hex"
+                  & Swagger.maxLength ?~ 58
+                  & Swagger.minLength ?~ 58
+
+instance Swagger.ToSchema GYStakeAddress where
+  declareNamedSchema _ = pure $ Swagger.named "GYStakeAddress" $ Swagger.paramSchemaToSchema (Proxy @GYStakeAddress)
+                       & Swagger.description    ?~ "A stake address, serialised as CBOR."
+                       & Swagger.example        ?~ toJSON ("e07a77d120b9e86addc7388dbbb1bd2350490b7d140ab234038632334d" :: Text)

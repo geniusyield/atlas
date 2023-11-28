@@ -15,6 +15,7 @@ module GeniusYield.Types.Address (
     addressToPlutus,
     addressFromPlutus,
     addressToPaymentCredential,
+    addressToStakeCredential,
     addressFromPubKeyHash,
     addressFromValidator,
     addressFromCredential,
@@ -36,6 +37,7 @@ module GeniusYield.Types.Address (
     unsafeStakeAddressFromText,
     stakeAddressToText,
     stakeAddressCredential,
+    stakeKeyFromAddress,
 
 ) where
 
@@ -79,7 +81,8 @@ import           GeniusYield.Types.Credential         (GYPaymentCredential,
                                                        paymentCredentialFromApi,
                                                        paymentCredentialToApi,
                                                        stakeCredentialFromApi,
-                                                       stakeCredentialToApi)
+                                                       stakeCredentialToApi,
+                                                       stakeCredentialToHexText)
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.NetworkId
 import           GeniusYield.Types.PubKeyHash
@@ -247,6 +250,29 @@ addressToPaymentCredential _byron = Nothing
 -- | Get payment credential part of a shelley address.
 getShelleyAddressPaymentCredential :: Api.S.Address Api.ShelleyAddr -> GYPaymentCredential
 getShelleyAddressPaymentCredential (Api.S.ShelleyAddress _network credential _stake) = Api.S.fromShelleyPaymentCredential credential & paymentCredentialFromApi
+
+
+-- | If an address is a shelley address, then we'll return stake credential, if present, wrapped in `Just` and `Nothing` otherwise.
+--
+-- >>> addressToStakeCredential addr
+-- Just (GYStakeCredentialByKey (GYStakeKeyHash "1b930e9f7add78a174a21000e989ff551366dcd127028cb2aa39f616"))
+-- >>> addressToStakeCredential addrScript
+-- Nothing
+-- >>> addressToStakeCredential addrByron1
+-- Nothing
+-- >>> addressToStakeCredential addrByron2
+-- Nothing
+--
+addressToStakeCredential :: GYAddress -> Maybe GYStakeCredential
+addressToStakeCredential (addressToApi -> Api.AddressShelley addr) = getShelleyAddressStakeCredential addr
+addressToStakeCredential _byron = Nothing
+
+-- | Get stake credential part of a shelley address, if present.
+getShelleyAddressStakeCredential :: Api.S.Address Api.ShelleyAddr -> Maybe GYStakeCredential
+getShelleyAddressStakeCredential (Api.S.ShelleyAddress _network _payment stake) =
+  case Api.S.fromShelleyStakeReference stake of
+    Api.S.StakeAddressByValue stakeCred -> Just $ stakeCredentialFromApi stakeCred
+    _                                   -> Nothing
 
 -- | Create address from 'GYPubKeyHash'.
 --
@@ -554,6 +580,13 @@ stakeAddressToText = Api.serialiseAddress . stakeAddressToApi
 -- | Get a stake credential from a stake address. This drops the network information.
 stakeAddressCredential :: GYStakeAddress -> GYStakeCredential
 stakeAddressCredential = stakeCredentialFromApi . Api.stakeAddressCredential . stakeAddressToApi
+
+-- |
+--
+-- >>> stakeKeyFromAddress addr
+-- Just "1b930e9f7add78a174a21000e989ff551366dcd127028cb2aa39f616"
+stakeKeyFromAddress :: GYAddress -> Maybe Text
+stakeKeyFromAddress addr = addressToStakeCredential addr >>= Just . stakeCredentialToHexText
 
 instance Show GYStakeAddress where
     showsPrec d rewAddr = showParen (d > 10) $

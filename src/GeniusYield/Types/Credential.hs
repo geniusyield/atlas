@@ -18,6 +18,7 @@ module GeniusYield.Types.Credential (
   , GYStakeCredential (..)
   , stakeCredentialFromApi
   , stakeCredentialToApi
+  , stakeCredentialToHexText
   ) where
 
 
@@ -99,3 +100,10 @@ stakeCredentialToApi (GYStakeCredentialByScript sh) = Api.StakeCredentialByScrip
 stakeCredentialFromApi :: Api.StakeCredential -> GYStakeCredential
 stakeCredentialFromApi (Api.StakeCredentialByKey skh) = GYStakeCredentialByKey (stakeKeyHashFromApi skh)
 stakeCredentialFromApi (Api.StakeCredentialByScript sh) = GYStakeCredentialByScript (validatorHashFromApi sh)
+
+-- | Get hexadecimal value of stake credential.
+stakeCredentialToHexText :: GYStakeCredential -> Text
+stakeCredentialToHexText =
+  \case
+    GYStakeCredentialByKey skh -> Api.serialiseToRawBytesHexText (stakeKeyHashToApi skh)
+    GYStakeCredentialByScript sh -> Api.serialiseToRawBytesHexText (validatorHashToApi sh)

@@ -12,12 +12,14 @@ module GeniusYield.Test.Utils
     (
     -- Run
     -- , testRun
-    -- , Wallet (..)
+    -- -- , Wallet (..)
     -- , Wallets (..)
     -- , newWallet
     -- , runWallet
     -- , runWallet'
-    -- , walletAddress
+    -- , runWalletGY
+    -- , runWalletGY'
+    -- -- , walletAddress
     -- , walletPubKeyHash
     -- , balance
     -- , withBalance
@@ -38,7 +40,7 @@ module GeniusYield.Test.Utils
     afterAllSucceed
     , feesFromLovelace
     , withMaxQCTests
-    , pattern (:=)
+    , pattern (:=), testRunGY
     ) where
 
 -- import qualified Cardano.Simple.Ledger.Slot as Fork
@@ -143,6 +145,32 @@ withMaxQCTests n = Tasty.adjustOption f where
 --                       <*> newWallet "w8" w
 --                       <*> newWallet "w9" w
 
+-- testRunGY :: String -> (Wallets -> GYTxMonadRun a) -> Tasty.TestTree
+-- testRunGY name action = do
+--     testNoErrorsTrace v defaultBabbage name $ do
+--       -- FIXME: do we need that Wallet? (undefined)
+--       asRun pureGen undefined (wallets >>= action)
+
+--   where
+--     v = valueToPlutus $ valueFromLovelace 1_000_000_000_000_000 <>
+--                         fakeGold                  1_000_000_000 <>
+--                         fakeIron                  1_000_000_000
+
+--     w = valueFromLovelace 1_000_000_000_000 <>
+--         fakeGold                  1_000_000 <>
+--         fakeIron                  1_000_000
+
+--     wallets :: GYTxMonadRun Wallets
+--     wallets = Wallets <$> newWalletGY "w1" w
+--                       <*> newWalletGY "w2" w
+--                       <*> newWalletGY "w3" w
+--                       <*> newWalletGY "w4" w
+--                       <*> newWalletGY "w5" w
+--                       <*> newWalletGY "w6" w
+--                       <*> newWalletGY "w7" w
+--                       <*> newWalletGY "w8" w
+--                       <*> newWalletGY "w9" w
+
 
 -- -- | Available wallets.
 -- data Wallets = Wallets
@@ -183,6 +211,14 @@ withMaxQCTests n = Tasty.adjustOption f where
 --     case ma of
 --         Nothing -> fail $ printf "Run wallet action returned Nothing"
 --         Just a  -> return a
+
+
+-- runWalletGY :: Wallet -> GYTxMonadRun a -> GYTxMonadRun (Maybe a)
+-- runWalletGY w action = GeniusYield.TxBuilder.liftRun $ runWallet w action
+
+-- runWalletGY' :: Wallet -> GYTxMonadRun a -> GYTxMonadRun a
+-- runWalletGY' w action = GeniusYield.TxBuilder.liftRun $ runWallet' w action
+
 
 -- -- | Gets a GYPubKeyHash of a testing wallet.
 -- walletPubKeyHash :: Wallet -> GYPubKeyHash

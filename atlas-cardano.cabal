@@ -64,6 +64,8 @@ library
     GeniusYield.Api.TestTokens
     GeniusYield.CardanoApi.EraHistory
     GeniusYield.CardanoApi.Query
+    GeniusYield.Clb.Clb
+    GeniusYield.Clb.MockConfig
     GeniusYield.Examples.Common
     GeniusYield.Examples.Gift
     GeniusYield.Examples.Limbo
@@ -102,6 +104,7 @@ library
     GeniusYield.Transaction.Common
     GeniusYield.TxBuilder
     GeniusYield.TxBuilder.Class
+    GeniusYield.TxBuilder.Clb
     GeniusYield.TxBuilder.Common
     GeniusYield.TxBuilder.Errors
     GeniusYield.TxBuilder.Node

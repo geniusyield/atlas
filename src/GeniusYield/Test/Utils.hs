@@ -9,38 +9,41 @@ Stability   : develop
 
 -}
 module GeniusYield.Test.Utils
-    (
-    -- Run
-    -- , testRun
-    -- -- , Wallet (..)
-    -- , Wallets (..)
-    -- , newWallet
-    -- , runWallet
-    -- , runWallet'
-    -- , runWalletGY
-    -- , runWalletGY'
-    -- -- , walletAddress
-    -- , walletPubKeyHash
-    -- , balance
-    -- , withBalance
-    -- , withWalletBalancesCheck
-    -- , withWalletBalancesCheckSimple
-    -- , getBalance
-    -- , getBalances
-    -- , runWithWalletBalancesCheck
-    -- , waitUntilSlot
-    -- , waitNSlotsGYTxMonad
-    -- , findLockedUtxosInBody
-    -- , utxosInBody
-    -- , addRefScript
-    -- , expectInsufficientFunds
-    -- , addRefInput
-    -- , fakeGold
-    -- , fakeIron
-    afterAllSucceed
+    ( Run
+    , testRun
+    , testRunGY
+    , testRunGYClb
+    -- , Wallet (..)
+    , Wallets (..)
+    , newWallet
+    , runWallet
+    , runWallet'
+    , runWalletGY
+    , runWalletGY'
+    , runWalletGYClb
+    -- , walletAddress
+    , walletPubKeyHash
+    , balance
+    , withBalance
+    , withWalletBalancesCheck
+    , withWalletBalancesCheckClb
+    , withWalletBalancesCheckSimple
+    , getBalance
+    , getBalances
+    , runWithWalletBalancesCheck
+    , waitUntilSlot
+    , waitNSlotsGYTxMonad
+    , findLockedUtxosInBody
+    , utxosInBody
+    , addRefScript
+    , addRefScriptClb
+    , expectInsufficientFunds
+    , addRefInput
+    , fakeGold, fakeIron
+    , afterAllSucceed
     , feesFromLovelace
     , withMaxQCTests
-    , pattern (:=), testRunGY
+    , pattern (:=),
     ) where
 
 -- import qualified Cardano.Simple.Ledger.Slot as Fork
@@ -63,6 +66,11 @@ import qualified Test.Tasty.Runners         as Tasty
 -- import           GeniusYield.Transaction
 -- import           GeniusYield.TxBuilder
 import           GeniusYield.Types
+import GeniusYield.TxBuilder.Clb (GYTxMonadClb, asClb, asRandClb, liftClb)
+import GeniusYield.Clb.Clb (testNoErrorsTraceClb, intToKeyPair, Clb)
+import GeniusYield.Clb.MockConfig (defaultBabbageClb)
+import qualified Cardano.Ledger.Api as L
+import qualified Test.Cardano.Ledger.Core.KeyPair as TL
 
 -------------------------------------------------------------------------------
 -- tasty tools
@@ -145,64 +153,120 @@ withMaxQCTests n = Tasty.adjustOption f where
 --                       <*> newWallet "w8" w
 --                       <*> newWallet "w9" w
 
--- testRunGY :: String -> (Wallets -> GYTxMonadRun a) -> Tasty.TestTree
--- testRunGY name action = do
---     testNoErrorsTrace v defaultBabbage name $ do
---       -- FIXME: do we need that Wallet? (undefined)
---       asRun pureGen undefined (wallets >>= action)
+testRunGY :: String -> (Wallets -> GYTxMonadRun a) -> Tasty.TestTree
+testRunGY name action = do
+    testNoErrorsTrace v defaultBabbage name $ do
+      -- FIXME: do we need that Wallet? (undefined)
+      asRun pureGen undefined (wallets >>= action)
 
---   where
---     v = valueToPlutus $ valueFromLovelace 1_000_000_000_000_000 <>
---                         fakeGold                  1_000_000_000 <>
---                         fakeIron                  1_000_000_000
+  where
+    v = valueToPlutus $ valueFromLovelace 1_000_000_000_000_000 <>
+                        fakeGold                  1_000_000_000 <>
+                        fakeIron                  1_000_000_000
 
---     w = valueFromLovelace 1_000_000_000_000 <>
---         fakeGold                  1_000_000 <>
---         fakeIron                  1_000_000
+    w = valueFromLovelace 1_000_000_000_000 <>
+        fakeGold                  1_000_000 <>
+        fakeIron                  1_000_000
 
---     wallets :: GYTxMonadRun Wallets
---     wallets = Wallets <$> newWalletGY "w1" w
---                       <*> newWalletGY "w2" w
---                       <*> newWalletGY "w3" w
---                       <*> newWalletGY "w4" w
---                       <*> newWalletGY "w5" w
---                       <*> newWalletGY "w6" w
---                       <*> newWalletGY "w7" w
---                       <*> newWalletGY "w8" w
---                       <*> newWalletGY "w9" w
+    wallets :: GYTxMonadRun Wallets
+    wallets = Wallets <$> newWalletGY "w1" w
+                      <*> newWalletGY "w2" w
+                      <*> newWalletGY "w3" w
+                      <*> newWalletGY "w4" w
+                      <*> newWalletGY "w5" w
+                      <*> newWalletGY "w6" w
+                      <*> newWalletGY "w7" w
+                      <*> newWalletGY "w8" w
+                      <*> newWalletGY "w9" w
+
+testRunGYClb :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
+-- testRunGYClb :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
+testRunGYClb name action =
+    testNoErrorsTraceClb v defaultBabbageClb name $ do
+      -- FIXME: do we need that Wallet? (undefined)
+    --   asClb pureGen undefined (wallets >>= action)
+      asClb pureGen undefined $ action wallets
+
+  where
+    v = valueFromLovelace 1_000_000_000_000_000 <>
+        fakeGold                  1_000_000_000 <>
+        fakeIron                  1_000_000_000
+
+    -- w = valueFromLovelace 1_000_000_000_000 <>
+    --     fakeGold                  1_000_000 <>
+    --     fakeIron                  1_000_000
+
+    wallets :: Wallets
+    wallets = Wallets (mkSimpleWallet "w1" (intToKeyPair 0))
+                      (mkSimpleWallet "w2" (intToKeyPair 0))
+                      (mkSimpleWallet "w3" (intToKeyPair 0))
+                      (mkSimpleWallet "w4" (intToKeyPair 0))
+                      (mkSimpleWallet "w5" (intToKeyPair 0))
+                      (mkSimpleWallet "w6" (intToKeyPair 0))
+                      (mkSimpleWallet "w7" (intToKeyPair 0))
+                      (mkSimpleWallet "w8" (intToKeyPair 0))
+                      (mkSimpleWallet "w9" (intToKeyPair 0))
+
+mkSimpleWallet :: WalletName -> TL.KeyPair r L.StandardCrypto -> Wallet
+mkSimpleWallet n kp =
+  Wallet
+    { walletPaymentSigningKey = paymentSigningKeyFromLedgerKeyPair kp
+    , walletNetworkId         = GYTestnetPreprod
+    , walletName              = n
+    }
 
 
--- -- | Available wallets.
--- data Wallets = Wallets
---     { w1 :: !Wallet
---     , w2 :: !Wallet
---     , w3 :: !Wallet
---     , w4 :: !Wallet
---     , w5 :: !Wallet
---     , w6 :: !Wallet
---     , w7 :: !Wallet
---     , w8 :: !Wallet
---     , w9 :: !Wallet
---     } deriving (Show, Eq, Ord)
+-- | Available wallets.
+data Wallets = Wallets
+    { w1 :: !Wallet
+    , w2 :: !Wallet
+    , w3 :: !Wallet
+    , w4 :: !Wallet
+    , w5 :: !Wallet
+    , w6 :: !Wallet
+    , w7 :: !Wallet
+    , w8 :: !Wallet
+    , w9 :: !Wallet
+    } deriving (Show, Eq, Ord)
 
--- -- | Given a name and an initial fund, create a testing wallet.
--- newWallet :: String -> GYValue -> RandT StdGen Run Wallet
--- newWallet n v = do
---     pkh  <- lift . newUser $ valueToPlutus v
---     nid  <- lift networkIdRun
---     mkp  <- lift $ getUserSignKey pkh
---     case mkp of
---         Nothing -> fail $ "error creating user with pubkey hash " <> show pkh
---         Just kp -> return $
---                        Wallet
---                         { walletPaymentSigningKey = paymentSigningKeyFromLedgerKeyPair kp
---                         , walletNetworkId         = nid
---                         , walletName              = n
---                         }
+-- | Given a name and an initial fund, create a testing wallet.
+newWallet :: String -> GYValue -> RandT StdGen Run Wallet
+newWallet n v = do
+    pkh  <- lift . newUser $ valueToPlutus v
+    nid  <- lift networkIdRun
+    mkp  <- lift $ getUserSignKey pkh
+    case mkp of
+        Nothing -> fail $ "error creating user with pubkey hash " <> show pkh
+        Just kp -> return $
+                       Wallet
+                        { walletPaymentSigningKey = paymentSigningKeyFromLedgerKeyPair kp
+                        , walletNetworkId         = nid
+                        , walletName              = n
+                        }
 
--- -- | Runs a `GYTxMonadRun` action using the given wallet.
--- runWallet :: Wallet -> GYTxMonadRun a -> Run (Maybe a)
--- runWallet w action = flip evalRandT pureGen $ asRandRun w action
+-- | Given a name and an initial fund, create a testing wallet.
+newWalletGY :: String -> GYValue -> GYTxMonadRun Wallet
+newWalletGY n v = do
+    pkh  <- liftRun . newUser $ valueToPlutus v
+    nid  <- liftRun networkIdRun
+    mkp  <- liftRun $ getUserSignKey pkh
+    case mkp of
+        Nothing -> fail $ "error creating user with pubkey hash " <> show pkh
+        Just kp -> return $
+                       Wallet
+                        { walletPaymentSigningKey = paymentSigningKeyFromLedgerKeyPair kp
+                        , walletNetworkId         = nid
+                        , walletName              = n
+                        }
+
+
+-- | Runs a `GYTxMonadRun` action using the given wallet.
+runWallet :: Wallet -> GYTxMonadRun a -> Run (Maybe a)
+runWallet w action = flip evalRandT pureGen $ asRandRun w action
+
+-- | Runs a `GYTxMonadRun` action using the given wallet.
+runWalletClb :: Wallet -> GYTxMonadClb a -> Clb (Maybe a)
+runWalletClb w action = flip evalRandT pureGen $ asRandClb w action
 
 -- -- | Version of `runWallet` that fails if `Nothing` is returned by the action.
 -- runWallet' :: Wallet -> GYTxMonadRun a -> Run a
@@ -219,10 +283,12 @@ withMaxQCTests n = Tasty.adjustOption f where
 -- runWalletGY' :: Wallet -> GYTxMonadRun a -> GYTxMonadRun a
 -- runWalletGY' w action = GeniusYield.TxBuilder.liftRun $ runWallet' w action
 
+runWalletGYClb :: Wallet -> GYTxMonadClb a -> GYTxMonadClb (Maybe a)
+runWalletGYClb w action = liftClb $ runWalletClb w action
 
--- -- | Gets a GYPubKeyHash of a testing wallet.
--- walletPubKeyHash :: Wallet -> GYPubKeyHash
--- walletPubKeyHash = fromJust . addressToPubKeyHash . walletAddress
+-- | Gets a GYPubKeyHash of a testing wallet.
+walletPubKeyHash :: Wallet -> GYPubKeyHash
+walletPubKeyHash = fromJust . addressToPubKeyHash . walletAddress
 
 -- {- | Gets the balance from anything that `HasAddress`. The usual case will be a
 --      testing wallet.
@@ -248,8 +314,11 @@ withMaxQCTests n = Tasty.adjustOption f where
 --     liftRun $ logInfo $ printf "%s:\nold balance: %s\nnew balance: %s\ndiff: %s" n old new diff
 --     return (b, diff)
 
--- {- | Computes a 'GYTxMonadRun' action, checking that the 'Wallet' balances
---         change according to the input list.
+withWalletBalancesCheckClb :: [(Wallet, GYValue)] -> GYTxMonadClb a -> GYTxMonadClb a
+withWalletBalancesCheckClb = undefined
+
+{- | Computes a 'GYTxMonadRun' action, checking that the 'Wallet' balances
+        change according to the input list.
 
 -- Notes:
 -- * An empty list means no checks are performed.
@@ -354,9 +423,12 @@ withMaxQCTests n = Tasty.adjustOption f where
 --   in
 --     findAllMatches (0, os, [])
 
--- -- | Given PSM transaction and the corresponding transaction id, gives the list of UTxOs generated by that body /provided they still exist/. This function is usually expected to be called immediately after the transaction's submission.
--- utxosInBody :: GYTxQueryMonad m => Fork.Tx -> GYTxId -> m [Maybe GYUTxO]
--- utxosInBody Fork.Tx{txOutputs = os} txId = mapM (\i -> utxoAtTxOutRef (txOutRefFromTuple (txId, fromInteger $ toInteger i))) [0 .. (length os - 1)]
+-- | Given PSM transaction and the corresponding transaction id, gives the list of UTxOs generated by that body /provided they still exist/. This function is usually expected to be called immediately after the transaction's submission.
+utxosInBody :: GYTxQueryMonad m => Fork.Tx -> GYTxId -> m [Maybe GYUTxO]
+utxosInBody Fork.Tx{txOutputs = os} txId = mapM (\i -> utxoAtTxOutRef (txOutRefFromTuple (txId, fromInteger $ toInteger i))) [0 .. (length os - 1)]
+
+addRefScriptClb :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadClb (Maybe GYTxOutRef)
+addRefScriptClb = undefined
 
 -- -- | Adds the given script to the given address and returns the reference for it.
 -- addRefScript :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadRun (Maybe GYTxOutRef)

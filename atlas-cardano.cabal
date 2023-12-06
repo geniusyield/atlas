@@ -65,7 +65,11 @@ library
     GeniusYield.CardanoApi.EraHistory
     GeniusYield.CardanoApi.Query
     GeniusYield.Clb.Clb
+    GeniusYield.Clb.ClbLedgerState
+    GeniusYield.Clb.Era
+    GeniusYield.Clb.TimeSlot
     GeniusYield.Clb.MockConfig
+    GeniusYield.Clb.Params
     GeniusYield.Examples.Common
     GeniusYield.Examples.Gift
     GeniusYield.Examples.Limbo
@@ -168,6 +172,7 @@ library
     , data-default          ^>=0.7.1.1
     , deriving-aeson        ^>=0.2.9
     , directory             ^>=1.3.6.2
+    , deepseq
     , either                ^>=5.0.2
     , filepath              ^>=1.4.2.2
     , fixed-vector          ^>=1.2.2.1
@@ -183,6 +188,7 @@ library
     , mtl                   ^>=2.3.1
     , network-uri           ^>=2.6.4.2
     , postgresql-simple     ^>=0.7.0.0
+    , prettyprinter
     , raven-haskell         ^>=0.1.4.1
     , safe-money            ^>=0.9.1
     , scientific            ^>=0.3.7.0
@@ -214,14 +220,19 @@ library
   build-depends:
     , cardano-addresses
     , cardano-api
+    , cardano-api:{internal}
     , cardano-balance-tx:{cardano-balance-tx, internal}
+    , cardano-binary
     , cardano-coin-selection
     , cardano-crypto-class
+    , cardano-ledger-api
+    , cardano-ledger-core:{cardano-ledger-core, testlib}
+    , cardano-ledger-byron
+    , cardano-ledger-shelley
+    , cardano-ledger-mary
     , cardano-ledger-alonzo
     , cardano-ledger-babbage
     , cardano-ledger-binary
-    , cardano-ledger-byron
-    , cardano-ledger-core:{cardano-ledger-core, testlib}
     , cardano-ledger-shelley
     , cardano-slotting
     , cardano-wallet-primitive

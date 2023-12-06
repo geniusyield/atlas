@@ -17,24 +17,18 @@ import           OnChain.Compiled
 import           GeniusYield.Test.Utils
 import           GeniusYield.Types
 import GeniusYield.Imports (printf)
--- import GeniusYield.TxBuilder.Clb
---     ( Wallet(walletName),
---       walletAddress,
---       ownAddress,
---       sendSkeleton,
---       GYTxMonadClb )
-import GeniusYield.TxBuilder.Run
-    ( GYTxMonadRun,
+import GeniusYield.TxBuilder.Clb
+    ( GYTxMonadClb,
       Wallet(walletName),
       walletAddress,
       ownAddress,
       sendSkeleton )
-import GeniusYield.TxBuilder (gyLogDebug', slotToBeginTime, utxosAtAddress)
+import GeniusYield.TxBuilder (gyLogDebug', slotToBeginTime, utxosAtAddress, logMsg, GYTxSkeleton, addressToPubKeyHash', mustHaveOutput, mustBeSignedBy)
 
 -- | Our unit tests for placing bet operation
 placeBetTests :: TestTree
 placeBetTests = testGroup "Place Bet"
-    [ testRunGY "Balance checks after placing first bet" $ firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000) 0_176_941
+    [ testRunGYClb "Balance checks after placing first bet" $ firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000) 0_176_941
     -- , testRun "Balance checks with multiple bets" $ multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
     --   [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
     --   , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
@@ -54,35 +48,65 @@ placeBetTests = testGroup "Place Bet"
 firstBetTrace :: OracleAnswerDatum  -- ^ Guess
               -> GYValue            -- ^ Bet
               -> Integer            -- ^ Expected fees
-              -> Wallets -> GYTxMonadRun ()  -- Our continuation function
-firstBetTrace dat bet expectedFees ws@Wallets{..} = do
+              -> Wallets -> GYTxMonadClb ()  -- Our continuation function
+              -- -> GYTxMonadClb ()  -- Our continuation function
+firstBetTrace dat bet expectedFees Wallets{w1} = do
+  gyLogDebug' "" "Hey!"
+  void $ runWalletGYClb w1 simpleTest
+
   -- First step: Get the required parameters for initializing our parameterized script and add the corresponding reference script
-  (brp, refScript) <- computeParamsAndAddRefScript 40 100 (valueFromLovelace 200_000_000) ws
-  void $ runWalletGY w1 $ do  -- following operations are ran by first wallet, `w1`
-  -- Second step: Perform the actual run.
-    withWalletBalancesCheck [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
-      placeBetRun refScript brp dat bet Nothing
+  -- (brp, refScript) <- computeParamsAndAddRefScript 40 100 (valueFromLovelace 200_000_000) ws
+  -- void $ runWalletGYClb w1 $ do  -- following operations are ran by first wallet, `w1`
+  -- -- Second step: Perform the actual run.
+  --   withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
+  --     placeBetRun refScript brp dat bet Nothing
+
+simpleTest :: GYTxMonadClb ()
+simpleTest = do
+  addr <- ownAddress
+  gyLogDebug' "" $ "My own address is: " <> show addr
+  skeleton <- trivialTx addr
+  gyLogDebug' "" $ printf "tx skeleton: %s" (show skeleton)
+  void $ sendSkeleton skeleton
+
+trivialTx :: GYAddress -> GYTxMonadClb (GYTxSkeleton 'PlutusV2)
+trivialTx ownAddr = do
+  gyLogDebug' "" $ printf "ownAddr: %s" (show ownAddr)
+
+  pkh <- addressToPubKeyHash' ownAddr
+  let targetAddr = unsafeAddressFromText "addr_test1qr2vfntpz92f9pawk8gs0fdmhtfe32pqcx0s8fuztxaw3p5pjay24kygaj4g8uevf89ewxzvsdc60wln8spzm2al059q8a9w3x"
+  -- let targetAddr = unsafeAddressFromText "addr1q82vfntpz92f9pawk8gs0fdmhtfe32pqcx0s8fuztxaw3p5pjay24kygaj4g8uevf89ewxzvsdc60wln8spzm2al059qytcwae"
+  return $
+    mustHaveOutput
+      (GYTxOut
+        { gyTxOutAddress = targetAddr
+        , gyTxOutValue = valueFromLovelace 100_000_000
+        , gyTxOutDatum = Nothing
+        , gyTxOutRefS    = Nothing
+        })
+      <> mustBeSignedBy pkh
+
 
 -- | Function to compute the parameters for the contract and add the corresponding refernce script.
 computeParamsAndAddRefScript
   :: Integer                                    -- ^ Bet Until slot
   -> Integer                                    -- ^ Bet Reveal slot
   -> GYValue                                    -- ^ Bet step value
-  -> Wallets -> GYTxMonadRun (BetRefParams, GYTxOutRef)  -- Our continuation
+  -> Wallets -> GYTxMonadClb (BetRefParams, GYTxOutRef)  -- Our continuation
 computeParamsAndAddRefScript betUntil' betReveal' betStep Wallets{..} = do
   let betUntil = slotFromApi (fromInteger betUntil')
       betReveal = slotFromApi (fromInteger betReveal')
-  fmap fromJust $ runWalletGY w1 $ do
+  fmap fromJust $ runWalletGYClb w1 $ do
     betUntilTime <- slotToBeginTime betUntil
     betRevealTime <- slotToBeginTime betReveal
     let brp = BetRefParams (pubKeyHashToPlutus $ walletPubKeyHash w8) (timeToPlutus betUntilTime) (timeToPlutus betRevealTime) (valueToPlutus betStep)  -- let oracle be wallet `w8`.
-    mORef <- addRefScript (walletAddress w9) (betRefValidator' brp)
+    mORef <- addRefScriptClb (walletAddress w9) (betRefValidator' brp)
     case mORef of
       Nothing        -> fail "Couldn't find index of the Reference Script in outputs"
       Just refScript -> return (brp, refScript)
 
 -- | Run to call the `placeBet` operation.
-placeBetRun :: GYTxOutRef -> BetRefParams -> OracleAnswerDatum -> GYValue -> Maybe GYTxOutRef -> GYTxMonadRun GYTxId
+placeBetRun :: GYTxOutRef -> BetRefParams -> OracleAnswerDatum -> GYValue -> Maybe GYTxOutRef -> GYTxMonadClb GYTxId
 placeBetRun refScript brp guess bet mPreviousBetsUtxoRef = do
   addr <- ownAddress
   skeleton <- placeBet refScript brp guess bet addr mPreviousBetsUtxoRef

@@ -1,31 +1,32 @@
 -- | Config for Mock ledger
 module GeniusYield.Clb.MockConfig (
-  Stat (..),
+  -- Stat (..),
   MockConfig (..),
   CheckLimits (..),
   defaultSlotConfig,
   defaultMockConfig,
   defaultAlonzo,
-  defaultBabbage,
+  defaultBabbageClb,
   defaultAlonzoParams,
   defaultBabbageParams,
   skipLimits,
   warnLimits,
   forceLimits,
-  readMockConfig,
+  -- readMockConfig,
 ) where
 
 import Cardano.Ledger.BaseTypes
-import Cardano.Simple.Ledger.TimeSlot (SlotConfig (..))
-import Plutus.Model.Mock.ProtocolParameters
-import Plutus.Model.Mock.Stat
+-- import Cardano.Simple.Ledger.TimeSlot (SlotConfig (..))
+-- import Plutus.Model.Mock.Stat
+import GeniusYield.Clb.Params
+    ( PParams, defaultBabbageParams, defaultAlonzoParams )
+import GeniusYield.Clb.TimeSlot
 
--- | Config for the blockchain.
 -- | Config for the blockchain.
 data MockConfig = MockConfig
   { mockConfigCheckLimits :: !CheckLimits
   -- ^ limits check mode
-  , mockConfigLimitStats :: !Stat
+  -- , mockConfigLimitStats :: !Stat
   -- ^ TX execution resources limits
   , mockConfigProtocol :: !PParams
   -- ^ Protocol parameters
@@ -62,17 +63,18 @@ defaultAlonzo = defaultMockConfig defaultAlonzoParams
 {- | Default Babbage era config. If we use this parameter
  then Babbage era TXs will be used for testing
 -}
-defaultBabbage :: MockConfig
-defaultBabbage = defaultMockConfig defaultBabbageParams
+defaultBabbageClb :: MockConfig
+defaultBabbageClb = defaultMockConfig defaultBabbageParams
 
 -- | Default blockchain config.
 defaultMockConfig :: PParams -> MockConfig
 defaultMockConfig params =
   MockConfig
-    { mockConfigLimitStats = mainnetTxLimits
-    , mockConfigCheckLimits = ErrorLimits
+    {
+      --mockConfigLimitStats = mainnetTxLimits
+     mockConfigCheckLimits = ErrorLimits
     , mockConfigProtocol = params
-    , mockConfigNetworkId = Mainnet
+    , mockConfigNetworkId = Testnet
     , mockConfigSlotConfig = defaultSlotConfig
     }
 
@@ -88,10 +90,10 @@ warnLimits cfg = cfg {mockConfigCheckLimits = WarnLimits}
 forceLimits :: MockConfig -> MockConfig
 forceLimits cfg = cfg {mockConfigCheckLimits = ErrorLimits}
 
-{- | Read config for protocol parameters and form blockchain config.
+-- {- | Read config for protocol parameters and form blockchain config.
 
- > readMockConfig protocolParametersFile
--}
-readMockConfig :: FilePath -> IO MockConfig
-readMockConfig paramsFile =
-  defaultMockConfig {- TODO . setDefaultCostModel -} <$> readAlonzoParams paramsFile
+--  > readMockConfig protocolParametersFile
+-- -}
+-- readMockConfig :: FilePath -> IO MockConfig
+-- readMockConfig paramsFile =
+--   defaultMockConfig {- TODO . setDefaultCostModel -} <$> readAlonzoParams paramsFile

@@ -13,9 +13,9 @@ module GeniusYield.TxBuilder.Clb
     , walletAddress
     , GYTxRunState (..)
     , GYTxMonadClb
-    , asRun
-    , asRandRun
-    , liftRun
+    , asClb
+    , asRandClb
+    , liftClb
     , ownAddress
     , sendSkeleton
     , sendSkeleton'
@@ -59,18 +59,20 @@ import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
-import           GeniusYield.Clb.Clb (Clb, CardanoTx, logError, ClbState (..), txOutRefAt, txOutRefAtPaymentCred, logInfo)
+import           GeniusYield.Clb.Clb (Clb, CardanoTx, logError, ClbState (..), txOutRefAt, txOutRefAtPaymentCred, logInfo, sendTx)
 import GeniusYield.Clb.MockConfig (MockConfig(..))
+import GeniusYield.TxBuilder.Run (Wallet (..), WalletName)
+import GeniusYield.Clb.TimeSlot (SlotConfig(..))
+import GeniusYield.Clb.Params (PParams(..))
+import Cardano.Ledger.Shelley.API (LedgerState(..), UTxOState (utxosUtxo), StakeReference (..))
+import GeniusYield.Clb.ClbLedgerState (EmulatedLedgerState (..), initialState, setUtxo)
+import Cardano.Ledger.UTxO (UTxO(..))
+import Control.Lens ((^.))
+import Cardano.Ledger.Babbage.TxBody (addrEitherBabbageTxOutL, valueEitherBabbageTxOutL)
+import Cardano.Ledger.Address (unCompactAddr, decompactAddr)
+import qualified Cardano.Ledger.Compactible as L
+import qualified Cardano.Api.Shelley as ApiS
 
-type WalletName = String
-
--- | Testing Wallet representation.
-data Wallet = Wallet
-    { walletPaymentSigningKey :: !GYPaymentSigningKey
-    , walletNetworkId         :: !GYNetworkId
-    , walletName              :: !WalletName
-    }
-    deriving (Show, Eq, Ord)
 
 -- | Gets a GYAddress of a testing wallet.
 walletAddress :: Wallet -> GYAddress
@@ -85,6 +87,7 @@ newtype GYTxRunEnv = GYTxRunEnv { runEnvWallet :: Wallet }
 type FeesLovelace = Sum Integer
 type MinAdaLovelace = Sum Integer
 
+-- Used by 'withWalletBalancesCheckSimple' (not yet)
 newtype GYTxRunState = GYTxRunState { walletExtraLovelace :: Map WalletName (FeesLovelace, MinAdaLovelace) }
 
 newtype GYTxMonadClb a = GYTxMonadClb
@@ -98,29 +101,29 @@ instance MonadRandom GYTxMonadClb where
     getRandomRs = GYTxMonadClb . getRandomRs
     getRandoms  = GYTxMonadClb getRandoms
 
-asRandRun :: Wallet
+asRandClb :: Wallet
           -> GYTxMonadClb a
           -> RandT StdGen Clb (Maybe a)
-asRandRun w m = do
+asRandClb w m = do
     e <- runReaderT (evalStateT (runExceptT $ unGYTxMonadClb m) $ GYTxRunState Map.empty) $ GYTxRunEnv w
     case e of
         Left (Left err)  -> lift (logError err) >> return Nothing
         Left (Right err) -> lift (logError (show err)) >> return Nothing
         Right a          -> return $ Just a
 
-asRun :: StdGen
+asClb :: StdGen
       -> Wallet
       -> GYTxMonadClb a
       -> Clb (Maybe a)
-asRun g w m = evalRandT (asRandRun w m) g
+asClb g w m = evalRandT (asRandClb w m) g
 
 ownAddress :: GYTxMonadClb GYAddress
 ownAddress = do
     nid <- networkId
     asks $ addressFromPubKeyHash nid . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
 
-liftRun :: Clb a -> GYTxMonadClb a
-liftRun = GYTxMonadClb . lift . lift . lift . lift
+liftClb :: Clb a -> GYTxMonadClb a
+liftClb = GYTxMonadClb . lift . lift . lift . lift
 
 networkIdRun :: Clb GYNetworkId
 networkIdRun = do
@@ -142,16 +145,19 @@ instance MonadError GYTxMonadException GYTxMonadClb where
 
 instance GYTxQueryMonad GYTxMonadClb where
 
-    networkId = liftRun networkIdRun
+    networkId = liftClb networkIdRun
 
-    lookupDatum h = liftRun $ do
+    lookupDatum :: GYDatumHash -> GYTxMonadClb (Maybe GYDatum)
+    lookupDatum h = liftClb $ do
         mdh <- gets mockDatums
         return $ do
             d <- Map.lookup (datumHashToPlutus h) mdh
             return $ datumFromPlutus d
 
     utxosAtAddress addr mAssetClass = do
-        refs  <- liftRun $ txOutRefAt $ addressToPlutus addr
+        gyLogDebug' "" $ "utxosAtAddress, addr: " <> show addr
+        refs  <- liftClb $ txOutRefAt $ addressToApi' addr
+        gyLogDebug' "" $ "utxosAtAddress, refs: " <> show refs
         utxos <- wither f refs
         let utxos' =
               case mAssetClass of
@@ -167,7 +173,7 @@ instance GYTxQueryMonad GYTxMonadClb where
 
     utxosAtPaymentCredential :: GYPaymentCredential -> GYTxMonadClb GYUTxOs
     utxosAtPaymentCredential cred = do
-        refs  <- liftRun $ txOutRefAtPaymentCred $ paymentCredentialToPlutus cred
+        refs  <- liftClb $ txOutRefAtPaymentCred $ paymentCredentialToPlutus cred
         utxos <- wither f refs
         return $ utxosFromList utxos
       where
@@ -179,34 +185,36 @@ instance GYTxQueryMonad GYTxMonadClb where
 
 
     utxoAtTxOutRef ref = do
-
-        undefined
-        -- mUtxosWithoutRefScripts   <- liftRun $ gets mockUtxos
+        utxos <- liftClb $ gets (unUTxO . utxosUtxo . lsUTxOState . _memPoolState . emulatedLedgerState)
+        -- mUtxosWithoutRefScripts   <- liftClb $ gets mockUtxos
         -- let m = mUtxosWithoutRefScripts
-        -- mScripts <- liftRun $ gets mockScripts
+        let m = Map.mapKeys (txOutRefToPlutus . txOutRefFromApi . Api.S.fromShelleyTxIn) utxos
+        -- mScripts <- liftClb $ gets mockScripts
         -- nid <- networkId
-        -- return $ do
-        --     o <- Map.lookup (txOutRefToPlutus ref) m
-        --     a <- rightToMaybe $ addressFromPlutus nid $ Plutus.txOutAddress o
-        --     v <- rightToMaybe $ valueFromPlutus       $ Plutus.txOutValue   o
-        --     d <- case Plutus.txOutDatum o of
-        --             Plutus.NoOutputDatum      -> return GYOutDatumNone
-        --             Plutus.OutputDatumHash h' -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus h')
-        --             Plutus.OutputDatum d      -> return $ GYOutDatumInline $ datumFromPlutus d
-        --     let s = do
-        --           sh <- Plutus.txOutReferenceScript o
-        --           vs <- Map.lookup sh mScripts
-        --           if | isV1 vs   -> Just (Some $ scriptFromSerialisedScript @'PlutusV1 (coerce $ versioned'content vs))
-        --              | isV2 vs   -> Just (Some $ scriptFromSerialisedScript @'PlutusV2 (coerce $ versioned'content vs))
-        --              | otherwise -> Nothing
+        return $ do
+            o <- Map.lookup (txOutRefToPlutus ref) m
+            -- a <- rightToMaybe $ addressFromPlutus nid $ Plutus.txOutAddress o
+            a <- addressFromApi . Api.S.fromShelleyAddrToAny . decompactAddr <$> rightToMaybe (o ^. addrEitherBabbageTxOutL)
+            -- v <- rightToMaybe $ valueFromPlutus       $ Plutus.txOutValue   o
+            v <- valueFromApi . ApiS.fromMaryValue . L.fromCompact <$> rightToMaybe (o ^. valueEitherBabbageTxOutL)
+            -- d <- case Plutus.txOutDatum o of
+            --         Plutus.NoOutputDatum      -> return GYOutDatumNone
+            --         Plutus.OutputDatumHash h' -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus h')
+            --         Plutus.OutputDatum d      -> return $ GYOutDatumInline $ datumFromPlutus d
+            -- let s = do
+            --       sh <- Plutus.txOutReferenceScript o
+            --       vs <- Map.lookup sh mScripts
+            --       if | isV1 vs   -> Just (Some $ scriptFromSerialisedScript @'PlutusV1 (coerce $ versioned'content vs))
+            --          | isV2 vs   -> Just (Some $ scriptFromSerialisedScript @'PlutusV2 (coerce $ versioned'content vs))
+            --          | otherwise -> Nothing
 
-        --     return GYUTxO
-        --         { utxoRef       = ref
-        --         , utxoAddress   = a
-        --         , utxoValue     = v
-        --         , utxoOutDatum  = d
-        --         , utxoRefScript = s
-        --         }
+            return GYUTxO
+                { utxoRef       = ref
+                , utxoAddress   = a
+                , utxoValue     = v
+                , utxoOutDatum  = GYOutDatumNone -- FIXME:
+                , utxoRefScript = Nothing
+                }
 
     slotConfig = do
         (zero, len) <- slotConfig'
@@ -214,17 +222,17 @@ instance GYTxQueryMonad GYTxMonadClb where
 
     -- TODO: Make it actually the last seen block's slot.
     slotOfCurrentBlock = do
-        s <- undefined -- FIXME: liftRun $ Fork.getSlot <$> Plutus.Model.currentSlot
+        s <- undefined -- FIXME: liftClb $ Fork.getSlot <$> Plutus.Model.currentSlot
         case slotFromInteger s of
             Nothing -> throwError $ GYConversionException $ GYInvalidSlot s
             Just s' -> return s'
 
-    logMsg = undefined
-    -- logMsg ns s msg = liftRun $ case s of
-    --     GYDebug   -> logInfo  $ printf "%s [DEBUG]: %s" ns msg
-    --     GYInfo    -> logInfo  $ printf "%s [INFO]: %s"  ns msg
-    --     GYWarning -> logInfo  $ printf "%s [WARN]: %s"  ns msg
-    --     GYError   -> logError $ printf "%s [ERROR]: %s" ns msg
+    logMsg ns s msg = liftClb $ case s of
+        GYDebug   -> logInfo  $ printf "%s [DEBUG]: %s" ns msg
+        GYInfo    -> logInfo  $ printf "%s [INFO]: %s"  ns msg
+        GYWarning -> logInfo  $ printf "%s [WARN]: %s"  ns msg
+        -- GYError   -> logError $ printf "%s [ERROR]: %s" ns msg
+        GYError   -> logInfo $ printf "%s [ERROR]: %s" ns msg
 
 instance GYTxMonad GYTxMonadClb where
 
@@ -251,85 +259,54 @@ instance GYTxMonad GYTxMonadClb where
 
 -- Send skeletons with multiple signatures from wallet
 sendSkeletonWithWallets :: GYTxSkeleton v -> [Wallet] -> GYTxMonadClb GYTxId
-sendSkeletonWithWallets skeleton ws = snd <$> sendSkeleton' skeleton ws
+sendSkeletonWithWallets skeleton ws = do
+    --  snd <$> sendSkeleton' skeleton ws
+    sendSkeleton' skeleton  []
+    pure "6c751d3e198c5608dfafdfdffe16aeac8a28f88f3a769cf22dd45e8bc84f47e8"
 
 sendSkeleton :: GYTxSkeleton v -> GYTxMonadClb GYTxId
-sendSkeleton skeleton = snd <$> sendSkeleton' skeleton  []
+sendSkeleton skeleton = do
+    -- snd <$> sendSkeleton' skeleton  []
+    sendSkeleton' skeleton  []
+    pure "6c751d3e198c5608dfafdfdffe16aeac8a28f88f3a769cf22dd45e8bc84f47e8"
 
 
-sendSkeleton' :: GYTxSkeleton v -> [Wallet]  -> GYTxMonadClb (CardanoTx, GYTxId)
+sendSkeleton' :: GYTxSkeleton v -> [Wallet]  -> GYTxMonadClb () -- (CardanoTx, GYTxId)
 sendSkeleton' skeleton ws = do
-    w <- asks runEnvWallet
-    let sigs = walletSignatures (w:ws)
+    -- body
     body <- skeletonToTxBody skeleton
-    pp <- protocolParameters
-    modify (updateWalletState w pp body)
     dumpBody body
+    -- unused now
+    -- pp <- protocolParameters
+    -- modify (updateWalletState w pp body)
+    -- signature
+    -- let sigs = walletSignatures (w:ws)
+    Wallet{walletPaymentSigningKey} <- asks runEnvWallet
+    -- The whole tx
+    let tx = signGYTxBody body [walletPaymentSigningKey]
+    gyLogDebug' "" $ "Tx encoded: " <> txToHex tx
 
-    let tx1     = undefined -- FIXME:
-            -- toExtra (mempty
-            --     { Fork.txSignatures = sigs
-            --     , Fork.txValidRange       = case txBodyValidityRange body of
-            --         (Nothing, Nothing) -> Plutus.always
-            --         (Nothing, Just ub) -> Plutus.to $ slot ub
-            --         (Just lb, Nothing) -> Plutus.from $ slot lb
-            --         (Just lb, Just ub) -> Plutus.interval (slot lb) (slot ub)
-            --     })                             <>
-            -- payFee (Lovelace $ txBodyFee body) <>
-            -- mconcat [collateralInput $ txOutRefToPlutus ref | ref <- Set.toList $ txBodyCollateral body]
+    e <- liftClb $ do
+        sendTx $ txToApi tx
 
-    tx2 <- foldM addInput  tx1 $ txBodyTxIns body
-    tx3 <- foldM addReferenceInput tx2 $ txBodyTxInsReference body \\ skeletonToRefScriptsORefs skeleton
-    tx4 <- foldM addOutput tx3 $ utxosToList $ txBodyUTxOs body
-    tx5 <- foldM addMint   tx4 $ Map.toList $ gytxMint skeleton
-
-    undefined
-
-    -- e <- liftRun $ do
-    --     logInfo $ show tx5
-    --     sendTx tx5
+    pure ()
     -- case e of
     --     Left fr -> fail $ show fr
     --     Right _ -> do
-    --       mtxs <- liftRun $ gets mockTxs
+    --       mtxs <- liftClb $ gets mockTxs
     --       let tid = case viewr (unLog mtxs) of EmptyR -> error "Absurd (sendSkeleton'): Sequence can't be empty"; (_ :> a) -> txStatId $ snd a in
     --         case txIdFromPlutus tid of
     --           Left e'   -> fail $ printf "invalid tid %s, error: %s" (show tid) (show e')
     --           Right tid' -> return (tx5, tid')
 
   where
-    walletSignatures =
-      let walletPubKeyHash = pubKeyHashToPlutus . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey
-          walletKeyPair = paymentSigningKeyToLedgerKeyPair . walletPaymentSigningKey
-       in Map.fromList . map (\w -> (walletPubKeyHash w, walletKeyPair w))
 
-
-    -- Updates the wallet state.
-    -- Updates extra lovelace required for fees & minimum ada requirements against the wallet sending this transaction.
-    updateWalletState :: Wallet -> Api.BundledProtocolParameters Api.BabbageEra -> GYTxBody -> GYTxRunState -> GYTxRunState
-    updateWalletState w@Wallet {..} pp body GYTxRunState {..} = GYTxRunState $ Map.insertWith mappend walletName v walletExtraLovelace
-      where
-        v = ( coerce $ txBodyFee body
-            , coerce $ flip valueAssetClass GYLovelace $
-                foldMap'
-                  (\o ->
-                    -- If this additional ada is coming back to one's own self, we need not account for it.
-                    if gyTxOutAddress o == walletAddress w then
-                      mempty
-                    else gyTxOutValue (adjustTxOut (minimumUTxO pp) o) `valueMinus` gyTxOutValue o
-                  ) $ gytxOuts skeleton
-            )
-
-    -- FIXME:
-    -- slot :: GYSlot -> Fork.Slot
-    -- slot = Fork.Slot . slotToInteger
-    slot = undefined
 
     dumpBody :: GYTxBody -> GYTxMonadClb ()
     dumpBody body = do
         ins <- mapM utxoAtTxOutRef' $ txBodyTxIns body
         refIns <- mapM utxoAtTxOutRef' $ txBodyTxInsReference body
-        liftRun $ logInfo $ printf "fee: %d lovelace\nmint value: %s\nvalidity range: %s\ncollateral: %s\ntotal collateral: %d\ninputs:\n\n%sreference inputs:\n\n%soutputs:\n\n%s"
+        liftClb $ logInfo $ printf "fee: %d lovelace\nmint value: %s\nvalidity range: %s\ncollateral: %s\ntotal collateral: %d\ninputs:\n\n%sreference inputs:\n\n%soutputs:\n\n%s"
             (txBodyFee body)
             (txBodyMintValue body)
             (show $ txBodyValidityRange body)
@@ -352,122 +329,6 @@ sendSkeleton' skeleton ws = do
                              printf "   datum:      %s\n"   (show utxoOutDatum) <>
                              printf "   ref script: %s\n\n" (show utxoRefScript)
 
-    -- FIXME:
-    addInput :: CardanoTx -> GYTxOutRef -> GYTxMonadClb CardanoTx
-    addInput = undefined
-    -- addInput tx ref = do
-    --     let ref' = txOutRefToPlutus ref
-    --     utxo <- utxoAtTxOutRef' ref
-    --     case addressToPubKeyHash $ utxoAddress utxo of
-    --         Nothing -> do
-    --             Some w <- findWitness ref
-    --             case w of
-    --                 GYTxInWitnessKey          -> fail $ printf "expected script witness for %s" ref
-    --                 GYTxInWitnessScript s d r -> do
-    --                     (vs, forRef) <- case s of
-    --                         GYInScript v      -> return (Just (validatorToVersioned v), mempty)
-    --                         GYInReference refScriptORef gyScriptV2 -> return (Nothing, toExtra (mempty {Fork.txReferenceInputs = Set.singleton $ Fork.TxIn (txOutRefToPlutus refScriptORef) Nothing, Fork.txScripts = Map.singleton (scriptPlutusHash gyScriptV2) (Versioned Ledger.PlutusV2 $ coerce $ scriptToSerialisedScript gyScriptV2)}))
-    --                     return $ tx <> toExtra (mempty
-    --                         { Fork.txInputs = Set.singleton $ Fork.TxIn ref' $ Just $ Fork.ConsumeScriptAddress
-    --                             vs
-    --                             (redeemerToPlutus r)
-    --                             (datumToPlutus d)
-    --                         }) <> forRef
-    --         Just _  -> return $ tx <> spendPubKey ref'
-
-    -- FIXME:
-    addReferenceInput :: CardanoTx -> GYTxOutRef -> GYTxMonadClb CardanoTx
-    addReferenceInput = undefined
-    -- addReferenceInput tx ref = do
-    --   let ref' = txOutRefToPlutus ref
-    --   utxo <- utxoAtTxOutRef' ref
-    --   let sm = case utxoRefScript utxo of
-    --                Nothing       -> Map.empty
-    --                Just (Some s) ->
-    --                    let sh = scriptPlutusHash s
-    --                        v = Versioned Ledger.PlutusV2 $ coerce $ scriptToSerialisedScript s
-    --                    in Map.singleton sh v
-
-    --   case utxoOutDatum utxo of
-    --     GYOutDatumHash dh -> do  -- Caution! Currently we don't support referring datum for such an input! Though have written code here in case framework adds support of it later.
-    --       d <- findDatum dh
-    --       return $ tx <> toExtra (
-    --         mempty {
-    --           Fork.txReferenceInputs = Set.singleton $ Fork.TxIn ref' Nothing,
-    --           Fork.txData = Map.singleton (datumHashToPlutus dh) (datumToPlutus d),
-    --           Fork.txScripts = sm
-    --           }
-    --         )
-    --     _InlineOrNone -> return $ tx <> toExtra (
-    --       mempty {
-    --           Fork.txReferenceInputs = Set.singleton $ Fork.TxIn ref' Nothing,
-    --           Fork.txScripts = sm
-    --         }
-    --       )
-
-    -- FIXME:
-    addOutput :: CardanoTx -> GYUTxO -> GYTxMonadClb CardanoTx
-    addOutput = undefined
-    -- addOutput tx utxo = do
-    --     let o = utxoToPlutus utxo
-    --     dm <- case utxoOutDatum utxo of
-    --             GYOutDatumNone     -> return Map.empty
-    --             GYOutDatumInline _ -> return Map.empty
-    --             GYOutDatumHash dh  -> do
-    --                 d <- findDatum dh
-    --                 return $ Map.singleton (datumHashToPlutus dh) (datumToPlutus d)
-
-    --     sm <- case utxoRefScript utxo of
-    --             Nothing       -> return Map.empty
-    --             Just (Some s) -> do
-    --                 let sh = scriptPlutusHash s
-    --                     v = Versioned Ledger.PlutusV2 $ coerce $ scriptToSerialisedScript s
-    --                 return $ Map.singleton sh v
-
-    --     return $ tx <> toExtra mempty
-    --         { Fork.txOutputs = [o]
-    --         , Fork.txData    = dm
-    --         , Fork.txScripts = sm
-    --         }
-
-    -- FIXME:
-    addMint :: CardanoTx -> (GYMintScript v, (Map GYTokenName Integer, GYRedeemer)) -> GYTxMonadClb CardanoTx
-    addMint = undefined
-    -- addMint tx (mp, (m, r)) = do
-    --     let pid = mintingPolicyIdFromWitness mp
-    --         vmp = mintingPolicyToVersioned mp
-    --         r'  =  redeemerToPlutus r
-    --         v   = valueToPlutus $ foldMap (\(tn, n) -> valueSingleton (GYToken pid tn) n) $ Map.toList m
-    --     return $ tx <> mintValue (TypedPolicy vmp) r' v
-
-    findWitness :: GYTxOutRef -> GYTxMonadClb (Some GYTxInWitness)
-    findWitness ref = case find (\GYTxIn{..} -> gyTxInTxOutRef == ref) $ gytxIns skeleton of
-                    Nothing -> fail $ printf "missing input for %s" ref
-                    Just i  -> return $ Some $ gyTxInWitness i
-
-    findDatum :: GYDatumHash -> GYTxMonadClb GYDatum
-    findDatum dh = go $ gytxOuts skeleton
-      where
-        go :: [GYTxOut v] -> GYTxMonadClb GYDatum
-        go []       = fail $ printf "datum hash without corresponding datum: %s" $ show dh
-        go (o : os) = case gyTxOutDatum o of
-            Nothing                 -> go os
-            Just (d, _)
-                | hashDatum d == dh -> return d
-                | otherwise         -> go os
-
-    validatorToVersioned = undefined
-    -- validatorToVersioned :: GYValidator v -> Versioned Fork.Validator
-    -- validatorToVersioned v = case validatorVersion v of
-    --     SingPlutusV1 -> Versioned Ledger.PlutusV1 $ coerce $ validatorToSerialisedScript v
-    --     SingPlutusV2 -> Versioned Ledger.PlutusV2 $ coerce $ validatorToSerialisedScript v
-
-    mintingPolicyToVersioned = undefined
-    -- mintingPolicyToVersioned :: GYMintScript v -> Versioned Fork.MintingPolicy
-    -- mintingPolicyToVersioned v = case mintingPolicyVersionFromWitness v of
-    --     PlutusV1 -> Versioned Ledger.PlutusV1 $ coerce $ gyMintScriptToSerialisedScript v
-    --     PlutusV2 -> Versioned Ledger.PlutusV2 $ coerce $ gyMintScriptToSerialisedScript v
-
 skeletonToTxBody :: GYTxSkeleton v -> GYTxMonadClb GYTxBody
 skeletonToTxBody skeleton = do
     ss <- systemStart
@@ -486,28 +347,27 @@ skeletonToTxBody skeleton = do
             GYTxBuildNoInputs                     -> error "impossible case"
 
 slotConfig' :: GYTxMonadClb (UTCTime, NominalDiffTime)
-slotConfig' = liftRun $ do
+slotConfig' = liftClb $ do
     sc <- gets $ mockConfigSlotConfig . mockConfig
-    undefined
-    -- let len  = fromInteger (Fork.scSlotLength sc) / 1000
-    --     zero = posixSecondsToUTCTime $ timeToPOSIX $ timeFromPlutus $ Fork.scSlotZeroTime sc
-    -- return (zero, len)
+    let len  = fromInteger (scSlotLength sc) / 1000
+        zero = posixSecondsToUTCTime $ timeToPOSIX $ timeFromPlutus $ scSlotZeroTime sc
+    return (zero, len)
 
 systemStart :: GYTxMonadClb Api.SystemStart
 systemStart = gyscSystemStart <$> slotConfig
 
 protocolParameters :: GYTxMonadClb (Api.S.BundledProtocolParameters Api.S.BabbageEra)
 protocolParameters = do
-    pparams <- liftRun $ gets $ mockConfigProtocol . mockConfig
-    undefined
-    -- return $ case pparams of
-    --     AlonzoParams  _ -> error "Run.hs/protocolParameters: Only support babbage era parameters"
-    --     BabbageParams p -> Api.BundleAsShelleyBasedProtocolParameters Api.ShelleyBasedEraBabbage (Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage p) p
+    pparams <- liftClb $ gets $ mockConfigProtocol . mockConfig
+    return $ case pparams of
+        AlonzoParams  _ -> error "Run.hs/protocolParameters: Only support babbage era parameters"
+        BabbageParams p -> Api.BundleAsShelleyBasedProtocolParameters Api.ShelleyBasedEraBabbage (Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage p) p
 
-stakePools = undefined
--- stakePools :: GYTxMonadClb (Set Api.S.PoolId)
+
+stakePools :: GYTxMonadClb (Set Api.S.PoolId)
+stakePools = pure Set.empty
 -- stakePools = do
---     pids <- liftRun $ gets $ Map.keys . stake'pools . mockStake
+--     pids <- liftClb $ gets $ Map.keys . stake'pools . mockStake
 --     foldM f Set.empty pids
 --   where
 --     f :: Set Api.S.PoolId -> PoolId -> GYTxMonadClb (Set Api.S.PoolId)

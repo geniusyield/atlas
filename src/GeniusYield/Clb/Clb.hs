@@ -1,7 +1,7 @@
 module GeniusYield.Clb.Clb where
 
-import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api
+import Cardano.Api qualified as C
+import Cardano.Api.Shelley qualified as C
 import Cardano.Binary qualified as CBOR
 import Cardano.Crypto.DSIGN qualified as Crypto
 import Cardano.Crypto.Hash qualified as Crypto
@@ -12,32 +12,27 @@ import Cardano.Ledger.Babbage.TxOut qualified as L (BabbageTxOut(TxOutCompact), 
 import Cardano.Ledger.BaseTypes qualified as L (Network (Testnet), Globals, mkVersion)
 import Cardano.Ledger.Compactible qualified as L
 import Cardano.Ledger.Core qualified as Core
-import Cardano.Ledger.Keys qualified as C
+import Cardano.Ledger.Keys qualified as L
 import Cardano.Ledger.Mary (MaryValue)
 import Cardano.Ledger.SafeHash qualified as L
 import Cardano.Ledger.Shelley.API qualified as L (LedgerState(..), UTxOState (utxosUtxo), StakeReference (..), Validated, applyTx)
 import Cardano.Ledger.TxIn qualified as L (TxId (..), TxIn (..), mkTxInPartial)
 import Cardano.Ledger.UTxO qualified as L (UTxO (..))
-import Control.Lens (over, (&), (.~))
-import Control.Monad.Identity (Identity, runIdentity)
+import Control.Lens (over, (.~))
 import Control.Monad.State (State, MonadState (get), gets, runState, modify', put)
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
-import Data.Bifunctor (first)
-import Data.Foldable (toList)
-import Data.Function (on)
 import Data.List
-import Data.Map (Map)
 import Data.Map qualified as M
 import Data.Maybe (fromJust)
 import Data.Sequence (Seq (..))
 import Data.Sequence qualified as Seq
-import Data.Text (Text)
 import Data.Text qualified as Text
 import GeniusYield.Clb.ClbLedgerState (EmulatedLedgerState (..), initialState, setUtxo, memPoolState, currentBlock)
 import GeniusYield.Clb.Era (EmulatorEra)
 import GeniusYield.Clb.MockConfig (MockConfig (..))
 import GeniusYield.Clb.Params (PParams(BabbageParams, AlonzoParams), mkGlobals, babbageOnly)
 import GeniusYield.Clb.TimeSlot (slotLength)
+import GeniusYield.Imports
 import GeniusYield.Types.TxOutRef (txOutRefToPlutus, txOutRefFromApi)
 import GeniusYield.Types.Value (GYValue, valueToApi)
 import PlutusLedgerApi.V1 qualified as P (Datum, DatumHash, TxOutRef, Credential)
@@ -46,7 +41,6 @@ import Prettyprinter ( Pretty(pretty), colon, (<+>), indent, vcat )
 import Test.Cardano.Ledger.Core.KeyPair qualified as TL
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCaseInfo, assertFailure)
-import GeniusYield.Imports
 
 --------------------------------------------------------------------------------
 -- Base emulator types
@@ -54,7 +48,7 @@ import GeniusYield.Imports
 
 -- | Cardano tx from any era.
 data CardanoTx where
-  CardanoTx :: Api.IsCardanoEra era => Api.Tx era -> Api.EraInMode era Api.CardanoMode -> CardanoTx
+  CardanoTx :: C.IsCardanoEra era => C.Tx era -> C.EraInMode era C.CardanoMode -> CardanoTx
 
 -- A validated Tx, but: might has IsValid = False
 newtype OnChainTx = OnChainTx { getOnChainTx :: L.Validated (Core.Tx EmulatorEra) }
@@ -123,7 +117,7 @@ initMock cfg@MockConfig{mockConfigProtocol = params@(BabbageParams pparams)} ini
       ( L.mkTxInPartial genesisTxId 0
       , L.TxOutCompact
           (L.compactAddr $ mkAddr' $ intToKeyPair 0)
-          (fromJust $ L.toCompact $ Api.toMaryValue $ valueToApi initVal)
+          (fromJust $ L.toCompact $ C.toMaryValue $ valueToApi initVal)
       )
 
     mkAddr' payKey = L.Addr L.Testnet (TL.mkCred payKey) L.StakeRefNull
@@ -199,13 +193,13 @@ appendLog :: Slot -> a -> Log a -> Log a
 appendLog slot val (Log xs) = Log (xs Seq.|> (slot, val))
 
 -- | Read all TxOutRefs that belong to given address.
-txOutRefAt :: Api.AddressInEra Api.BabbageEra -> Clb [P.TxOutRef]
-txOutRefAt addr = gets (txOutRefAtState $ Api.toShelleyAddr addr)
+txOutRefAt :: C.AddressInEra C.BabbageEra -> Clb [P.TxOutRef]
+txOutRefAt addr = gets (txOutRefAtState $ C.toShelleyAddr addr)
 
 -- | Read all TxOutRefs that belong to given address.
 txOutRefAtState :: L.Addr L.StandardCrypto -> ClbState -> [P.TxOutRef]
 txOutRefAtState addr st =
-  txOutRefToPlutus . txOutRefFromApi . Api.fromShelleyTxIn
+  txOutRefToPlutus . txOutRefFromApi . C.fromShelleyTxIn
     <$> M.keys (M.filter atAddr utxos)
   where
     utxos = L.unUTxO $ L.utxosUtxo $ L.lsUTxOState $ _memPoolState $ emulatedLedgerState st
@@ -224,13 +218,13 @@ txOutRefAtPaymentCred cred = gets (txOutRefAtPaymentCredState cred)
 txOutRefAtPaymentCredState :: P.Credential -> ClbState -> [P.TxOutRef]
 txOutRefAtPaymentCredState _cred _st = TODO
 
-sendTx :: Api.Tx Api.BabbageEra -> Clb ValidationResult
-sendTx (Api.ShelleyTx _ tx) = do -- FIXME: use patterns, but not cardano-api:internal!
+sendTx :: C.Tx C.BabbageEra -> Clb ValidationResult
+sendTx (C.ShelleyTx _ tx) = do -- FIXME: use patterns, but not cardano-api:internal!
   state@ClbState{mockConfig=MockConfig{mockConfigProtocol, mockConfigSlotConfig}} <- get
   -- FIXME: fromJust
   let majorVer = fromJust $ runIdentity
-        $ runMaybeT @Identity $ L.mkVersion $ fst $ Api.protocolParamProtocolVersion
-        $ Api.fromLedgerPParams Api.ShelleyBasedEraBabbage $ babbageOnly mockConfigProtocol
+        $ runMaybeT @Identity $ L.mkVersion $ fst $ C.protocolParamProtocolVersion
+        $ C.fromLedgerPParams C.ShelleyBasedEraBabbage $ babbageOnly mockConfigProtocol
   let globals = mkGlobals (slotLength mockConfigSlotConfig) majorVer
   let ret = validateTx
         globals
@@ -272,7 +266,7 @@ validateTx globals state  tx =
     -- FIXME: why Phase1, not sure here?
     Left err ->
       FailPhase1
-        (CardanoTx (Api.ShelleyTx Api.ShelleyBasedEraBabbage tx) Api.BabbageEraInCardanoMode)
+        (CardanoTx (C.ShelleyTx C.ShelleyBasedEraBabbage tx) C.BabbageEraInCardanoMode)
         err
     Right (newState, vtx) ->
       Success newState vtx
@@ -301,7 +295,7 @@ intToKeyPair :: L.Crypto c => Integer -> TL.KeyPair r c
 intToKeyPair n = TL.KeyPair vk sk
   where
     sk = Crypto.genKeyDSIGN $ mkSeedFromInteger n
-    vk = C.VKey $ Crypto.deriveVerKeyDSIGN sk
+    vk = L.VKey $ Crypto.deriveVerKeyDSIGN sk
 
     {- | Construct a seed from a bunch of Word64s
 

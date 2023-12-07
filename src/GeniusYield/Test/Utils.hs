@@ -156,8 +156,7 @@ withMaxQCTests n = Tasty.adjustOption f where
 testRunGY :: String -> (Wallets -> GYTxMonadRun a) -> Tasty.TestTree
 testRunGY name action = do
     testNoErrorsTrace v defaultBabbage name $ do
-      -- FIXME: do we need that Wallet? (undefined)
-      asRun pureGen undefined (wallets >>= action)
+      asRun pureGen TODO (wallets >>= action)
 
   where
     v = valueToPlutus $ valueFromLovelace 1_000_000_000_000_000 <>
@@ -183,9 +182,7 @@ testRunGYClb :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
 -- testRunGYClb :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
 testRunGYClb name action =
     testNoErrorsTraceClb v defaultBabbageClb name $ do
-      -- FIXME: do we need that Wallet? (undefined)
-    --   asClb pureGen undefined (wallets >>= action)
-      asClb pureGen undefined $ action wallets
+      asClb pureGen TODO $ action wallets
 
   where
     v = valueFromLovelace 1_000_000_000_000_000 <>
@@ -315,7 +312,7 @@ walletPubKeyHash = fromJust . addressToPubKeyHash . walletAddress
 --     return (b, diff)
 
 withWalletBalancesCheckClb :: [(Wallet, GYValue)] -> GYTxMonadClb a -> GYTxMonadClb a
-withWalletBalancesCheckClb = undefined
+withWalletBalancesCheckClb = TODO
 
 {- | Computes a 'GYTxMonadRun' action, checking that the 'Wallet' balances
         change according to the input list.
@@ -428,7 +425,7 @@ utxosInBody :: GYTxQueryMonad m => Fork.Tx -> GYTxId -> m [Maybe GYUTxO]
 utxosInBody Fork.Tx{txOutputs = os} txId = mapM (\i -> utxoAtTxOutRef (txOutRefFromTuple (txId, fromInteger $ toInteger i))) [0 .. (length os - 1)]
 
 addRefScriptClb :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadClb (Maybe GYTxOutRef)
-addRefScriptClb = undefined
+addRefScriptClb = TODO
 
 -- -- | Adds the given script to the given address and returns the reference for it.
 -- addRefScript :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadRun (Maybe GYTxOutRef)

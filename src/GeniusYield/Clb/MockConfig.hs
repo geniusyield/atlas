@@ -1,4 +1,4 @@
--- | Config for Mock ledger
+-- | Config for emulator (from PSM)
 module GeniusYield.Clb.MockConfig (
   -- Stat (..),
   MockConfig (..),
@@ -12,12 +12,9 @@ module GeniusYield.Clb.MockConfig (
   skipLimits,
   warnLimits,
   forceLimits,
-  -- readMockConfig,
 ) where
 
-import Cardano.Ledger.BaseTypes
--- import Cardano.Simple.Ledger.TimeSlot (SlotConfig (..))
--- import Plutus.Model.Mock.Stat
+import Cardano.Ledger.BaseTypes qualified as L
 import GeniusYield.Clb.Params
     ( PParams, defaultBabbageParams, defaultAlonzoParams )
 import GeniusYield.Clb.TimeSlot
@@ -26,16 +23,13 @@ import GeniusYield.Clb.TimeSlot
 data MockConfig = MockConfig
   { mockConfigCheckLimits :: !CheckLimits
   -- ^ limits check mode
-  -- , mockConfigLimitStats :: !Stat
-  -- ^ TX execution resources limits
   , mockConfigProtocol :: !PParams
   -- ^ Protocol parameters
-  , mockConfigNetworkId :: !Network
+  , mockConfigNetworkId :: !L.Network
   -- ^ Network id (mainnet / testnet)
   , mockConfigSlotConfig :: !SlotConfig
   -- ^ Slot config
   }
-
 
 data CheckLimits
   = -- | ignore TX-limits
@@ -70,11 +64,9 @@ defaultBabbageClb = defaultMockConfig defaultBabbageParams
 defaultMockConfig :: PParams -> MockConfig
 defaultMockConfig params =
   MockConfig
-    {
-      --mockConfigLimitStats = mainnetTxLimits
-     mockConfigCheckLimits = ErrorLimits
+    { mockConfigCheckLimits = ErrorLimits
     , mockConfigProtocol = params
-    , mockConfigNetworkId = Testnet
+    , mockConfigNetworkId = L.Testnet
     , mockConfigSlotConfig = defaultSlotConfig
     }
 
@@ -89,11 +81,3 @@ warnLimits cfg = cfg {mockConfigCheckLimits = WarnLimits}
 -- | Error on limits
 forceLimits :: MockConfig -> MockConfig
 forceLimits cfg = cfg {mockConfigCheckLimits = ErrorLimits}
-
--- {- | Read config for protocol parameters and form blockchain config.
-
---  > readMockConfig protocolParametersFile
--- -}
--- readMockConfig :: FilePath -> IO MockConfig
--- readMockConfig paramsFile =
---   defaultMockConfig {- TODO . setDefaultCostModel -} <$> readAlonzoParams paramsFile

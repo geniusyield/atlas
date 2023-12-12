@@ -137,10 +137,11 @@ instance GYTxMonad GYTxMonadNode where
 
     someUTxO lang = do
         addrs           <- ownAddresses
-        utxosToConsider <- availableUTxOs
+        utxosToConsider <- utxosRemoveRefScripts <$> availableUTxOs
+        random          <- randomTxOutRef utxosToConsider
         case lang of
           PlutusV2 ->
-            case someTxOutRef utxosToConsider  of
+            case random  of
                 Just (oref, _) -> return oref
                 Nothing        -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs
           PlutusV1 ->

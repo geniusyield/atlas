@@ -11,6 +11,7 @@ permissions:
 jobs:
   build:
     uses: ./.github/workflows/haskell.yml
+    secrets: inherit
   release:
     runs-on: ubuntu-22.04
     needs: build

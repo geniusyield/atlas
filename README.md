@@ -10,9 +10,6 @@
     <a href="https://haddock.atlas-app.io/">
       <img src="https://img.shields.io/badge/-Haddock-5E5184?style=flat-square&logo=haskell&logoColor=white" />
     </a>
-    <a href="https://cardano.stackexchange.com/questions/tagged/atlas">
-      <img src="https://img.shields.io/stackexchange/cardano/t/atlas?style=flat-square&label=Cardano%20Atlas%20Questions" />
-    </a>
     <a href="https://github.com/geniusyield/atlas/commits/main">
       <img src="https://img.shields.io/github/commit-activity/m/geniusyield/atlas?style=flat-square&label=Commit%20Activity" />
     </a>

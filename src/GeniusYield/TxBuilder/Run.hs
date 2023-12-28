@@ -57,7 +57,7 @@ import qualified PlutusTx.Builtins.Internal                as Plutus
 import qualified Cardano.Simple.PlutusLedgerApi.V1.Scripts as Fork
 import           Data.Sequence                             (ViewR (..), viewr)
 import           GeniusYield.Imports
-import           GeniusYield.Transaction                   (GYCoinSelectionStrategy (GYRandomImproveMultiAsset))
+import           GeniusYield.Transaction                   (GYCoinSelectionStrategy (GYRandomImproveMultiAsset), BuildTxException (BuildTxBalancingError))
 import           GeniusYield.Transaction.Common            (adjustTxOut,
                                                             minimumUTxO)
 import           GeniusYield.TxBuilder.Class
@@ -466,7 +466,7 @@ skeletonToTxBody skeleton = do
         Left err  -> throwAppError err
         Right res -> case res of
             GYTxBuildSuccess (Identity body :| _) -> return body
-            GYTxBuildFailure v                    -> throwAppError $ InsufficientFundsErr v
+            GYTxBuildFailure be                   -> throwAppError $ BuildTxBalancingError be
             GYTxBuildPartialSuccess _ _           -> error "impossible case"
             GYTxBuildNoInputs                     -> error "impossible case"
 

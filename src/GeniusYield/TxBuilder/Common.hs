@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 {-|
 Module      : GeniusYield.TxBuilder.Common
 Copyright   : (c) 2023 GYELD GMBH
@@ -9,7 +8,6 @@ Stability   : develop
 -}
 module GeniusYield.TxBuilder.Common
     ( GYTxBuildResult (..)
-    , pattern InsufficientFundsErr
     , buildTxCore
     , collateralLovelace
     , collateralValue
@@ -43,9 +41,9 @@ data GYTxBuildResult f
     -- | All given 'GYTxSkeleton's were successfully built.
     = GYTxBuildSuccess !(NonEmpty (f GYTxBody))
     -- | Some of the given 'GYTxSkeleton's were successfully built, but the rest failed due to _insufficient funds_.
-    | GYTxBuildPartialSuccess !GYValue !(NonEmpty (f GYTxBody))
+    | GYTxBuildPartialSuccess !BalancingError !(NonEmpty (f GYTxBody))
     -- | None of the given 'GYTxSkeleton's could be built due to _insufficient funds_.
-    | GYTxBuildFailure !GYValue
+    | GYTxBuildFailure !BalancingError
     -- | Input did not contain any 'GYTxSkeleton's.
     | GYTxBuildNoInputs
 
@@ -167,7 +165,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
             case res of
                 {- Not enough funds for this transaction
                 We assume it's not worth continuing with the next transactions (which is often the case) -}
-                Left (InsufficientFundsErr v) -> pure $ Right $ reverseResult $ updateBuildRes (Left v) acc
+                Left (BuildTxBalancingError be) -> pure $ Right $ reverseResult $ updateBuildRes (Left be) acc
                 -- Any other exception is fatal. TODO: To think more on whether collateral error can be handled here.
                 Left err                      -> pure $ Left err
                 Right fres                    -> do
@@ -201,9 +199,6 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
     reverseResult (GYTxBuildSuccess ne) = GYTxBuildSuccess $ NE.reverse ne
     reverseResult (GYTxBuildPartialSuccess v ne) = GYTxBuildPartialSuccess v $ NE.reverse ne
     reverseResult anyOther = anyOther
-
-pattern InsufficientFundsErr :: GYValue -> BuildTxException
-pattern InsufficientFundsErr v = BuildTxBalancingError (BalancingErrorInsufficientFunds v)
 
 collateralLovelace :: Integer
 collateralLovelace = 5_000_000

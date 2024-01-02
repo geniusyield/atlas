@@ -234,8 +234,8 @@ runGYTxMonadNodeF cstrat nid providers addrs change collateral m = do
     x <- runGYTxMonadNodeCore (const id) cstrat nid providers addrs change collateral $ (:[]) <$> m
     case x of
       GYTxBuildSuccess ne          -> pure $ NE.head ne
-      GYTxBuildPartialSuccess gv _ -> throwIO $ InsufficientFundsErr gv
-      GYTxBuildFailure gv          -> throwIO $ InsufficientFundsErr gv
+      GYTxBuildPartialSuccess be _ -> throwIO $ BuildTxBalancingError be
+      GYTxBuildFailure be          -> throwIO $ BuildTxBalancingError be
       -- We know there is precisely one input.
       GYTxBuildNoInputs            -> error "runGYTxMonadNodeF: absurd"
 

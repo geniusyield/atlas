@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 {-|
 Module      : GeniusYield.TxBuilder.Common
 Copyright   : (c) 2023 GYELD GMBH
@@ -9,7 +8,6 @@ Stability   : develop
 -}
 module GeniusYield.TxBuilder.Common
     ( GYTxBuildResult (..)
-    , pattern InsufficientFundsErr
     , buildTxCore
     , collateralLovelace
     , collateralValue
@@ -201,9 +199,6 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
     reverseResult (GYTxBuildSuccess ne) = GYTxBuildSuccess $ NE.reverse ne
     reverseResult (GYTxBuildPartialSuccess v ne) = GYTxBuildPartialSuccess v $ NE.reverse ne
     reverseResult anyOther = anyOther
-
-pattern InsufficientFundsErr :: GYValue -> BuildTxException
-pattern InsufficientFundsErr v = BuildTxBalancingError (BalancingErrorInsufficientFunds v)
 
 collateralLovelace :: Integer
 collateralLovelace = 5_000_000

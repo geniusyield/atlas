@@ -21,6 +21,7 @@ import qualified Cardano.Api.Shelley as Api.S
 
 import           GeniusYield.Imports
 import           GeniusYield.Types
+import qualified Text.Printf         as Printf
 
 {- | An *almost* finalized Tx.
 
@@ -57,6 +58,9 @@ data BalancingError
     -- ^ User wallet has no utxos to select.
 
 deriving stock instance Show BalancingError
+
+instance Printf.PrintfArg BalancingError where
+    formatArg = Printf.formatArg . show
 
 instance Eq BalancingError where
     BalancingErrorInsufficientFunds v1 == BalancingErrorInsufficientFunds v2 = v1 == v2

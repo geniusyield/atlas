@@ -51,6 +51,7 @@ import qualified Data.ByteString                    as BS
 import qualified Data.ByteString.Base16             as BS16
 import qualified Data.ByteString.Char8              as BS8
 import qualified Data.ByteString.Lazy               as LBS
+import qualified Data.Csv                           as Csv
 import qualified Data.Set                           as Set
 import qualified Data.Swagger                       as Swagger
 import qualified Data.Swagger.Internal.Schema       as Swagger
@@ -217,6 +218,16 @@ instance Swagger.ToSchema GYTxId where
 --
 instance Printf.PrintfArg GYTxId where
     formatArg tid = Printf.formatArg (show tid)
+
+instance Csv.FromField GYTxId where
+    parseField f = do
+        s <- Csv.parseField f
+        case txIdFromHexE s of
+            Left err  -> fail err
+            Right tid -> return tid
+
+instance Csv.ToField GYTxId where
+    toField = Csv.toField . show
 
 txIdFromHex :: String -> Maybe GYTxId
 txIdFromHex = rightToMaybe . txIdFromHexE

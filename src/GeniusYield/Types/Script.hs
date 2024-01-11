@@ -71,6 +71,8 @@ module GeniusYield.Types.Script (
     GYMintingPolicyId,
     mintingPolicyIdToApi,
     mintingPolicyIdFromApi,
+    mintingPolicyIdToCurrencySymbol,
+    mintingPolicyIdFromCurrencySymbol,
     mintingPolicyIdCurrencySymbol,
 
     -- * Script
@@ -424,8 +426,24 @@ mintingPolicyIdToApi = coerce
 mintingPolicyIdFromApi :: Api.PolicyId -> GYMintingPolicyId
 mintingPolicyIdFromApi = coerce
 
+{-# DEPRECATED mintingPolicyIdCurrencySymbol "Use mintingPolicyIdToCurrencySymbol." #-}
 mintingPolicyIdCurrencySymbol :: GYMintingPolicyId -> PlutusV1.CurrencySymbol
 mintingPolicyIdCurrencySymbol = coerce $ PlutusTx.toBuiltin . Api.serialiseToRawBytes @Api.PolicyId
+
+mintingPolicyIdToCurrencySymbol :: GYMintingPolicyId -> PlutusV1.CurrencySymbol
+mintingPolicyIdToCurrencySymbol = mintingPolicyIdCurrencySymbol
+
+-- |
+--
+-- >>> mintingPolicyIdFromCurrencySymbol $ mintingPolicyIdToCurrencySymbol "ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef"
+-- Right "ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef"
+--
+mintingPolicyIdFromCurrencySymbol :: PlutusV1.CurrencySymbol -> Either PlutusToCardanoError GYMintingPolicyId
+mintingPolicyIdFromCurrencySymbol cs =
+    bimap
+        (\e -> DeserialiseRawBytesError $ Text.pack $ "validatorHashFromPlutus: " <> show cs <> ", error: " <> show e)
+        mintingPolicyIdFromApi
+    $ Api.deserialiseFromRawBytes Api.AsPolicyId $ PlutusTx.fromBuiltin $ PlutusV1.unCurrencySymbol cs
 
 mintingPolicyIdToText :: GYMintingPolicyId -> Text
 mintingPolicyIdToText = Api.serialiseToRawBytesHexText . Api.unPolicyId . mintingPolicyIdToApi

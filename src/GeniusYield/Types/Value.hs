@@ -442,7 +442,7 @@ instance Swagger.ToSchema GYAssetClass where
 -- | Converts a 'GYAssetClass' into a Plutus 'Plutus.AssetClass'.
 assetClassToPlutus :: GYAssetClass -> Plutus.AssetClass
 assetClassToPlutus GYLovelace      = Plutus.AssetClass (Ada.adaSymbol, Ada.adaToken)
-assetClassToPlutus (GYToken cs tn) = Plutus.AssetClass (mintingPolicyIdCurrencySymbol cs, tokenNameToPlutus tn)
+assetClassToPlutus (GYToken cs tn) = Plutus.AssetClass (mintingPolicyIdToCurrencySymbol cs, tokenNameToPlutus tn)
 
 -- | Converts a Plutus 'Plutus.AssetClass' into a 'GYAssetClass'.
 -- Returns Left 'GYFromPlutusValueError' if it fails.

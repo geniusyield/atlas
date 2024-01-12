@@ -20,6 +20,7 @@ module GeniusYield.Types.Tx
     , txToHex
     , txToHexBS
     , txToCBOR
+    , writeTx
       -- * Transaction Id's
     , GYTxId
     , txIdFromHex
@@ -38,7 +39,8 @@ module GeniusYield.Types.Tx
 
 import qualified Cardano.Api                        as Api
 import qualified Cardano.Api.Shelley                as Api.S
-import           Cardano.Ledger.Alonzo.TxWits       (AlonzoTxWits, addrAlonzoTxWitsL)
+import           Cardano.Ledger.Alonzo.TxWits       (AlonzoTxWits,
+                                                     addrAlonzoTxWitsL)
 import           Cardano.Ledger.Babbage             (Babbage)
 import qualified Cardano.Ledger.Babbage             as Babbage (BabbageEra)
 import qualified Cardano.Ledger.Binary              as CBOR
@@ -49,6 +51,7 @@ import qualified Data.ByteString                    as BS
 import qualified Data.ByteString.Base16             as BS16
 import qualified Data.ByteString.Char8              as BS8
 import qualified Data.ByteString.Lazy               as LBS
+import qualified Data.Csv                           as Csv
 import qualified Data.Set                           as Set
 import qualified Data.Swagger                       as Swagger
 import qualified Data.Swagger.Internal.Schema       as Swagger
@@ -159,6 +162,13 @@ txToCBOR = Api.serialiseToCBOR . txToApi
 txToHex :: GYTx -> String
 txToHex = BS8.unpack . txToHexBS
 
+writeTx :: FilePath -> GYTx -> IO ()
+writeTx file tx = do
+    e <- Api.writeFileTextEnvelope (Api.File file) Nothing (txToApi tx)
+    case e of
+        Left err -> ioError $ userError $ show err
+        Right () -> pure ()
+
 -- | Transaction hash/id of a particular transaction.
 newtype GYTxId = GYTxId Api.TxId
     deriving (Eq, Ord)
@@ -208,6 +218,16 @@ instance Swagger.ToSchema GYTxId where
 --
 instance Printf.PrintfArg GYTxId where
     formatArg tid = Printf.formatArg (show tid)
+
+instance Csv.FromField GYTxId where
+    parseField f = do
+        s <- Csv.parseField f
+        case txIdFromHexE s of
+            Left err  -> fail err
+            Right tid -> return tid
+
+instance Csv.ToField GYTxId where
+    toField = Csv.toField . show
 
 txIdFromHex :: String -> Maybe GYTxId
 txIdFromHex = rightToMaybe . txIdFromHexE

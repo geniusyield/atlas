@@ -16,6 +16,7 @@ module GeniusYield.Types.Datum (
     datumFromPlutus,
     datumFromPlutus',
     datumFromPlutusData,
+    unitDatum,
     hashDatum,
     -- * Datum hash
     GYDatumHash,
@@ -86,6 +87,12 @@ datumFromPlutus' = GYDatum
 -- | Get a 'GYDatum' from any Plutus 'Plutus.ToData' type.
 datumFromPlutusData :: PlutusTx.ToData a => a -> GYDatum
 datumFromPlutusData = GYDatum . PlutusTx.toBuiltinData
+
+-- | Unit datum
+--
+-- @'datumFromPlutusData' ()@.
+unitDatum :: GYDatum
+unitDatum = datumFromPlutusData ()
 
 -- | Returns the 'GYDatumHash' of the given 'GYDatum'
 hashDatum :: GYDatum -> GYDatumHash

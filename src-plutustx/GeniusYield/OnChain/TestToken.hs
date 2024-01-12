@@ -1,6 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS -fno-strictness -fno-spec-constr -fno-specialise #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 {-|
 Module      : GeniusYield.OnChain.TestToken
 Copyright   : (c) 2023 GYELD GMBH

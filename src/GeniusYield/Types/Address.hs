@@ -37,6 +37,8 @@ module GeniusYield.Types.Address (
     unsafeStakeAddressFromText,
     stakeAddressToText,
     stakeAddressCredential,
+    stakeAddressToCredential,
+    stakeAddressFromCredential,
     GYStakeKeyHashString,
     stakeKeyFromAddress,
     -- * newtype wrapper
@@ -99,6 +101,7 @@ import           GeniusYield.Types.Script
 -- >>> import qualified Data.Aeson                 as Aeson
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 -- >>> import qualified Data.Csv                   as Csv
+-- >>> import GeniusYield.Types.NetworkId
 -- >>> import qualified Text.Printf                as Printf
 -- >>> import qualified Web.HttpApiData            as Web
 --
@@ -581,9 +584,22 @@ unsafeStakeAddressFromText t = fromMaybe
 stakeAddressToText :: GYStakeAddress -> Text.Text
 stakeAddressToText = Api.serialiseAddress . stakeAddressToApi
 
+
+{-# DEPRECATED stakeAddressCredential "Use stakeAddressToCredential." #-}
 -- | Get a stake credential from a stake address. This drops the network information.
 stakeAddressCredential :: GYStakeAddress -> GYStakeCredential
 stakeAddressCredential = stakeCredentialFromApi . Api.stakeAddressCredential . stakeAddressToApi
+
+-- | Get a stake credential from a stake address. This drops the network information.
+stakeAddressToCredential :: GYStakeAddress -> GYStakeCredential
+stakeAddressToCredential = stakeAddressCredential
+
+-- | Get a stake address from a stake credential. This also requires network information.
+--
+-- >>> stakeAddr == stakeAddressFromCredential GYTestnetPreprod (stakeAddressToCredential stakeAddr)
+-- True
+stakeAddressFromCredential :: GYNetworkId -> GYStakeCredential -> GYStakeAddress
+stakeAddressFromCredential (networkIdToApi -> netId') (stakeCredentialToApi -> stakeCred') = Api.makeStakeAddress netId' stakeCred' & stakeAddressFromApi
 
 type GYStakeKeyHashString = String
 

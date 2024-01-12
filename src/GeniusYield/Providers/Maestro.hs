@@ -81,9 +81,9 @@ silenceHeadersMaestroClientError other                          = other
 -------------------------------------------------------------------------------
 
 -- | Submits a 'GYTx'.
-maestroSubmitTx :: Maestro.MaestroEnv 'Maestro.V1 -> GYSubmitTx
-maestroSubmitTx env tx = do
-  txId <- handleMaestroSubmitError <=< try $ Maestro.submitAndMonitorTx env $ Api.serialiseToCBOR $ txToApi tx
+maestroSubmitTx :: Bool -> Maestro.MaestroEnv 'Maestro.V1 -> GYSubmitTx
+maestroSubmitTx useTurboSubmit env tx = do
+  txId <- handleMaestroSubmitError <=< try $ let txCbor = Api.serialiseToCBOR $ txToApi tx in if useTurboSubmit then Maestro.turboSubmitAndMonitorTx env txCbor else Maestro.submitAndMonitorTx env txCbor
   either
     (throwIO . MspvDeserializeFailure "SubmitTx" . DeserializeErrorHex . Text.pack)
     pure
@@ -236,10 +236,7 @@ maestroUtxosAtAddress env addr mAssetClass = do
   -- Here one would not get `MaestroNotFound` error.
   addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (Maestro.utxosAtAddress env (coerce addrAsText) (Just False) (Just False) (fmap (\(mp, tn) -> Maestro.NonAdaNativeToken (coerce mp) (coerce tn)) extractedAssetClass))
 
-  either
-    (throwIO . MspvDeserializeFailure locationIdent)
-    pure
-    $ utxosFromList <$> traverse utxoFromMaestro addrUtxos
+  either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro addrUtxos)
   where
     locationIdent = "AddressUtxos"
 
@@ -265,10 +262,7 @@ maestroUtxosAtAddresses env addrs = do
   -- Here one would not get `MaestroNotFound` error.
   addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosAtMultiAddresses env (Just False) (Just False)) $ coerce addrsInText)
 
-  either
-    (throwIO . MspvDeserializeFailure locationIdent)
-    pure
-    $ utxosFromList <$> traverse utxoFromMaestro addrUtxos
+  either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro addrUtxos)
   where
     locationIdent = "AddressesUtxos"
 
@@ -293,10 +287,7 @@ maestroUtxosAtPaymentCredential env paymentCredential = do
   -- Here one would not get `MaestroNotFound` error.
   utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages $ Maestro.utxosByPaymentCredential env paymentCredentialBech32 (Just False) (Just False)
 
-  either
-    (throwIO . MspvDeserializeFailure locationIdent)
-    pure
-    $ utxosFromList <$> traverse utxoFromMaestro utxos
+  either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro utxos)
   where
     locationIdent = "PaymentCredentialUtxosWithDatums"
 
@@ -502,9 +493,9 @@ maestroEraHistory env = do
 maestroLookupDatum :: Maestro.MaestroEnv 'Maestro.V1 -> GYLookupDatum
 maestroLookupDatum env dh = do
   datumMaybe <- handler =<< try (Maestro.getTimestampedData <$> (Maestro.getDatumByHash env . coerce . Api.serialiseToRawBytesHexText $ datumHashToApi dh))
-  sequence $ datumMaybe <&> \(Maestro.Datum datumBytes _datumJson) -> case datumFromCBOR datumBytes of  -- NOTE: `datumFromMaestroJSON datumJson` also gives the same result.
+  mapM (\(Maestro.Datum datumBytes _datumJson) -> case datumFromCBOR datumBytes of  -- NOTE: `datumFromMaestroJSON datumJson` also gives the same result.
     Left err -> throwIO $ MspvDeserializeFailure locationIdent err
-    Right bd -> pure bd
+    Right bd -> pure bd) datumMaybe
   where
     locationIdent = "LookupDatum"
     -- This particular error is fine in this case, we can just return 'Nothing'.

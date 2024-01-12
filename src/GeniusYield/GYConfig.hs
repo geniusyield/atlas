@@ -61,14 +61,14 @@ The supported providers. The options are:
 In JSON format, this essentially corresponds to:
 
 = { socketPath: FilePath, kupoUrl: string }
-| { maestroToken: string }
+| { maestroToken: string, turboSubmit: boolean }
 | { blockfrostKey: string }
 
 The constructor tags don't need to appear in the JSON.
 -}
 data GYCoreProviderInfo
   = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text}
-  | GYMaestro {cpiMaestroToken :: !(Confidential Text)}
+  | GYMaestro {cpiMaestroToken :: !(Confidential Text), cpiTurboSubmit :: !Bool}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock (Show)
 
@@ -107,7 +107,7 @@ findMaestroTokenAndNetId configs = do
         Just conf -> do
             let netId = cfgNetworkId conf
             case cfgCoreProvider conf of
-              GYMaestro (Confidential token) -> return (token, netId)
+              GYMaestro (Confidential token) _ -> return (token, netId)
               _ -> throwIO $ userError "Missing Maestro Token"
 
 {- |
@@ -167,7 +167,7 @@ withCfgProviders
             , Node.nodeSubmitTx info
             , KupoApi.kupoAwaitTxConfirmed kEnv
             )
-        GYMaestro (Confidential apiToken) -> do
+        GYMaestro (Confidential apiToken) turboSubmit -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
           maestroGetParams <- makeGetParameters
             (MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv)
@@ -181,7 +181,7 @@ withCfgProviders
             , maestroSlotActions
             , MaestroApi.maestroQueryUtxo maestroApiEnv
             , MaestroApi.maestroLookupDatum maestroApiEnv
-            , MaestroApi.maestroSubmitTx maestroApiEnv
+            , MaestroApi.maestroSubmitTx turboSubmit maestroApiEnv
             , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do

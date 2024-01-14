@@ -9,7 +9,10 @@ Stability   : develop
 module GeniusYield.Types.Redeemer (
     GYRedeemer,
     redeemerToApi,
+    redeemerFromApi,
     redeemerToPlutus,
+    redeemerToPlutus',
+    redeemerFromPlutus,
     redeemerFromPlutus',
     redeemerFromPlutusData,
     unitRedeemer,
@@ -38,6 +41,9 @@ redeemerToPlutus (GYRedeemer x) = PlutusV1.Redeemer x
 redeemerToPlutus' :: GYRedeemer -> PlutusTx.BuiltinData
 redeemerToPlutus' (GYRedeemer x) = x
 
+redeemerFromPlutus :: PlutusV1.Redeemer -> GYRedeemer
+redeemerFromPlutus (PlutusV1.Redeemer x) = GYRedeemer x
+
 redeemerFromPlutus' :: PlutusTx.BuiltinData -> GYRedeemer
 redeemerFromPlutus' = GYRedeemer
 
@@ -46,6 +52,9 @@ redeemerFromPlutusData = GYRedeemer . PlutusTx.toBuiltinData
 
 redeemerToApi :: GYRedeemer -> Api.HashableScriptData
 redeemerToApi = redeemerToPlutus' >>> PlutusTx.builtinDataToData >>> Api.fromPlutusData >>> Api.unsafeHashableScriptData
+
+redeemerFromApi :: Api.HashableScriptData -> GYRedeemer
+redeemerFromApi = GYRedeemer . PlutusTx.dataToBuiltinData . Api.toPlutusData . Api.getScriptData
 
 -- | Unit redeemer
 --

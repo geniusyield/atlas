@@ -1,3 +1,4 @@
 {
-    "maestroToken": "QED"
+  "maestroToken": "QED",
+  "turboSubmit": true
 }

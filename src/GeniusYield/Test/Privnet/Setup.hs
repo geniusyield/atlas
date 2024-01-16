@@ -123,19 +123,20 @@ makeSetup' privnetPath kupoUrl = do
         localGetParams = nodeGetParameters era info
 
     -- context used for tests
-    let ctx0 :: Ctx
+    let user' = flip User Nothing
+        ctx0 :: Ctx
         ctx0 = Ctx
             { ctxEra              = era
             , ctxInfo             = info
             , ctxUserF            = User userFskey Nothing userFaddr
-            , ctxUser2            = uncurry (`User` Nothing) (V.index userSkeyAddr (Proxy @0))
-            , ctxUser3            = uncurry (`User` Nothing) (V.index userSkeyAddr (Proxy @1))
-            , ctxUser4            = uncurry (`User` Nothing) (V.index userSkeyAddr (Proxy @2))
-            , ctxUser5            = uncurry (`User` Nothing) (V.index userSkeyAddr (Proxy @3))
-            , ctxUser6            = uncurry (`User` Nothing) (V.index userSkeyAddr (Proxy @4))
-            , ctxUser7            = uncurry (`User` Nothing) (V.index userSkeyAddr (Proxy @5))
-            , ctxUser8            = uncurry (`User` Nothing) (V.index userSkeyAddr (Proxy @6))
-            , ctxUser9            = uncurry (`User` Nothing) (V.index userSkeyAddr (Proxy @7))
+            , ctxUser2            = uncurry user' (V.index userSkeyAddr (Proxy @0))
+            , ctxUser3            = uncurry user' (V.index userSkeyAddr (Proxy @1))
+            , ctxUser4            = uncurry user' (V.index userSkeyAddr (Proxy @2))
+            , ctxUser5            = uncurry user' (V.index userSkeyAddr (Proxy @3))
+            , ctxUser6            = uncurry user' (V.index userSkeyAddr (Proxy @4))
+            , ctxUser7            = uncurry user' (V.index userSkeyAddr (Proxy @5))
+            , ctxUser8            = uncurry user' (V.index userSkeyAddr (Proxy @6))
+            , ctxUser9            = uncurry user' (V.index userSkeyAddr (Proxy @7))
             , ctxGold             = GYLovelace -- temporarily
             , ctxIron             = GYLovelace -- temporarily
             , ctxLog              = noLogging

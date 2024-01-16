@@ -62,18 +62,6 @@ paymentKeyHashFromPlutus (Plutus.PubKeyHash (Plutus.BuiltinByteString h)) =
         GYPaymentKeyHash
     $ Api.deserialiseFromRawBytes (Api.AsHash Api.AsPaymentKey) h
 
-
-
-{-
-    (\case
-        Conv.Tag t Conv.DeserialisationError ->
-            DeserialiseRawBytesError (Txt.pack $ "paymentKeyHashFromPlutus" ++ '.':t)
-        _ -> UnknownPlutusToCardanoError "paymentKeyHashFromPlutus"
-    )
-    GYPaymentKeyHash
-    $ Conv.toCardanoPaymentKeyHash (Plutus.PaymentPubKeyHash h)
--}
-
 -- |
 --
 -- >>> let Just pkh = Aeson.decode @GYPaymentKeyHash "\"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d\""

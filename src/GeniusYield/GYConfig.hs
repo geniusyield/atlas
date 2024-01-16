@@ -68,7 +68,7 @@ The constructor tags don't need to appear in the JSON.
 -}
 data GYCoreProviderInfo
   = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text}
-  | GYMaestro {cpiMaestroToken :: !(Confidential Text), cpiTurboSubmit :: !Bool}
+  | GYMaestro {cpiMaestroToken :: !(Confidential Text), cpiTurboSubmit :: !(Maybe Bool)}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock (Show)
 
@@ -181,7 +181,7 @@ withCfgProviders
             , maestroSlotActions
             , MaestroApi.maestroQueryUtxo maestroApiEnv
             , MaestroApi.maestroLookupDatum maestroApiEnv
-            , MaestroApi.maestroSubmitTx turboSubmit maestroApiEnv
+            , MaestroApi.maestroSubmitTx (Just True == turboSubmit) maestroApiEnv
             , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do

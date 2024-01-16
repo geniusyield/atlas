@@ -31,6 +31,8 @@ import           Data.Default                     (Default (def))
 import           GeniusYield.Examples.Gift
 import           GeniusYield.Examples.Limbo
 import           GeniusYield.Examples.Treat
+import           GeniusYield.Providers.Common     (SubmitTxException)
+import           GeniusYield.Providers.Node       (nodeSubmitTx)
 import           GeniusYield.Test.Privnet.Asserts
 import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Setup
@@ -254,6 +256,23 @@ tests setup = testGroup "gift"
         assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef eightAdaUtxo) False $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
         -- eight ada utxo won't satisfy 5 ada check and thus would be ignored
         void $ ctxRunFWithCollateral ctx newUser (utxoRef eightAdaUtxo) True $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+
+    , testCaseSteps "Testing signature from stake key" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        let newUserValue = valueFromLovelace 200_000_000 <> valueSingleton (ctxIron ctx) 25
+            submitWithoutStakeKey User {..} txBody = do
+              let tx = signGYTxBody' txBody [GYSomeSigningKey userPaymentSKey]
+              nodeSubmitTx (ctxInfo ctx) tx
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue (CreateUserConfig { cucGenerateCollateral = True, cucGenerateStakeKey = True })
+
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
+        forUTxOs_ newUserUtxos (info . show)
+        txBody <- ctxRunI ctx newUser $ return $ mustBeSignedBy (userStakePkh newUser & fromJust) <> mustHaveOutput (mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000))
+        -- When signed without required stake key, should give a submit exception.
+        catch (void (submitWithoutStakeKey newUser txBody)) (\(_ :: SubmitTxException) -> pure ())
+        -- Signing should go smoothly.
+        void $ submitTx ctx newUser txBody
 
     , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup setup info $ \ctx -> do
         giftCleanup ctx

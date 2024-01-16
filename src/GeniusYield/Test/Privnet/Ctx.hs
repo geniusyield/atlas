@@ -11,9 +11,14 @@ module GeniusYield.Test.Privnet.Ctx (
     Ctx (..),
     -- * User
     User (..),
+    CreateUserConfig (..),
     ctxUsers,
     userPkh,
+    userPaymentPkh,
+    userStakePkh,
     userVKey,
+    userPaymentVKey,
+    userStakeVKey,
     -- * Operations
     ctxRunI,
     ctxRunC,
@@ -33,29 +38,55 @@ module GeniusYield.Test.Privnet.Ctx (
     addRefInputCtx,
 ) where
 
-import           Test.Tasty.HUnit           (assertFailure)
-
-import qualified Cardano.Api                as Api
-import qualified Data.Map.Strict            as Map
-
+import qualified Cardano.Api                      as Api
+import           Data.Default                     (Default (..))
+import qualified Data.Map.Strict                  as Map
+import qualified Data.Set                         as Set
+import qualified GeniusYield.Examples.Limbo       as Limbo
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Node
 import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
+import           GeniusYield.Types.PaymentKeyHash (GYPaymentKeyHash)
+import           Test.Tasty.HUnit                 (assertFailure)
 
-import qualified GeniusYield.Examples.Limbo as Limbo
+data CreateUserConfig =
+     CreateUserConfig
+       { -- | Create collateral output of 5 ada?
+         cucGenerateCollateral :: !Bool,
+         -- | Create a stake key for the user?
+         cucGenerateStakeKey   :: !Bool
+       }
+
+instance Default CreateUserConfig where
+   def = CreateUserConfig { cucGenerateCollateral = False, cucGenerateStakeKey = False }
 
 data User = User
-    { userSKey :: !GYPaymentSigningKey
-    , userAddr :: !GYAddress
+    { userPaymentSKey :: !GYPaymentSigningKey
+    , userStakeSKey   :: !(Maybe GYStakeSigningKey)
+    , userAddr        :: !GYAddress
     }
 
+{-# DEPRECATED userVKey "Use userPaymentVKey." #-}
 userVKey :: User -> GYPaymentVerificationKey
-userVKey = paymentVerificationKey . userSKey
+userVKey = paymentVerificationKey . userPaymentSKey
 
+userPaymentVKey :: User -> GYPaymentVerificationKey
+userPaymentVKey = userVKey
+
+userStakeVKey :: User -> Maybe GYStakeVerificationKey
+userStakeVKey = fmap stakeVerificationKey . userStakeSKey
+
+{-# DEPRECATED userPkh "User userPaymentPkh." #-}
 userPkh :: User -> GYPubKeyHash
-userPkh = pubKeyHash . paymentVerificationKey . userSKey
+userPkh = toPubKeyHash . paymentKeyHash . paymentVerificationKey . userPaymentSKey
+
+userPaymentPkh :: User -> GYPaymentKeyHash
+userPaymentPkh = paymentKeyHash . paymentVerificationKey . userPaymentSKey
+
+userStakePkh :: User -> Maybe GYStakeKeyHash
+userStakePkh = fmap (stakeKeyHash . stakeVerificationKey) . userStakeSKey
 
 data Ctx = Ctx
     { ctxEra              :: !GYEra
@@ -86,28 +117,31 @@ ctxUsers ctx = ($ ctx) <$> [ctxUser2, ctxUser3, ctxUser4, ctxUser5, ctxUser6, ct
 newTempUserCtx:: Ctx
               -> User            -- ^ User which will fund this new user.
               -> GYValue         -- ^ Describes balance of new user.
-              -> Bool            -- ^ Create collateral output of 5 ada?
+              -> CreateUserConfig
               -> IO User
-newTempUserCtx ctx fundUser fundValue createCollateral = do
-  newSKey <- generatePaymentSigningKey
-  let newVKey = paymentVerificationKey newSKey
-      newKeyHash = pubKeyHash newVKey
-      newAddr = addressFromPubKeyHash GYPrivnet newKeyHash
+newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
+  newPaymentSKey <- generatePaymentSigningKey
+  newStakeSKey <- if cucGenerateStakeKey then Just <$> generateStakeSigningKey else pure Nothing
+  let newPaymentVKey = paymentVerificationKey newPaymentSKey
+      newStakeVKey = stakeVerificationKey <$> newStakeSKey
+      newPaymentKeyHash = paymentKeyHash newPaymentVKey
+      newStakeKeyHash = stakeKeyHash <$> newStakeVKey
+      newAddr = addressFromCredential GYPrivnet (GYPaymentCredentialByKey newPaymentKeyHash) (GYStakeCredentialByKey <$> newStakeKeyHash)
       (adaInValue, otherValue) = valueSplitAda fundValue
 
   -- We want this new user to have at least 5 ada if we want to create collateral.
   -- Our balancer would add minimum ada required for other utxo in case of equality
-  when (createCollateral && adaInValue < collateralLovelace) $ fail "Given value for new user has less than 5 ada"
+  when (cucGenerateCollateral && adaInValue < collateralLovelace) $ fail "Given value for new user has less than 5 ada"
 
   txBody <- ctxRunI ctx fundUser $ return $
-    if createCollateral then
+    if cucGenerateCollateral then
       mustHaveOutput (mkGYTxOutNoDatum newAddr (otherValue <> (valueFromLovelace adaInValue `valueMinus` collateralValue))) <>
       mustHaveOutput (mkGYTxOutNoDatum newAddr collateralValue)
     else
       mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
 
   void $ submitTx ctx fundUser txBody
-  return $ User {userSKey = newSKey, userAddr = newAddr}
+  return $ User {userPaymentSKey = newPaymentSKey, userAddr = newAddr, userStakeSKey = newStakeSKey}
 
 
 ctxRunF :: forall t v. Traversable t => Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
@@ -159,10 +193,14 @@ ctxProviders ctx = GYProviders
 
 submitTx :: Ctx -> User -> GYTxBody -> IO GYTxId
 submitTx ctx@Ctx { ctxInfo } User {..} txBody = do
-    let tx = signGYTxBody txBody [userSKey]
-    -- when optsPrintTxBodies $ printf "Transaction %s\n" (ppShow txBody')
+    let reqSigs = txBodyReqSignatories txBody
+        tx =
+          signGYTxBody' txBody $
+            case userStakeSKey of
+              Nothing -> [GYSomeSigningKey userPaymentSKey]
+              -- It might be the case that @cardano-api@ is clever enough to not add signature if it is not required but cursory look at their code suggests otherwise.
+              Just stakeKey -> if Set.member (toPubKeyHash . stakeKeyHash . stakeVerificationKey $ stakeKey) reqSigs then [GYSomeSigningKey userPaymentSKey, GYSomeSigningKey stakeKey] else [GYSomeSigningKey userPaymentSKey]
     txId <- nodeSubmitTx ctxInfo tx
-    -- printf "Submitted transaction %s\n" (show txId)
 
     gyAwaitTxConfirmed (ctxProviders ctx) (GYAwaitTxParameters { maxAttempts = 30, checkInterval = 1_000_000, confirmations = 0 }) txId
     return txId

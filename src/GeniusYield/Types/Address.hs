@@ -17,6 +17,7 @@ module GeniusYield.Types.Address (
     addressToPaymentCredential,
     addressToStakeCredential,
     addressFromPubKeyHash,
+    addressFromPaymentKeyHash,
     addressFromValidator,
     addressFromCredential,
     addressFromValidatorHash,
@@ -91,6 +92,8 @@ import           GeniusYield.Types.Credential         (GYPaymentCredential,
                                                        stakeCredentialToHexText)
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.NetworkId
+import           GeniusYield.Types.PaymentKeyHash     (GYPaymentKeyHash,
+                                                       paymentKeyHashToApi)
 import           GeniusYield.Types.PubKeyHash
 import           GeniusYield.Types.Script
 
@@ -243,7 +246,7 @@ addressFromPlutus nid addr =
 -- | If an address is a shelley address, then we'll return payment credential wrapped in `Just`, `Nothing` otherwise.
 --
 -- >>> addressToPaymentCredential addr
--- Just (GYPaymentCredentialByKey (GYPubKeyHash "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"))
+-- Just (GYPaymentCredentialByKey (GYPaymentKeyHash "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"))
 -- >>> addressToPaymentCredential addrScript
 -- Just (GYPaymentCredentialByScript (GYValidatorHash "178155803bc461c5b0b371c779cb481ec7420df0c619cd9860e570d2"))
 -- >>> addressToPaymentCredential addrByron1
@@ -285,10 +288,21 @@ getShelleyAddressStakeCredential (Api.S.ShelleyAddress _network _payment stake) 
 --
 -- /note:/ no stake credential.
 --
+{-# DEPRECATED addressFromPubKeyHash "Use addressFromPaymentKeyHash." #-}
 addressFromPubKeyHash :: GYNetworkId -> GYPubKeyHash -> GYAddress
 addressFromPubKeyHash nid pkh = addressFromApi $ Api.AddressShelley $ Api.S.makeShelleyAddress
     (networkIdToApi nid)
     (Api.S.PaymentCredentialByKey (pubKeyHashToApi pkh))
+    Api.S.NoStakeAddress
+
+-- | Create address from 'GYPaymentKeyHash'.
+--
+-- /note:/ no stake credential.
+--
+addressFromPaymentKeyHash :: GYNetworkId -> GYPaymentKeyHash -> GYAddress
+addressFromPaymentKeyHash nid pkh = addressFromApi $ Api.AddressShelley $ Api.S.makeShelleyAddress
+    (networkIdToApi nid)
+    (Api.S.PaymentCredentialByKey (paymentKeyHashToApi pkh))
     Api.S.NoStakeAddress
 
 -- | Create address from 'GYValidatorHash'.

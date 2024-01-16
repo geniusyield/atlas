@@ -181,7 +181,7 @@ withCfgProviders
             , maestroSlotActions
             , MaestroApi.maestroQueryUtxo maestroApiEnv
             , MaestroApi.maestroLookupDatum maestroApiEnv
-            , MaestroApi.maestroSubmitTx (fromMaybe False turboSubmit) maestroApiEnv
+            , MaestroApi.maestroSubmitTx (Just True == turboSubmit) maestroApiEnv
             , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do

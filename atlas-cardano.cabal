@@ -131,6 +131,7 @@ library
     GeniusYield.Types.Tx
     GeniusYield.Types.TxBody
     GeniusYield.Types.TxIn
+    GeniusYield.Types.TxMetadata
     GeniusYield.Types.TxOut
     GeniusYield.Types.TxOutRef
     GeniusYield.Types.UTxO

@@ -21,7 +21,6 @@ import qualified Cardano.Api.Shelley as Api.S
 
 import           GeniusYield.Imports
 import           GeniusYield.Types
-import           GeniusYield.Types.TxMetadata (GYTxMetadata)
 import qualified Text.Printf         as Printf
 
 {- | An *almost* finalized Tx.

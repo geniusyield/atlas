@@ -1,7 +1,9 @@
 module GeniusYield.Types.TxMetadata (
-  GYTxMetadata (..),
+  GYTxMetadata (..)
 ) where
 
-import Cardano.Api qualified as Api
+import qualified Cardano.Api as Api
+
 
 newtype GYTxMetadata = GYTxMetadata (Api.TxMetadataInEra Api.BabbageEra)
+  deriving Show

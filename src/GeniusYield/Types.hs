@@ -36,6 +36,7 @@ import           GeniusYield.Types.Time          as X
 import           GeniusYield.Types.Tx            as X
 import           GeniusYield.Types.TxBody        as X
 import           GeniusYield.Types.TxIn          as X
+import           GeniusYield.Types.TxMetadata    as X
 import           GeniusYield.Types.TxOut         as X
 import           GeniusYield.Types.TxOutRef      as X
 import           GeniusYield.Types.UTxO          as X

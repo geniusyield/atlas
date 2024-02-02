@@ -57,7 +57,8 @@ import qualified PlutusTx.Builtins.Internal                as Plutus
 import qualified Cardano.Simple.PlutusLedgerApi.V1.Scripts as Fork
 import           Data.Sequence                             (ViewR (..), viewr)
 import           GeniusYield.Imports
-import           GeniusYield.Transaction                   (GYCoinSelectionStrategy (GYRandomImproveMultiAsset), BuildTxException (BuildTxBalancingError))
+import           GeniusYield.Transaction                   (BuildTxException (BuildTxBalancingError),
+                                                            GYCoinSelectionStrategy (GYRandomImproveMultiAsset))
 import           GeniusYield.Transaction.Common            (adjustTxOut,
                                                             minimumUTxO)
 import           GeniusYield.TxBuilder.Class
@@ -77,7 +78,7 @@ data Wallet = Wallet
 
 -- | Gets a GYAddress of a testing wallet.
 walletAddress :: Wallet -> GYAddress
-walletAddress Wallet{..} = addressFromPubKeyHash walletNetworkId $ pubKeyHash $
+walletAddress Wallet{..} = addressFromPaymentKeyHash walletNetworkId $ paymentKeyHash $
                            paymentVerificationKey walletPaymentSigningKey
 
 instance HasAddress Wallet where
@@ -120,7 +121,7 @@ asRun g w m = evalRandT (asRandRun w m) g
 ownAddress :: GYTxMonadRun GYAddress
 ownAddress = do
     nid <- networkId
-    asks $ addressFromPubKeyHash nid . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
+    asks $ addressFromPaymentKeyHash nid . paymentKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
 
 liftRun :: Run a -> GYTxMonadRun a
 liftRun = GYTxMonadRun . lift . lift . lift . lift
@@ -296,7 +297,7 @@ sendSkeleton' skeleton ws = do
 
   where
     walletSignatures =
-      let walletPubKeyHash = pubKeyHashToPlutus . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey
+      let walletPubKeyHash = pubKeyHashToPlutus . toPubKeyHash . paymentKeyHash . paymentVerificationKey . walletPaymentSigningKey
           walletKeyPair = paymentSigningKeyToLedgerKeyPair . walletPaymentSigningKey
        in Map.fromList . map (\w -> (walletPubKeyHash w, walletKeyPair w))
 

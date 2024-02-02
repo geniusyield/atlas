@@ -27,9 +27,12 @@ import           GeniusYield.Imports
 import           GeniusYield.Transaction
 import           GeniusYield.Types
 
+import           Data.Default                     (Default (def))
 import           GeniusYield.Examples.Gift
 import           GeniusYield.Examples.Limbo
 import           GeniusYield.Examples.Treat
+import           GeniusYield.Providers.Common     (SubmitTxException)
+import           GeniusYield.Providers.Node       (nodeSubmitTx)
 import           GeniusYield.Test.Privnet.Asserts
 import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Setup
@@ -147,7 +150,7 @@ tests setup = testGroup "gift"
         ----------- Create a new user and fund it
         let ironAC = ctxIron ctx
         -- `newUser` just have one UTxO which will be used as collateral.
-        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25) False
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25) def
         info $ printf "Newly created user's address %s" (show $ userAddr newUser)
         ----------- (ctxUserF ctx) submits some gifts
         txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
@@ -190,7 +193,7 @@ tests setup = testGroup "gift"
         ----------- Create a new user and fund it
         let ironAC = ctxIron ctx
             newUserValue = valueFromLovelace 200_000_000 <> valueSingleton ironAC 25
-        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue True
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue (CreateUserConfig { cucGenerateCollateral = True, cucGenerateStakeKey = False })
 
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
@@ -208,7 +211,7 @@ tests setup = testGroup "gift"
         ----------- Create a new user and fund it
         pp <- gyGetProtocolParameters (ctxProviders ctx)
         let newUserValue = maximumRequiredCollateralValue pp `valueMinus` valueFromLovelace 1
-        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue def
 
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
@@ -219,7 +222,7 @@ tests setup = testGroup "gift"
         pp <- gyGetProtocolParameters (ctxProviders ctx)
         ----------- Create a new user and fund it
         let newUserValue = maximumRequiredCollateralValue pp <> valueFromLovelace 0_500_000
-        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue def
 
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
@@ -230,7 +233,7 @@ tests setup = testGroup "gift"
         pp <- gyGetProtocolParameters (ctxProviders ctx)
         ----------- Create a new user and fund it
         let newUserValue = maximumRequiredCollateralValue pp <> valueFromLovelace 1_500_000
-        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue False
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue def
 
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
@@ -239,7 +242,7 @@ tests setup = testGroup "gift"
 
     , testCaseSteps "Checking if collateral is reserved in case we want it even if it's value is not 5 ada" $ \info -> withSetup setup info $ \ctx -> do
         ----------- Create a new user and fund it
-        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 40_000_000) False
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 40_000_000) def
         -- Add another UTxO to be used as collateral.
         txBody <- ctxRunI ctx (ctxUserF ctx) $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 8_000_000)
         void $ submitTx ctx (ctxUserF ctx) txBody
@@ -253,6 +256,23 @@ tests setup = testGroup "gift"
         assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef eightAdaUtxo) False $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
         -- eight ada utxo won't satisfy 5 ada check and thus would be ignored
         void $ ctxRunFWithCollateral ctx newUser (utxoRef eightAdaUtxo) True $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+
+    , testCaseSteps "Testing signature from stake key" $ \info -> withSetup setup info $ \ctx -> do
+        ----------- Create a new user and fund it
+        let newUserValue = valueFromLovelace 200_000_000 <> valueSingleton (ctxIron ctx) 25
+            submitWithoutStakeKey User {..} txBody = do
+              let tx = signGYTxBody' txBody [GYSomeSigningKey userPaymentSKey]
+              nodeSubmitTx (ctxInfo ctx) tx
+        newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue (CreateUserConfig { cucGenerateCollateral = True, cucGenerateStakeKey = True })
+
+        info $ printf "UTxOs at this new user"
+        newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
+        forUTxOs_ newUserUtxos (info . show)
+        txBody <- ctxRunI ctx newUser $ return $ mustBeSignedBy (userStakePkh newUser & fromJust) <> mustHaveOutput (mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000))
+        -- When signed without required stake key, should give a submit exception.
+        catch (void (submitWithoutStakeKey newUser txBody)) (\(_ :: SubmitTxException) -> pure ())
+        -- Signing should go smoothly.
+        void $ submitTx ctx newUser txBody
 
     , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup setup info $ \ctx -> do
         giftCleanup ctx

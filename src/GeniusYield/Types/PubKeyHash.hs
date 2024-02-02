@@ -7,7 +7,8 @@ Stability   : develop
 
 -}
 module GeniusYield.Types.PubKeyHash (
-    GYPubKeyHash,
+    GYPubKeyHash (..),
+    CanSignTx (..),
     pubKeyHashFromPlutus,
     pubKeyHashToPlutus,
     pubKeyHashToApi,
@@ -42,6 +43,14 @@ newtype GYPubKeyHash = GYPubKeyHash (Api.Hash Api.PaymentKey)
     deriving stock Show
     deriving newtype (Eq, Ord, IsString)
 
+class CanSignTx a where
+  toPubKeyHash :: a -> GYPubKeyHash
+  fromPubKeyHash :: GYPubKeyHash -> a
+
+instance CanSignTx GYPubKeyHash where
+  toPubKeyHash = id
+  fromPubKeyHash = id
+
 -- |
 --
 -- >>> pubKeyHashFromPlutus "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
@@ -56,18 +65,6 @@ pubKeyHashFromPlutus (Plutus.PubKeyHash (Plutus.BuiltinByteString h)) =
         (\e -> DeserialiseRawBytesError $ Text.pack $ "pubKeyHashFromPlutus " ++ show h ++ ", error: " ++ show e)
         GYPubKeyHash
     $ Api.deserialiseFromRawBytes (Api.AsHash Api.AsPaymentKey) h
-
-
-
-{-
-    (\case
-        Conv.Tag t Conv.DeserialisationError ->
-            DeserialiseRawBytesError (Txt.pack $ "pubKeyHashFromPlutus" ++ '.':t)
-        _ -> UnknownPlutusToCardanoError "pubKeyHashFromPlutus"
-    )
-    GYPubKeyHash
-    $ Conv.toCardanoPaymentKeyHash (Plutus.PaymentPubKeyHash h)
--}
 
 -- |
 --

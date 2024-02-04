@@ -233,7 +233,6 @@ instance GYTxQueryMonad GYTxMonadClb where
         GYDebug   -> logInfo  $ printf "%s [DEBUG]: %s" ns msg
         GYInfo    -> logInfo  $ printf "%s [INFO]: %s"  ns msg
         GYWarning -> logInfo  $ printf "%s [WARN]: %s"  ns msg
-        -- GYError   -> logError $ printf "%s [ERROR]: %s" ns msg
         GYError   -> logInfo $ printf "%s [ERROR]: %s" ns msg
 
 instance GYTxMonad GYTxMonadClb where

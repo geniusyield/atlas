@@ -41,7 +41,6 @@ import Prettyprinter ( Pretty(pretty), colon, (<+>), indent, vcat )
 import Test.Cardano.Ledger.Core.KeyPair qualified as TL
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCaseInfo, assertFailure)
-import Cardano.Ledger.Pretty (ppLedgerState)
 import Cardano.Ledger.Pretty.Babbage ()
 --------------------------------------------------------------------------------
 -- Base emulator types
@@ -91,8 +90,14 @@ data ClbState = ClbState
   , mockConfig :: !MockConfig
   , mockDatums :: !(Map P.DatumHash P.Datum)
   , mockInfo :: !(Log String)
+  , mockFails :: !(Log FailReason)
   , mockCurrentSlot :: !Slot -- FIXME: sync up with emulatedLedgerState
   }
+
+-- | Fail reasons.
+newtype FailReason
+  = GenericFail String
+  deriving (Show)
 
 -- | Run emulator.
 runMock :: Clb a -> ClbState -> (a, ClbState)
@@ -108,6 +113,7 @@ initMock cfg@MockConfig{mockConfigProtocol = params@(BabbageParams pparams)} ini
     , mockConfig = cfg
     , mockCurrentSlot = Slot 1
     , mockInfo = mempty
+    , mockFails = mempty
     }
   where
 
@@ -178,16 +184,21 @@ instance Pretty Slot where
 -- Actions in Clb monad
 --------------------------------------------------------------------------------
 
--- | Log generic error.
+-- | Log a generic (non-typed) error.
 logError :: String -> Clb ()
-logError = logInfo
-  -- FIXME:
-  -- logFail . GenericFail
+logError = logFail . GenericFail
 
+-- | Add a non-error log enty.
 logInfo :: String -> Clb ()
 logInfo msg = do
   slot <- gets mockCurrentSlot
   modify' $ \s -> s {mockInfo = appendLog slot msg (mockInfo s)}
+
+-- | Log failure.
+logFail :: FailReason -> Clb ()
+logFail res = do
+  curTime <- gets mockCurrentSlot
+  modify' $ \s -> s {mockFails = appendLog curTime res (mockFails s)}
 
 -- | Insert event to log
 appendLog :: Slot -> a -> Log a -> Log a
@@ -249,12 +260,23 @@ testNoErrorsTraceClb funds cfg msg act =
   where
     (errors, mock) = runMock (act >> checkErrors) $ initMock cfg funds
     mockLog = "\nBlockchain log :\n----------------\n" <> ppMockEvent (mockInfo mock)
-
+{- | Checks that script runs without errors and returns pretty printed failure
+ if something bad happens.
+-}
 checkErrors :: Clb (Maybe String)
 checkErrors = do
-  -- FIXME: implement
-  _ <- get
-  pure Nothing
+  failures <- fromLog <$> getFails
+  -- names <- gets mockNames
+  pure $
+    if null failures
+      then Nothing
+      -- else Just (init . unlines $ fmap (ppFailure names) failures)
+      else Just (init . unlines $ fmap show failures)
+
+-- | Return list of failures
+getFails :: Clb (Log FailReason)
+getFails = gets mockFails
+
 
 --------------------------------------------------------------------------------
 -- Transactions validation TODO: factor out

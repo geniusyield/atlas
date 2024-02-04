@@ -51,8 +51,11 @@ firstBetTrace :: OracleAnswerDatum  -- ^ Guess
               -> Wallets -> GYTxMonadClb ()  -- Our continuation function
               -- -> GYTxMonadClb ()  -- Our continuation function
 firstBetTrace dat bet expectedFees Wallets{w1} = do
-  gyLogDebug' "" "Hey!"
-  void $ runWalletGYClb w1 simpleTest
+  gyLogDebug' "" "Hey there!"
+  void $ runWalletGYClb w1 $ do
+    -- withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
+    withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace 100178393)] $ do
+      simpleTest
 
   -- First step: Get the required parameters for initializing our parameterized script and add the corresponding reference script
   -- (brp, refScript) <- computeParamsAndAddRefScript 40 100 (valueFromLovelace 200_000_000) ws

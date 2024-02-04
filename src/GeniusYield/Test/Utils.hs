@@ -68,6 +68,7 @@ import qualified Test.Tasty.Runners         as Tasty
 import           GeniusYield.Types
 import GeniusYield.TxBuilder.Clb (GYTxMonadClb, asClb, asRandClb, liftClb)
 import GeniusYield.Clb.Clb (testNoErrorsTraceClb, intToKeyPair, Clb)
+import GeniusYield.Clb.Clb qualified as Clb
 import GeniusYield.Clb.MockConfig (defaultBabbageClb)
 import qualified Cardano.Ledger.Api as L
 import qualified Test.Cardano.Ledger.Core.KeyPair as TL
@@ -311,9 +312,6 @@ walletPubKeyHash = fromJust . addressToPubKeyHash . walletAddress
 --     liftRun $ logInfo $ printf "%s:\nold balance: %s\nnew balance: %s\ndiff: %s" n old new diff
 --     return (b, diff)
 
-withWalletBalancesCheckClb :: [(Wallet, GYValue)] -> GYTxMonadClb a -> GYTxMonadClb a
-withWalletBalancesCheckClb = TODO
-
 {- | Computes a 'GYTxMonadRun' action, checking that the 'Wallet' balances
         change according to the input list.
 
@@ -492,3 +490,33 @@ infix 0 :=
 
 pureGen :: StdGen
 pureGen = mkStdGen 42
+
+{- -----------------------------------------------------------------------------
+  CLB
+----------------------------------------------------------------------------- -}
+
+balanceClb :: HasAddress a => a -> GYTxMonadClb GYValue
+balanceClb a = do
+    nid <- networkId
+    case addressFromPlutus nid $ toAddress a of
+        Left err   -> fail $ show err
+        Right addr -> do
+            utxos <- utxosAtAddress addr Nothing
+            return $ foldMapUTxOs utxoValue utxos
+
+withBalanceClb :: HasAddress a => String -> a -> GYTxMonadClb b -> GYTxMonadClb (b, GYValue)
+withBalanceClb n a m = do
+    old <- balanceClb a
+    b   <- m
+    new <- balanceClb a
+    let diff = new `valueMinus` old
+    gyLogDebug' "" $ printf "%s:\nold balance: %s\nnew balance: %s\ndiff: %s" n old new diff
+    return (b, diff)
+
+withWalletBalancesCheckClb :: [(Wallet, GYValue)] -> GYTxMonadClb a -> GYTxMonadClb a
+withWalletBalancesCheckClb []            m = m
+withWalletBalancesCheckClb ((w, v) : xs) m = do
+    (b, diff) <- withBalanceClb (walletName w) w $ withWalletBalancesCheckClb xs m
+    unless (diff == v) $ do
+        fail $ printf "expected balance difference of %s for wallet %s, but the actual difference was %s" v (walletName w) diff
+    return b

@@ -21,6 +21,7 @@ module GeniusYield.TxBuilder.Clb
     , sendSkeleton'
     , sendSkeletonWithWallets
     , networkIdRun
+    , dumpUtxoState
     ) where
 
 import qualified Cardano.Api                               as Api
@@ -65,13 +66,14 @@ import GeniusYield.TxBuilder.Run (Wallet (..), WalletName)
 import GeniusYield.Clb.TimeSlot (SlotConfig(..))
 import GeniusYield.Clb.Params (PParams(..))
 import Cardano.Ledger.Shelley.API (LedgerState(..), UTxOState (utxosUtxo), StakeReference (..))
-import GeniusYield.Clb.ClbLedgerState (EmulatedLedgerState (..), initialState, setUtxo)
+import GeniusYield.Clb.ClbLedgerState (EmulatedLedgerState (..), initialState, setUtxo, memPoolState)
 import Cardano.Ledger.UTxO (UTxO(..))
 import Control.Lens ((^.))
 import Cardano.Ledger.Babbage.TxBody (addrEitherBabbageTxOutL, valueEitherBabbageTxOutL)
 import Cardano.Ledger.Address (unCompactAddr, decompactAddr)
 import qualified Cardano.Ledger.Compactible as L
 import qualified Cardano.Api.Shelley as ApiS
+import Cardano.Ledger.Pretty (ppLedgerState)
 
 
 -- | Gets a GYAddress of a testing wallet.
@@ -289,6 +291,9 @@ sendSkeleton' skeleton ws = do
     e <- liftClb $ do
         sendTx $ txToApi tx
 
+    -- uSet <- utxoSet
+    -- liftClb $ logInfo $ show $ ppLedgerState uSet
+
     pure ()
     -- case e of
     --     Left fr -> fail $ show fr
@@ -301,20 +306,20 @@ sendSkeleton' skeleton ws = do
 
   where
 
-
     dumpBody :: GYTxBody -> GYTxMonadClb ()
     dumpBody body = do
         ins <- mapM utxoAtTxOutRef' $ txBodyTxIns body
         refIns <- mapM utxoAtTxOutRef' $ txBodyTxInsReference body
-        liftClb $ logInfo $ printf "fee: %d lovelace\nmint value: %s\nvalidity range: %s\ncollateral: %s\ntotal collateral: %d\ninputs:\n\n%sreference inputs:\n\n%soutputs:\n\n%s"
-            (txBodyFee body)
-            (txBodyMintValue body)
-            (show $ txBodyValidityRange body)
-            (show $ txBodyCollateral body)
-            (txBodyTotalCollateralLovelace body)
-            (concatMap dumpInUTxO ins)
-            (concatMap dumpInUTxO refIns)
-            (concatMap dumpOutUTxO $ utxosToList $ txBodyUTxOs body)
+        gyLogDebug' "" $
+            printf "fee: %d lovelace\nmint value: %s\nvalidity range: %s\ncollateral: %s\ntotal collateral: %d\ninputs:\n\n%sreference inputs:\n\n%soutputs:\n\n%s"
+                (txBodyFee body)
+                (txBodyMintValue body)
+                (show $ txBodyValidityRange body)
+                (show $ txBodyCollateral body)
+                (txBodyTotalCollateralLovelace body)
+                (concatMap dumpInUTxO ins)
+                (concatMap dumpInUTxO refIns)
+                (concatMap dumpOutUTxO $ utxosToList $ txBodyUTxOs body)
 
     dumpInUTxO :: GYUTxO -> String
     dumpInUTxO GYUTxO{..} = printf " - ref:        %s\n"   utxoRef             <>
@@ -428,3 +433,12 @@ eraHistory = do
             , eraEnd = Ouroboros.EraUnbounded
             , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920}
             }
+
+dumpUtxoState :: GYTxMonadClb ()
+dumpUtxoState = do
+    s <- liftClb $ do
+        s <- gets ((^. memPoolState) . emulatedLedgerState)
+        pure $ show $ ppLedgerState s
+    gyLogDebug' "" s
+
+

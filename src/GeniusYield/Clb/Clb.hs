@@ -18,7 +18,7 @@ import Cardano.Ledger.SafeHash qualified as L
 import Cardano.Ledger.Shelley.API qualified as L (LedgerState(..), UTxOState (utxosUtxo), StakeReference (..), Validated, applyTx)
 import Cardano.Ledger.TxIn qualified as L (TxId (..), TxIn (..), mkTxInPartial)
 import Cardano.Ledger.UTxO qualified as L (UTxO (..))
-import Control.Lens (over, (.~))
+import Control.Lens (over, (.~), (^.))
 import Control.Monad.State (State, MonadState (get), gets, runState, modify', put)
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Data.List
@@ -41,7 +41,8 @@ import Prettyprinter ( Pretty(pretty), colon, (<+>), indent, vcat )
 import Test.Cardano.Ledger.Core.KeyPair qualified as TL
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCaseInfo, assertFailure)
-
+import Cardano.Ledger.Pretty (ppLedgerState)
+import Cardano.Ledger.Pretty.Babbage ()
 --------------------------------------------------------------------------------
 -- Base emulator types
 --------------------------------------------------------------------------------
@@ -244,8 +245,7 @@ sendTx (C.ShelleyTx _ tx) = do -- FIXME: use patterns, but not cardano-api:inter
 testNoErrorsTraceClb :: GYValue -> MockConfig -> String -> Clb a -> TestTree
 testNoErrorsTraceClb funds cfg msg act =
   testCaseInfo msg $ do
-    logg <- maybe (pure mockLog) assertFailure errors
-    pure $ logg <> "\nState: " <> show (emulatedLedgerState mock)
+    maybe (pure mockLog) assertFailure errors
   where
     (errors, mock) = runMock (act >> checkErrors) $ initMock cfg funds
     mockLog = "\nBlockchain log :\n----------------\n" <> ppMockEvent (mockInfo mock)

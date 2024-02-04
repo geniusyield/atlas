@@ -233,6 +233,7 @@ library
     , cardano-ledger-alonzo
     , cardano-ledger-babbage
     , cardano-ledger-binary
+    , cardano-ledger-pretty
     , cardano-ledger-shelley
     , cardano-slotting
     , cardano-wallet-primitive

@@ -53,8 +53,8 @@ firstBetTrace :: OracleAnswerDatum  -- ^ Guess
 firstBetTrace dat bet expectedFees Wallets{w1} = do
   gyLogDebug' "" "Hey there!"
   void $ runWalletGYClb w1 $ do
-    -- withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
-    withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace 100178393)] $ do
+    withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
+    -- withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace 100178393)] $ do
       simpleTest
 
   -- First step: Get the required parameters for initializing our parameterized script and add the corresponding reference script

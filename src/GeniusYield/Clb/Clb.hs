@@ -186,7 +186,9 @@ instance Pretty Slot where
 
 -- | Log a generic (non-typed) error.
 logError :: String -> Clb ()
-logError = logFail . GenericFail
+logError s = do
+  logInfo $ printf " [ERROR]: %s" s
+  logFail $ GenericFail s
 
 -- | Add a non-error log enty.
 logInfo :: String -> Clb ()
@@ -255,11 +257,14 @@ sendTx (C.ShelleyTx _ tx) = do -- FIXME: use patterns, but not cardano-api:inter
 -- | Helper for building tests
 testNoErrorsTraceClb :: GYValue -> MockConfig -> String -> Clb a -> TestTree
 testNoErrorsTraceClb funds cfg msg act =
-  testCaseInfo msg $ do
-    maybe (pure mockLog) assertFailure errors
+  testCaseInfo msg
+    $ maybe (pure mockLog) assertFailure
+    $ pure mockLog
   where
-    (errors, mock) = runMock (act >> checkErrors) $ initMock cfg funds
+    -- _errors since we decided to store errors in the log as well.
+    (_errors, mock) = runMock (act >> checkErrors) $ initMock cfg funds
     mockLog = "\nBlockchain log :\n----------------\n" <> ppMockEvent (mockInfo mock)
+
 {- | Checks that script runs without errors and returns pretty printed failure
  if something bad happens.
 -}

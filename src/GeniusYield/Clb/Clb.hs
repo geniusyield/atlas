@@ -1,3 +1,6 @@
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE RankNTypes #-}
+
 module GeniusYield.Clb.Clb where
 
 import Cardano.Api qualified as C
@@ -18,7 +21,7 @@ import Cardano.Ledger.SafeHash qualified as L
 import Cardano.Ledger.Shelley.API qualified as L (LedgerState(..), UTxOState (utxosUtxo), StakeReference (..), Validated, applyTx)
 import Cardano.Ledger.TxIn qualified as L (TxId (..), TxIn (..), mkTxInPartial)
 import Cardano.Ledger.UTxO qualified as L (UTxO (..))
-import Control.Lens (over, (.~), (^.))
+import Control.Lens (over, (.~))
 import Control.Monad.State (State, MonadState (get), gets, runState, modify', put)
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Data.List
@@ -37,11 +40,13 @@ import GeniusYield.Types.TxOutRef (txOutRefToPlutus, txOutRefFromApi)
 import GeniusYield.Types.Value (GYValue, valueToApi)
 import PlutusLedgerApi.V1 qualified as P (Datum, DatumHash, TxOutRef, Credential)
 import PlutusLedgerApi.V1.Scripts qualified as P (ScriptError)
-import Prettyprinter ( Pretty(pretty), colon, (<+>), indent, vcat )
+import Prettyprinter (Pretty, pretty, colon, (<+>), indent, vcat, hang, vsep, fillSep, Doc, LayoutOptions (..), PageWidth (..), defaultLayoutOptions, layoutPretty )
 import Test.Cardano.Ledger.Core.KeyPair qualified as TL
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCaseInfo, assertFailure)
 import Cardano.Ledger.Pretty.Babbage ()
+import Data.Char (isSpace)
+import Prettyprinter.Render.String (renderString)
 --------------------------------------------------------------------------------
 -- Base emulator types
 --------------------------------------------------------------------------------
@@ -87,12 +92,38 @@ newtype Clb a = Clb (State ClbState a)
 -- FIXME: remove non-state parts like MockConfig and Log (?)
 data ClbState = ClbState
   { emulatedLedgerState :: !EmulatedLedgerState
-  , mockConfig :: !MockConfig
-  , mockDatums :: !(Map P.DatumHash P.Datum)
-  , mockInfo :: !(Log String)
-  , mockFails :: !(Log FailReason)
-  , mockCurrentSlot :: !Slot -- FIXME: sync up with emulatedLedgerState
+  , mockConfig          :: !MockConfig
+  , mockDatums          :: !(Map P.DatumHash P.Datum)
+  , mockInfo            :: !(Log LogEntry)
+  , mockFails           :: !(Log FailReason)
+  , mockCurrentSlot     :: !Slot -- FIXME: sync up with emulatedLedgerState
   }
+
+data LogEntry =
+  LogEntry
+    { leLevel :: !LogLevel
+    , leMsg   :: !String
+    }
+
+data LogLevel = Debug | Info | Warning | Error
+
+instance Pretty LogLevel where
+  pretty Debug   = "[DEBUG]"
+  pretty Info    = "[ INFO]"
+  pretty Warning = "[ WARN]"
+  pretty Error   = "[ERROR]"
+
+instance Pretty LogEntry where
+  pretty (LogEntry l msg) = pretty l <+> hang 1 msg'
+    where
+      ws = wordsIdent <$> lines msg
+      wsD = fmap pretty <$> ws
+      ls = fillSep <$> wsD
+      msg' = vsep ls
+
+-- | Like 'words' but keeps leading identation.
+wordsIdent :: String -> [String]
+wordsIdent s = takeWhile isSpace s : words s
 
 -- | Fail reasons.
 newtype FailReason
@@ -158,7 +189,12 @@ instance Semigroup (Log a) where
 instance Monoid (Log a) where
   mempty = Log Seq.empty
 
-ppMockEvent :: Log String -> String
+ppMockEvent' :: Log LogEntry -> Doc ann
+ppMockEvent' = vcat . fmap ppSlot . fromGroupLog
+  where
+    ppSlot (slot, events) = vcat [pretty slot <> colon, indent 2 (vcat $ pretty <$> events)]
+
+ppMockEvent :: Log LogEntry -> String
 ppMockEvent = show . vcat . fmap ppSlot . fromGroupLog
   where
     ppSlot (slot, events) = vcat [pretty slot <> colon, indent 2 (vcat $ pretty <$> events)]
@@ -186,15 +222,15 @@ instance Pretty Slot where
 
 -- | Log a generic (non-typed) error.
 logError :: String -> Clb ()
-logError s = do
-  logInfo $ printf " [ERROR]: %s" s
-  logFail $ GenericFail s
+logError msg = do
+  logInfo $ LogEntry Error msg
+  logFail $ GenericFail msg
 
 -- | Add a non-error log enty.
-logInfo :: String -> Clb ()
-logInfo msg = do
+logInfo :: LogEntry -> Clb ()
+logInfo le = do
   slot <- gets mockCurrentSlot
-  modify' $ \s -> s {mockInfo = appendLog slot msg (mockInfo s)}
+  modify' $ \s -> s {mockInfo = appendLog slot le (mockInfo s)}
 
 -- | Log failure.
 logFail :: FailReason -> Clb ()
@@ -259,11 +295,14 @@ testNoErrorsTraceClb :: GYValue -> MockConfig -> String -> Clb a -> TestTree
 testNoErrorsTraceClb funds cfg msg act =
   testCaseInfo msg
     $ maybe (pure mockLog) assertFailure
-    $ pure mockLog
+    $ mbErrors >>= \errors -> pure (mockLog <> "\n\nError :\n-------\n" <>  errors)
   where
     -- _errors since we decided to store errors in the log as well.
-    (_errors, mock) = runMock (act >> checkErrors) $ initMock cfg funds
-    mockLog = "\nBlockchain log :\n----------------\n" <> ppMockEvent (mockInfo mock)
+    (mbErrors, mock) = runMock (act >> checkErrors) $ initMock cfg funds
+    mockLog = "\nEmulator log :\n--------------\n" <> logString
+    options = defaultLayoutOptions { layoutPageWidth = AvailablePerLine 150 1.0}
+    logDoc = ppMockEvent' (mockInfo mock)
+    logString = renderString $ layoutPretty options logDoc
 
 {- | Checks that script runs without errors and returns pretty printed failure
  if something bad happens.

@@ -23,7 +23,7 @@ import GeniusYield.TxBuilder.Clb
       walletAddress,
       ownAddress,
       sendSkeleton, dumpUtxoState )
-import GeniusYield.TxBuilder (gyLogDebug', slotToBeginTime, utxosAtAddress, logMsg, GYTxSkeleton, addressToPubKeyHash', mustHaveOutput, mustBeSignedBy)
+import GeniusYield.TxBuilder (gyLogDebug', slotToBeginTime, utxosAtAddress, logMsg, GYTxSkeleton, addressToPubKeyHash', mustHaveOutput, mustBeSignedBy, gyLogInfo')
 
 -- | Our unit tests for placing bet operation
 placeBetTests :: TestTree
@@ -67,7 +67,7 @@ firstBetTrace dat bet expectedFees Wallets{w1} = do
 simpleTest :: GYTxMonadClb ()
 simpleTest = do
   addr <- ownAddress
-  gyLogDebug' "" $ "My own address is: " <> show addr
+  gyLogInfo' "" $ "My own address is: " <> show addr
   skeleton <- trivialTx addr
   gyLogDebug' "" $ printf "tx skeleton: %s" (show skeleton)
   dumpUtxoState

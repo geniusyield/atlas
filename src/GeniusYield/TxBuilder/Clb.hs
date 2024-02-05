@@ -60,7 +60,7 @@ import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
-import           GeniusYield.Clb.Clb (Clb, CardanoTx, logError, ClbState (..), txOutRefAt, txOutRefAtPaymentCred, logInfo, sendTx)
+import           GeniusYield.Clb.Clb (Clb, CardanoTx, logError, ClbState (..), txOutRefAt, txOutRefAtPaymentCred, logInfo, sendTx, LogEntry (LogEntry), LogLevel (..))
 import GeniusYield.Clb.MockConfig (MockConfig(..))
 import GeniusYield.TxBuilder.Run (Wallet (..), WalletName)
 import GeniusYield.Clb.TimeSlot (SlotConfig(..))
@@ -74,6 +74,7 @@ import Cardano.Ledger.Address (unCompactAddr, decompactAddr)
 import qualified Cardano.Ledger.Compactible as L
 import qualified Cardano.Api.Shelley as ApiS
 import Cardano.Ledger.Pretty (ppLedgerState)
+import Prettyprinter (pretty)
 
 
 -- | Gets a GYAddress of a testing wallet.
@@ -229,11 +230,14 @@ instance GYTxQueryMonad GYTxMonadClb where
             Nothing -> throwError $ GYConversionException $ GYInvalidSlot s
             Just s' -> return s'
 
-    logMsg ns s msg = liftClb $ case s of
-        GYDebug   -> logInfo  $ printf "%s [DEBUG]: %s" ns msg
-        GYInfo    -> logInfo  $ printf "%s [INFO]: %s"  ns msg
-        GYWarning -> logInfo  $ printf "%s [WARN]: %s"  ns msg
-        GYError   -> logInfo $ printf "%s [ERROR]: %s" ns msg
+    logMsg _ns s msg = do
+        -- let doc = lines msg
+        let doc = msg
+        liftClb $ logInfo $ case s of
+            GYDebug   -> LogEntry Debug doc
+            GYInfo    -> LogEntry Info doc
+            GYWarning -> LogEntry Warning doc
+            GYError   -> LogEntry Error doc
 
 instance GYTxMonad GYTxMonadClb where
 

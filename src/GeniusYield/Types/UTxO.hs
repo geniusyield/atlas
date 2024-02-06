@@ -10,6 +10,7 @@ module GeniusYield.Types.UTxO (
     GYUTxO (..),
     utxoFromApi,
     utxoFromApi',
+    utxoFromApi'',
     utxoToPlutus,
     utxoHasInlineDatum,
     utxoHasReferenceScript,
@@ -135,19 +136,27 @@ utxosToApi (GYUTxOs m) = Api.UTxO $ Map.foldlWithKey' f Map.empty m
     outDatumToApi (GYOutDatumInline d) = Api.TxOutDatumInline Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra $ datumToApi' d
 
 utxoFromApi :: Api.TxIn -> Api.TxOut Api.CtxTx Api.BabbageEra -> GYUTxO
-utxoFromApi txIn (Api.TxOut a v d s) = GYUTxO
-    { utxoRef       = txOutRefFromApi txIn
-    , utxoAddress   = addressFromApi' a
-    , utxoValue     = valueFromApiTxOutValue v
-    , utxoOutDatum  = f d
-    , utxoRefScript = someScriptFromReferenceApi s
-    }
+utxoFromApi = (fst .) . utxoFromApi''
+
+-- | Like `utxoFromApi` but also gives full datum of an output even if the output had it as hashed but corresponding tx included it's pre-image.
+utxoFromApi'' :: Api.TxIn -> Api.TxOut Api.CtxTx Api.BabbageEra -> (GYUTxO, Maybe GYDatum)
+utxoFromApi'' txIn (Api.TxOut a v d s) =
+  let (d', fullD) = f d in
+  ( GYUTxO
+      { utxoRef       = txOutRefFromApi txIn
+      , utxoAddress   = addressFromApi' a
+      , utxoValue     = valueFromApiTxOutValue v
+      , utxoOutDatum  = d'
+      , utxoRefScript = someScriptFromReferenceApi s
+      }
+  , fullD
+  )
   where
-    f :: Api.TxOutDatum Api.CtxTx Api.BabbageEra -> GYOutDatum
-    f Api.TxOutDatumNone          = GYOutDatumNone
-    f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
-    f (Api.TxOutDatumInTx _ sd)   = GYOutDatumHash . hashDatum $ datumFromApi' sd
-    f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' sd
+    f :: Api.TxOutDatum Api.CtxTx Api.BabbageEra -> (GYOutDatum, Maybe GYDatum)
+    f Api.TxOutDatumNone          = (GYOutDatumNone, Nothing)
+    f (Api.TxOutDatumHash _ hash) = (GYOutDatumHash $ datumHashFromApi hash, Nothing)
+    f (Api.TxOutDatumInTx _ sd)   = let sd' = datumFromApi' sd in (GYOutDatumHash . hashDatum $ sd', Just sd')
+    f (Api.TxOutDatumInline _ sd) = let sd' = datumFromApi' sd in (GYOutDatumInline sd', Just sd')
 
 utxoFromApi' :: Api.TxIn -> Api.TxOut Api.CtxUTxO era -> GYUTxO
 utxoFromApi' txIn (Api.TxOut a v d s) = GYUTxO

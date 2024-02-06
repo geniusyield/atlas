@@ -67,7 +67,7 @@ In JSON format, this essentially corresponds to:
 The constructor tags don't need to appear in the JSON.
 -}
 data GYCoreProviderInfo
-  = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text}
+  = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text, cpiMonitorMempool :: !(Maybe Bool)}
   | GYMaestro {cpiMaestroToken :: !(Confidential Text), cpiTurboSubmit :: !(Maybe Bool)}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock (Show)
@@ -154,10 +154,10 @@ withCfgProviders
     f =
     do
       (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed) <- case cfgCoreProvider of
-        GYNodeKupo path kupoUrl -> do
-          let info = nodeConnectInfo path cfgNetworkId
+        GYNodeKupo {..} -> do
+          let info = nodeConnectInfo cpiSocketPath cfgNetworkId
               era = networkIdToEra cfgNetworkId
-          kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
+          kEnv <- KupoApi.newKupoApiEnv $ Text.unpack cpiKupoUrl
           nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetSlotOfCurrentBlock info
           pure
             ( Node.nodeGetParameters era info

@@ -30,6 +30,7 @@ module GeniusYield.Types.TxBody (
     txBodyFee,
     txBodyFeeValue,
     txBodyUTxOs,
+    txBodyUTxOsWithDatums,
     txBodyTxIns,
     txBodyTxInsReference,
     txBodyTxId,
@@ -53,6 +54,7 @@ import qualified Data.ByteString.Char8        as BS8
 import qualified Data.Set                     as Set
 
 import           GeniusYield.Imports
+import           GeniusYield.Types.Datum      (GYDatum)
 import           GeniusYield.Types.Key        (GYSomeSigningKey (GYSomeSigningKey))
 import           GeniusYield.Types.Key.Class  (ToShelleyWitnessSigningKey,
                                                toShelleyWitnessSigningKey)
@@ -151,13 +153,17 @@ txBodyFeeValue = valueFromLovelace . txBodyFee
 
 -- | Return utxos created by tx (body).
 txBodyUTxOs :: GYTxBody -> GYUTxOs
-txBodyUTxOs (GYTxBody body@(Api.TxBody Api.TxBodyContent {txOuts})) =
-    utxosFromList $ zipWith f [0..] txOuts
+txBodyUTxOs = utxosFromList . fmap fst . txBodyUTxOsWithDatums
+
+-- | Return utxos with datums created by tx (body).
+txBodyUTxOsWithDatums :: GYTxBody -> [(GYUTxO, Maybe GYDatum)]
+txBodyUTxOsWithDatums (GYTxBody body@(Api.TxBody Api.TxBodyContent {txOuts})) =
+    zipWith f [0..] txOuts
   where
     txId = Api.getTxId body
 
-    f :: Word -> Api.TxOut Api.CtxTx Api.BabbageEra -> GYUTxO
-    f i = utxoFromApi (Api.TxIn txId (Api.TxIx i))
+    f :: Word -> Api.TxOut Api.CtxTx Api.BabbageEra -> (GYUTxO, Maybe GYDatum)
+    f i = utxoFromApi'' (Api.TxIn txId (Api.TxIx i))
 
 -- | Returns the 'GYTxOutRef' consumed by the tx.
 txBodyTxIns :: GYTxBody -> [GYTxOutRef]

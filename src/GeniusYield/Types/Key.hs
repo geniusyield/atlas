@@ -557,17 +557,18 @@ readSomeSigningKey file = do
         Left err   -> throwIO $ userError $ show err
         Right skey -> return skey
 
-data GYSomePaymentSigningKey = forall a. (ToShelleyWitnessSigningKey a, Show a) => GYSomePaymentSigningKey a
+data GYSomePaymentSigningKey = AGYPaymentSigningKey !GYPaymentSigningKey | AGYExtendedPaymentSigningKey !GYExtendedPaymentSigningKey
 
 readSomePaymentSigningKey :: FilePath -> IO GYSomePaymentSigningKey
 readSomePaymentSigningKey file = do
     e <- Api.readFileTextEnvelopeAnyOf
-        [ Api.FromSomeType (Api.AsSigningKey Api.AsPaymentKey)         $ GYSomePaymentSigningKey . paymentSigningKeyFromApi
-        , Api.FromSomeType (Api.AsSigningKey Api.AsPaymentExtendedKey) $ GYSomePaymentSigningKey . extendedPaymentSigningKeyFromApi
+        [ Api.FromSomeType (Api.AsSigningKey Api.AsPaymentKey)         $ AGYPaymentSigningKey . paymentSigningKeyFromApi
+        , Api.FromSomeType (Api.AsSigningKey Api.AsPaymentExtendedKey) $ AGYExtendedPaymentSigningKey . extendedPaymentSigningKeyFromApi
         ] (Api.File file)
     case e of
         Left err   -> throwIO $ userError $ show err
         Right skey -> return skey
 
 somePaymentSigningKeyToSomeSigningKey :: GYSomePaymentSigningKey -> GYSomeSigningKey
-somePaymentSigningKeyToSomeSigningKey (GYSomePaymentSigningKey key) = GYSomeSigningKey key
+somePaymentSigningKeyToSomeSigningKey (AGYPaymentSigningKey key) = GYSomeSigningKey key
+somePaymentSigningKeyToSomeSigningKey (AGYExtendedPaymentSigningKey key) = GYSomeSigningKey key

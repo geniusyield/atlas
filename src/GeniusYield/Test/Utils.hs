@@ -67,6 +67,7 @@ import qualified Test.Tasty.Runners         as Tasty
 -- import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 import GeniusYield.TxBuilder.Clb (GYTxMonadClb, asClb, asRandClb, liftClb)
+import GeniusYield.TxBuilder.Clb qualified as Clb
 import GeniusYield.Clb.Clb (testNoErrorsTraceClb, intToKeyPair, Clb)
 import GeniusYield.Clb.MockConfig (defaultBabbageClb)
 import qualified Cardano.Ledger.Api as L
@@ -422,7 +423,15 @@ utxosInBody :: GYTxQueryMonad m => Fork.Tx -> GYTxId -> m [Maybe GYUTxO]
 utxosInBody Fork.Tx{txOutputs = os} txId = mapM (\i -> utxoAtTxOutRef (txOutRefFromTuple (txId, fromInteger $ toInteger i))) [0 .. (length os - 1)]
 
 addRefScriptClb :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadClb (Maybe GYTxOutRef)
-addRefScriptClb = TODO
+addRefScriptClb addr script = do
+    let script' = validatorToScript script
+    -- (Tx _ txBody, txId) <- Clb.sendSkeleton' (mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just script' }) []
+    (_, txId) <- Clb.sendSkeleton' (mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just script' })
+    -- now need to find utxo at given address which has the given reference script hm...
+    -- let index = findIndex (\o -> Plutus2.txOutReferenceScript o == Just (scriptPlutusHash script')) (Fork.txOutputs txBody)
+    -- return $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< index
+    return $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< Just (0 :: Int)
+
 
 -- -- | Adds the given script to the given address and returns the reference for it.
 -- addRefScript :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadRun (Maybe GYTxOutRef)

@@ -154,7 +154,7 @@ initMock cfg@MockConfig{mockConfigProtocol = params@(BabbageParams pparams)} ini
     genesis =
       ( L.mkTxInPartial genesisTxId 0
       , L.TxOutCompact
-          (L.compactAddr $ mkAddr' $ intToKeyPair 0)
+          (L.compactAddr $ mkAddr' $ intToKeyPair 0) -- TODO: use wallet distribution
           (fromJust $ L.toCompact $ C.toMaryValue $ valueToApi initVal)
       )
 

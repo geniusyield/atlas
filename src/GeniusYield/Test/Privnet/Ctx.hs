@@ -38,18 +38,17 @@ module GeniusYield.Test.Privnet.Ctx (
     addRefInputCtx,
 ) where
 
-import qualified Cardano.Api                      as Api
-import           Data.Default                     (Default (..))
-import qualified Data.Map.Strict                  as Map
-import qualified Data.Set                         as Set
-import qualified GeniusYield.Examples.Limbo       as Limbo
+import qualified Cardano.Api                as Api
+import           Data.Default               (Default (..))
+import qualified Data.Map.Strict            as Map
+import qualified Data.Set                   as Set
+import qualified GeniusYield.Examples.Limbo as Limbo
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Node
 import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
-import           GeniusYield.Types.PaymentKeyHash (GYPaymentKeyHash)
-import           Test.Tasty.HUnit                 (assertFailure)
+import           Test.Tasty.HUnit           (assertFailure)
 
 data CreateUserConfig =
      CreateUserConfig

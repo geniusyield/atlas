@@ -26,6 +26,7 @@ import           Cardano.Api
 import           Cardano.Mnemonic              (MkSomeMnemonicError (..),
                                                 mkSomeMnemonic)
 import qualified Data.Text                     as T
+import           Data.Word                     (Word32)
 import           GeniusYield.Imports           ((&))
 import           GeniusYield.Types.Address     (GYAddress,
                                                 unsafeAddressFromText)
@@ -50,14 +51,14 @@ data WalletKeys = WalletKeys
 
 -- | Derives @WalletKeys@ from mnemonic with the given account index and payment address index, thus using derivation path @1852H/1815H/iH/2/0@ for stake key and derivation path @1852H/1815H/iH/0/p@ for payment key where @i@ denotes the account index and @p@ denotes the given payment address index.
 -- Fun fact, Ada Lovelace lived from 1815 to 1852.
-walletKeysFromMnemonicIndexed :: Mnemonic -> Integer -> Integer -> Either String WalletKeys
+walletKeysFromMnemonicIndexed :: Mnemonic -> Word32 -> Word32 -> Either String WalletKeys
 walletKeysFromMnemonicIndexed mns nAcctIndex nAddrIndex =
   case mkSomeMnemonic @'[9, 12, 15, 18, 21, 24] mns of
     Left err -> Left $ getMkSomeMnemonicError err
     Right mw ->
       let rootK = genMasterKeyFromMnemonic mw mempty :: S.Shelley 'RootK XPrv
-          accIx = indexFromWord32 $ minHardenedPathValue + fromInteger nAcctIndex
-          addrIx = indexFromWord32 $ fromInteger nAddrIndex
+          accIx = indexFromWord32 $ minHardenedPathValue + nAcctIndex
+          addrIx = indexFromWord32 nAddrIndex
 
       in deriveWalletKeys rootK accIx addrIx
 
@@ -83,7 +84,7 @@ walletKeysFromMnemonic :: Mnemonic -> Either String WalletKeys
 walletKeysFromMnemonic ms = walletKeysFromMnemonicIndexed ms 0 0
 
 -- | Derives @WalletKeys@ from mnemonic for the given account index, using derivation path `1852H/1815H/iH/2/0` for stake key and derivation path @1852H/1815H/iH/0/0@ for payment key where @i@ denotes account index.
-walletKeysFromMnemonicWithAccIndex :: Mnemonic -> Integer -> Either String WalletKeys
+walletKeysFromMnemonicWithAccIndex :: Mnemonic -> Word32 -> Either String WalletKeys
 walletKeysFromMnemonicWithAccIndex ms accIx = walletKeysFromMnemonicIndexed ms accIx 0
 
 walletKeysToExtendedPaymentSigningKey :: WalletKeys -> GYExtendedPaymentSigningKey

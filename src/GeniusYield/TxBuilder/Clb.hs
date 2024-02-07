@@ -16,10 +16,9 @@ module GeniusYield.TxBuilder.Clb
     , asClb
     , asRandClb
     , liftClb
-    , ownAddress
+    -- , ownAddress
     , sendSkeleton
     , sendSkeleton'
-    , sendSkeletonWithWallets
     , networkIdRun
     , dumpUtxoState
     ) where
@@ -60,7 +59,7 @@ import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
-import           GeniusYield.Clb.Clb (Clb, CardanoTx, logError, ClbState (..), txOutRefAt, txOutRefAtPaymentCred, logInfo, sendTx, LogEntry (LogEntry), LogLevel (..))
+import           GeniusYield.Clb.Clb (Clb, CardanoTx, logError, ClbState (..), txOutRefAt, txOutRefAtPaymentCred, logInfo, sendTx, LogEntry (LogEntry), LogLevel (..), ValidationResult (..), OnChainTx)
 import GeniusYield.Clb.MockConfig (MockConfig(..))
 import GeniusYield.TxBuilder.Run (Wallet (..), WalletName)
 import GeniusYield.Clb.TimeSlot (SlotConfig(..))
@@ -120,10 +119,10 @@ asClb :: StdGen
       -> Clb (Maybe a)
 asClb g w m = evalRandT (asRandClb w m) g
 
-ownAddress :: GYTxMonadClb GYAddress
-ownAddress = do
-    nid <- networkId
-    asks $ addressFromPubKeyHash nid . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
+-- ownAddress :: GYTxMonadClb GYAddress
+-- ownAddress = do
+--     nid <- networkId
+--     asks $ addressFromPubKeyHash nid . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
 
 liftClb :: Clb a -> GYTxMonadClb a
 liftClb = GYTxMonadClb . lift . lift . lift . lift
@@ -241,7 +240,9 @@ instance GYTxQueryMonad GYTxMonadClb where
 
 instance GYTxMonad GYTxMonadClb where
 
-    ownAddresses = singleton <$> ownAddress
+    ownAddresses = singleton <$> do
+        nid <- networkId
+        asks $ addressFromPubKeyHash nid . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
 
     availableUTxOs = do
         addrs <- ownAddresses
@@ -262,53 +263,36 @@ instance GYTxMonad GYTxMonadClb where
 
     randSeed = return 42
 
--- Send skeletons with multiple signatures from wallet
-sendSkeletonWithWallets :: GYTxSkeleton v -> [Wallet] -> GYTxMonadClb GYTxId
-sendSkeletonWithWallets skeleton ws = do
-    --  snd <$> sendSkeleton' skeleton ws
-    sendSkeleton' skeleton  []
-    pure "6c751d3e198c5608dfafdfdffe16aeac8a28f88f3a769cf22dd45e8bc84f47e8"
-
 sendSkeleton :: GYTxSkeleton v -> GYTxMonadClb GYTxId
-sendSkeleton skeleton = do
-    -- snd <$> sendSkeleton' skeleton  []
-    sendSkeleton' skeleton  []
-    pure "6c751d3e198c5608dfafdfdffe16aeac8a28f88f3a769cf22dd45e8bc84f47e8"
+sendSkeleton skeleton = snd <$> sendSkeleton' skeleton
 
-
-sendSkeleton' :: GYTxSkeleton v -> [Wallet]  -> GYTxMonadClb () -- (CardanoTx, GYTxId)
-sendSkeleton' skeleton ws = do
-    -- body
+sendSkeleton' :: GYTxSkeleton v -> GYTxMonadClb (OnChainTx, GYTxId)
+sendSkeleton' skeleton = do
+    -- Tx body
     body <- skeletonToTxBody skeleton
     dumpBody body
-    -- unused now
+
+    -- FIXME: not needed now?
     -- pp <- protocolParameters
     -- modify (updateWalletState w pp body)
     -- signature
     -- let sigs = walletSignatures (w:ws)
+
+    -- Sign tx
+    -- TODO: support multi-sigs
     Wallet{walletPaymentSigningKey} <- asks runEnvWallet
-    -- The whole tx
     let tx = signGYTxBody body [walletPaymentSigningKey]
-    gyLogDebug' "" $ "Tx encoded: " <> txToHex tx
+    gyLogDebug' "" $ "encodede tx: " <> txToHex tx
 
-    e <- liftClb $ do
-        sendTx $ txToApi tx
-
-    -- uSet <- utxoSet
-    -- liftClb $ logInfo $ show $ ppLedgerState uSet
-
-    pure ()
-    -- case e of
-    --     Left fr -> fail $ show fr
-    --     Right _ -> do
-    --       mtxs <- liftClb $ gets mockTxs
-    --       let tid = case viewr (unLog mtxs) of EmptyR -> error "Absurd (sendSkeleton'): Sequence can't be empty"; (_ :> a) -> txStatId $ snd a in
-    --         case txIdFromPlutus tid of
-    --           Left e'   -> fail $ printf "invalid tid %s, error: %s" (show tid) (show e')
-    --           Right tid' -> return (tx5, tid')
+    -- Submit
+    vRes <- liftClb $ sendTx $ txToApi tx
+    case vRes of
+        Success _state onChainTx -> pure (onChainTx, txBodyTxId body)
+        _ -> fail "Transaction failed"
 
   where
 
+    -- TODO: use Prettyprinter
     dumpBody :: GYTxBody -> GYTxMonadClb ()
     dumpBody body = do
         ins <- mapM utxoAtTxOutRef' $ txBodyTxIns body
@@ -337,22 +321,22 @@ sendSkeleton' skeleton ws = do
                              printf "   datum:      %s\n"   (show utxoOutDatum) <>
                              printf "   ref script: %s\n\n" (show utxoRefScript)
 
-skeletonToTxBody :: GYTxSkeleton v -> GYTxMonadClb GYTxBody
-skeletonToTxBody skeleton = do
-    ss <- systemStart
-    eh <- eraHistory
-    pp <- protocolParameters
-    ps <- stakePools
+    skeletonToTxBody :: GYTxSkeleton v -> GYTxMonadClb GYTxBody
+    skeletonToTxBody skeleton = do
+        ss <- systemStart
+        eh <- eraHistory
+        pp <- protocolParameters
+        ps <- stakePools
 
-    addr        <- ownAddress
-    e <- buildTxCore ss eh pp ps GYRandomImproveMultiAsset (const id) [addr] addr Nothing (return [Identity skeleton])
-    case e of
-        Left err  -> throwAppError err
-        Right res -> case res of
-            GYTxBuildSuccess (Identity body :| _) -> return body
-            GYTxBuildFailure v                    -> throwAppError $ InsufficientFundsErr v
-            GYTxBuildPartialSuccess _ _           -> error "impossible case"
-            GYTxBuildNoInputs                     -> error "impossible case"
+        addr        <- (!! 0) <$> ownAddresses -- FIXME
+        e <- buildTxCore ss eh pp ps GYRandomImproveMultiAsset (const id) [addr] addr Nothing (return [Identity skeleton])
+        case e of
+            Left err  -> throwAppError err
+            Right res -> case res of
+                GYTxBuildSuccess (Identity body :| _) -> return body
+                GYTxBuildFailure v                    -> throwAppError $ InsufficientFundsErr v
+                GYTxBuildPartialSuccess _ _           -> error "impossible case"
+                GYTxBuildNoInputs                     -> error "impossible case"
 
 slotConfig' :: GYTxMonadClb (UTCTime, NominalDiffTime)
 slotConfig' = liftClb $ do

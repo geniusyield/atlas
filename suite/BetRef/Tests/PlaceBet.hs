@@ -21,21 +21,21 @@ import GeniusYield.TxBuilder.Clb
     ( GYTxMonadClb,
       Wallet(walletName),
       walletAddress,
-      ownAddress,
       sendSkeleton, dumpUtxoState )
-import GeniusYield.TxBuilder (gyLogDebug', slotToBeginTime, utxosAtAddress, logMsg, GYTxSkeleton, addressToPubKeyHash', mustHaveOutput, mustBeSignedBy, gyLogInfo')
+import GeniusYield.TxBuilder (gyLogDebug', slotToBeginTime, utxosAtAddress, logMsg, GYTxSkeleton, addressToPubKeyHash', mustHaveOutput, mustBeSignedBy, gyLogInfo', GYTxMonad, ownAddresses)
 
 -- | Our unit tests for placing bet operation
 placeBetTests :: TestTree
 placeBetTests = testGroup "Place Bet"
-    [ testRunGYClb "Balance checks after placing first bet" $ firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000) 0_176_941
-    -- , testRun "Balance checks with multiple bets" $ multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
-    --   [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
-    --   , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
-    --   , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
-    --   , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
-    --   , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> fakeGold 1_000)
-    --   ]
+    [  testRunGYClb "Simple spending tx" $ simplSpendingTxTrace
+    -- ,  testRunGYClb "Balance checks after placing first bet" $ firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000) 0_176_941
+    --   , testRun "Balance checks with multiple bets" $ multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
+    --     [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
+    --     , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
+    --     , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
+    --     , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
+    --     , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> fakeGold 1_000)
+    --     ]
     -- , testRun "Not adding atleast bet step amount should fail" $ mustFail . multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
     --   [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
     --   , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
@@ -44,41 +44,25 @@ placeBetTests = testGroup "Place Bet"
     --   , (w4, OracleAnswerDatum 5, valueFromLovelace 55_000_000 <> fakeGold 1_000)]
     ]
 
--- | Trace for placing the first bet.
-firstBetTrace :: OracleAnswerDatum  -- ^ Guess
-              -> GYValue            -- ^ Bet
-              -> Integer            -- ^ Expected fees
-              -> Wallets -> GYTxMonadClb ()  -- Our continuation function
-              -- -> GYTxMonadClb ()  -- Our continuation function
-firstBetTrace dat bet expectedFees Wallets{w1} = do
+-- | Trace for a super-simple spending transaction.
+simplSpendingTxTrace :: Wallets -> GYTxMonadClb ()
+simplSpendingTxTrace Wallets{w1} = do
   gyLogDebug' "" "Hey there!"
   void $ runWalletGYClb w1 $ do
-    withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
-    -- withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace 100178393)] $ do
-      simpleTest
+    withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace 100178393)] $ do
+      skeleton <- mkTrivialTx
+      gyLogDebug' "" $ printf "tx skeleton: %s" (show skeleton)
+      dumpUtxoState
+      txId <- sendSkeleton skeleton
+      gyLogDebug' "" $ printf "tx submitted, txId: %s" txId
+      dumpUtxoState
 
-  -- First step: Get the required parameters for initializing our parameterized script and add the corresponding reference script
-  -- (brp, refScript) <- computeParamsAndAddRefScript 40 100 (valueFromLovelace 200_000_000) ws
-  -- void $ runWalletGYClb w1 $ do  -- following operations are ran by first wallet, `w1`
-  -- -- Second step: Perform the actual run.
-  --   withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
-  --     placeBetRun refScript brp dat bet Nothing
-
-simpleTest :: GYTxMonadClb ()
-simpleTest = do
-  addr <- ownAddress
-  gyLogInfo' "" $ "My own address is: " <> show addr
-  skeleton <- trivialTx addr
-  gyLogDebug' "" $ printf "tx skeleton: %s" (show skeleton)
-  dumpUtxoState
-  void $ sendSkeleton skeleton
-  dumpUtxoState
-
-trivialTx :: GYAddress -> GYTxMonadClb (GYTxSkeleton 'PlutusV2)
-trivialTx ownAddr = do
-  gyLogDebug' "" $ printf "ownAddr: %s" (show ownAddr)
-
-  pkh <- addressToPubKeyHash' ownAddr
+-- Pretend off-chain code written in 'GYTxMonad m'
+mkTrivialTx :: GYTxMonad m => m (GYTxSkeleton 'PlutusV2)
+mkTrivialTx = do
+  addr <- fmap (!! 0) ownAddresses -- FIXME:
+  gyLogDebug' "" $ printf "ownAddr: %s" (show addr)
+  pkh <- addressToPubKeyHash' addr
   let targetAddr = unsafeAddressFromText "addr_test1qr2vfntpz92f9pawk8gs0fdmhtfe32pqcx0s8fuztxaw3p5pjay24kygaj4g8uevf89ewxzvsdc60wln8spzm2al059q8a9w3x"
   -- let targetAddr = unsafeAddressFromText "addr1q82vfntpz92f9pawk8gs0fdmhtfe32pqcx0s8fuztxaw3p5pjay24kygaj4g8uevf89ewxzvsdc60wln8spzm2al059qytcwae"
   return $
@@ -90,6 +74,30 @@ trivialTx ownAddr = do
         , gyTxOutRefS    = Nothing
         })
       <> mustBeSignedBy pkh
+
+
+-- -- | Trace for placing the first bet.
+-- firstBetTrace :: OracleAnswerDatum  -- ^ Guess
+--               -> GYValue            -- ^ Bet
+--               -> Integer            -- ^ Expected fees
+--               -> Wallets -> GYTxMonadClb ()  -- Our continuation function
+--               -- -> GYTxMonadClb ()  -- Our continuation function
+-- firstBetTrace dat bet expectedFees Wallets{w1} = do
+--   gyLogDebug' "" "Hey there!"
+--   void $ runWalletGYClb w1 $ do
+--     withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
+--     -- withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace 100178393)] $ do
+--       simpleTest
+
+  -- First step: Get the required parameters for initializing our parameterized script and add the corresponding reference script
+  -- (brp, refScript) <- computeParamsAndAddRefScript 40 100 (valueFromLovelace 200_000_000) ws
+  -- void $ runWalletGYClb w1 $ do  -- following operations are ran by first wallet, `w1`
+  -- -- Second step: Perform the actual run.
+  --   withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
+  --     placeBetRun refScript brp dat bet Nothing
+
+
+
 
 
 -- | Function to compute the parameters for the contract and add the corresponding refernce script.
@@ -110,13 +118,13 @@ computeParamsAndAddRefScript betUntil' betReveal' betStep Wallets{..} = do
       Nothing        -> fail "Couldn't find index of the Reference Script in outputs"
       Just refScript -> return (brp, refScript)
 
--- | Run to call the `placeBet` operation.
-placeBetRun :: GYTxOutRef -> BetRefParams -> OracleAnswerDatum -> GYValue -> Maybe GYTxOutRef -> GYTxMonadClb GYTxId
-placeBetRun refScript brp guess bet mPreviousBetsUtxoRef = do
-  addr <- ownAddress
-  skeleton <- placeBet refScript brp guess bet addr mPreviousBetsUtxoRef
-  gyLogDebug' "" $ printf "tx skeleton: %s" (show skeleton)
-  sendSkeleton skeleton
+-- -- | Run to call the `placeBet` operation.
+-- placeBetRun :: GYTxMonad m => GYTxOutRef -> BetRefParams -> OracleAnswerDatum -> GYValue -> Maybe GYTxOutRef -> m GYTxId
+-- placeBetRun refScript brp guess bet mPreviousBetsUtxoRef = do
+--   addr <- (!! 0) <$> ownAddresses
+--   skeleton <- placeBet refScript brp guess bet addr mPreviousBetsUtxoRef
+--   gyLogDebug' "" $ printf "tx skeleton: %s" (show skeleton)
+--   sendSkeleton skeleton
 
 -- -- | Trace which allows for multiple bets.
 -- multipleBetsTraceWrapper

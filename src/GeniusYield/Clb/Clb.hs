@@ -55,7 +55,7 @@ import Prettyprinter.Render.String (renderString)
 data CardanoTx where
   CardanoTx :: C.IsCardanoEra era => C.Tx era -> C.EraInMode era C.CardanoMode -> CardanoTx
 
--- A validated Tx, but: might has IsValid = False
+-- A validated Tx, but: might has IsValid = False (in which case collaterals will be used)
 newtype OnChainTx = OnChainTx { getOnChainTx :: L.Validated (Core.Tx EmulatorEra) }
 
 -- | A reason why a transaction is invalid.

@@ -558,6 +558,7 @@ readSomeSigningKey file = do
         Right skey -> return skey
 
 data GYSomePaymentSigningKey = AGYPaymentSigningKey !GYPaymentSigningKey | AGYExtendedPaymentSigningKey !GYExtendedPaymentSigningKey
+  deriving stock (Eq, Show, Ord)
 
 readSomePaymentSigningKey :: FilePath -> IO GYSomePaymentSigningKey
 readSomePaymentSigningKey file = do

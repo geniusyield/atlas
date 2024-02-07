@@ -27,7 +27,6 @@ module GeniusYield.Types.Key
     , paymentSigningKeyFromLedgerKeyPair
     , readPaymentSigningKey
     , readExtendedPaymentSigningKey
-    , readSomeSigningKey
     , writePaymentSigningKey
     , writeExtendedPaymentSigningKey
     , paymentVerificationKey
@@ -51,6 +50,10 @@ module GeniusYield.Types.Key
     , stakeVerificationKey
     , generateStakeSigningKey
     , GYSomeSigningKey (..)
+    , readSomeSigningKey
+    , GYSomePaymentSigningKey (..)
+    , readSomePaymentSigningKey
+    , somePaymentSigningKeyToSomeSigningKey
 ) where
 
 import qualified Cardano.Api                      as Api
@@ -553,3 +556,18 @@ readSomeSigningKey file = do
     case e of
         Left err   -> throwIO $ userError $ show err
         Right skey -> return skey
+
+data GYSomePaymentSigningKey = forall a. (ToShelleyWitnessSigningKey a, Show a) => GYSomePaymentSigningKey a
+
+readSomePaymentSigningKey :: FilePath -> IO GYSomePaymentSigningKey
+readSomePaymentSigningKey file = do
+    e <- Api.readFileTextEnvelopeAnyOf
+        [ Api.FromSomeType (Api.AsSigningKey Api.AsPaymentKey)         $ GYSomePaymentSigningKey . paymentSigningKeyFromApi
+        , Api.FromSomeType (Api.AsSigningKey Api.AsPaymentExtendedKey) $ GYSomePaymentSigningKey . extendedPaymentSigningKeyFromApi
+        ] (Api.File file)
+    case e of
+        Left err   -> throwIO $ userError $ show err
+        Right skey -> return skey
+
+somePaymentSigningKeyToSomeSigningKey :: GYSomePaymentSigningKey -> GYSomeSigningKey
+somePaymentSigningKeyToSomeSigningKey (GYSomePaymentSigningKey key) = GYSomeSigningKey key

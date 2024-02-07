@@ -10,6 +10,8 @@ module GeniusYield.Types.Wallet
   ( WalletKeys
   , Mnemonic
   , walletKeysFromMnemonic
+  , walletKeysFromMnemonicWithAccIndex
+  , walletKeysFromMnemonicIndexed
   , walletKeysToExtendedPaymentSigningKey
   , walletKeysToExtendedStakeSigningKey
   , writeExtendedPaymentSigningKeyTextEnvelope
@@ -46,7 +48,8 @@ data WalletKeys = WalletKeys
   , wkStakeKey   :: !(S.Shelley 'DelegationK XPrv)  -- ^ The wallet's stake key.
   }
 
--- | Derives `WalletKeys` from mnemonic.
+-- | Derives @WalletKeys@ from mnemonic with the given account index and payment address index, thus using derivation path @1852H/1815H/iH/2/0@ for stake key and derivation path @1852H/1815H/iH/0/p@ for payment key where @i@ denotes the account index and @p@ denotes the given payment address index.
+-- Fun fact, Ada Lovelace lived from 1815 to 1852.
 walletKeysFromMnemonicIndexed :: Mnemonic -> Integer -> Integer -> Either String WalletKeys
 walletKeysFromMnemonicIndexed mns nAcctIndex nAddrIndex =
   case mkSomeMnemonic @'[9, 12, 15, 18, 21, 24] mns of
@@ -67,17 +70,21 @@ walletKeysFromMnemonicIndexed mns nAcctIndex nAddrIndex =
       deriveWalletKeys _ _ Nothing = Left $ "Invalid Address Index: " <> show nAddrIndex
       deriveWalletKeys rootK (Just accIx) (Just addIx) =
         let acctK = deriveAccountPrivateKey rootK accIx
-            addrK = deriveAddressPrivateKey acctK S.UTxOExternal addIx
+            paymentK = deriveAddressPrivateKey acctK S.UTxOExternal addIx
             stakeK = S.deriveDelegationPrivateKey acctK
 
-         in Right WalletKeys {wkRootKey = rootK, wkAcctKey = acctK, wkPaymentKey = addrK, wkStakeKey = stakeK}
+         in Right WalletKeys {wkRootKey = rootK, wkAcctKey = acctK, wkPaymentKey = paymentK, wkStakeKey = stakeK}
 
       -- value for '0H' index
       minHardenedPathValue = 0x80000000
 
--- | Derives @WalletKeys@ from mnemonic with first index, using derivation path `1852H/1815H/0H/2/0` for stake key and derivation path `1852H/1815H/0H/0/0` for payment key.
+-- | Derives @WalletKeys@ from mnemonic with first account index, using derivation path @1852H/1815H/0H/2/0@ for stake key and derivation path @1852H/1815H/0H/0/0@ for payment key.
 walletKeysFromMnemonic :: Mnemonic -> Either String WalletKeys
 walletKeysFromMnemonic ms = walletKeysFromMnemonicIndexed ms 0 0
+
+-- | Derives @WalletKeys@ from mnemonic for the given account index, using derivation path `1852H/1815H/iH/2/0` for stake key and derivation path @1852H/1815H/iH/0/0@ for payment key where @i@ denotes account index.
+walletKeysFromMnemonicWithAccIndex :: Mnemonic -> Integer -> Either String WalletKeys
+walletKeysFromMnemonicWithAccIndex ms accIx = walletKeysFromMnemonicIndexed ms accIx 0
 
 walletKeysToExtendedPaymentSigningKey :: WalletKeys -> GYExtendedPaymentSigningKey
 walletKeysToExtendedPaymentSigningKey WalletKeys{wkPaymentKey} = S.getKey wkPaymentKey & PaymentExtendedSigningKey & extendedPaymentSigningKeyFromApi

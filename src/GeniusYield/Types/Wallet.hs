@@ -50,7 +50,6 @@ data WalletKeys = WalletKeys
   }
 
 -- | Derives @WalletKeys@ from mnemonic with the given account index and payment address index, thus using derivation path @1852H/1815H/iH/2/0@ for stake key and derivation path @1852H/1815H/iH/0/p@ for payment key where @i@ denotes the account index and @p@ denotes the given payment address index.
--- Fun fact, Ada Lovelace lived from 1815 to 1852.
 walletKeysFromMnemonicIndexed :: Mnemonic -> Word32 -> Word32 -> Either String WalletKeys
 walletKeysFromMnemonicIndexed mns nAcctIndex nAddrIndex =
   case mkSomeMnemonic @'[9, 12, 15, 18, 21, 24] mns of

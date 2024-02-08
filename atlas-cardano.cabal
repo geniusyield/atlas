@@ -236,6 +236,7 @@ library
     , cardano-ledger-pretty
     , cardano-ledger-shelley
     , cardano-slotting
+    , cardano-strict-containers
     , cardano-wallet-primitive
     , ouroboros-consensus
     , ouroboros-consensus-cardano

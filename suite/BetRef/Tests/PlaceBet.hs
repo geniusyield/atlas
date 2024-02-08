@@ -107,10 +107,11 @@ firstBetTrace dat bet expectedFees ws@Wallets{w1} = do
 
   -- First step: Get the required parameters for initializing our parameterized script and add the corresponding reference script
   (brp, refScript) <- computeParamsAndAddRefScript 40 100 (valueFromLovelace 200_000_000) ws
-  void $ runWalletGYClb w1 $ do  -- following operations are ran by first wallet, `w1`
-    -- Second step: Perform the actual run.
-    withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
-      placeBetRun refScript brp dat bet Nothing
+  -- void $ runWalletGYClb w1 $ do  -- following operations are ran by first wallet, `w1`
+  --   -- Second step: Perform the actual run.
+  --   withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
+  --     placeBetRun refScript brp dat bet Nothing
+  pure ()
 
 -- | Function to compute the parameters for the contract and add the corresponding refernce script.
 computeParamsAndAddRefScript
@@ -134,6 +135,7 @@ computeParamsAndAddRefScript betUntil' betReveal' betStep Wallets{..} = do
     -- let store scripts in `w9`
     mORef <- addRefScriptClb (walletAddress w9) (betRefValidator' brp)
     dumpUtxoState
+    gyLogDebug' "" $ printf "reference script output: %s" (show mORef)
     case mORef of
       Nothing        -> fail "Couldn't find index of the Reference Script in outputs"
       Just refScript -> return (brp, refScript)

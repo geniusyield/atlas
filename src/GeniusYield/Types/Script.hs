@@ -125,6 +125,7 @@ module GeniusYield.Types.Script (
     someScriptToReferenceApi,
     someScriptFromReferenceApi,
     referenceScriptToApiPlutusScriptWitness,
+    apiHashToPlutus,
 
     -- ** File operations
     writeScript,

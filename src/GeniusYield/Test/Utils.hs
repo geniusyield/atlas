@@ -68,10 +68,18 @@ import qualified Test.Tasty.Runners         as Tasty
 import           GeniusYield.Types
 import GeniusYield.TxBuilder.Clb (GYTxMonadClb, asClb, asRandClb, liftClb)
 import GeniusYield.TxBuilder.Clb qualified as Clb
-import GeniusYield.Clb.Clb (testNoErrorsTraceClb, intToKeyPair, Clb)
+import GeniusYield.Clb.Clb (testNoErrorsTraceClb, intToKeyPair, Clb, OnChainTx (getOnChainTx))
 import GeniusYield.Clb.MockConfig (defaultBabbageClb)
 import qualified Cardano.Ledger.Api as L
 import qualified Test.Cardano.Ledger.Core.KeyPair as TL
+import Cardano.Ledger.Shelley.API (extractTx)
+import Cardano.Ledger.Babbage.Tx (AlonzoTx(body), BabbageTxBody (btbOutputs))
+import Cardano.Ledger.Babbage.TxBody (txOutScript)
+import qualified Data.Sequence.Strict as StrictSeq
+import qualified Cardano.Api                      as Api
+import qualified Cardano.Api.Shelley as Shelley
+import Cardano.Ledger.Binary (Sized(sizedValue))
+import GeniusYield.Clb.Era (EmulatorEra)
 
 -------------------------------------------------------------------------------
 -- tasty tools
@@ -425,12 +433,16 @@ utxosInBody Fork.Tx{txOutputs = os} txId = mapM (\i -> utxoAtTxOutRef (txOutRefF
 addRefScriptClb :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadClb (Maybe GYTxOutRef)
 addRefScriptClb addr script = do
     let script' = validatorToScript script
-    -- (Tx _ txBody, txId) <- Clb.sendSkeleton' (mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just script' }) []
-    (_, txId) <- Clb.sendSkeleton' (mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just script' })
-    -- now need to find utxo at given address which has the given reference script hm...
-    -- let index = findIndex (\o -> Plutus2.txOutReferenceScript o == Just (scriptPlutusHash script')) (Fork.txOutputs txBody)
-    -- return $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< index
-    return $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< Just (0 :: Int)
+    (tx, txId) <- Clb.sendSkeleton' (mustHaveOutput (mkGYTxOutNoDatum addr mempty) { gyTxOutRefS = Just script' })
+    let outputs =  btbOutputs $ body $  extractTx $ getOnChainTx tx
+
+    let index = StrictSeq.findIndexL
+            (\o ->
+                let lsh = fmap (apiHashToPlutus . Api.ScriptHash) $ L.hashScript <$> (txOutScript . sizedValue) o
+                in lsh == Just (scriptPlutusHash script')
+            )
+            outputs
+    return $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< index
 
 
 -- -- | Adds the given script to the given address and returns the reference for it.

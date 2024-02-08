@@ -29,7 +29,7 @@ placeBetTests :: TestTree
 placeBetTests = testGroup "Place Bet"
     [  testRunGYClb "Simple spending tx" $ simplSpendingTxTrace
     ,  testRunGYClb "Balance checks after placing first bet" $
-        firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000) 0_176_941
+        firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000) 0_173_069
     --   , testRun "Balance checks with multiple bets" $ multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
     --     [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
     --     , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
@@ -97,7 +97,6 @@ Level 3. The action (Off-chain code)
 -- First-bet trace example
 -- -----------------------------------------------------------------------------
 
-
 -- | Trace for placing the first bet.
 firstBetTrace :: OracleAnswerDatum  -- ^ Guess
               -> GYValue            -- ^ Bet
@@ -105,13 +104,14 @@ firstBetTrace :: OracleAnswerDatum  -- ^ Guess
               -> Wallets -> GYTxMonadClb ()  -- Our continuation function
 firstBetTrace dat bet expectedFees ws@Wallets{w1} = do
 
-  -- First step: Get the required parameters for initializing our parameterized script and add the corresponding reference script
+  -- First step: Get the required parameters for initializing our parameterized script,
+  -- claculate the script, and post it to the blockchain as a reference script.
   (brp, refScript) <- computeParamsAndAddRefScript 40 100 (valueFromLovelace 200_000_000) ws
-  -- void $ runWalletGYClb w1 $ do  -- following operations are ran by first wallet, `w1`
-  --   -- Second step: Perform the actual run.
-  --   withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
-  --     placeBetRun refScript brp dat bet Nothing
-  pure ()
+  void $ runWalletGYClb w1 $ do  -- following operations are ran by first wallet, `w1`
+    -- Second step: Perform the actual run.
+    withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
+      placeBetRun refScript brp dat bet Nothing
+  -- pure ()
 
 -- | Function to compute the parameters for the contract and add the corresponding refernce script.
 computeParamsAndAddRefScript
@@ -145,10 +145,10 @@ placeBetRun :: GYTxOutRef -> BetRefParams -> OracleAnswerDatum -> GYValue -> May
 placeBetRun refScript brp guess bet mPreviousBetsUtxoRef = do
   addr <- (!! 0) <$> ownAddresses
   skeleton <- placeBet refScript brp guess bet addr mPreviousBetsUtxoRef
-  gyLogDebug' "" $ printf "tx skeleton: %s" (show skeleton)
-  sendSkeleton skeleton
-
-
+  gyLogDebug' "" $ printf "place bet tx skeleton: %s" (show skeleton)
+  txId <- sendSkeleton skeleton
+  dumpUtxoState
+  pure txId
 
 -- -----------------------------------------------------------------------------
 -- Multiple bets example

@@ -624,8 +624,8 @@ mustMint :: GYMintScript v -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkelet
 mustMint _ _ _ 0  = mempty
 mustMint p r tn n = emptyGYTxSkeleton {gytxMint = Map.singleton p (Map.singleton tn n, r)}
 
-mustBeSignedBy :: GYPubKeyHash -> GYTxSkeleton v
-mustBeSignedBy pkh = emptyGYTxSkeleton {gytxSigs = Set.singleton pkh}
+mustBeSignedBy :: CanSignTx a => a -> GYTxSkeleton v
+mustBeSignedBy pkh = emptyGYTxSkeleton {gytxSigs = Set.singleton $ toPubKeyHash pkh}
 
 isInvalidBefore :: GYSlot -> GYTxSkeleton v
 isInvalidBefore s = emptyGYTxSkeleton {gytxInvalidBefore = Just s}

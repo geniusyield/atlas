@@ -8,7 +8,7 @@ Stability   : develop
 -}
 module GeniusYield.Types.Key.Class (
   ToShelleyWitnessSigningKey,
-  toShelleyWitnessSigningKey
+  toShelleyWitnessSigningKey,
 ) where
 
 import qualified Cardano.Api as Api

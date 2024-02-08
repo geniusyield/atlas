@@ -98,7 +98,7 @@ providersMashupTests configs =
     , testCase "Submitting a valid transaction" $ do
         skey <- readPaymentSigningKey "preprod-submit-test-wallet.skey"
         let nid = GYTestnetPreprod
-            senderAddress = addressFromPubKeyHash GYTestnetPreprod $ pubKeyHash $ paymentVerificationKey skey
+            senderAddress = addressFromPaymentKeyHash GYTestnetPreprod $ paymentKeyHash $ paymentVerificationKey skey
         forM_ configs $ \config -> withCfgProviders config mempty $ \provider@GYProviders {..} -> do
           delayBySecond
           senderUTxOs <- runGYTxQueryMonadNode nid provider $ utxosAtAddress senderAddress Nothing

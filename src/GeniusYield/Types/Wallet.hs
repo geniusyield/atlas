@@ -1,31 +1,63 @@
-module GeniusYield.Types.Wallet where
+{-|
+Module      : GeniusYield.Types.Wallet
+Copyright   : (c) 2023 GYELD GMBH
+License     : Apache 2.0
+Maintainer  : support@geniusyield.co
+Stability   : develop
+-}
 
+module GeniusYield.Types.Wallet
+  ( WalletKeys
+  , Mnemonic
+  , walletKeysFromMnemonic
+  , walletKeysFromMnemonicWithAccIndex
+  , walletKeysFromMnemonicIndexed
+  , walletKeysToExtendedPaymentSigningKey
+  , walletKeysToExtendedStakeSigningKey
+  , writeExtendedPaymentSigningKeyTextEnvelope
+  , writeStakeSigningKeyTextEnvelope
+  , walletKeysToAddress
+  ) where
+
+import           Cardano.Address               (bech32)
 import           Cardano.Address.Derivation
 import qualified Cardano.Address.Style.Shelley as S
 import           Cardano.Api
 import           Cardano.Mnemonic              (MkSomeMnemonicError (..),
                                                 mkSomeMnemonic)
 import qualified Data.Text                     as T
+import           Data.Word                     (Word32)
+import           GeniusYield.Imports           ((&))
+import           GeniusYield.Types.Address     (GYAddress,
+                                                unsafeAddressFromText)
+import           GeniusYield.Types.Key         (GYExtendedPaymentSigningKey,
+                                                GYExtendedStakeSigningKey,
+                                                extendedPaymentSigningKeyFromApi,
+                                                extendedStakeSigningKeyFromApi,
+                                                writeExtendedPaymentSigningKey,
+                                                writeExtendedStakeSigningKey)
+import           GeniusYield.Types.NetworkId   (GYNetworkId (..))
+import           GHC.IO                        (throwIO)
 
 type Mnemonic = [T.Text]
 
+-- | Opaque type to represent keys of wallet.
 data WalletKeys = WalletKeys
-  { wkRootKey    :: !XPrv     -- ^ The wallet root Key
-  , wkAcctKey    :: !XPrv     -- ^ The wallet Account Key
-  , wkPaymentKey :: !XPrv     -- ^ The Wallet payment Key
-  , wkStakeKey   :: !XPrv     -- ^ The Wallet Stake Key
+  { wkRootKey    :: !(S.Shelley 'RootK XPrv)        -- ^ The wallet's root key, aka _master key_.
+  , wkAcctKey    :: !(S.Shelley 'AccountK XPrv)     -- ^ The wallet's account key.
+  , wkPaymentKey :: !(S.Shelley 'PaymentK XPrv)     -- ^ The wallet's payment key.
+  , wkStakeKey   :: !(S.Shelley 'DelegationK XPrv)  -- ^ The wallet's stake key.
   }
 
--- | derives Wallet keys from mnemonic words
---
-walletKeysFromMnemonicIndexed :: Mnemonic -> Integer -> Integer -> Either String WalletKeys
+-- | Derives @WalletKeys@ from mnemonic with the given account index and payment address index, thus using derivation path @1852H/1815H/iH/2/0@ for stake key and derivation path @1852H/1815H/iH/0/p@ for payment key where @i@ denotes the account index and @p@ denotes the given payment address index.
+walletKeysFromMnemonicIndexed :: Mnemonic -> Word32 -> Word32 -> Either String WalletKeys
 walletKeysFromMnemonicIndexed mns nAcctIndex nAddrIndex =
   case mkSomeMnemonic @'[9, 12, 15, 18, 21, 24] mns of
     Left err -> Left $ getMkSomeMnemonicError err
     Right mw ->
       let rootK = genMasterKeyFromMnemonic mw mempty :: S.Shelley 'RootK XPrv
-          accIx = indexFromWord32 $ minHardenedPathValue + fromInteger nAcctIndex
-          addrIx = indexFromWord32 $ fromInteger nAddrIndex
+          accIx = indexFromWord32 $ minHardenedPathValue + nAcctIndex
+          addrIx = indexFromWord32 nAddrIndex
 
       in deriveWalletKeys rootK accIx addrIx
 
@@ -38,37 +70,54 @@ walletKeysFromMnemonicIndexed mns nAcctIndex nAddrIndex =
       deriveWalletKeys _ _ Nothing = Left $ "Invalid Address Index: " <> show nAddrIndex
       deriveWalletKeys rootK (Just accIx) (Just addIx) =
         let acctK = deriveAccountPrivateKey rootK accIx
-            addrK = deriveAddressPrivateKey acctK S.UTxOExternal addIx
+            paymentK = deriveAddressPrivateKey acctK S.UTxOExternal addIx
             stakeK = S.deriveDelegationPrivateKey acctK
 
-         in Right WalletKeys {wkRootKey = S.getKey rootK, wkAcctKey = S.getKey acctK, wkPaymentKey = S.getKey addrK, wkStakeKey = S.getKey stakeK}
+         in Right WalletKeys {wkRootKey = rootK, wkAcctKey = acctK, wkPaymentKey = paymentK, wkStakeKey = stakeK}
 
       -- value for '0H' index
       minHardenedPathValue = 0x80000000
 
--- | gives wallet keys with fist index
---   with derivation path  `1852H/1815H/0H/2/0` for Stake Key
---   with derivation path  `1852H/1815H/0H/0/0` for Payment Key
---
+-- | Derives @WalletKeys@ from mnemonic with first account index, using derivation path @1852H/1815H/0H/2/0@ for stake key and derivation path @1852H/1815H/0H/0/0@ for payment key.
 walletKeysFromMnemonic :: Mnemonic -> Either String WalletKeys
 walletKeysFromMnemonic ms = walletKeysFromMnemonicIndexed ms 0 0
 
--- | writes TextEnvelope with type `PaymentExtendedSigningKeyShelley_ed25519_bip32` from mnemonic
---
+-- | Derives @WalletKeys@ from mnemonic for the given account index, using derivation path `1852H/1815H/iH/2/0` for stake key and derivation path @1852H/1815H/iH/0/0@ for payment key where @i@ denotes account index.
+walletKeysFromMnemonicWithAccIndex :: Mnemonic -> Word32 -> Either String WalletKeys
+walletKeysFromMnemonicWithAccIndex ms accIx = walletKeysFromMnemonicIndexed ms accIx 0
+
+walletKeysToExtendedPaymentSigningKey :: WalletKeys -> GYExtendedPaymentSigningKey
+walletKeysToExtendedPaymentSigningKey WalletKeys{wkPaymentKey} = S.getKey wkPaymentKey & PaymentExtendedSigningKey & extendedPaymentSigningKeyFromApi
+
+walletKeysToExtendedStakeSigningKey :: WalletKeys -> GYExtendedStakeSigningKey
+walletKeysToExtendedStakeSigningKey WalletKeys{wkStakeKey} = S.getKey wkStakeKey & StakeExtendedSigningKey & extendedStakeSigningKeyFromApi
+
+{-# DEPRECATED writeExtendedPaymentSigningKeyTextEnvelope "Use combination of walletKeysFromMnemonic, walletKeysToExtendedPaymentSigningKey and writeExtendedPaymentSigningKey." #-}
+-- | Writes @TextEnvelope@ with type @PaymentExtendedSigningKeyShelley_ed25519_bip32@ from mnemonic.
 writeExtendedPaymentSigningKeyTextEnvelope :: Mnemonic -> FilePath -> IO ()
 writeExtendedPaymentSigningKeyTextEnvelope mnemonic fPath = do
   case walletKeysFromMnemonic mnemonic of
-    Left err -> error err
-    Right WalletKeys{wkPaymentKey} -> do
-      e <- writeFileTextEnvelope (File fPath) Nothing $ PaymentExtendedSigningKey wkPaymentKey
-      either (error . show) pure e
+    Left err -> throwIO $ userError err
+    Right wk -> walletKeysToExtendedPaymentSigningKey wk & writeExtendedPaymentSigningKey fPath
 
--- | writes TextEnvelope with type `StakeExtendedSigningKeyShelley_ed25519_bip32` from mnemonic
---
+{-# DEPRECATED writeStakeSigningKeyTextEnvelope "Use combination of walletKeysFromMnemonic, walletKeysToExtendedStakeSigningKey and writeExtendedStakeSigningKey." #-}
+-- | Writes @TextEnvelope@ with type @StakeExtendedSigningKeyShelley_ed25519_bip32@ from mnemonic.
 writeStakeSigningKeyTextEnvelope :: Mnemonic -> FilePath -> IO ()
 writeStakeSigningKeyTextEnvelope mnemonic fPath = do
   case walletKeysFromMnemonic mnemonic of
-    Left err -> error err
-    Right WalletKeys{wkStakeKey} -> do
-      e <- writeFileTextEnvelope (File fPath) Nothing $ StakeExtendedSigningKey wkStakeKey
-      either (error . show) pure e
+    Left err -> throwIO $ userError err
+    Right wk -> walletKeysToExtendedStakeSigningKey wk & writeExtendedStakeSigningKey fPath
+
+-- | Gives the delegation address made using extended payment and stake keys.
+walletKeysToAddress :: WalletKeys -> GYNetworkId -> GYAddress
+walletKeysToAddress WalletKeys{wkPaymentKey, wkStakeKey} netId =
+  let paymentCredential = S.PaymentFromExtendedKey $ toXPub <$> wkPaymentKey
+      delegationCredential = S.DelegationFromExtendedKey $ toXPub <$> wkStakeKey
+  in S.delegationAddress netId' paymentCredential delegationCredential & bech32 & unsafeAddressFromText
+  where
+    netId' = case netId of
+      GYMainnet        -> S.shelleyMainnet
+      GYTestnetPreprod -> S.shelleyTestnet
+      GYTestnetPreview -> S.shelleyTestnet
+      GYTestnetLegacy  -> S.shelleyTestnet
+      GYPrivnet        -> S.shelleyTestnet

@@ -82,7 +82,7 @@ makeSetup' privnetPath kupoUrl = do
     userFskey <- readPaymentSigningKey $ pathUserSKey $ pathUserF paths
     debug $ printf "userFskey = %s\n" (show userFskey)
     debug $ printf "userFvkey = %s\n" (show $ paymentVerificationKey userFskey)
-    debug $ printf "userFpkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey userFskey)
+    debug $ printf "userFpkh  = %s\n" (show $ paymentKeyHash $ paymentVerificationKey userFskey)
 
     -- Generate user 2 .. 9
     userSkeyAddr <- forM (pathUsers paths) generateUser
@@ -93,7 +93,7 @@ makeSetup' privnetPath kupoUrl = do
         debug $ printf "user addr = %s\n" userIaddr
         debug $ printf "user skey = %s\n" (show userIskey)
         debug $ printf "user vkey = %s\n" (show $ paymentVerificationKey userIskey)
-        debug $ printf "user pkh  = %s\n" (show $ pubKeyHash $ paymentVerificationKey userIskey)
+        debug $ printf "user pkh  = %s\n" (show $ paymentKeyHash $ paymentVerificationKey userIskey)
       ) userSkeyAddr
 
     -- Further down we need local node connection
@@ -123,19 +123,20 @@ makeSetup' privnetPath kupoUrl = do
         localGetParams = nodeGetParameters era info
 
     -- context used for tests
-    let ctx0 :: Ctx
+    let user' = flip User Nothing
+        ctx0 :: Ctx
         ctx0 = Ctx
             { ctxEra              = era
             , ctxInfo             = info
-            , ctxUserF            = User userFskey userFaddr
-            , ctxUser2            = uncurry User (V.index userSkeyAddr (Proxy @0))
-            , ctxUser3            = uncurry User (V.index userSkeyAddr (Proxy @1))
-            , ctxUser4            = uncurry User (V.index userSkeyAddr (Proxy @2))
-            , ctxUser5            = uncurry User (V.index userSkeyAddr (Proxy @3))
-            , ctxUser6            = uncurry User (V.index userSkeyAddr (Proxy @4))
-            , ctxUser7            = uncurry User (V.index userSkeyAddr (Proxy @5))
-            , ctxUser8            = uncurry User (V.index userSkeyAddr (Proxy @6))
-            , ctxUser9            = uncurry User (V.index userSkeyAddr (Proxy @7))
+            , ctxUserF            = User userFskey Nothing userFaddr
+            , ctxUser2            = uncurry user' (V.index userSkeyAddr (Proxy @0))
+            , ctxUser3            = uncurry user' (V.index userSkeyAddr (Proxy @1))
+            , ctxUser4            = uncurry user' (V.index userSkeyAddr (Proxy @2))
+            , ctxUser5            = uncurry user' (V.index userSkeyAddr (Proxy @3))
+            , ctxUser6            = uncurry user' (V.index userSkeyAddr (Proxy @4))
+            , ctxUser7            = uncurry user' (V.index userSkeyAddr (Proxy @5))
+            , ctxUser8            = uncurry user' (V.index userSkeyAddr (Proxy @6))
+            , ctxUser9            = uncurry user' (V.index userSkeyAddr (Proxy @7))
             , ctxGold             = GYLovelace -- temporarily
             , ctxIron             = GYLovelace -- temporarily
             , ctxLog              = noLogging

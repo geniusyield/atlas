@@ -1,26 +1,27 @@
 module GeniusYield.Types.TxMetadata (
   GYTxMetadata (..),
-  metadataFromApi
+  metadataFromApi,
+  metadataMsg
 ) where
 
 import qualified Cardano.Api as Api
 import qualified Data.Map as Map
--- import           Data.Word (Word64)
+import           Data.Text (Text)
 
 
 newtype GYTxMetadata = GYTxMetadata (Api.TxMetadataInEra Api.BabbageEra)
   deriving Show
 
-metadataFromApi :: Api.TxMetadata -> Maybe GYTxMetadata
-metadataFromApi md
-  | Map.null kvMap = Nothing
-  | otherwise      = Just . GYTxMetadata . Api.TxMetadataInEra Api.TxMetadataInBabbageEra $ md
-  where
-    Api.TxMetadata kvMap = md
+metadataFromApi :: Api.TxMetadata -> GYTxMetadata
+metadataFromApi md@(Api.TxMetadata kvm)
+  | Map.null kvm = GYTxMetadata Api.TxMetadataNone
+  | otherwise    = GYTxMetadata . Api.TxMetadataInEra Api.TxMetadataInBabbageEra $ md
+
+metadataMsg :: Text -> GYTxMetadata
+metadataMsg msg = metadataFromApi . Api.makeTransactionMetadata $
+                  Map.fromList [(674, Api.TxMetaMap [(Api.TxMetaText "msg", Api.TxMetaList [Api.TxMetaText msg])])]
+
 
 -- TODO  other direction :  metadataToApi  (coerce)
-
-
--- TODO GY version of Api.TxMetadtaValue
 
 -- Keep Maybe in skeleton

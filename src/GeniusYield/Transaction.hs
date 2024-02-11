@@ -84,7 +84,6 @@ import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Transaction.CoinSelection
 import           GeniusYield.Transaction.Common
 import           GeniusYield.Types
--- import           GeniusYield.Types.TxMetadata (GYTxMetadata(GYTxMetadata))
 
 -- | A container for various network parameters, and user wallet information, used by balancer.
 data GYBuildTxEnv = GYBuildTxEnv
@@ -397,9 +396,6 @@ finalizeGYBalancedTx
 
     txMetadata :: Api.TxMetadataInEra Api.BabbageEra
     txMetadata = maybe Api.TxMetadataNone coerce mbTxMetadata
-    -- txMetadata = maybe Api.TxMetadataNone coerce' mbTxMetadata
-    --   where
-    --     coerce' (GYTxMetadata md) = md
 
     body :: Api.TxBodyContent Api.BuildTx Api.BabbageEra
     body = Api.TxBodyContent
@@ -411,7 +407,7 @@ finalizeGYBalancedTx
         dummyRetCol
         fee
         (lb', ub')
-        txMetadata   -- was 'Api.TxMetadataNone'
+        txMetadata
         Api.TxAuxScriptsNone
         extra
         (Api.BuildTxWith $ Just $ Api.S.unbundleProtocolParams pp)

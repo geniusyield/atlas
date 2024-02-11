@@ -23,6 +23,7 @@ module GeniusYield.Test.Utils
     , runWalletGYClb
     -- , walletAddress
     , walletPubKeyHash
+    , balanceClb
     , balance
     , withBalance
     , withWalletBalancesCheck
@@ -190,7 +191,7 @@ testRunGY name action = do
 testRunGYClb :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
 -- testRunGYClb :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
 testRunGYClb name action =
-    testNoErrorsTraceClb v defaultBabbageClb name $ do
+    testNoErrorsTraceClb v w defaultBabbageClb name $ do
       asClb pureGen TODO $ action wallets
 
   where
@@ -198,20 +199,20 @@ testRunGYClb name action =
         fakeGold                  1_000_000_000 <>
         fakeIron                  1_000_000_000
 
-    -- w = valueFromLovelace 1_000_000_000_000 <>
-    --     fakeGold                  1_000_000 <>
-    --     fakeIron                  1_000_000
+    w = valueFromLovelace 1_000_000_000_000 <>
+        fakeGold                  1_000_000 <>
+        fakeIron                  1_000_000
 
     wallets :: Wallets
-    wallets = Wallets (mkSimpleWallet "w1" (intToKeyPair 0))
-                      (mkSimpleWallet "w2" (intToKeyPair 0))
-                      (mkSimpleWallet "w3" (intToKeyPair 0))
-                      (mkSimpleWallet "w4" (intToKeyPair 0))
-                      (mkSimpleWallet "w5" (intToKeyPair 0))
-                      (mkSimpleWallet "w6" (intToKeyPair 0))
-                      (mkSimpleWallet "w7" (intToKeyPair 0))
-                      (mkSimpleWallet "w8" (intToKeyPair 0))
-                      (mkSimpleWallet "w9" (intToKeyPair 0))
+    wallets = Wallets (mkSimpleWallet "w1" (intToKeyPair 1))
+                      (mkSimpleWallet "w2" (intToKeyPair 2))
+                      (mkSimpleWallet "w3" (intToKeyPair 3))
+                      (mkSimpleWallet "w4" (intToKeyPair 4))
+                      (mkSimpleWallet "w5" (intToKeyPair 5))
+                      (mkSimpleWallet "w6" (intToKeyPair 6))
+                      (mkSimpleWallet "w7" (intToKeyPair 7))
+                      (mkSimpleWallet "w8" (intToKeyPair 8))
+                      (mkSimpleWallet "w9" (intToKeyPair 9))
 
 mkSimpleWallet :: WalletName -> TL.KeyPair r L.StandardCrypto -> Wallet
 mkSimpleWallet n kp =

@@ -3,6 +3,7 @@
 
 module GeniusYield.Clb.Clb where
 
+import Debug.Trace (trace)
 import Cardano.Api qualified as C
 import Cardano.Api.Shelley qualified as C
 import Cardano.Binary qualified as CBOR
@@ -47,6 +48,11 @@ import Test.Tasty.HUnit (testCaseInfo, assertFailure)
 import Cardano.Ledger.Pretty.Babbage ()
 import Data.Char (isSpace)
 import Prettyprinter.Render.String (renderString)
+import Cardano.Api.TxBody qualified as Api
+import qualified Cardano.Api.TxBody as C
+import qualified Cardano.Api.ScriptData as C
+import qualified Plutus.Model.V1 as P
+import qualified PlutusLedgerApi.V1 as PV1
 --------------------------------------------------------------------------------
 -- Base emulator types
 --------------------------------------------------------------------------------
@@ -135,9 +141,9 @@ runMock :: Clb a -> ClbState -> (a, ClbState)
 runMock (Clb act) = runState act
 
 -- | Init emulator state.
-initMock :: MockConfig -> GYValue -> ClbState
-initMock MockConfig{mockConfigProtocol = (AlonzoParams _)} _ = error "Unsupported params"
-initMock cfg@MockConfig{mockConfigProtocol = params@(BabbageParams pparams)} initVal =
+initMock :: MockConfig -> GYValue -> GYValue -> ClbState
+initMock MockConfig{mockConfigProtocol = (AlonzoParams _)} _ _ = error "Unsupported params"
+initMock cfg@MockConfig{mockConfigProtocol = params@(BabbageParams pparams)} initVal walletFunds=
   ClbState
     { emulatedLedgerState = setUtxo pparams utxos (initialState params)
     , mockDatums = M.empty
@@ -148,15 +154,24 @@ initMock cfg@MockConfig{mockConfigProtocol = params@(BabbageParams pparams)} ini
     }
   where
 
-    utxos = L.UTxO $ M.fromList [genesis]
+    utxos = L.UTxO $ M.fromList $ mkGenesis walletFunds <$> [1..9]
 
-    genesis :: (L.TxIn (Core.EraCrypto EmulatorEra), Core.TxOut EmulatorEra)
-    genesis =
-      ( L.mkTxInPartial genesisTxId 0
+    -- genesis :: (L.TxIn (Core.EraCrypto EmulatorEra), Core.TxOut EmulatorEra)
+    -- genesis =
+    --   ( L.mkTxInPartial genesisTxId 0
+    --   , L.TxOutCompact
+    --       (L.compactAddr $ mkAddr' $ intToKeyPair 0) -- TODO: use wallet distribution
+    --       (fromJust $ L.toCompact $ C.toMaryValue $ valueToApi initVal)
+    --   )
+
+    mkGenesis :: GYValue -> Integer -> (L.TxIn (Core.EraCrypto EmulatorEra), Core.TxOut EmulatorEra)
+    mkGenesis walletFund wallet =
+      ( L.mkTxInPartial genesisTxId wallet
       , L.TxOutCompact
-          (L.compactAddr $ mkAddr' $ intToKeyPair 0) -- TODO: use wallet distribution
-          (fromJust $ L.toCompact $ C.toMaryValue $ valueToApi initVal)
+          (L.compactAddr $ mkAddr' $ intToKeyPair wallet)
+          (fromJust $ L.toCompact $ C.toMaryValue $ valueToApi walletFund)
       )
+
 
     mkAddr' payKey = L.Addr L.Testnet (TL.mkCred payKey) L.StakeRefNull
 
@@ -269,8 +284,11 @@ txOutRefAtPaymentCredState :: P.Credential -> ClbState -> [P.TxOutRef]
 txOutRefAtPaymentCredState _cred _st = TODO
 
 sendTx :: C.Tx C.BabbageEra -> Clb ValidationResult
-sendTx (C.ShelleyTx _ tx) = do -- FIXME: use patterns, but not cardano-api:internal!
-  state@ClbState{mockConfig=MockConfig{mockConfigProtocol, mockConfigSlotConfig}} <- get
+sendTx apiTx@(C.ShelleyTx _ tx) = do -- FIXME: use patterns, but not cardano-api:internal!
+  state@ClbState
+    { mockConfig = MockConfig{mockConfigProtocol, mockConfigSlotConfig}
+    , mockDatums = mockDatums
+    } <- get
   -- FIXME: fromJust
   let majorVer = fromJust $ runIdentity
         $ runMaybeT @Identity $ L.mkVersion $ fst $ C.protocolParamProtocolVersion
@@ -281,24 +299,52 @@ sendTx (C.ShelleyTx _ tx) = do -- FIXME: use patterns, but not cardano-api:inter
         (emulatedLedgerState state)
         tx
   case ret of
-    Success newState _ -> put $ state { emulatedLedgerState = newState }
-    FailPhase1 _ err -> error $ "Ahhh" <> show err
-    FailPhase2 _ err _ -> error $ "Ahhh" <> show err
+    Success newState _ -> do
+      let txDatums = scriptDataFromCardanoTxBody $ C.getTxBody apiTx
+      put $ state
+        { emulatedLedgerState = newState
+        , mockDatums = M.union mockDatums txDatums
+        }
+    FailPhase1 {} -> pure ()
+    FailPhase2 {} -> pure ()
   pure ret
+
+-- | Given a 'C.TxBody from a 'C.Tx era', return the datums and redeemers along
+-- with their hashes.
+scriptDataFromCardanoTxBody
+  :: C.TxBody era
+  -- -> (Map P.DatumHash P.Datum, PV1.Redeemers)
+  -> Map P.DatumHash P.Datum
+scriptDataFromCardanoTxBody C.ByronTxBody {} = mempty
+scriptDataFromCardanoTxBody (C.ShelleyTxBody _ _ _ C.TxBodyNoScriptData _ _) = mempty
+scriptDataFromCardanoTxBody
+  (C.ShelleyTxBody _ _ _ (C.TxBodyScriptData _ (L.TxDats' dats) _) _ _) =
+
+  let datums = M.fromList
+                 ((\d -> (P.datumHash d, d))
+                   . PV1.Datum
+                   . fromCardanoScriptData
+                   . C.getScriptData
+                   . C.fromAlonzoData
+                     <$> M.elems dats)
+   in datums
+
+fromCardanoScriptData :: C.ScriptData -> PV1.BuiltinData
+fromCardanoScriptData = PV1.dataToBuiltinData . C.toPlutusData
 
 --------------------------------------------------------------------------------
 -- Helpers for working with tests
 --------------------------------------------------------------------------------
 
 -- | Helper for building tests
-testNoErrorsTraceClb :: GYValue -> MockConfig -> String -> Clb a -> TestTree
-testNoErrorsTraceClb funds cfg msg act =
+testNoErrorsTraceClb :: GYValue -> GYValue -> MockConfig -> String -> Clb a -> TestTree
+testNoErrorsTraceClb funds walletFunds cfg msg act =
   testCaseInfo msg
     $ maybe (pure mockLog) assertFailure
     $ mbErrors >>= \errors -> pure (mockLog <> "\n\nError :\n-------\n" <>  errors)
   where
     -- _errors since we decided to store errors in the log as well.
-    (mbErrors, mock) = runMock (act >> checkErrors) $ initMock cfg funds
+    (mbErrors, mock) = runMock (act >> checkErrors) $ initMock cfg funds walletFunds
     mockLog = "\nEmulator log :\n--------------\n" <> logString
     options = defaultLayoutOptions { layoutPageWidth = AvailablePerLine 150 1.0}
     logDoc = ppMockEvent' (mockInfo mock)

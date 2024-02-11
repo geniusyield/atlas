@@ -68,13 +68,19 @@ import Cardano.Ledger.Shelley.API (LedgerState(..), UTxOState (utxosUtxo), Stake
 import GeniusYield.Clb.ClbLedgerState (EmulatedLedgerState (..), initialState, setUtxo, memPoolState)
 import Cardano.Ledger.UTxO (UTxO(..))
 import Control.Lens ((^.))
-import Cardano.Ledger.Babbage.TxBody (addrEitherBabbageTxOutL, valueEitherBabbageTxOutL)
+import Cardano.Ledger.Babbage.TxBody (addrEitherBabbageTxOutL, valueEitherBabbageTxOutL, getDatumBabbageTxOut, Datum (..))
 import Cardano.Ledger.Address (unCompactAddr, decompactAddr)
 import qualified Cardano.Ledger.Compactible as L
 import qualified Cardano.Api.Shelley as ApiS
 import Cardano.Ledger.Pretty (ppLedgerState)
 import Prettyprinter (pretty)
-
+import qualified PlutusLedgerApi.V2 as PV2
+import qualified Cardano.Ledger.Babbage.TxBody as L
+import qualified Cardano.Ledger.Alonzo.TxInfo as L
+import Cardano.Ledger.Api (binaryDataToData, getPlutusData)
+-- import qualified Cardano.Ledger.Plutus.TxInfo as L
+import Cardano.Ledger.BaseTypes (SlotNo, StrictMaybe (SJust, SNothing))
+import Data.Maybe (fromJust)
 
 -- | Gets a GYAddress of a testing wallet.
 walletAddress :: Wallet -> GYAddress
@@ -199,10 +205,19 @@ instance GYTxQueryMonad GYTxMonadClb where
             a <- addressFromApi . Api.S.fromShelleyAddrToAny . decompactAddr <$> rightToMaybe (o ^. addrEitherBabbageTxOutL)
             -- v <- rightToMaybe $ valueFromPlutus       $ Plutus.txOutValue   o
             v <- valueFromApi . ApiS.fromMaryValue . L.fromCompact <$> rightToMaybe (o ^. valueEitherBabbageTxOutL)
-            -- d <- case Plutus.txOutDatum o of
-            --         Plutus.NoOutputDatum      -> return GYOutDatumNone
-            --         Plutus.OutputDatumHash h' -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus h')
-            --         Plutus.OutputDatum d      -> return $ GYOutDatumInline $ datumFromPlutus d
+
+            d <- case o ^. L.datumTxOutF of
+                NoDatum -> return GYOutDatumNone -- PV2.NoOutputDatum
+                DatumHash dh -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus $ fromJust $ L.transDataHash $ SJust dh ) -- FIXME: fromJust
+                Datum binaryData -> pure $
+                    GYOutDatumInline
+                    . datumFromPlutus
+                    . PV2.Datum
+                    . PV2.dataToBuiltinData
+                    . getPlutusData
+                    . binaryDataToData
+                    $ binaryData
+
             -- let s = do
             --       sh <- Plutus.txOutReferenceScript o
             --       vs <- Map.lookup sh mScripts
@@ -214,8 +229,8 @@ instance GYTxQueryMonad GYTxMonadClb where
                 { utxoRef       = ref
                 , utxoAddress   = a
                 , utxoValue     = v
-                , utxoOutDatum  = GYOutDatumNone -- FIXME:
-                , utxoRefScript = Nothing
+                , utxoOutDatum  = d
+                , utxoRefScript = Nothing        -- FIXME:
                 }
 
     slotConfig = do
@@ -282,13 +297,14 @@ sendSkeleton' skeleton = do
     -- TODO: support multi-sigs
     Wallet{walletPaymentSigningKey} <- asks runEnvWallet
     let tx = signGYTxBody body [walletPaymentSigningKey]
-    gyLogDebug' "" $ "encodede tx: " <> txToHex tx
+    gyLogDebug' "" $ "encoded tx: " <> txToHex tx
 
     -- Submit
     vRes <- liftClb $ sendTx $ txToApi tx
     case vRes of
         Success _state onChainTx -> pure (onChainTx, txBodyTxId body)
-        _ -> fail "Transaction failed"
+        FailPhase1 _ err -> fail $ show err
+        FailPhase2 _ err _ -> fail $ show err
 
   where
 
@@ -351,9 +367,11 @@ systemStart = gyscSystemStart <$> slotConfig
 protocolParameters :: GYTxMonadClb (Api.S.BundledProtocolParameters Api.S.BabbageEra)
 protocolParameters = do
     pparams <- liftClb $ gets $ mockConfigProtocol . mockConfig
-    return $ case pparams of
+    case pparams of
         AlonzoParams  _ -> error "Run.hs/protocolParameters: Only support babbage era parameters"
-        BabbageParams p -> Api.BundleAsShelleyBasedProtocolParameters Api.ShelleyBasedEraBabbage (Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage p) p
+        BabbageParams p -> do
+            -- gyLogDebug' "" $ show p
+            pure $ Api.BundleAsShelleyBasedProtocolParameters Api.ShelleyBasedEraBabbage (Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage p) p
 
 
 stakePools :: GYTxMonadClb (Set Api.S.PoolId)

@@ -47,10 +47,11 @@ placeBet refScript brp guess bet ownAddr mPreviousBetsUtxoRef = do
     -- Need to append to previous.
     Just previousBetsUtxoRef -> do
       previousUtxo <- utxoAtTxOutRef' previousBetsUtxoRef
+      gyLogDebug' "" $ printf "1. previousUtxo: %s" (show previousUtxo)
       (_addr, previousValue, dat@(BetRefDatum previousGuesses _previousBet)) <- utxoDatum' previousUtxo
-      gyLogDebug' "" $ printf "previous guesses %s" (show previousGuesses)
+      gyLogDebug' "" $ printf "2. previous guesses %s" (show previousGuesses)
       betUntilSlot <- enclosingSlotFromTime' (timeFromPlutus $ brpBetUntil brp)
-      gyLogDebug' "" $ printf "bet until slot %s" (show betUntilSlot)
+      gyLogDebug' "" $ printf "3. bet until slot %s" (show betUntilSlot)
       return $
            input brp refScript previousBetsUtxoRef dat (Bet guess)
         <> mustHaveOutput GYTxOut
@@ -86,6 +87,7 @@ input :: BetRefParams -> GYTxOutRef -> GYTxOutRef -> BetRefDatum -> BetRefAction
 input brp refScript inputRef dat red =
   mustHaveInput GYTxIn
     { gyTxInTxOutRef = inputRef
+    -- , gyTxInWitness = GYTxInWitnessKey
     , gyTxInWitness  = GYTxInWitnessScript
         (GYInReference refScript $ validatorToScript $ betRefValidator' brp)
         (datumFromPlutusData dat)

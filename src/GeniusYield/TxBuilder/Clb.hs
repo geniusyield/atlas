@@ -21,6 +21,7 @@ module GeniusYield.TxBuilder.Clb
     , sendSkeleton'
     , networkIdRun
     , dumpUtxoState
+    , gyMustFail
     ) where
 
 import qualified Cardano.Api                               as Api
@@ -59,7 +60,7 @@ import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
-import           GeniusYield.Clb.Clb (Clb, CardanoTx, logError, ClbState (..), txOutRefAt, txOutRefAtPaymentCred, logInfo, sendTx, LogEntry (LogEntry), LogLevel (..), ValidationResult (..), OnChainTx)
+import           GeniusYield.Clb.Clb (Clb, CardanoTx, logError, ClbState (..), txOutRefAt, txOutRefAtPaymentCred, logInfo, sendTx, LogEntry (LogEntry), LogLevel (..), ValidationResult (..), OnChainTx, getFails, fromLog, unLog, Log (Log))
 import GeniusYield.Clb.MockConfig (MockConfig(..))
 import GeniusYield.TxBuilder.Run (Wallet (..), WalletName)
 import GeniusYield.Clb.TimeSlot (SlotConfig(..))
@@ -83,6 +84,7 @@ import Cardano.Ledger.BaseTypes (SlotNo, StrictMaybe (SJust, SNothing))
 import Data.Maybe (fromJust)
 import Cardano.Api (ShelleyBasedEra(ShelleyBasedEraBabbage))
 import Cardano.Api.Script (fromShelleyBasedScript, fromShelleyScriptToReferenceScript)
+import Data.Sequence qualified as Seq
 
 -- | Gets a GYAddress of a testing wallet.
 walletAddress :: Wallet -> GYAddress
@@ -134,6 +136,34 @@ asClb g w m = evalRandT (asRandClb w m) g
 
 liftClb :: Clb a -> GYTxMonadClb a
 liftClb = GYTxMonadClb . lift . lift . lift . lift
+
+{- | Try to execute an action, and if it fails, restore to the current state
+ while preserving logs. If the action succeeds, logs an error as we expect
+ it to fail. Use 'mustFailWith' and 'mustFailWithBlock' to provide custom
+ error message or/and failure action name.
+-}
+gyMustFail :: GYTxMonadClb a -> GYTxMonadClb ()
+gyMustFail act = do
+    (st, preFails) <- liftClb $ do
+        st <- get
+        preFails <- getFails
+        pure (st, preFails)
+    void $ act
+    postFails <- liftClb $ getFails
+    if noNewErrors preFails postFails
+        then liftClb $ logError "Expected action to fail but it succeeds"
+    else do
+        infoLog <- liftClb $ gets mockInfo
+        liftClb $ put
+            st
+                { mockInfo = infoLog <> mkMustFailLog preFails postFails
+                -- , mustFailLog = mkMustFailLog preFails postFails
+                }
+    where
+      noNewErrors (fromLog -> a) (fromLog -> b) = length a == length b
+      mkMustFailLog (unLog -> pre) (unLog -> post) =
+        Log $ second (LogEntry Error . ((msg  <> ":") <> ). show) <$> Seq.drop (Seq.length pre) post
+      msg = "Unnamed failure action"
 
 networkIdRun :: Clb GYNetworkId
 networkIdRun = do

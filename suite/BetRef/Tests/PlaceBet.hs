@@ -20,7 +20,7 @@ import GeniusYield.TxBuilder.Clb
     ( GYTxMonadClb,
       Wallet(walletName),
       walletAddress,
-      sendSkeleton, dumpUtxoState )
+      sendSkeleton, dumpUtxoState, gyMustFail )
 import GeniusYield.TxBuilder
     ( GYTxMonad,
       GYTxSkeleton,
@@ -47,12 +47,12 @@ placeBetTests = testGroup "Place Bet"
         , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
         , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> fakeGold 1_000)
         ]
-    -- , testRun "Not adding atleast bet step amount should fail" $ mustFail . multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
-    --   [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
-    --   , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
-    --   , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
-    --   , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
-    --   , (w4, OracleAnswerDatum 5, valueFromLovelace 55_000_000 <> fakeGold 1_000)]
+    , testRunGYClb "Not adding atleast bet step amount should fail" $ gyMustFail . multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
+      [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
+      , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
+      , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
+      , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
+      , (w4, OracleAnswerDatum 5, valueFromLovelace 55_000_000 <> fakeGold 1_000)]
     ]
 
 -- -----------------------------------------------------------------------------
@@ -158,9 +158,10 @@ placeBetRun refScript brp guess bet mPreviousBetsUtxoRef = do
   addr <- (!! 0) <$> ownAddresses
   skeleton <- placeBet refScript brp guess bet addr mPreviousBetsUtxoRef
   gyLogDebug' "" $ printf "place bet tx skeleton: %s" (show skeleton)
-  txId <- sendSkeleton skeleton
+  sendSkeleton skeleton
+  -- txId <- sendSkeleton skeleton
   -- dumpUtxoState
-  pure txId
+  -- pure txId
 
 -- -----------------------------------------------------------------------------
 -- Multiple bets example

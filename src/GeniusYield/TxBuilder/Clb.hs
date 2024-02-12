@@ -81,6 +81,8 @@ import Cardano.Ledger.Api (binaryDataToData, getPlutusData)
 -- import qualified Cardano.Ledger.Plutus.TxInfo as L
 import Cardano.Ledger.BaseTypes (SlotNo, StrictMaybe (SJust, SNothing))
 import Data.Maybe (fromJust)
+import Cardano.Api (ShelleyBasedEra(ShelleyBasedEraBabbage))
+import Cardano.Api.Script (fromShelleyBasedScript, fromShelleyScriptToReferenceScript)
 
 -- | Gets a GYAddress of a testing wallet.
 walletAddress :: Wallet -> GYAddress
@@ -193,22 +195,24 @@ instance GYTxQueryMonad GYTxMonadClb where
 
 
     utxoAtTxOutRef ref = do
+        -- All UTxOs map
         utxos <- liftClb $ gets (unUTxO . utxosUtxo . lsUTxOState . _memPoolState . emulatedLedgerState)
-        -- mUtxosWithoutRefScripts   <- liftClb $ gets mockUtxos
-        -- let m = mUtxosWithoutRefScripts
+        -- Maps keys to Plutus TxOutRef
         let m = Map.mapKeys (txOutRefToPlutus . txOutRefFromApi . Api.S.fromShelleyTxIn) utxos
-        -- mScripts <- liftClb $ gets mockScripts
-        -- nid <- networkId
+
         return $ do
             o <- Map.lookup (txOutRefToPlutus ref) m
-            -- a <- rightToMaybe $ addressFromPlutus nid $ Plutus.txOutAddress o
+
+            -- FIXME: rightToMaybe
             a <- addressFromApi . Api.S.fromShelleyAddrToAny . decompactAddr <$> rightToMaybe (o ^. addrEitherBabbageTxOutL)
-            -- v <- rightToMaybe $ valueFromPlutus       $ Plutus.txOutValue   o
+
+            -- FIXME: rightToMaybe
             v <- valueFromApi . ApiS.fromMaryValue . L.fromCompact <$> rightToMaybe (o ^. valueEitherBabbageTxOutL)
 
+            -- FIXME: fromJust
             d <- case o ^. L.datumTxOutF of
-                NoDatum -> return GYOutDatumNone -- PV2.NoOutputDatum
-                DatumHash dh -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus $ fromJust $ L.transDataHash $ SJust dh ) -- FIXME: fromJust
+                NoDatum -> pure GYOutDatumNone
+                DatumHash dh -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus $ fromJust $ L.transDataHash $ SJust dh)
                 Datum binaryData -> pure $
                     GYOutDatumInline
                     . datumFromPlutus
@@ -218,19 +222,16 @@ instance GYTxQueryMonad GYTxMonadClb where
                     . binaryDataToData
                     $ binaryData
 
-            -- let s = do
-            --       sh <- Plutus.txOutReferenceScript o
-            --       vs <- Map.lookup sh mScripts
-            --       if | isV1 vs   -> Just (Some $ scriptFromSerialisedScript @'PlutusV1 (coerce $ versioned'content vs))
-            --          | isV2 vs   -> Just (Some $ scriptFromSerialisedScript @'PlutusV2 (coerce $ versioned'content vs))
-            --          | otherwise -> Nothing
+            let s = case o ^. L.referenceScriptTxOutL of
+                        SJust x  -> someScriptFromReferenceApi $ fromShelleyScriptToReferenceScript ShelleyBasedEraBabbage x
+                        SNothing -> Nothing
 
             return GYUTxO
                 { utxoRef       = ref
                 , utxoAddress   = a
                 , utxoValue     = v
                 , utxoOutDatum  = d
-                , utxoRefScript = Nothing        -- FIXME:
+                , utxoRefScript = s
                 }
 
     slotConfig = do

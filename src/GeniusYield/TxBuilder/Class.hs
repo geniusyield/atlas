@@ -371,7 +371,7 @@ instance Semigroup (GYTxSkeleton v) where
         , gytxSigs          = Set.union (gytxSigs x) (gytxSigs y)
         , gytxInvalidBefore = combineInvalidBefore (gytxInvalidBefore x) (gytxInvalidBefore y)
         , gytxInvalidAfter  = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
-        , gytxMetadata      = combineMetadata (gytxMetadata x) (gytxMetadata y)
+        , gytxMetadata      = (Just combineMetadata) <*> (gytxMetadata x) <*> (gytxMetadata y)
         }
       where
         -- we keep only one input per utxo to spend
@@ -390,9 +390,8 @@ instance Semigroup (GYTxSkeleton v) where
         combineInvalidAfter (Just s) (Just t) = Just (min s t)
 
         -- Keep the last metadata assigned in a skeleton
-        combineMetadata :: Maybe GYTxMetadata -> Maybe GYTxMetadata -> Maybe GYTxMetadata
-        combineMetadata mx Nothing = mx
-        combineMetadata _  my      = my
+        combineMetadata :: GYTxMetadata -> GYTxMetadata -> GYTxMetadata
+        combineMetadata mdx mdy = metadataFromApi $ (metadataToApi mdx) <> (metadataToApi mdy)
 
 instance Monoid (GYTxSkeleton v) where
     mempty = emptyGYTxSkeleton

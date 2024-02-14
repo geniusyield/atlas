@@ -389,10 +389,6 @@ instance Semigroup (GYTxSkeleton v) where
         combineInvalidAfter Nothing  n        = n
         combineInvalidAfter (Just s) (Just t) = Just (min s t)
 
-        -- -- Keep the last metadata assigned in a skeleton
-        -- combineMetadata :: GYTxMetadata -> GYTxMetadata -> GYTxMetadata
-        -- combineMetadata mdx mdy = metadataFromApi $ metadataToApi mdx <> metadataToApi mdy
-
 instance Monoid (GYTxSkeleton v) where
     mempty = emptyGYTxSkeleton
 

@@ -27,6 +27,9 @@ import           GeniusYield.Imports (Text, coerce)
 newtype GYTxMetadata = GYTxMetadata (Api.TxMetadataInEra Api.BabbageEra)
   deriving Show
 
+instance Semigroup GYTxMetadata where
+  (<>) mdx mdy = metadataFromApi $ metadataToApi mdx <> metadataToApi mdy
+
 type GYTxMetadataValue = Api.TxMetadataValue
 
 --------------------------------------------------------------------------------

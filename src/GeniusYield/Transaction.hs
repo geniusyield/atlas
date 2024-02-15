@@ -395,7 +395,11 @@ finalizeGYBalancedTx
         collateralTotalValue = foldMapUTxOs utxoValue collaterals
 
     txMetadata :: Api.TxMetadataInEra Api.BabbageEra
-    txMetadata = maybe Api.TxMetadataNone coerce mbTxMetadata
+    txMetadata = maybe Api.TxMetadataNone toMetaInEra mbTxMetadata
+      where
+        toMetaInEra :: GYTxMetadata -> Api.TxMetadataInEra Api.BabbageEra
+        toMetaInEra gymd = let md = coerce gymd in
+          if md == mempty then Api.TxMetadataNone else Api.TxMetadataInEra Api.TxMetadataInBabbageEra md
 
     body :: Api.TxBodyContent Api.BuildTx Api.BabbageEra
     body = Api.TxBodyContent

@@ -10,8 +10,8 @@ module GeniusYield.Types.TxMetadata (
   gyMetaBytesChunks,
   mergeGYTransactionMetadata,
   makeApiTransactionMetadata,
-  metadataFromApi,
-  metadataToApi,
+  fromApi,
+  toApi,
   metadataMsg,
   metadataMsgs
 ) where
@@ -23,12 +23,8 @@ import           Data.Word           (Word64)
 import           GeniusYield.Imports (Text, coerce)
 
 
-
-newtype GYTxMetadata = GYTxMetadata (Api.TxMetadataInEra Api.BabbageEra)
-  deriving Show
-
-instance Semigroup GYTxMetadata where
-  (<>) mdx mdy = metadataFromApi $ metadataToApi mdx <> metadataToApi mdy
+newtype GYTxMetadata = GYTxMetadata Api.TxMetadata
+  deriving newtype (Semigroup, Show)
 
 type GYTxMetadataValue = Api.TxMetadataValue
 
@@ -37,16 +33,12 @@ type GYTxMetadataValue = Api.TxMetadataValue
 --------------------------------------------------------------------------------
 
 -- | Convert 'Cardano.Api.TxMetadata' to 'GYTxMetadata'.
-metadataFromApi :: Api.TxMetadata -> GYTxMetadata
-metadataFromApi md@(Api.TxMetadata kvm)
-  | Map.null kvm = GYTxMetadata Api.TxMetadataNone
-  | otherwise    = GYTxMetadata (Api.TxMetadataInEra Api.TxMetadataInBabbageEra md)
+fromApi :: Api.TxMetadata -> GYTxMetadata
+fromApi = GYTxMetadata  
 
 -- | Convert 'GYTxMetadata' to 'Cardano.Api.TxMetadata'.
-metadataToApi :: GYTxMetadata -> Api.TxMetadata
-metadataToApi gymd = case coerce gymd of
-  Api.TxMetadataNone -> mempty
-  Api.TxMetadataInEra Api.TxMetadataInBabbageEra md -> md
+toApi :: GYTxMetadata -> Api.TxMetadata
+toApi = coerce
 
 
 --------------------------------------------------------------------------------
@@ -83,7 +75,7 @@ gyMetaBytesChunks = Api.metaBytesChunks
 
 -- | Merge two 'GYTxMetadata's, controlling how to handle the respective 'GYTxMetadataValue's in case of label collision.
 mergeGYTransactionMetadata :: (GYTxMetadataValue -> GYTxMetadataValue -> GYTxMetadataValue) -> GYTxMetadata -> GYTxMetadata -> GYTxMetadata
-mergeGYTransactionMetadata f gymd1 gymd2 = metadataFromApi $ Api.mergeTransactionMetadata f (metadataToApi gymd1) (metadataToApi gymd2)
+mergeGYTransactionMetadata f gymd1 gymd2 = fromApi $ Api.mergeTransactionMetadata f (toApi gymd1) (toApi gymd2)
 
 -- | Apply 'TxMetadata' wrapper to a 'Map Word64 GYTxMetadataValue'.
 makeApiTransactionMetadata :: Map.Map Word64 GYTxMetadataValue -> Api.TxMetadata
@@ -102,7 +94,7 @@ metadataMsg msg = metadataMsgs [msg]
 metadataMsgs :: [Text] -> Maybe GYTxMetadata
 metadataMsgs msgs = case metaValue of
   Api.TxMetaList [] -> Nothing
-  _                 -> Just . metadataFromApi . makeApiTransactionMetadata $
+  _                 -> Just . fromApi . makeApiTransactionMetadata $
                        Map.fromList [(674, gyTxMetaMap [(gyTxMetaText "msg", metaValue)])]
   where
     metaValue :: GYTxMetadataValue
@@ -110,5 +102,5 @@ metadataMsgs msgs = case metaValue of
     
     metaAppend :: GYTxMetadataValue -> GYTxMetadataValue -> GYTxMetadataValue
     metaAppend (Api.TxMetaList xs) (Api.TxMetaList ys) = Api.TxMetaList (xs ++ ys)
-    metaAppend _ _ = error "Unexpected error applying 'gyMetaTextChunks'"
+    metaAppend _ _ = error "Unexpected error while using 'gyMetaTextChunks'"
 

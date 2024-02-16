@@ -57,6 +57,7 @@ module GeniusYield.TxBuilder.Class
     , mustHaveRefInput
     , mustHaveOutput
     , mustHaveOptionalOutput
+    , mustHaveTxMetadata
     , mustMint
     , mustBeSignedBy
     , isInvalidBefore
@@ -614,6 +615,9 @@ mustHaveOutput o = emptyGYTxSkeleton {gytxOuts = [o]}
 
 mustHaveOptionalOutput :: Maybe (GYTxOut v) -> GYTxSkeleton v
 mustHaveOptionalOutput = maybe mempty $ \o -> emptyGYTxSkeleton {gytxOuts = [o]}
+
+mustHaveTxMetadata :: Maybe GYTxMetadata -> GYTxSkeleton v
+mustHaveTxMetadata m = emptyGYTxSkeleton {gytxMetadata = m}
 
 mustMint :: GYMintScript v -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkeleton v
 mustMint _ _ _ 0  = mempty

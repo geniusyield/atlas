@@ -1,3 +1,11 @@
+{-|
+Module      : GeniusYield.Types.TxMetadata
+Copyright   : (c) 2024 GYELD GMBH
+License     : Apache 2.0
+Maintainer  : support@geniusyield.co
+Stability   : develop
+
+-}
 module GeniusYield.Types.TxMetadata (
   GYTxMetadata (..),
   GYTxMetadataValue,

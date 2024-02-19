@@ -372,7 +372,7 @@ instance Semigroup (GYTxSkeleton v) where
         , gytxSigs          = Set.union (gytxSigs x) (gytxSigs y)
         , gytxInvalidBefore = combineInvalidBefore (gytxInvalidBefore x) (gytxInvalidBefore y)
         , gytxInvalidAfter  = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
-        , gytxMetadata      = Just (<>) <*> gytxMetadata x <*> gytxMetadata y
+        , gytxMetadata      = combineMetadata (gytxMetadata x) (gytxMetadata y)
         }
       where
         -- we keep only one input per utxo to spend
@@ -389,6 +389,11 @@ instance Semigroup (GYTxSkeleton v) where
         combineInvalidAfter m        Nothing  = m
         combineInvalidAfter Nothing  n        = n
         combineInvalidAfter (Just s) (Just t) = Just (min s t)
+
+        combineMetadata :: Maybe GYTxMetadata -> Maybe GYTxMetadata -> Maybe GYTxMetadata
+        combineMetadata Nothing my = my
+        combineMetadata mx Nothing = mx
+        combineMetadata mx my      = Just (<>) <*> mx <*> my
 
 instance Monoid (GYTxSkeleton v) where
     mempty = emptyGYTxSkeleton

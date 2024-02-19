@@ -7,7 +7,7 @@ Stability   : develop
 
 -}
 module GeniusYield.Types.TxMetadata (
-  GYTxMetadata (..),
+  GYTxMetadata,
   GYTxMetadataValue,
   gyTxMetaMap,
   gyTxMetaList,
@@ -18,8 +18,8 @@ module GeniusYield.Types.TxMetadata (
   gyMetaBytesChunks,
   mergeGYTransactionMetadata,
   makeApiTransactionMetadata,
-  fromApi,
-  toApi,
+  metadataFromApi,
+  metadataToApi,
   metadataMsg,
   metadataMsgs
 ) where
@@ -41,12 +41,12 @@ type GYTxMetadataValue = Api.TxMetadataValue
 --------------------------------------------------------------------------------
 
 -- | Convert 'Cardano.Api.TxMetadata' to 'GYTxMetadata'.
-fromApi :: Api.TxMetadata -> GYTxMetadata
-fromApi = GYTxMetadata  
+metadataFromApi :: Api.TxMetadata -> GYTxMetadata
+metadataFromApi = GYTxMetadata  
 
 -- | Convert 'GYTxMetadata' to 'Cardano.Api.TxMetadata'.
-toApi :: GYTxMetadata -> Api.TxMetadata
-toApi = coerce
+metadataToApi :: GYTxMetadata -> Api.TxMetadata
+metadataToApi = coerce
 
 
 --------------------------------------------------------------------------------
@@ -83,7 +83,7 @@ gyMetaBytesChunks = Api.metaBytesChunks
 
 -- | Merge two 'GYTxMetadata's, controlling how to handle the respective 'GYTxMetadataValue's in case of label collision.
 mergeGYTransactionMetadata :: (GYTxMetadataValue -> GYTxMetadataValue -> GYTxMetadataValue) -> GYTxMetadata -> GYTxMetadata -> GYTxMetadata
-mergeGYTransactionMetadata f gymd1 gymd2 = fromApi $ Api.mergeTransactionMetadata f (toApi gymd1) (toApi gymd2)
+mergeGYTransactionMetadata f gymd1 gymd2 = metadataFromApi $ Api.mergeTransactionMetadata f (metadataToApi gymd1) (metadataToApi gymd2)
 
 -- | Apply 'TxMetadata' wrapper to a 'Map Word64 GYTxMetadataValue'.
 makeApiTransactionMetadata :: Map.Map Word64 GYTxMetadataValue -> Api.TxMetadata
@@ -102,7 +102,7 @@ metadataMsg msg = metadataMsgs [msg]
 metadataMsgs :: [Text] -> Maybe GYTxMetadata
 metadataMsgs msgs = case metaValue of
   Api.TxMetaList [] -> Nothing
-  _                 -> Just . fromApi . makeApiTransactionMetadata $
+  _                 -> Just . metadataFromApi . makeApiTransactionMetadata $
                        Map.fromList [(674, gyTxMetaMap [(gyTxMetaText "msg", metaValue)])]
   where
     metaValue :: GYTxMetadataValue

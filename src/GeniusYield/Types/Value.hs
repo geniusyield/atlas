@@ -437,7 +437,7 @@ instance Swagger.ToSchema GYAssetClass where
                                                      ]
                              & Swagger.minProperties ?~ 1
                              & Swagger.maxProperties ?~ 1
-                             & Swagger.example       ?~ toJSON ("ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.GOLD" :: Text)
+                             & Swagger.example       ?~ toJSON ("ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.474f4c44" :: Text)
 
 -- | Converts a 'GYAssetClass' into a Plutus 'Plutus.AssetClass'.
 assetClassToPlutus :: GYAssetClass -> Plutus.AssetClass

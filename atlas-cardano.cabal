@@ -51,8 +51,8 @@ common plutus-ghc-options
 
   -- expose all unfoldings, so plutustx compiler can do its job
   ghc-options:
-    -fexpose-all-unfoldings -fobject-code 
-    -fplugin-opt PlutusTx.Plugin:defer-errors
+    -fexpose-all-unfoldings -fobject-code -fplugin-opt
+    PlutusTx.Plugin:defer-errors
 
   -- set target plutus-core version
   ghc-options: -fplugin-opt PlutusTx.Plugin:target-version=1.0.0
@@ -82,6 +82,7 @@ library
     GeniusYield.Providers.Node
     GeniusYield.Providers.Sentry
     GeniusYield.Scripts.TestToken
+    GeniusYield.Swagger.Utils
     GeniusYield.Test.Privnet.Asserts
     GeniusYield.Test.Privnet.Ctx
     GeniusYield.Test.Privnet.Examples
@@ -196,8 +197,8 @@ library
 
   -- Dependencies whose version is fixed by @cabal.project@ file.
   build-depends:
-    , maestro-sdk
     , bech32
+    , maestro-sdk
 
   -- Custom forks (version pinned by @source-repository-package@ stanza in @cabal.project@ file).
   build-depends:

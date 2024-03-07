@@ -434,7 +434,7 @@ instance Swagger.ToSchema GYAssetClass where
                            return $ Swagger.named "GYAssetClass" $
                                Swagger.paramSchemaToSchema p
                              & Swagger.type_         ?~ Swagger.SwaggerString
-                             & Swagger.description   ?~ "This is an asset class, i.e. either lovelace or some other token with its minting policy and token name."
+                             & Swagger.description   ?~ "This is an asset class, i.e. either \"lovelace\" or some other token with its minting policy and token name delimited by dot (.)."
                              & Swagger.example       ?~ toJSON ("ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.474f4c44" :: Text)
 
 -- | Converts a 'GYAssetClass' into a Plutus 'Plutus.AssetClass'.

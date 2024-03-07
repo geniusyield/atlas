@@ -425,18 +425,16 @@ instance Aeson.ToJSONKey GYAssetClass where
 instance Aeson.FromJSONKey GYAssetClass where
     fromJSONKey = Aeson.FromJSONKeyTextParser (either (fail . show) pure . Web.parseUrlPiece)
 
+instance Swagger.ToParamSchema GYAssetClass where
+  toParamSchema _ = mempty
+                  & Swagger.type_ ?~ Swagger.SwaggerString
+
 instance Swagger.ToSchema GYAssetClass where
-  declareNamedSchema _ = do
-                           unitSchema   <- Swagger.declareSchemaRef @()     Proxy
-                           stringSchema <- Swagger.declareSchemaRef @String Proxy
-                           return $ Swagger.named "GYAssetClass" $ mempty
+  declareNamedSchema p = do
+                           return $ Swagger.named "GYAssetClass" $
+                               Swagger.paramSchemaToSchema p
                              & Swagger.type_         ?~ Swagger.SwaggerString
                              & Swagger.description   ?~ "This is an asset class, i.e. either lovelace or some other token with its minting policy and token name."
-                             & Swagger.properties .~ [ ("GYLovelace" :: Text, unitSchema)
-                                                     , ("GYToken" :: Text, stringSchema)
-                                                     ]
-                             & Swagger.minProperties ?~ 1
-                             & Swagger.maxProperties ?~ 1
                              & Swagger.example       ?~ toJSON ("ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.474f4c44" :: Text)
 
 -- | Converts a 'GYAssetClass' into a Plutus 'Plutus.AssetClass'.
@@ -485,7 +483,7 @@ showAssetClass (Plutus.AssetClass (cs, tn))
         Nothing  -> error $ "invalid token name: " <> show tn
         Just tn' -> show cs <> "." <> T.unpack (tokenNameToHex tn')
 
--- | Note: not used currently by API (tests only)
+-- |
 --
 -- >>> Web.toUrlPiece GYLovelace
 -- "lovelace"

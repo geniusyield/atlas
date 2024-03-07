@@ -1,3 +1,5 @@
+{-# LANGUAGE UnicodeSyntax #-}
+
 {-|
 Module      : GeniusYield.Utils
 Copyright   : (c) 2023 GYELD GMBH
@@ -13,13 +15,16 @@ module GeniusYield.Utils
     , fieldNamePrefixStripN
     , modifyException
     , serialiseToBech32WithPrefix
+    , addSwaggerExample
+    , addSwaggerDescription
     ) where
 
 import           Cardano.Api          (SerialiseAsRawBytes (serialiseToRawBytes))
 import           Codec.Binary.Bech32  as Bech32
+import           Control.Lens         (mapped, (?~))
 import           Control.Monad.Except (ExceptT (..))
 import           Data.Char            (toLower)
-
+import qualified Data.Swagger         as Swagger
 import           GeniusYield.Imports
 
 -- | @fieldNamePrefixStrip2 "muAssets" == "assets"@
@@ -49,3 +54,11 @@ serialiseToBech32WithPrefix prefix =
                     ++ show prefix
                     ++ ", " ++ show e
     Right p -> serialiseToRawBytes >>> Bech32.dataPartFromBytes >>> Bech32.encodeLenient p
+
+-- | Utility function to add swagger description to a schema.
+addSwaggerDescription ∷ (Functor f1, Functor f2, Swagger.HasSchema b1 a, Swagger.HasDescription a (Maybe b2)) ⇒ b2 → f1 (f2 b1) → f1 (f2 b1)
+addSwaggerDescription desc = mapped . mapped . Swagger.schema . Swagger.description ?~ desc
+
+-- | Utility function to add swagger example to a schema.
+addSwaggerExample ∷ (Functor f1, Functor f2, Swagger.HasSchema b1 a, Swagger.HasExample a (Maybe b2)) ⇒ b2 → f1 (f2 b1) → f1 (f2 b1)
+addSwaggerExample ex = mapped . mapped . Swagger.schema . Swagger.example ?~ ex

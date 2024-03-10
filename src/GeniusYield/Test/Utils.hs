@@ -62,6 +62,7 @@ import           Data.Maybe                 (fromJust)
 import qualified Test.Tasty                 as Tasty
 import qualified Test.Tasty.QuickCheck      as Tasty
 import qualified Test.Tasty.Runners         as Tasty
+import           Test.Tasty.HUnit (assertFailure, testCaseInfo)
 
 -- import           GeniusYield.Imports
 -- import           GeniusYield.Transaction
@@ -69,8 +70,19 @@ import qualified Test.Tasty.Runners         as Tasty
 import           GeniusYield.Types
 import GeniusYield.TxBuilder.Clb (GYTxMonadClb, asClb, asRandClb, liftClb)
 import GeniusYield.TxBuilder.Clb qualified as Clb
-import GeniusYield.Clb.Clb (testNoErrorsTraceClb, intToKeyPair, Clb, OnChainTx (getOnChainTx))
-import GeniusYield.Clb.MockConfig (defaultBabbageClb)
+import Clb qualified (
+  Clb,
+  ClbState (mockInfo),
+  initClb,
+  checkErrors,
+  OnChainTx (getOnChainTx),
+  MockConfig,
+  ppLog,
+  runClb,
+  intToKeyPair,
+  defaultBabbage,
+--   EmulatorEra
+ )
 import qualified Cardano.Ledger.Api as L
 import qualified Test.Cardano.Ledger.Core.KeyPair as TL
 import Cardano.Ledger.Shelley.API (extractTx)
@@ -78,9 +90,13 @@ import Cardano.Ledger.Babbage.Tx (AlonzoTx(body), BabbageTxBody (btbOutputs))
 import Cardano.Ledger.Babbage.TxBody (txOutScript)
 import qualified Data.Sequence.Strict as StrictSeq
 import qualified Cardano.Api                      as Api
-import qualified Cardano.Api.Shelley as Shelley
+-- import qualified Cardano.Api.Shelley as Shelley
 import Cardano.Ledger.Binary (Sized(sizedValue))
-import GeniusYield.Clb.Era (EmulatorEra)
+import Test.Tasty (TestTree)
+
+import Prettyprinter
+import Prettyprinter.Render.String (renderString)
+
 
 -------------------------------------------------------------------------------
 -- tasty tools
@@ -189,9 +205,8 @@ testRunGY name action = do
                       <*> newWalletGY "w9" w
 
 testRunGYClb :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
--- testRunGYClb :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
 testRunGYClb name action =
-    testNoErrorsTraceClb v w defaultBabbageClb name $ do
+    testNoErrorsTraceClb v w Clb.defaultBabbage name $ do
       asClb pureGen TODO $ action wallets
 
   where
@@ -204,15 +219,30 @@ testRunGYClb name action =
         fakeIron                  1_000_000
 
     wallets :: Wallets
-    wallets = Wallets (mkSimpleWallet "w1" (intToKeyPair 1))
-                      (mkSimpleWallet "w2" (intToKeyPair 2))
-                      (mkSimpleWallet "w3" (intToKeyPair 3))
-                      (mkSimpleWallet "w4" (intToKeyPair 4))
-                      (mkSimpleWallet "w5" (intToKeyPair 5))
-                      (mkSimpleWallet "w6" (intToKeyPair 6))
-                      (mkSimpleWallet "w7" (intToKeyPair 7))
-                      (mkSimpleWallet "w8" (intToKeyPair 8))
-                      (mkSimpleWallet "w9" (intToKeyPair 9))
+    wallets = Wallets (mkSimpleWallet "w1" (Clb.intToKeyPair 1))
+                      (mkSimpleWallet "w2" (Clb.intToKeyPair 2))
+                      (mkSimpleWallet "w3" (Clb.intToKeyPair 3))
+                      (mkSimpleWallet "w4" (Clb.intToKeyPair 4))
+                      (mkSimpleWallet "w5" (Clb.intToKeyPair 5))
+                      (mkSimpleWallet "w6" (Clb.intToKeyPair 6))
+                      (mkSimpleWallet "w7" (Clb.intToKeyPair 7))
+                      (mkSimpleWallet "w8" (Clb.intToKeyPair 8))
+                      (mkSimpleWallet "w9" (Clb.intToKeyPair 9))
+
+-- | Helper for building tests
+testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig -> String -> Clb.Clb a -> TestTree
+testNoErrorsTraceClb funds walletFunds cfg msg act =
+  testCaseInfo msg
+    $ maybe (pure mockLog) assertFailure
+    $ mbErrors >>= \errors -> pure (mockLog <> "\n\nError :\n-------\n" <>  errors)
+  where
+    -- _errors since we decided to store errors in the log as well.
+    (mbErrors, mock) = Clb.runClb (act >> Clb.checkErrors) $ Clb.initClb cfg (valueToApi funds) (valueToApi walletFunds)
+    mockLog = "\nEmulator log :\n--------------\n" <> logString
+    options = defaultLayoutOptions { layoutPageWidth = AvailablePerLine 150 1.0}
+    logDoc = Clb.ppLog $ Clb.mockInfo mock
+    logString = renderString $ layoutPretty options logDoc
+
 
 mkSimpleWallet :: WalletName -> TL.KeyPair r L.StandardCrypto -> Wallet
 mkSimpleWallet n kp =
@@ -272,7 +302,7 @@ runWallet :: Wallet -> GYTxMonadRun a -> Run (Maybe a)
 runWallet w action = flip evalRandT pureGen $ asRandRun w action
 
 -- | Runs a `GYTxMonadRun` action using the given wallet.
-runWalletClb :: Wallet -> GYTxMonadClb a -> Clb (Maybe a)
+runWalletClb :: Wallet -> GYTxMonadClb a -> Clb.Clb (Maybe a)
 runWalletClb w action = flip evalRandT pureGen $ asRandClb w action
 
 -- -- | Version of `runWallet` that fails if `Nothing` is returned by the action.
@@ -435,7 +465,7 @@ addRefScriptClb :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadClb (Maybe GYT
 addRefScriptClb addr script = do
     let script' = validatorToScript script
     (tx, txId) <- Clb.sendSkeleton' (mustHaveOutput (mkGYTxOutNoDatum addr mempty) { gyTxOutRefS = Just script' })
-    let outputs =  btbOutputs $ body $  extractTx $ getOnChainTx tx
+    let outputs =  btbOutputs $ body $  extractTx $ Clb.getOnChainTx tx
 
     let index = StrictSeq.findIndexL
             (\o ->

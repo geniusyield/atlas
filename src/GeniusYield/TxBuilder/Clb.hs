@@ -60,31 +60,54 @@ import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
-import           GeniusYield.Clb.Clb (Clb, CardanoTx, logError, ClbState (..), txOutRefAt, txOutRefAtPaymentCred, logInfo, sendTx, LogEntry (LogEntry), LogLevel (..), ValidationResult (..), OnChainTx, getFails, fromLog, unLog, Log (Log))
-import GeniusYield.Clb.MockConfig (MockConfig(..))
-import GeniusYield.TxBuilder.Run (Wallet (..), WalletName)
-import GeniusYield.Clb.TimeSlot (SlotConfig(..))
-import GeniusYield.Clb.Params (PParams(..))
-import Cardano.Ledger.Shelley.API (LedgerState(..), UTxOState (utxosUtxo), StakeReference (..))
-import GeniusYield.Clb.ClbLedgerState (EmulatedLedgerState (..), initialState, setUtxo, memPoolState)
-import Cardano.Ledger.UTxO (UTxO(..))
-import Control.Lens ((^.))
-import Cardano.Ledger.Babbage.TxBody (addrEitherBabbageTxOutL, valueEitherBabbageTxOutL, getDatumBabbageTxOut, Datum (..))
-import Cardano.Ledger.Address (unCompactAddr, decompactAddr)
-import qualified Cardano.Ledger.Compactible as L
-import qualified Cardano.Api.Shelley as ApiS
-import Cardano.Ledger.Pretty (ppLedgerState)
-import Prettyprinter (pretty)
-import qualified PlutusLedgerApi.V2 as PV2
-import qualified Cardano.Ledger.Babbage.TxBody as L
-import qualified Cardano.Ledger.Alonzo.TxInfo as L
-import Cardano.Ledger.Api (binaryDataToData, getPlutusData)
--- import qualified Cardano.Ledger.Plutus.TxInfo as L
-import Cardano.Ledger.BaseTypes (SlotNo, StrictMaybe (SJust, SNothing))
-import Data.Maybe (fromJust)
+
 import Cardano.Api (ShelleyBasedEra(ShelleyBasedEraBabbage))
 import Cardano.Api.Script (fromShelleyBasedScript, fromShelleyScriptToReferenceScript)
+import Cardano.Api.Shelley qualified as ApiS
+import Cardano.Ledger.Address (unCompactAddr, decompactAddr)
+import Cardano.Ledger.Alonzo.TxInfo qualified as L
+import Cardano.Ledger.Api (binaryDataToData, getPlutusData)
+import Cardano.Ledger.Babbage.TxBody (addrEitherBabbageTxOutL, valueEitherBabbageTxOutL, getDatumBabbageTxOut, Datum (..))
+import Cardano.Ledger.Babbage.TxBody qualified as L
+import Cardano.Ledger.BaseTypes (SlotNo, StrictMaybe (SJust, SNothing))
+import Cardano.Ledger.Compactible qualified as L
+import Cardano.Ledger.Pretty (ppLedgerState)
+import Cardano.Ledger.Shelley.API (LedgerState(..), UTxOState (utxosUtxo), StakeReference (..))
+import Cardano.Ledger.UTxO (UTxO(..))
+import Control.Lens ((^.))
+import Data.Maybe (fromJust)
 import Data.Sequence qualified as Seq
+import Clb (
+  PParams(..),
+  SlotConfig(..),
+  MockConfig(..),
+  EmulatedLedgerState (..),
+
+  Clb,
+  ClbState (..),
+
+  txOutRefAt,
+  txOutRefAtPaymentCred,
+
+  sendTx,
+  ValidationResult (..),
+  OnChainTx,
+--   CardanoTx,
+
+  LogEntry (LogEntry),
+  LogLevel (..),
+  Log (Log),
+  fromLog,
+  unLog,
+  getFails,
+  logInfo,
+  logError,
+ )
+import Clb qualified (dumpUtxoState)
+
+import GeniusYield.TxBuilder.Run (Wallet (..), WalletName)
+import PlutusLedgerApi.V2 qualified as PV2
+import Prettyprinter (pretty)
 
 -- | Gets a GYAddress of a testing wallet.
 walletAddress :: Wallet -> GYAddress
@@ -141,6 +164,7 @@ liftClb = GYTxMonadClb . lift . lift . lift . lift
  while preserving logs. If the action succeeds, logs an error as we expect
  it to fail. Use 'mustFailWith' and 'mustFailWithBlock' to provide custom
  error message or/and failure action name.
+ FIXME: should we move it to CLB?
 -}
 gyMustFail :: GYTxMonadClb a -> GYTxMonadClb ()
 gyMustFail act = do
@@ -471,10 +495,5 @@ eraHistory = do
             }
 
 dumpUtxoState :: GYTxMonadClb ()
-dumpUtxoState = do
-    s <- liftClb $ do
-        s <- gets ((^. memPoolState) . emulatedLedgerState)
-        pure $ show $ ppLedgerState s
-    gyLogDebug' "" s
-
+dumpUtxoState = liftClb Clb.dumpUtxoState
 

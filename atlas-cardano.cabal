@@ -64,12 +64,6 @@ library
     GeniusYield.Api.TestTokens
     GeniusYield.CardanoApi.EraHistory
     GeniusYield.CardanoApi.Query
-    GeniusYield.Clb.Clb
-    GeniusYield.Clb.ClbLedgerState
-    GeniusYield.Clb.Era
-    GeniusYield.Clb.TimeSlot
-    GeniusYield.Clb.MockConfig
-    GeniusYield.Clb.Params
     GeniusYield.Examples.Common
     GeniusYield.Examples.Gift
     GeniusYield.Examples.Limbo

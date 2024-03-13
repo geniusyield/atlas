@@ -142,7 +142,6 @@ library
   other-modules:   GeniusYield.Utils
   build-depends:
     , aeson                  ^>=2.1.2.1
-    , async                  ^>=2.2.4
     , attoparsec             ^>=0.14.4
     , base                   ^>=4.16.4.0
     , base16-bytestring      ^>=1.0.2.0
@@ -162,7 +161,6 @@ library
     , http-api-data          ^>=0.5
     , http-client            ^>=0.7.13.1
     , http-client-tls        ^>=0.3.6.1
-    , http-media             ^>=0.8.0.0
     , http-types             ^>=0.12.3
     , indexed-traversable    ^>=0.1.2.1
     , katip                  ^>=0.8.7.4
@@ -171,19 +169,14 @@ library
     , mtl                    ^>=2.2.2
     , network-uri            ^>=2.6.4.2
     , postgresql-simple      ^>=0.6.5
-    , postgresql-simple-url  ^>=0.2.1.0
     , raven-haskell          ^>=0.1.4.1
-    , resource-pool          ^>=0.4.0.0
     , safe-money             ^>=0.9.1
     , scientific             ^>=0.3.7.0
     , servant                ^>=0.19.1
     , servant-client         ^>=0.19
     , servant-client-core    ^>=0.19
     , some                   ^>=1.0.5
-    , sop-core               ^>=0.5.0.2
-    , stm                    ^>=2.5.0.2
     , swagger2               ^>=2.8.7
-    , tagged                 ^>=0.8.7
     , tasty                  ^>=1.4.3
     , tasty-hunit            ^>=0.10.0.3
     , tasty-quickcheck       ^>=0.10.2

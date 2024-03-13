@@ -68,7 +68,7 @@ module GeniusYield.Types.Value (
     makeAssetClass
 ) where
 
-import           Control.Lens                     ((.~), (?~))
+import           Control.Lens                     ((?~))
 import           Data.Aeson                       (object, (.=))
 import qualified Data.Aeson.Key                   as K
 import qualified Data.Aeson.KeyMap                as KM

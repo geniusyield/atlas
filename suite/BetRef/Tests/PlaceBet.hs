@@ -37,17 +37,17 @@ import GeniusYield.TxBuilder
 -- | Our unit tests for placing bet operation
 placeBetTests :: TestTree
 placeBetTests = testGroup "Place Bet"
-    [  testRunGYClb "Simple spending tx" $ simplSpendingTxTrace
-    ,  testRunGYClb "Balance checks after placing first bet" $
+    [  mkTestFor "Simple spending tx" $ simplSpendingTxTrace
+    ,  mkTestFor "Balance checks after placing first bet" $
         firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000) 0_176_941 -- 0_173_069
-    , testRunGYClb "Balance checks with multiple bets" $ multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
+    , mkTestFor "Balance checks with multiple bets" $ multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
         [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
         , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
         , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
         , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
         , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> fakeGold 1_000)
         ]
-    , testRunGYClb "Not adding atleast bet step amount should fail" $ gyMustFail . multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
+    , mkTestFor "Not adding atleast bet step amount should fail" $ gyMustFail . multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
       [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
       , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
       , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
@@ -68,7 +68,7 @@ simplSpendingTxTrace Wallets{w1} = do
     gyLogDebug' "" $ printf "tx skeleton: %s" (show skeleton)
 
     -- balance assetion check
-    withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace 100178393)] $ do
+    withWalletBalanceCheck [w1 := valueNegate (valueFromLovelace 100178393)] $ do
       -- test itself
       dumpUtxoState
       txId <- sendSkeleton skeleton
@@ -119,7 +119,7 @@ firstBetTrace dat bet expectedFees ws@Wallets{w1} = do
   (brp, refScript) <- computeParamsAndAddRefScript 40 100 (valueFromLovelace 200_000_000) ws
   void $ runWalletGYClb w1 $ do  -- following operations are ran by first wallet, `w1`
     -- Second step: Perform the actual run.
-    withWalletBalancesCheckClb [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
+    withWalletBalanceCheck [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] $ do
       placeBetRun refScript brp dat bet Nothing
   -- pure ()
 
@@ -223,12 +223,10 @@ multipleBetsTraceCore brp refScript walletBets ws@Wallets{..} = do
       balanceDiffWithoutFees = getBalanceDiff walletBets Set.empty []
 
   -- The test itself
-  balanceBeforeAllTheseOps <- fmap fromJust $
-    runWalletGYClb w1 $ traverse (\(wallet, _value) -> balance wallet) balanceDiffWithoutFees
+  balanceBeforeAllTheseOps <- fmap fromJust $ runWalletGYClb w1 $ traverse (\(wallet, _value) -> balance wallet) balanceDiffWithoutFees
   gyLogDebug' "" $ printf "balanceBeforeAllTheseOps: %s" (mconcat balanceBeforeAllTheseOps)
   performBetOperations walletBets True
-  balanceAfterAllTheseOps <-  fmap fromJust $
-    runWalletGYClb w1 $ traverse (\(wallet, _value) -> balance wallet) balanceDiffWithoutFees
+  balanceAfterAllTheseOps <-  fmap fromJust $ runWalletGYClb w1 $ traverse (\(wallet, _value) -> balance wallet) balanceDiffWithoutFees
   gyLogDebug' "" $ printf "balanceAfterAllTheseOps: %s" (mconcat balanceAfterAllTheseOps)
   -- Check the difference
   void $ runWalletGYClb w1 $ verify (zip3 balanceDiffWithoutFees balanceBeforeAllTheseOps balanceAfterAllTheseOps)

@@ -10,6 +10,7 @@ Stability   : develop
 -}
 module GeniusYield.TxBuilder.Clb
     ( Wallet (..)
+    , WalletName
     , walletAddress
     , GYTxRunState (..)
     , GYTxMonadClb
@@ -19,7 +20,7 @@ module GeniusYield.TxBuilder.Clb
     -- , ownAddress
     , sendSkeleton
     , sendSkeleton'
-    , networkIdRun
+    -- , networkIdRun
     , dumpUtxoState
     , mustFail
     ) where
@@ -49,8 +50,6 @@ import qualified Ouroboros.Consensus.HardFork.History      as Ouroboros
 import qualified PlutusLedgerApi.V1.Interval               as Plutus
 import qualified PlutusLedgerApi.V2                        as Plutus
 import qualified PlutusTx.Builtins.Internal                as Plutus
-
-import qualified Cardano.Simple.PlutusLedgerApi.V1.Scripts as Fork
 import           Data.Sequence                             (ViewR (..), viewr)
 import           GeniusYield.Imports
 import           GeniusYield.Transaction                   (GYCoinSelectionStrategy (GYRandomImproveMultiAsset))
@@ -92,7 +91,6 @@ import Clb (
   sendTx,
   ValidationResult (..),
   OnChainTx,
---   CardanoTx,
 
   LogEntry (LogEntry),
   LogLevel (..),
@@ -104,10 +102,24 @@ import Clb (
   logError,
  )
 import Clb qualified (dumpUtxoState)
-
-import GeniusYield.TxBuilder.Run (Wallet (..), WalletName)
 import PlutusLedgerApi.V2 qualified as PV2
 import Prettyprinter (pretty)
+import Control.Monad.Extra (maybeM)
+import GeniusYield.Test.Address
+
+
+type WalletName = String
+
+-- | Testing Wallet representation.
+data Wallet = Wallet
+    { walletPaymentSigningKey :: !GYPaymentSigningKey
+    , walletNetworkId         :: !GYNetworkId
+    , walletName              :: !WalletName
+    }
+    deriving (Show, Eq, Ord)
+
+instance HasAddress Wallet where
+    toAddress = addressToPlutus . walletAddress
 
 -- | Gets a GYAddress of a testing wallet.
 walletAddress :: Wallet -> GYAddress
@@ -189,12 +201,9 @@ mustFail act = do
         Log $ second (LogEntry Error . ((msg  <> ":") <> ). show) <$> Seq.drop (Seq.length pre) post
       msg = "Unnamed failure action"
 
-networkIdRun :: Clb GYNetworkId
-networkIdRun = do
-    n <- gets $ mockConfigNetworkId . mockConfig
-    return $ case n of
-        Ledger.Mainnet -> GYMainnet
-        Ledger.Testnet -> GYTestnetPreprod
+getNetworkId :: GYTxMonadClb GYNetworkId
+getNetworkId = maybeM (fail "Unsupported network") pure $
+    liftClb $ gets (networkIdFromApi . mockConfigNetworkId . mockConfig)
 
 instance MonadFail GYTxMonadClb where
     fail = GYTxMonadClb . throwError . Left
@@ -209,7 +218,7 @@ instance MonadError GYTxMonadException GYTxMonadClb where
 
 instance GYTxQueryMonad GYTxMonadClb where
 
-    networkId = liftClb networkIdRun
+    networkId = getNetworkId
 
     lookupDatum :: GYDatumHash -> GYTxMonadClb (Maybe GYDatum)
     lookupDatum h = liftClb $ do

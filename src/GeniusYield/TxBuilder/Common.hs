@@ -157,6 +157,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                     gytxInvalidBefore
                     gytxInvalidAfter
                     gytxSigs
+                    gytxMetadata
 
         go :: GYUTxOs -> GYTxBuildResult f -> [f (GYTxSkeleton v)] -> m (Either BuildTxException  (GYTxBuildResult f))
         go _         acc []             = pure $ Right $ reverseResult acc

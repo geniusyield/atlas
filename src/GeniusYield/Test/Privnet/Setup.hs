@@ -60,8 +60,7 @@ withSetup' ioSetup kont = do
     mvar <- newEmptyMVar
     cokont (const $ return ()) (\ctx -> do
         res <- kont ctx
-        putMVar mvar res
-        pure ())
+        putMVar mvar res)
     takeMVar mvar
 
 makeSetup :: IO Setup

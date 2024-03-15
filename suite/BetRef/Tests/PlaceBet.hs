@@ -20,7 +20,7 @@ import GeniusYield.TxBuilder.Clb
     ( GYTxMonadClb,
       Wallet(walletName),
       walletAddress,
-      sendSkeleton, dumpUtxoState, gyMustFail )
+      sendSkeleton, dumpUtxoState, mustFail )
 import GeniusYield.TxBuilder
     ( GYTxMonad,
       GYTxSkeleton,
@@ -145,7 +145,7 @@ computeParamsAndAddRefScript betUntil' betReveal' betStep Wallets{..} = do
     -- let store scripts in `w9`
     let w9addr = walletAddress w9
     gyLogDebug' "" $ "Wallet 9 addr: " <> show w9addr
-    mORef <- addRefScriptClb  w9addr (betRefValidator' brp)
+    mORef <- addRefScript w9addr (betRefValidator' brp)
     -- dumpUtxoState
     gyLogDebug' "" $ printf "reference script output: %s" (show mORef)
     case mORef of
@@ -223,22 +223,29 @@ multipleBetsTraceCore brp refScript walletBets ws@Wallets{..} = do
       balanceDiffWithoutFees = getBalanceDiff walletBets Set.empty []
 
   -- The test itself
-  balanceBeforeAllTheseOps <- fmap fromJust $ runWalletGYClb w1 $ traverse (\(wallet, _value) -> balanceClb wallet) balanceDiffWithoutFees
+  balanceBeforeAllTheseOps <- fmap fromJust $
+    runWalletGYClb w1 $ traverse (\(wallet, _value) -> balance wallet) balanceDiffWithoutFees
   gyLogDebug' "" $ printf "balanceBeforeAllTheseOps: %s" (mconcat balanceBeforeAllTheseOps)
   performBetOperations walletBets True
-  balanceAfterAllTheseOps <-  fmap fromJust $ runWalletGYClb w1 $ traverse (\(wallet, _value) -> balanceClb wallet) balanceDiffWithoutFees
+  balanceAfterAllTheseOps <-  fmap fromJust $
+    runWalletGYClb w1 $ traverse (\(wallet, _value) -> balance wallet) balanceDiffWithoutFees
   gyLogDebug' "" $ printf "balanceAfterAllTheseOps: %s" (mconcat balanceAfterAllTheseOps)
-
+  -- Check the difference
   void $ runWalletGYClb w1 $ verify (zip3 balanceDiffWithoutFees balanceBeforeAllTheseOps balanceAfterAllTheseOps)
-
   where
-    -- | Function to verify that the wallet indeed lost by /roughly/ the bet amount. We say /roughly/ as fees is assumed to be within (0, 1 ada].
+    -- | Function to verify that the wallet indeed lost by /roughly/ the bet amount.
+    -- We say /roughly/ as fees is assumed to be within (0, 1 ada].
     verify [] = return ()
     verify (((wallet, diff), vBefore, vAfter) : xs) =
       let vAfterWithoutFees = vBefore <> diff
           (expectedAdaWithoutFees, expectedOtherAssets) = valueSplitAda vAfterWithoutFees
           (actualAda, actualOtherAssets) = valueSplitAda vAfter
           threshold = 1_000_000  -- 1 ada
-      in if expectedOtherAssets == actualOtherAssets && actualAda < expectedAdaWithoutFees && expectedAdaWithoutFees - threshold <= actualAda then verify xs
-             -- valueGreater vAfterWithoutFees vAfter && valueGreaterOrEqual vAfter (valueMinus vAfterWithoutFees threshold) then verify xs
-         else fail ("For wallet " <> walletName wallet <> " expected value (without fees) " <> show vAfterWithoutFees <> " but actual is " <> show vAfter)
+      in
+        if expectedOtherAssets == actualOtherAssets
+            && actualAda < expectedAdaWithoutFees
+            && expectedAdaWithoutFees - threshold <= actualAda
+        then verify xs
+        else
+          fail ("For wallet " <> walletName wallet <> " expected value (without fees) " <>
+                show vAfterWithoutFees <> " but actual is " <> show vAfter)

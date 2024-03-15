@@ -37,10 +37,8 @@ module GeniusYield.Test.Utils
     , findLockedUtxosInBody
     , utxosInBody
     , addRefScript
-    , addRefScriptClb
-    , expectInsufficientFunds
     , addRefInput
-    , fakeGold, fakeIron
+    , waitUntilSlot
     , afterAllSucceed
     , feesFromLovelace
     , withMaxQCTests
@@ -68,8 +66,9 @@ import           Test.Tasty.HUnit (assertFailure, testCaseInfo)
 -- import           GeniusYield.Transaction
 -- import           GeniusYield.TxBuilder
 import           GeniusYield.Types
-import GeniusYield.TxBuilder.Clb (GYTxMonadClb, asClb, asRandClb, liftClb)
-import GeniusYield.TxBuilder.Clb qualified as Clb
+import qualified Cardano.Api.Shelley as Api.S
+
+import GeniusYield.Test.Address
 import Clb qualified (
   Clb,
   ClbState (mockInfo),
@@ -81,13 +80,13 @@ import Clb qualified (
   runClb,
   intToKeyPair,
   defaultBabbage,
---   EmulatorEra
+  waitSlot,
  )
 import qualified Cardano.Ledger.Api as L
 import qualified Test.Cardano.Ledger.Core.KeyPair as TL
 import Cardano.Ledger.Shelley.API (extractTx)
 import Cardano.Ledger.Babbage.Tx (AlonzoTx(body), BabbageTxBody (btbOutputs))
-import Cardano.Ledger.Babbage.TxBody (txOutScript)
+import Cardano.Ledger.Babbage.TxBody (txOutScript, txOutData)
 import qualified Data.Sequence.Strict as StrictSeq
 import qualified Cardano.Api                      as Api
 -- import qualified Cardano.Api.Shelley as Shelley
@@ -96,6 +95,11 @@ import Test.Tasty (TestTree)
 
 import Prettyprinter
 import Prettyprinter.Render.String (renderString)
+import PlutusTx
+import PlutusTx.Prelude qualified as PlutusTx
+import PlutusCore.Core (plcVersion100)
+import PlutusLedgerApi.V2.Contexts (ownCurrencySymbol)
+import Cardano.Ledger.Api.Tx.Body (getPlutusData)
 
 
 -------------------------------------------------------------------------------
@@ -464,9 +468,10 @@ utxosInBody Fork.Tx{txOutputs = os} txId = mapM (\i -> utxoAtTxOutRef (txOutRefF
 addRefScriptClb :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadClb (Maybe GYTxOutRef)
 addRefScriptClb addr script = do
     let script' = validatorToScript script
-    (tx, txId) <- Clb.sendSkeleton' (mustHaveOutput (mkGYTxOutNoDatum addr mempty) { gyTxOutRefS = Just script' })
+    (tx, txId) <- sendSkeleton' (mustHaveOutput (mkGYTxOutNoDatum addr mempty) { gyTxOutRefS = Just $ GYPlutusScript script' })
     let outputs =  btbOutputs $ body $  extractTx $ Clb.getOnChainTx tx
 
+    -- TODO: factor out
     let index = StrictSeq.findIndexL
             (\o ->
                 let lsh = fmap (apiHashToPlutus . Api.ScriptHash) $ L.hashScript <$> (txOutScript . sizedValue) o
@@ -475,49 +480,34 @@ addRefScriptClb addr script = do
             outputs
     return $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< index
 
+-- | Adds an input (whose datum we'll refer later) and returns the reference to it.
+addRefInput:: Bool       -- ^ Whether to inline this datum? FIXME: do we need False case?
+           -> GYAddress  -- ^ Where to place this output?
+           -> GYDatum    -- ^ Our datum.
+           -> GYTxMonadClb (Maybe GYTxOutRef)
+addRefInput toInline addr dat = do
+    (tx, txId) <- sendSkeleton'
+        (mustHaveOutput $ GYTxOut
+            addr
+            mempty
+            (Just (dat, if toInline then GYTxOutUseInlineDatum else GYTxOutDontUseInlineDatum))
+            Nothing
+        )
+    gyLogDebug' "" $ printf "Added reference input with txId %s" txId
 
--- -- | Adds the given script to the given address and returns the reference for it.
--- addRefScript :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadRun (Maybe GYTxOutRef)
--- addRefScript addr script = do
---     let script' = validatorToScript script
---     (Tx _ txBody, txId) <- sendSkeleton' (mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just $ GYPlutusScript script' }) []
---     -- now need to find utxo at given address which has the given reference script hm...
---     let index = findIndex (\o -> Plutus2.txOutReferenceScript o == Just (scriptPlutusHash script')) (Fork.txOutputs txBody)
---     return $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< index
+    -- Now we need to find the output's index that contains the datum we are adding.
+    let outputs =  btbOutputs $ body $  extractTx $ Clb.getOnChainTx tx
 
--- -- | Expect the transaction building to fail with a 'BalancingErrorInsufficientFunds' error
--- expectInsufficientFunds :: Wallet -> GYTxSkeleton v -> Run ()
--- expectInsufficientFunds w skeleton = do
---     m <- runWallet w $ catchError (Nothing <$ sendSkeleton skeleton) (return . Just)
---     case m of
---         Nothing       -> error "impossible case"
---         Just Nothing  -> logError "expected transaction to fail, but it didn't"
---         Just (Just e) -> case insufficientFunds e of
---             Nothing -> logError $ "expected transaction to fail because of insufficientFunds, but it failed for another reason: " <> show e
---             Just v  -> logInfo $ printf "transaction failed as expected due to insufficient funds: %s" v
---   where
---     insufficientFunds :: GYTxMonadException -> Maybe GYValue
---     insufficientFunds (GYApplicationException e) = case cast e of
---         Just (BuildTxBalancingError (BalancingErrorInsufficientFunds v)) -> Just v
---         _                                                                -> Nothing
---     insufficientFunds _                          = Nothing
-
--- -- | Adds an input (whose datum we'll refer later) and returns the reference to it.
--- addRefInput:: Bool       -- ^ Whether to inline this datum?
---            -> GYAddress  -- ^ Where to place this output?
---            -> GYDatum    -- ^ Our datum.
---            -> GYTxMonadRun (Maybe GYTxOutRef)
--- addRefInput toInline addr dat = do
---   (Tx _ txBody, txId) <- sendSkeleton' (mustHaveOutput $ GYTxOut addr mempty (Just (dat, if toInline then GYTxOutUseInlineDatum else GYTxOutDontUseInlineDatum)) Nothing) []
---   liftRun $ logInfo $ printf "Added reference input with txId %s" txId
---   outputsWithResolvedDatums <- mapM (resolveDatumFromPlutusOutput . Plutus2.txOutDatum ) (Fork.txOutputs txBody)
---   let mIndex = findIndex (\d -> Just dat == d) outputsWithResolvedDatums
---   return $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< mIndex
-
--- resolveDatumFromPlutusOutput :: GYTxQueryMonad m => Plutus2.OutputDatum -> m (Maybe GYDatum)
--- resolveDatumFromPlutusOutput (Plutus2.OutputDatum d)      = return $ Just $ datumFromPlutus d
--- resolveDatumFromPlutusOutput (Plutus2.OutputDatumHash dh) = lookupDatum $ unsafeDatumHashFromPlutus dh
--- resolveDatumFromPlutusOutput Plutus2.NoOutputDatum        = return Nothing
+    let index = StrictSeq.findIndexL
+            (\o ->
+                -- FIXME: This is ugly!
+                let lsd = datumFromPlutus
+                            . Plutus2.Datum . fromJust . fromData @BuiltinData. getPlutusData
+                                <$> (txOutData . sizedValue) o
+                in lsd == Just dat
+            )
+            outputs
+    return $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< index
 
 {- | Abstraction for explicitly building a Value representing the fees of a
      transaction.
@@ -562,7 +552,6 @@ withBalanceClb n a m = do
     new <- balanceClb a
     let diff = new `valueMinus` old
     gyLogDebug' "" $ printf "%s:\nold balance: %s\nnew balance: %s\ndiff: %s" n old new diff
-    -- gyLogDebug' "" $ pretty $ printf "%s:\nold balance: %s\nnew balance: %s\ndiff: %s" n old new diff
     return (b, diff)
 
 withWalletBalancesCheckClb :: [(Wallet, GYValue)] -> GYTxMonadClb a -> GYTxMonadClb a
@@ -572,3 +561,9 @@ withWalletBalancesCheckClb ((w, v) : xs) m = do
     unless (diff == v) $ do
         fail $ printf "expected balance difference of %s for wallet %s, but the actual difference was %s" v (walletName w) diff
     return b
+
+
+-- | Waits until a certain 'GYSlot'.
+-- Silently returns if the given slot is greater than the current slot.
+waitUntilSlot :: GYSlot -> GYTxMonadClb ()
+waitUntilSlot slot = liftClb $ Clb.waitSlot $ slotToApi slot

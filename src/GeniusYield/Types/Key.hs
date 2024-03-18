@@ -122,7 +122,6 @@ paymentVerificationKeyToLedger = coerce
 paymentVerificationKeyRawBytes :: GYPaymentVerificationKey -> BS8.ByteString
 paymentVerificationKeyRawBytes = Api.serialiseToRawBytes . paymentVerificationKeyToApi
 
-{-# DEPRECATED pubKeyHash "Use paymentKeyHash." #-}
 pubKeyHash :: GYPaymentVerificationKey -> GYPubKeyHash
 pubKeyHash = pubKeyHashFromApi . Api.verificationKeyHash . paymentVerificationKeyToApi
 

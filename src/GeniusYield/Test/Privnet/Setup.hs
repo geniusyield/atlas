@@ -11,11 +11,14 @@ module GeniusYield.Test.Privnet.Setup (
     makeSetup,
     Setup,
     withSetup,
-    withSetup',
+    -- withSetup',
 ) where
 
+{-
+import           Control.Concurrent             (newEmptyMVar, putMVar,
+                                                 takeMVar)
+-}
 import           Control.Exception              (IOException)
-import           Control.Concurrent             (newEmptyMVar, putMVar, takeMVar)
 import           System.Environment             (lookupEnv)
 import           System.Exit                    (exitFailure)
 import           System.FilePath                ((</>))
@@ -54,6 +57,10 @@ withSetup ioSetup putLog kont = do
     Setup cokont <- ioSetup
     cokont putLog kont
 
+{-
+TODO: WIP: Provide a variant of `withSetup` that can access `Ctx` to return a non-unit result.
+TODO: Can below implementation also accept @putLog@?
+-- | This is a variant of `withSetup` that can access `Ctx` to return a non-unit result.
 withSetup' :: IO Setup -> (Ctx -> IO a) -> IO a
 withSetup' ioSetup kont = do
     Setup cokont <- ioSetup
@@ -62,6 +69,7 @@ withSetup' ioSetup kont = do
         res <- kont ctx
         putMVar mvar res)
     takeMVar mvar
+-}
 
 makeSetup :: IO Setup
 makeSetup = do

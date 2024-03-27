@@ -1,9 +1,8 @@
 {
   description = "atlas-cardano";
- inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
+  inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
   inputs.nixpkgs.follows = "haskellNix/nixpkgs-unstable";
   inputs.flake-utils.url = "github:numtide/flake-utils";
-
   inputs.CHaP = {
       url = "github:input-output-hk/cardano-haskell-packages?ref=repo";
       flake = false;
@@ -16,6 +15,16 @@
     in
       flake-utils.lib.eachSystem supportedSystems (system:
       let
+        overlay = final: prev: {
+          haskell-nix = prev.haskell-nix // {
+            extraPkgconfigMappings = prev.haskell-nix.extraPkgconfigMappings // {
+                # String pkgconfig-depends names are mapped to lists of Nixpkgs
+                # package names
+                "libblst" = [ "blst" ];
+            };
+          };
+        };
+
         overlays = [ haskellNix.overlay
           (final: prev: {
             hixProject =
@@ -25,6 +34,7 @@
                 inputMap = { "https://input-output-hk.github.io/cardano-haskell-packages" = CHaP; };
               };
           })
+          overlay
         ];
         pkgs = import nixpkgs { inherit system overlays; inherit (haskellNix) config; };
         flake = pkgs.hixProject.flake {};

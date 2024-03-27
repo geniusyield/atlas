@@ -77,7 +77,6 @@ userPaymentVKey = userVKey
 userStakeVKey :: User -> Maybe GYStakeVerificationKey
 userStakeVKey = fmap stakeVerificationKey . userStakeSKey
 
-{-# DEPRECATED userPkh "User userPaymentPkh." #-}
 userPkh :: User -> GYPubKeyHash
 userPkh = toPubKeyHash . paymentKeyHash . paymentVerificationKey . userPaymentSKey
 

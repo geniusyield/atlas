@@ -153,7 +153,7 @@ library
 
   other-modules:   GeniusYield.Utils
   build-depends:
-    , aeson                 ^>=2.1.2.1
+    , aeson                 ^>=2.2.1.0
     , attoparsec            ^>=0.14.4
     , base                  ^>=4.18.2.0
     , base16-bytestring     ^>=1.0.2.0
@@ -189,11 +189,10 @@ library
     , servant-client-core   ^>=0.20
     , some                  ^>=1.0.5
     , swagger2              ^>=2.8.7
-    , tasty                 ^>=1.4.3
+    , tasty                 ^>=1.5
     , tasty-hunit           ^>=0.10.0.3
     , tasty-quickcheck      ^>=0.10.2
     , template-haskell      ^>=2.20.0.0
-    -- text won't work 2.1.1
     , text                  ^>=2.0.2
     , time                  ^>=1.12.2
     , transformers          ^>=0.6.1.0
@@ -250,7 +249,7 @@ library framework-onchain-plutustx
     GeniusYield.OnChain.TestToken
     GeniusYield.OnChain.TestToken.Compiled
 
-  build-depends:   base ^>= 4.18.1.0
+  build-depends:   base ^>= 4.18.2.0
 
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
   build-depends:

@@ -1,7 +1,5 @@
 {pkgs, config, ...}:
-  let indexState = "2024-03-15T17:07:52Z";
-  in {
-  # name = "project-name";
+  {
   compiler-nix-name = "ghc964"; # Version of GHC to use
 
   # Cross compilation support:
@@ -15,13 +13,21 @@
   # Tools to include in the development shell
   shell = {
     tools = {
-      cabal = { version = "3.10.1.0"; index-state = indexState; };
-      cabal-fmt = { index-state = indexState; };
-      haskell-language-server = { index-state = indexState; };
+      cabal = { };
+      cabal-fmt = { };
+      haskell-language-server = { };
+      fourmolu = { };
+      hlint = { };
     };
 
     buildInputs = with pkgs; [
       jq
+      haskellPackages.pretty-simple
     ];
+
+    # This force cabal to forget about the default folder.
+    shellHook = ''
+      export CABAL_DIR=$(pwd)/.cabal
+    '';
   };
 }

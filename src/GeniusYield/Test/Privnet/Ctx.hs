@@ -30,6 +30,7 @@ module GeniusYield.Test.Privnet.Ctx (
     ctxProviders,
     ctxSlotConfig,
     submitTx,
+    submitTx',
     -- * Helpers
     newTempUserCtx,
     ctxQueryBalance,
@@ -190,7 +191,7 @@ ctxProviders ctx = GYProviders
     }
 
 submitTx :: Ctx -> User -> GYTxBody -> IO GYTxId
-submitTx ctx@Ctx { ctxInfo } User {..} txBody = do
+submitTx ctx User {..} txBody = do
     let reqSigs = txBodyReqSignatories txBody
         tx =
           signGYTxBody' txBody $
@@ -198,8 +199,11 @@ submitTx ctx@Ctx { ctxInfo } User {..} txBody = do
               Nothing -> [GYSomeSigningKey userPaymentSKey]
               -- It might be the case that @cardano-api@ is clever enough to not add signature if it is not required but cursory look at their code suggests otherwise.
               Just stakeKey -> if Set.member (toPubKeyHash . stakeKeyHash . stakeVerificationKey $ stakeKey) reqSigs then [GYSomeSigningKey userPaymentSKey, GYSomeSigningKey stakeKey] else [GYSomeSigningKey userPaymentSKey]
-    txId <- nodeSubmitTx ctxInfo tx
+    submitTx' ctx tx
 
+submitTx' :: Ctx -> GYTx -> IO GYTxId
+submitTx' ctx@Ctx { ctxInfo } tx = do
+    txId <- nodeSubmitTx ctxInfo tx
     gyAwaitTxConfirmed (ctxProviders ctx) (GYAwaitTxParameters { maxAttempts = 30, checkInterval = 1_000_000, confirmations = 0 }) txId
     return txId
 

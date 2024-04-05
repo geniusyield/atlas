@@ -21,6 +21,7 @@ module GeniusYield.Types.TxBody (
     makeSignedTransaction',
     appendWitnessGYTx,
     signGYTx,
+    signGYTx',
     -- * Functions
     txBodyFromHex,
     txBodyFromHexBS,
@@ -105,10 +106,18 @@ appendWitnessGYTx' appendKeyWitnessList previousTx =
 
 -- | Sign a transaction with (potentially) multiple keys and add your witness(s) among previous key witnesses, if any.
 signGYTx :: ToShelleyWitnessSigningKey a =>  GYTx -> [a] -> GYTx
-signGYTx previousTx skeys =  -- Though could have been written in terms of `appendWitnessGYTx'` but that would duplicate work to obtain @txBody@ as it's also required here to get for `appendKeyWitnessList`.
+signGYTx previousTx skeys = signGYTx'' previousTx $ map toShelleyWitnessSigningKey skeys
+
+-- | Sign a transaction with (potentially) multiple keys and add your witness(s) among previous key witnesses, if any.
+signGYTx'' :: GYTx -> [Api.ShelleyWitnessSigningKey] -> GYTx
+signGYTx'' previousTx skeys =  -- Though could have been written in terms of `appendWitnessGYTx'` but that would duplicate work to obtain @txBody@ as it's also required here to get for `appendKeyWitnessList`.
   let (txBody, previousKeyWitnessesList) = Api.S.getTxBodyAndWitnesses $ txToApi previousTx
-      appendKeyWitnessList = map (Api.makeShelleyKeyWitness txBody . toShelleyWitnessSigningKey) skeys
+      appendKeyWitnessList = map (Api.makeShelleyKeyWitness txBody) skeys
   in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
+
+-- | Sign a transaction with (potentially) multiple keys of potentially different nature and add your witness(s) among previous key witnesses, if any.
+signGYTx' :: GYTx -> [GYSomeSigningKey] -> GYTx
+signGYTx' previousTx skeys = signGYTx'' previousTx (map (\(GYSomeSigningKey a) -> toShelleyWitnessSigningKey a) skeys)
 
 -- | Create an unsigned transaction from the body.
 unsignedTx :: GYTxBody -> GYTx

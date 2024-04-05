@@ -408,6 +408,9 @@ instance Web.FromHttpApiData GYMintingPolicyId where
           Left x    -> fail $ "Invalid currency symbol: " ++ show cs ++ "; Reason: " ++ show x
           Right cs' -> return $ mintingPolicyIdFromApi cs'
 
+instance Web.ToHttpApiData GYMintingPolicyId where
+  toUrlPiece = mintingPolicyIdToText
+
 instance Swagger.ToParamSchema GYMintingPolicyId where
   toParamSchema _ = mempty
       & Swagger.type_           ?~ Swagger.SwaggerString

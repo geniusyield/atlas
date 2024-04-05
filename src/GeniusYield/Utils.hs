@@ -19,7 +19,6 @@ import           Cardano.Api          (SerialiseAsRawBytes (serialiseToRawBytes)
 import           Codec.Binary.Bech32  as Bech32
 import           Control.Monad.Except (ExceptT (..))
 import           Data.Char            (toLower)
-
 import           GeniusYield.Imports
 
 -- | @fieldNamePrefixStrip2 "muAssets" == "assets"@

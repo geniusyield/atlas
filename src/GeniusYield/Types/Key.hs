@@ -544,6 +544,9 @@ generateStakeSigningKey = stakeSigningKeyFromApi <$> Api.generateSigningKey Api.
 
 data GYSomeSigningKey = forall a. (ToShelleyWitnessSigningKey a, Show a) => GYSomeSigningKey a
 
+instance ToShelleyWitnessSigningKey GYSomeSigningKey where
+  toShelleyWitnessSigningKey (GYSomeSigningKey skey) = toShelleyWitnessSigningKey skey
+
 readSomeSigningKey :: FilePath -> IO GYSomeSigningKey
 readSomeSigningKey file = do
     e <- Api.readFileTextEnvelopeAnyOf

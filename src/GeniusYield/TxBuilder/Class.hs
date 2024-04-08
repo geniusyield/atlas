@@ -152,6 +152,17 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     utxosAtPaymentCredentialWithDatums :: GYPaymentCredential -> m [(GYUTxO, Maybe GYDatum)]
     utxosAtPaymentCredentialWithDatums = gyQueryUtxosAtPaymentCredWithDatumsDefault utxosAtPaymentCredential lookupDatum
 
+    -- | Lookup 'GYUTxOs' at zero or more 'GYPaymentCredential'.
+    utxosAtPaymentCredentials :: [GYPaymentCredential] -> m GYUTxOs
+    utxosAtPaymentCredentials = foldM f mempty
+      where
+        f :: GYUTxOs -> GYPaymentCredential -> m GYUTxOs
+        f utxos paymentCred = (<> utxos) <$> utxosAtPaymentCredential paymentCred
+
+    -- | Lookup UTxOs at zero or more 'GYPaymentCredential' with their datums. This has a default implementation using `utxosAtPaymentCredentials` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
+    utxosAtPaymentCredentialsWithDatums :: [GYPaymentCredential] -> m [(GYUTxO, Maybe GYDatum)]
+    utxosAtPaymentCredentialsWithDatums = gyQueryUtxosAtPaymentCredsWithDatumsDefault utxosAtPaymentCredentials lookupDatum
+
     {- | Obtain the slot config for the network.
 
     Implementations using era history to create slot config may raise 'GYEraSummariesToSlotConfigError'.
@@ -196,6 +207,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     utxosAtPaymentCredentialWithDatums = lift . utxosAtPaymentCredentialWithDatums
+    utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
+    utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
@@ -219,6 +232,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     utxosAtPaymentCredentialWithDatums = lift . utxosAtPaymentCredentialWithDatums
+    utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
+    utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
@@ -242,6 +257,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     utxoRefsAtAddress = lift . utxoRefsAtAddress
     utxosAtPaymentCredential = lift . utxosAtPaymentCredential
     utxosAtPaymentCredentialWithDatums = lift . utxosAtPaymentCredentialWithDatums
+    utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
+    utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s

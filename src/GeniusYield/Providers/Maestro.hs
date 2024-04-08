@@ -20,6 +20,7 @@ module GeniusYield.Providers.Maestro
   , maestroEraHistory
   , maestroLookupDatum
   , maestroUtxosAtAddressesWithDatums
+  , maestroUtxosAtPaymentCredentialsWithDatums
   ) where
 
 import qualified Cardano.Api                          as Api
@@ -305,6 +306,31 @@ maestroUtxosAtPaymentCredentialWithDatums env paymentCredential = do
   where
     locationIdent = "PaymentCredentialUtxos"
 
+-- | Query UTxOs present at multiple payment credentials.
+maestroUtxosAtPaymentCredentials :: Maestro.MaestroEnv 'Maestro.V1 -> [GYPaymentCredential] -> IO GYUTxOs
+maestroUtxosAtPaymentCredentials env pcs = do
+  let paymentCredentialsBech32 = map paymentCredentialToBech32 pcs
+  -- Here one would not get `MaestroNotFound` error.
+  utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosByMultiPaymentCredentials env (Just False) (Just False)) $ coerce paymentCredentialsBech32)
+
+  either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro utxos)
+  where
+    locationIdent = "PaymentCredentialsUtxos"
+
+-- | Query UTxOs present at multiple payment credentials with datums.
+maestroUtxosAtPaymentCredentialsWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> [GYPaymentCredential] -> IO [(GYUTxO, Maybe GYDatum)]
+maestroUtxosAtPaymentCredentialsWithDatums env pcs = do
+  let paymentCredentialsBech32 = map paymentCredentialToBech32 pcs
+  -- Here one would not get `MaestroNotFound` error.
+  utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosByMultiPaymentCredentials env (Just True) (Just False)) $ coerce paymentCredentialsBech32)
+
+  either
+    (throwIO . MspvDeserializeFailure locationIdent)
+    pure
+    $ traverse utxoFromMaestroWithDatum utxos
+  where
+    locationIdent = "PaymentCredentialsUtxosWithDatums"
+
 -- | Returns a list containing all 'GYTxOutRef' for a given 'GYAddress'.
 maestroRefsAtAddress :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> IO [GYTxOutRef]
 maestroRefsAtAddress env addr = do
@@ -389,6 +415,8 @@ maestroQueryUtxo env = GYQueryUTxO
   , gyQueryUtxosAtAddressesWithDatums'   = Just $ maestroUtxosAtAddressesWithDatums env
   , gyQueryUtxosAtPaymentCredential'     = maestroUtxosAtPaymentCredential env
   , gyQueryUtxosAtPaymentCredWithDatums' = Just $ maestroUtxosAtPaymentCredentialWithDatums env
+  , gyQueryUtxosAtPaymentCredentials'    = maestroUtxosAtPaymentCredentials env
+  , gyQueryUtxosAtPaymentCredsWithDatums' = Just $ maestroUtxosAtPaymentCredentialsWithDatums env
   }
 
 -------------------------------------------------------------------------------

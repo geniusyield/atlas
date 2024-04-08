@@ -41,6 +41,7 @@ import           GeniusYield.Types            (GYAddress, GYAddressBech32,
                                                GYUTxO (..), GYUTxOs, GYValue,
                                                addressFromBech32, addressToText,
                                                gyQueryUtxoAtAddressesDefault,
+                                               gyQueryUtxoAtPaymentCredentialsDefault,
                                                gyQueryUtxoRefsAtAddressDefault,
                                                gyQueryUtxosAtTxOutRefsDefault,
                                                paymentCredentialToHexText,
@@ -289,6 +290,8 @@ kupoQueryUtxo env =
     , gyQueryUtxosAtAddressesWithDatums' = Nothing
     , gyQueryUtxosAtPaymentCredential' = kupoUtxosAtPaymentCredential env
     , gyQueryUtxosAtPaymentCredWithDatums' = Nothing
+    , gyQueryUtxosAtPaymentCredentials' = gyQueryUtxoAtPaymentCredentialsDefault $ kupoUtxosAtPaymentCredential env
+    , gyQueryUtxosAtPaymentCredsWithDatums' = Nothing
     }
 
 kupoAwaitTxConfirmed :: KupoApiEnv -> GYAwaitTx

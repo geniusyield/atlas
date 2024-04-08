@@ -35,6 +35,7 @@ module GeniusYield.Types.Providers
       -- * Query UTxO
     , gyQueryUtxosAtAddressWithDatumsDefault
     , gyQueryUtxosAtAddressesWithDatumsDefault
+    , gyQueryUtxosAtPaymentCredsWithDatumsDefault
     , gyQueryUtxosAtPaymentCredWithDatumsDefault
     , gyQueryUtxosAtTxOutRefsWithDatumsDefault
     , GYQueryUTxO (..)
@@ -42,14 +43,17 @@ module GeniusYield.Types.Providers
     , gyQueryUtxosAtAddressWithDatums
     , gyQueryUtxosAtAddressesWithDatums
     , gyQueryUtxosAtPaymentCredWithDatums
+    , gyQueryUtxosAtPaymentCredsWithDatums
     , gyQueryUtxosAtAddress
     , gyQueryUtxosAtPaymentCredential
+    , gyQueryUtxosAtPaymentCredentials
     , gyQueryUtxosAtTxOutRefs
     , gyQueryUtxosAtTxOutRefsWithDatums
     , gyQueryUtxoAtTxOutRef
     , gyQueryUtxoRefsAtAddress
     , gyQueryUtxoRefsAtAddressDefault
     , gyQueryUtxoAtAddressesDefault
+    , gyQueryUtxoAtPaymentCredentialsDefault
     , gyQueryUtxosAtTxOutRefsDefault
       -- * Logging
     , GYLog (..)
@@ -153,6 +157,9 @@ gyQueryUtxosAtAddresses = gyQueryUtxosAtAddresses' . gyQueryUTxO
 gyQueryUtxosAtPaymentCredential :: GYProviders -> GYPaymentCredential -> IO GYUTxOs
 gyQueryUtxosAtPaymentCredential = gyQueryUtxosAtPaymentCredential' . gyQueryUTxO
 
+gyQueryUtxosAtPaymentCredentials :: GYProviders -> [GYPaymentCredential] -> IO  GYUTxOs
+gyQueryUtxosAtPaymentCredentials = gyQueryUtxosAtPaymentCredentials' . gyQueryUTxO
+
 gyQueryUtxosAtAddressWithDatums :: GYProviders -> GYAddress -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]
 gyQueryUtxosAtAddressWithDatums provider addr mAssetClass =
   case gyQueryUtxosAtAddressWithDatums' $ gyQueryUTxO provider of
@@ -170,6 +177,12 @@ gyQueryUtxosAtPaymentCredWithDatums provider cred =
   case gyQueryUtxosAtPaymentCredWithDatums' $ gyQueryUTxO provider of
     Nothing -> gyQueryUtxosAtPaymentCredWithDatumsDefault (gyQueryUtxosAtPaymentCredential provider) (gyLookupDatum provider) cred
     Just f  -> f cred
+
+gyQueryUtxosAtPaymentCredsWithDatums :: GYProviders -> [GYPaymentCredential] -> IO [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtPaymentCredsWithDatums provider pcs =
+  case gyQueryUtxosAtPaymentCredsWithDatums' $ gyQueryUTxO provider of
+    Nothing -> gyQueryUtxosAtPaymentCredsWithDatumsDefault (gyQueryUtxosAtPaymentCredentials provider) (gyLookupDatum provider) pcs
+    Just f  -> f pcs
 
 gyQueryUtxosAtTxOutRefs :: GYProviders -> [GYTxOutRef] -> IO GYUTxOs
 gyQueryUtxosAtTxOutRefs = gyQueryUtxosAtTxOutRefs' . gyQueryUTxO
@@ -423,16 +436,26 @@ data GYQueryUTxO = GYQueryUTxO
     , gyQueryUtxosAtPaymentCredential'     :: !(GYPaymentCredential -> IO GYUTxOs)
     , gyQueryUtxosAtPaymentCredWithDatums' :: !(Maybe (GYPaymentCredential -> IO [(GYUTxO, Maybe GYDatum)]))
     -- ^ `gyQueryUtxosAtPaymentCredWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
+    , gyQueryUtxosAtPaymentCredentials'    :: !([GYPaymentCredential] -> IO GYUTxOs)
+    , gyQueryUtxosAtPaymentCredsWithDatums'
+                                           :: !(Maybe ([GYPaymentCredential] -> IO [(GYUTxO, Maybe GYDatum)]))
+    -- ^ `gyQueryUtxosAtPaymentCredsWithDatums'` is as `Maybe` so that if an implementation is not given, a default one is used.
     }
 
 -- | Query Utxo Refs at address (default implementation)
 gyQueryUtxoRefsAtAddressDefault :: (GYAddress -> Maybe GYAssetClass -> IO GYUTxOs) -> GYAddress -> IO [GYTxOutRef]
 gyQueryUtxoRefsAtAddressDefault queryUtxosAtAddress = fmap utxosRefs . (`queryUtxosAtAddress` Nothing)
 
--- | Query Utxo for address (default implementation)
+-- | Query Utxo for addresses (default implementation)
 gyQueryUtxoAtAddressesDefault :: (GYAddress -> Maybe GYAssetClass -> IO GYUTxOs) -> [GYAddress] -> IO GYUTxOs
 gyQueryUtxoAtAddressesDefault queryUtxosAtAddress addrs = do
   utxos <- traverse (`queryUtxosAtAddress` Nothing) addrs
+  pure $ mconcat utxos
+
+-- | Query Utxo for payment credentials (default implementation)
+gyQueryUtxoAtPaymentCredentialsDefault :: (GYPaymentCredential -> IO GYUTxOs) -> [GYPaymentCredential] -> IO GYUTxOs
+gyQueryUtxoAtPaymentCredentialsDefault queryUtxosAtPaymentCredential pcs = do
+  utxos <- traverse queryUtxosAtPaymentCredential pcs  -- TODO: Add asset class.
   pure $ mconcat utxos
 
 -- | Query Utxos at output refs (default implementation).
@@ -451,6 +474,12 @@ gyQueryUtxosAtAddressWithDatumsDefault utxosAtAddressFun lookupDatumFun addr mAs
 gyQueryUtxosAtAddressesWithDatumsDefault :: Monad m => ([GYAddress] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYAddress] -> m [(GYUTxO, Maybe GYDatum)]
 gyQueryUtxosAtAddressesWithDatumsDefault utxosAtAddressesFun lookupDatumFun addrs = do
   utxosWithoutDatumResolutions <- utxosAtAddressesFun addrs
+  utxosDatumResolver utxosWithoutDatumResolutions lookupDatumFun
+
+-- | Lookup UTxOs at zero or more 'GYPaymentCredential' with their datums. This is a default implementation using `utxosAtPaymentCredentials` and `lookupDatum`.
+gyQueryUtxosAtPaymentCredsWithDatumsDefault :: Monad m => ([GYPaymentCredential] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYPaymentCredential] -> m [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtPaymentCredsWithDatumsDefault utxosAtPaymentCredsFun lookupDatumFun pcs = do
+  utxosWithoutDatumResolutions <- utxosAtPaymentCredsFun pcs
   utxosDatumResolver utxosWithoutDatumResolutions lookupDatumFun
 
 -- | Lookup UTxOs at given 'GYPaymentCredential' with their datums. This is a default implementation using `utxosAtPaymentCredential` and `lookupDatum`.

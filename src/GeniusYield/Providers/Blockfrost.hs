@@ -182,6 +182,8 @@ blockfrostQueryUtxo proj = GYQueryUTxO
     , gyQueryUtxosAtAddressesWithDatums'   = Nothing  -- Will use the default implementation.
     , gyQueryUtxosAtPaymentCredential'     = blockfrostUtxosAtPaymentCredential proj
     , gyQueryUtxosAtPaymentCredWithDatums' = Nothing  -- Will use the default implementation.
+    , gyQueryUtxosAtPaymentCredentials'    = gyQueryUtxoAtPaymentCredentialsDefault $ blockfrostUtxosAtPaymentCredential proj
+    , gyQueryUtxosAtPaymentCredsWithDatums' = Nothing  -- Will use the default implementation.
     }
 
 transformUtxo :: (Blockfrost.AddressUtxo, Maybe (Some GYScript)) -> Either SomeDeserializeError GYUTxO
@@ -432,9 +434,9 @@ blockfrostLookupDatum :: Blockfrost.Project -> GYLookupDatum
 blockfrostLookupDatum p dh = do
     datumMaybe <- handler <=< Blockfrost.runBlockfrost p
         . Blockfrost.getScriptDatum . Blockfrost.DatumHash . Text.pack . show $ datumHashToPlutus dh
-    sequence $ datumMaybe <&> \(Blockfrost.ScriptDatum v) -> case fromJson @Plutus.BuiltinData (Aeson.encode v) of
+    mapM (\(Blockfrost.ScriptDatum v) -> case fromJson @Plutus.BuiltinData (Aeson.encode v) of
       Left err -> throwIO $ BlpvDeserializeFailure locationIdent err
-      Right bd -> pure $ datumFromPlutus' bd
+      Right bd -> pure $ datumFromPlutus' bd) datumMaybe
   where
     -- This particular error is fine in this case, we can just return 'Nothing'.
     handler (Left Blockfrost.BlockfrostNotFound) = pure Nothing

@@ -294,7 +294,7 @@ maestroUtxosAtPaymentCredential env paymentCredential mAssetClass = do
 
   either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro utxos)
   where
-    locationIdent = "PaymentCredentialUtxosWithDatums"
+    locationIdent = "PaymentCredentialUtxos"
 
 -- | Query UTxOs present at payment credential with their associated datum fetched (under best effort basis).
 maestroUtxosAtPaymentCredentialWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> GYPaymentCredential -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]
@@ -309,7 +309,7 @@ maestroUtxosAtPaymentCredentialWithDatums env paymentCredential mAssetClass = do
     pure
     $ traverse utxoFromMaestroWithDatum utxos
   where
-    locationIdent = "PaymentCredentialUtxos"
+    locationIdent = "PaymentCredentialUtxosWithDatums"
 
 -- | Query UTxOs present at multiple payment credentials.
 maestroUtxosAtPaymentCredentials :: Maestro.MaestroEnv 'Maestro.V1 -> [GYPaymentCredential] -> IO GYUTxOs

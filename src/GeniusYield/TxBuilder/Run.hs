@@ -169,10 +169,14 @@ instance GYTxQueryMonad GYTxMonadRun where
                 Left _     -> return Nothing
                 Right ref' -> utxoAtTxOutRef ref'
 
-    utxosAtPaymentCredential cred = do
+    utxosAtPaymentCredential cred mAssetClass = do
         refs  <- liftRun $ txOutRefAtPaymentCred $ paymentCredentialToPlutus cred
         utxos <- wither f refs
-        return $ utxosFromList utxos
+        let utxos' =
+              case mAssetClass of
+                Nothing -> utxos
+                Just ac -> filter (\GYUTxO {..} -> valueAssetClass utxoValue ac > 0) utxos
+        return $ utxosFromList utxos'
       where
         f :: Plutus.TxOutRef -> GYTxMonadRun (Maybe GYUTxO)
         f ref = do

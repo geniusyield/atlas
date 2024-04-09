@@ -91,14 +91,14 @@ instance GYTxQueryMonad GYTxMonadNode where
     utxosAtAddressWithDatums addr mAssetClass = GYTxMonadNode $ \env ->
         gyQueryUtxosAtAddressWithDatums (envProviders env) addr mAssetClass
 
-    utxosAtPaymentCredential cred = GYTxMonadNode $ \env ->
-        gyQueryUtxosAtPaymentCredential (envProviders env) cred
+    utxosAtPaymentCredential cred mAssetClass = GYTxMonadNode $ \env ->
+        gyQueryUtxosAtPaymentCredential (envProviders env) cred mAssetClass
 
     utxosAtAddressesWithDatums addrs = GYTxMonadNode $ \env ->
         gyQueryUtxosAtAddressesWithDatums (envProviders env) addrs
 
-    utxosAtPaymentCredentialWithDatums cred = GYTxMonadNode $ \env ->
-        gyQueryUtxosAtPaymentCredWithDatums (envProviders env) cred
+    utxosAtPaymentCredentialWithDatums cred mAssetClass = GYTxMonadNode $ \env ->
+        gyQueryUtxosAtPaymentCredWithDatums (envProviders env) cred mAssetClass
 
     utxosAtPaymentCredentialsWithDatums pcs = GYTxMonadNode $ \env ->
         gyQueryUtxosAtPaymentCredsWithDatums (envProviders env) pcs

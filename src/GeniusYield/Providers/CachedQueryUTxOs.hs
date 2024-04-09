@@ -19,7 +19,7 @@ import           GeniusYield.Types
 data CachedQueryUTxO = CachedQueryUTxO
     { _cquAddrCache        :: !(Cache.Cache (GYAddress, Maybe GYAssetClass) GYUTxOs)
     , _cquRefCache         :: !(Cache.Cache GYTxOutRef (Maybe GYUTxO))
-    , _cquPaymentCredCache :: !(Cache.Cache GYPaymentCredential GYUTxOs)
+    , _cquPaymentCredCache :: !(Cache.Cache (GYPaymentCredential, Maybe GYAssetClass) GYUTxOs)
     , _cquInfo             :: !GYQueryUTxO
     , _cquLog              :: !GYLog
     }
@@ -104,14 +104,14 @@ cachedUtxosAtAddress ctx@(CachedQueryUTxO cache _ _ q (GYLog log' _)) addr mAsse
       log' mempty GYDebug $ "address cached:"  <> show addr
       return res
 
-cachedUtxosAtPaymentCred :: CachedQueryUTxO -> GYPaymentCredential -> IO GYUTxOs
-cachedUtxosAtPaymentCred ctx@(CachedQueryUTxO _ _ cache q (GYLog log' _)) cred = do
-  m <- Cache.lookup' cache cred
+cachedUtxosAtPaymentCred :: CachedQueryUTxO -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
+cachedUtxosAtPaymentCred ctx@(CachedQueryUTxO _ _ cache q (GYLog log' _)) cred mAssetClass = do
+  m <- Cache.lookup' cache (cred, mAssetClass)
   case m of
     Nothing    -> do
       log' mempty GYDebug $ "payment credential not cached: " <> show cred
-      res <- gyQueryUtxosAtPaymentCredential' q cred
-      Cache.insert cache cred res
+      res <- gyQueryUtxosAtPaymentCredential' q cred mAssetClass
+      Cache.insert cache (cred, mAssetClass) res
       storeCacheUTxO ctx res
       return  res
     Just res -> do

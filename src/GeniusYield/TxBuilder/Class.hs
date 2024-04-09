@@ -146,10 +146,10 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     utxoRefsAtAddress = fmap (Map.keys . mapUTxOs id) . flip utxosAtAddress Nothing
 
     -- | Lookup 'GYUTxOs' at 'GYPaymentCredential'.
-    utxosAtPaymentCredential :: GYPaymentCredential -> m GYUTxOs
+    utxosAtPaymentCredential :: GYPaymentCredential -> Maybe GYAssetClass -> m GYUTxOs
 
     -- | Lookup UTxOs at given 'GYPaymentCredential' with their datums. This has a default implementation using `utxosAtPaymentCredential` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
-    utxosAtPaymentCredentialWithDatums :: GYPaymentCredential -> m [(GYUTxO, Maybe GYDatum)]
+    utxosAtPaymentCredentialWithDatums :: GYPaymentCredential -> Maybe GYAssetClass -> m [(GYUTxO, Maybe GYDatum)]
     utxosAtPaymentCredentialWithDatums = gyQueryUtxosAtPaymentCredWithDatumsDefault utxosAtPaymentCredential lookupDatum
 
     -- | Lookup 'GYUTxOs' at zero or more 'GYPaymentCredential'.
@@ -157,7 +157,7 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     utxosAtPaymentCredentials = foldM f mempty
       where
         f :: GYUTxOs -> GYPaymentCredential -> m GYUTxOs
-        f utxos paymentCred = (<> utxos) <$> utxosAtPaymentCredential paymentCred
+        f utxos paymentCred = (<> utxos) <$> utxosAtPaymentCredential paymentCred Nothing
 
     -- | Lookup UTxOs at zero or more 'GYPaymentCredential' with their datums. This has a default implementation using `utxosAtPaymentCredentials` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
     utxosAtPaymentCredentialsWithDatums :: [GYPaymentCredential] -> m [(GYUTxO, Maybe GYDatum)]
@@ -205,8 +205,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
-    utxosAtPaymentCredential = lift . utxosAtPaymentCredential
-    utxosAtPaymentCredentialWithDatums = lift . utxosAtPaymentCredentialWithDatums
+    utxosAtPaymentCredential pc = lift . utxosAtPaymentCredential pc
+    utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
     utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
     utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
     slotConfig = lift slotConfig
@@ -230,8 +230,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
-    utxosAtPaymentCredential = lift . utxosAtPaymentCredential
-    utxosAtPaymentCredentialWithDatums = lift . utxosAtPaymentCredentialWithDatums
+    utxosAtPaymentCredential pc = lift . utxosAtPaymentCredential pc
+    utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
     utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
     utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
     slotConfig = lift slotConfig
@@ -255,8 +255,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     utxosAtAddresses = lift . utxosAtAddresses
     utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
     utxoRefsAtAddress = lift . utxoRefsAtAddress
-    utxosAtPaymentCredential = lift . utxosAtPaymentCredential
-    utxosAtPaymentCredentialWithDatums = lift . utxosAtPaymentCredentialWithDatums
+    utxosAtPaymentCredential pc = lift . utxosAtPaymentCredential pc
+    utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
     utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
     utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
     slotConfig = lift slotConfig

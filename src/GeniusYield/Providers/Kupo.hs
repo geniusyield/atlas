@@ -241,11 +241,15 @@ kupoUtxoAtTxOutRef env oref = do
  where
   locationIdent = "UtxoByRef"
 
-kupoUtxosAtPaymentCredential :: KupoApiEnv -> GYPaymentCredential -> IO GYUTxOs
-kupoUtxosAtPaymentCredential env cred = do
+kupoUtxosAtPaymentCredential :: KupoApiEnv -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
+kupoUtxosAtPaymentCredential env cred mAssetClass = do
+  let extractedAssetClass = extractAssetClass mAssetClass
+      commonRequestPart = fetchUtxosByPattern (paymentCredentialToHexText cred <> "/*") True
   credUtxos <-
     handleKupoError locationIdent <=< runKupoClient env $
-      fetchUtxosByPattern (paymentCredentialToHexText cred <> "/*") True Nothing Nothing
+      case extractedAssetClass of
+        Nothing       -> commonRequestPart Nothing Nothing
+        Just (mp, tn) -> commonRequestPart (Just mp) (Just tn)
   utxosFromList <$> traverse (transformUtxo env) (getResponse credUtxos)
  where
   locationIdent = "PaymentCredentialUtxos"

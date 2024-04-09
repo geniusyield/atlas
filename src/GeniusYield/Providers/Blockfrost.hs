@@ -221,13 +221,16 @@ blockfrostUtxosAtAddress proj addr mAssetClass = do
     handler (Left Blockfrost.BlockfrostNotFound) = pure []
     handler other                                = handleBlockfrostError locationIdent other
 
-blockfrostUtxosAtPaymentCredential :: Blockfrost.Project -> GYPaymentCredential -> IO GYUTxOs
-blockfrostUtxosAtPaymentCredential proj cred = do
+blockfrostUtxosAtPaymentCredential :: Blockfrost.Project -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
+blockfrostUtxosAtPaymentCredential proj cred mAssetClass = do
+    let extractedAssetClass = extractAssetClass mAssetClass
     {- 'Blockfrost.getAddressUtxos' doesn't return all utxos at that address, only the first 100 or so.
     Have to handle paging manually for all. -}
     credUtxos  <- handler <=< Blockfrost.runBlockfrost proj
         . Blockfrost.allPages $ \paged ->
-            Blockfrost.getAddressUtxos' (gyPaymentCredentialToBlockfrost cred) paged Blockfrost.Ascending
+            case extractedAssetClass of
+                Nothing -> Blockfrost.getAddressUtxos' (gyPaymentCredentialToBlockfrost cred) paged Blockfrost.Ascending
+                Just (ac, tn) -> Blockfrost.getAddressUtxosAsset' (gyPaymentCredentialToBlockfrost cred) (Blockfrost.mkAssetId $ ac <> tn) paged Blockfrost.Ascending
     credUtxos' <- mapM (\x -> lookupScriptHashIO proj (Blockfrost._addressUtxoReferenceScriptHash x) >>= \mrs -> return (x, mrs)) credUtxos
     case traverse transformUtxo credUtxos' of
       Left err -> throwIO $ BlpvDeserializeFailure locationIdent err

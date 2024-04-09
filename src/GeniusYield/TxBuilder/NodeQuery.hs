@@ -67,10 +67,10 @@ instance GYTxQueryMonad GYTxQueryMonadNode where
       GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyQueryUtxosAtAddressWithDatums providers addr mAssetClass
 
-    utxosAtPaymentCredential cred = do
+    utxosAtPaymentCredential cred mAssetClass = do
       logMsg mempty GYInfo $ printf "Querying UTxOs at payment credential: %s" cred
       GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
-        gyQueryUtxosAtPaymentCredential providers cred
+        gyQueryUtxosAtPaymentCredential providers cred mAssetClass
 
     utxosAtAddresses addrs = do
       logMsg mempty GYInfo $ printf "Querying utxos At Addresses: \n %s" (show addrs)
@@ -82,10 +82,10 @@ instance GYTxQueryMonad GYTxQueryMonadNode where
       GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyQueryUtxosAtAddressesWithDatums providers addrs
 
-    utxosAtPaymentCredentialWithDatums cred = do
+    utxosAtPaymentCredentialWithDatums cred mAssetClass = do
       logMsg mempty GYInfo $ printf "Querying utxos (with datums) at credential: \n %s" (show cred)
       GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
-        gyQueryUtxosAtPaymentCredWithDatums providers cred
+        gyQueryUtxosAtPaymentCredWithDatums providers cred mAssetClass
 
     utxosAtPaymentCredentials pcs = do
       logMsg mempty GYInfo $ printf "Querying utxos at payment credentials: \n %s" (show pcs)

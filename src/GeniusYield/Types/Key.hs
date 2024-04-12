@@ -122,7 +122,6 @@ paymentVerificationKeyToLedger = coerce
 paymentVerificationKeyRawBytes :: GYPaymentVerificationKey -> BS8.ByteString
 paymentVerificationKeyRawBytes = Api.serialiseToRawBytes . paymentVerificationKeyToApi
 
-{-# DEPRECATED pubKeyHash "Use paymentKeyHash." #-}
 pubKeyHash :: GYPaymentVerificationKey -> GYPubKeyHash
 pubKeyHash = pubKeyHashFromApi . Api.verificationKeyHash . paymentVerificationKeyToApi
 
@@ -544,6 +543,9 @@ generateStakeSigningKey :: IO GYStakeSigningKey
 generateStakeSigningKey = stakeSigningKeyFromApi <$> Api.generateSigningKey Api.AsStakeKey
 
 data GYSomeSigningKey = forall a. (ToShelleyWitnessSigningKey a, Show a) => GYSomeSigningKey a
+
+instance ToShelleyWitnessSigningKey GYSomeSigningKey where
+  toShelleyWitnessSigningKey (GYSomeSigningKey skey) = toShelleyWitnessSigningKey skey
 
 readSomeSigningKey :: FilePath -> IO GYSomeSigningKey
 readSomeSigningKey file = do

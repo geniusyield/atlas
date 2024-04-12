@@ -20,6 +20,7 @@ module GeniusYield.Providers.Maestro
   , maestroEraHistory
   , maestroLookupDatum
   , maestroUtxosAtAddressesWithDatums
+  , maestroUtxosAtPaymentCredentialsWithDatums
   ) where
 
 import qualified Cardano.Api                          as Api
@@ -229,12 +230,15 @@ utxoFromMaestroWithDatum u = do
           d <- datumFromCBOR db
           pure (gyUtxo, Just d)
 
+extractedAssetClassToMaestro :: Maybe (Text, Text) -> Maybe Maestro.NonAdaNativeToken
+extractedAssetClassToMaestro = fmap (\(mp, tn) -> Maestro.NonAdaNativeToken (coerce mp) (coerce tn))
+
 maestroUtxosAtAddress :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
 maestroUtxosAtAddress env addr mAssetClass = do
   let addrAsText = addressToText addr
       extractedAssetClass = extractAssetClass mAssetClass
   -- Here one would not get `MaestroNotFound` error.
-  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (Maestro.utxosAtAddress env (coerce addrAsText) (Just False) (Just False) (fmap (\(mp, tn) -> Maestro.NonAdaNativeToken (coerce mp) (coerce tn)) extractedAssetClass))
+  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (Maestro.utxosAtAddress env (coerce addrAsText) (Just False) (Just False) (extractedAssetClassToMaestro extractedAssetClass))
 
   either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro addrUtxos)
   where
@@ -246,7 +250,7 @@ maestroUtxosAtAddressWithDatums env addr mAssetClass = do
   let addrAsText = addressToText addr
       extractedAssetClass = extractAssetClass mAssetClass
   -- Here one would not get `MaestroNotFound` error.
-  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (Maestro.utxosAtAddress env (coerce addrAsText) (Just True) (Just False) (fmap (\(mp, tn) -> Maestro.NonAdaNativeToken (coerce mp) (coerce tn)) extractedAssetClass))
+  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (Maestro.utxosAtAddress env (coerce addrAsText) (Just True) (Just False) (extractedAssetClassToMaestro extractedAssetClass))
 
   either
     (throwIO . MspvDeserializeFailure locationIdent)
@@ -281,29 +285,56 @@ maestroUtxosAtAddressesWithDatums env addrs = do
     locationIdent = "AddressesUtxosWithDatums"
 
 -- | Query UTxOs present at payment credential.
-maestroUtxosAtPaymentCredential :: Maestro.MaestroEnv 'Maestro.V1 -> GYPaymentCredential -> IO GYUTxOs
-maestroUtxosAtPaymentCredential env paymentCredential = do
+maestroUtxosAtPaymentCredential :: Maestro.MaestroEnv 'Maestro.V1 -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
+maestroUtxosAtPaymentCredential env paymentCredential mAssetClass = do
   let paymentCredentialBech32 :: Maestro.Bech32StringOf Maestro.PaymentCredentialAddress = coerce $ paymentCredentialToBech32 paymentCredential
+      extractedAssetClass = extractAssetClass mAssetClass
   -- Here one would not get `MaestroNotFound` error.
-  utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages $ Maestro.utxosByPaymentCredential env paymentCredentialBech32 (Just False) (Just False)
+  utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages $ Maestro.utxosByPaymentCredential env paymentCredentialBech32 (Just False) (Just False) (extractedAssetClassToMaestro extractedAssetClass)
 
   either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro utxos)
   where
-    locationIdent = "PaymentCredentialUtxosWithDatums"
+    locationIdent = "PaymentCredentialUtxos"
 
 -- | Query UTxOs present at payment credential with their associated datum fetched (under best effort basis).
-maestroUtxosAtPaymentCredentialWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> GYPaymentCredential -> IO [(GYUTxO, Maybe GYDatum)]
-maestroUtxosAtPaymentCredentialWithDatums env paymentCredential = do
+maestroUtxosAtPaymentCredentialWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> GYPaymentCredential -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]
+maestroUtxosAtPaymentCredentialWithDatums env paymentCredential mAssetClass = do
   let paymentCredentialBech32 :: Maestro.Bech32StringOf Maestro.PaymentCredentialAddress = coerce $ paymentCredentialToBech32 paymentCredential
+      extractedAssetClass = extractAssetClass mAssetClass
   -- Here one would not get `MaestroNotFound` error.
-  utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages $ Maestro.utxosByPaymentCredential env paymentCredentialBech32 (Just True) (Just False)
+  utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages $ Maestro.utxosByPaymentCredential env paymentCredentialBech32 (Just True) (Just False) (extractedAssetClassToMaestro extractedAssetClass)
 
   either
     (throwIO . MspvDeserializeFailure locationIdent)
     pure
     $ traverse utxoFromMaestroWithDatum utxos
   where
-    locationIdent = "PaymentCredentialUtxos"
+    locationIdent = "PaymentCredentialUtxosWithDatums"
+
+-- | Query UTxOs present at multiple payment credentials.
+maestroUtxosAtPaymentCredentials :: Maestro.MaestroEnv 'Maestro.V1 -> [GYPaymentCredential] -> IO GYUTxOs
+maestroUtxosAtPaymentCredentials env pcs = do
+  let paymentCredentialsBech32 = map paymentCredentialToBech32 pcs
+  -- Here one would not get `MaestroNotFound` error.
+  utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosByMultiPaymentCredentials env (Just False) (Just False)) $ coerce paymentCredentialsBech32)
+
+  either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro utxos)
+  where
+    locationIdent = "PaymentCredentialsUtxos"
+
+-- | Query UTxOs present at multiple payment credentials with datums.
+maestroUtxosAtPaymentCredentialsWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> [GYPaymentCredential] -> IO [(GYUTxO, Maybe GYDatum)]
+maestroUtxosAtPaymentCredentialsWithDatums env pcs = do
+  let paymentCredentialsBech32 = map paymentCredentialToBech32 pcs
+  -- Here one would not get `MaestroNotFound` error.
+  utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosByMultiPaymentCredentials env (Just True) (Just False)) $ coerce paymentCredentialsBech32)
+
+  either
+    (throwIO . MspvDeserializeFailure locationIdent)
+    pure
+    $ traverse utxoFromMaestroWithDatum utxos
+  where
+    locationIdent = "PaymentCredentialsUtxosWithDatums"
 
 -- | Returns a list containing all 'GYTxOutRef' for a given 'GYAddress'.
 maestroRefsAtAddress :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> IO [GYTxOutRef]
@@ -389,6 +420,8 @@ maestroQueryUtxo env = GYQueryUTxO
   , gyQueryUtxosAtAddressesWithDatums'   = Just $ maestroUtxosAtAddressesWithDatums env
   , gyQueryUtxosAtPaymentCredential'     = maestroUtxosAtPaymentCredential env
   , gyQueryUtxosAtPaymentCredWithDatums' = Just $ maestroUtxosAtPaymentCredentialWithDatums env
+  , gyQueryUtxosAtPaymentCredentials'    = maestroUtxosAtPaymentCredentials env
+  , gyQueryUtxosAtPaymentCredsWithDatums' = Just $ maestroUtxosAtPaymentCredentialsWithDatums env
   }
 
 -------------------------------------------------------------------------------

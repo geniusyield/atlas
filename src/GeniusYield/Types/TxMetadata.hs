@@ -5,110 +5,125 @@ License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
 
+Transaction metadata types and functions for working with [transaction metadata](https://developers.cardano.org/docs/transaction-metadata/).
 -}
 module GeniusYield.Types.TxMetadata (
-  GYTxMetadata,
+  GYTxMetadata (..),
+  txMetadataFromApi,
+  txMetadataToApi,
   GYTxMetadataValue,
-  gyTxMetaMap,
-  gyTxMetaList,
-  gyTxMetaNumber,
-  gyTxMetaBytes,
-  gyTxMetaText,
-  gyMetaTextChunks,
-  gyMetaBytesChunks,
-  mergeGYTransactionMetadata,
-  makeApiTransactionMetadata,
-  metadataFromApi,
-  metadataToApi,
+  txMetadataValueToApi,
+  txMetadataValueFromApi,
+  constructTxMetadataMap,
+  constructTxMetadataList,
+  constructTxMetadataNumber,
+  constructTxMetadataBytes,
+  constructTxMetadataText,
+  constructTxMetadataBytesChunks,
+  constructTxMetadataTextChunks,
+  mergeTxMetadata,
   metadataMsg,
   metadataMsgs
 ) where
 
-import qualified Cardano.Api as Api
-import qualified Data.Map as Map
-import           Data.ByteString     (ByteString)
-import           Data.Word           (Word64)
-import           GeniusYield.Imports (Text, coerce)
+import qualified Cardano.Api                           as Api
+import           Data.ByteString                       (ByteString)
+import qualified Data.ByteString                       as BS
+import qualified Data.Map.Strict                       as Map
+import qualified Data.Text.Encoding                    as TE
+import           Data.Word                             (Word64)
+import           GeniusYield.Imports                   (Text, foldl')
+import           GeniusYield.Types.TxMetadata.Internal (GYTxMetadataValue (..),
+                                                        txMetadataValueFromApi,
+                                                        txMetadataValueToApi)
 
 
-newtype GYTxMetadata = GYTxMetadata Api.TxMetadata
-  deriving newtype (Semigroup, Show)
+newtype GYTxMetadata = GYTxMetadata (Map.Map Word64 GYTxMetadataValue)
+  deriving newtype (Eq, Semigroup, Show)
 
-type GYTxMetadataValue = Api.TxMetadataValue
+txMetadataToApi :: GYTxMetadata -> Api.TxMetadata
+txMetadataToApi (GYTxMetadata m) = Api.TxMetadata (Map.map txMetadataValueToApi m)
 
---------------------------------------------------------------------------------
--- Isomorphism between 'Cardano.Api.TxMetadata' and 'GYTxMetadata'
---------------------------------------------------------------------------------
+txMetadataFromApi :: Api.TxMetadata -> GYTxMetadata
+txMetadataFromApi (Api.TxMetadata m) = GYTxMetadata (Map.map txMetadataValueFromApi m)
 
--- | Convert 'Cardano.Api.TxMetadata' to 'GYTxMetadata'.
-metadataFromApi :: Api.TxMetadata -> GYTxMetadata
-metadataFromApi = GYTxMetadata  
+-- | Construct a 'GYTxMetadataValue' from a list of key-value pairs.
+constructTxMetadataMap :: [(GYTxMetadataValue, GYTxMetadataValue)] -> GYTxMetadataValue
+constructTxMetadataMap = GYTxMetaMap
 
--- | Convert 'GYTxMetadata' to 'Cardano.Api.TxMetadata'.
-metadataToApi :: GYTxMetadata -> Api.TxMetadata
-metadataToApi = coerce
+-- | Construct a 'GYTxMetadataValue' from a list of 'GYTxMetadataValue's.
+constructTxMetadataList :: [GYTxMetadataValue] -> GYTxMetadataValue
+constructTxMetadataList = GYTxMetaList
 
+-- | Construct a 'GYTxMetadataValue' from an 'Integer'. Returning 'Nothing' if the given 'Integer' is not in the range @-(2^64-1) .. 2^64-1@.
+constructTxMetadataNumber :: Integer -> Maybe GYTxMetadataValue
+constructTxMetadataNumber n =
+  let bound :: Integer = fromIntegral (maxBound :: Word64) in
+  if n >= negate bound && n <= bound
+  then Just $ GYTxMetaNumber n
+  else Nothing
 
---------------------------------------------------------------------------------
--- Convenience functions for dealing with 'GYTxMetadataValue's and 'TxMetadata'
---------------------------------------------------------------------------------
+-- | Construct a 'GYTxMetadataValue' from a 'ByteString'. Returning 'Nothing' if the given 'ByteString' is longer than 64 bytes.
+constructTxMetadataBytes :: ByteString -> Maybe GYTxMetadataValue
+constructTxMetadataBytes bs =
+  let len = BS.length bs in
+  if len <= 64
+    then Just $ GYTxMetaBytes bs
+    else Nothing
 
--- | Apply 'Map' constructor of 'GYTxMetadataValue'.
-gyTxMetaMap :: [(GYTxMetadataValue, GYTxMetadataValue)] -> GYTxMetadataValue
-gyTxMetaMap = Api.TxMetaMap
+-- | Construct a 'GYTxMetadataValue' from a 'Text'. Returning 'Nothing' if the given 'Text' is longer than 64 bytes when UTF-8 encoded.
+constructTxMetadataText :: Text -> Maybe GYTxMetadataValue
+constructTxMetadataText txt =
+  let len = BS.length $ TE.encodeUtf8 txt in
+  if len <= 64
+    then Just $ GYTxMetaText txt
+    else Nothing
 
--- | Apply 'List' constructor of 'GYTxMetadataValue'.
-gyTxMetaList :: [GYTxMetadataValue] -> GYTxMetadataValue
-gyTxMetaList = Api.TxMetaList
+-- | Construct a 'GYTxMetadataValue' from a 'ByteString' as a list of chunks (bytestrings) of acceptable sizes, splitting at 64th byte as maximum length allowed is 64 bytes.
+constructTxMetadataBytesChunks :: ByteString -> GYTxMetadataValue
+constructTxMetadataBytesChunks = txMetadataValueFromApi . Api.metaBytesChunks
 
--- | Apply 'Number' constructor of 'GYTxMetadataValue'.
-gyTxMetaNumber :: Integer -> GYTxMetadataValue
-gyTxMetaNumber = Api.TxMetaNumber
+-- | Construct a 'GYTxMetadataValue' from a 'Text' as a list of chunks (strings) of acceptable sizes. Note that maximum length allowed is 64 bytes, when given string is UTF-8 encoded. Splitting is slightly involved here as single character (in a text string) may be represented by multiple bytes in UTF-8 encoding, and hence, we split if adding the byte representation of the char exceeds the 64 byte limit.
+constructTxMetadataTextChunks :: Text -> GYTxMetadataValue
+constructTxMetadataTextChunks = txMetadataValueFromApi . Api.TxMetaList . constructTxMetadataTextChunks'
 
--- | Apply 'Bytes' constructor of 'GYTxMetadataValue'.
-gyTxMetaBytes :: ByteString -> GYTxMetadataValue
-gyTxMetaBytes = Api.TxMetaBytes
-
--- | Apply 'Text' constructor of 'GYTxMetadataValue'.
-gyTxMetaText :: Text -> GYTxMetadataValue
-gyTxMetaText = Api.TxMetaText
-
--- | Create a 'GYTxMetadataValue' from a Text as a list of chunks of an acceptable size.
-gyMetaTextChunks :: Text -> GYTxMetadataValue
-gyMetaTextChunks = Api.metaTextChunks
-
--- | Create a 'GYTxMetadataValue' from a 'ByteString' as a list of chunks of an accaptable size.
-gyMetaBytesChunks :: ByteString -> GYTxMetadataValue
-gyMetaBytesChunks = Api.metaBytesChunks
+constructTxMetadataTextChunks' :: Text -> [Api.TxMetadataValue]
+constructTxMetadataTextChunks' txt = case Api.metaTextChunks txt of
+  Api.TxMetaList xs -> xs
+  _                 -> error "GeniusYield.Types.TxMetadata.constructTxMetadataTextChunks': Absurd, expected TxMetaList"
 
 -- | Merge two 'GYTxMetadata's, controlling how to handle the respective 'GYTxMetadataValue's in case of label collision.
-mergeGYTransactionMetadata :: (GYTxMetadataValue -> GYTxMetadataValue -> GYTxMetadataValue) -> GYTxMetadata -> GYTxMetadata -> GYTxMetadata
-mergeGYTransactionMetadata f gymd1 gymd2 = metadataFromApi $ Api.mergeTransactionMetadata f (metadataToApi gymd1) (metadataToApi gymd2)
-
--- | Apply 'TxMetadata' wrapper to a 'Map Word64 GYTxMetadataValue'.
-makeApiTransactionMetadata :: Map.Map Word64 GYTxMetadataValue -> Api.TxMetadata
-makeApiTransactionMetadata = Api.TxMetadata
-
+mergeTxMetadata :: (GYTxMetadataValue -> GYTxMetadataValue -> GYTxMetadataValue) -> GYTxMetadata -> GYTxMetadata -> GYTxMetadata
+mergeTxMetadata f (GYTxMetadata m1) (GYTxMetadata m2) = GYTxMetadata $ Map.unionWith f m1 m2
 
 ----------------------------------------------------------------------------------------------
 -- Convenience functions for adding messages (comments/memos) following CIP 020 specification.
 ----------------------------------------------------------------------------------------------
 
 -- | Adds a single message (comment/memo) as transaction metadata following CIP 020 specification.
+--
+-- See 'metadataMsgs' for examples.
 metadataMsg :: Text -> Maybe GYTxMetadata
 metadataMsg msg = metadataMsgs [msg]
 
 -- | Adds multiple messages (comments/memos) as transaction metadata following CIP 020 specification.
+--
+-- >>> metadataMsgs ["Hello, World!", "This is a test message."]
+-- Just (fromList [(674,GYTxMetaMap [(GYTxMetaText "msg",GYTxMetaList [GYTxMetaText "Hello, World!",GYTxMetaText "This is a test message."])])])
+--
+-- >>> metadataMsgs [""]
+-- Nothing
+--
+-- >>> metadataMsgs []
+-- Nothing
+--
+-- >>> metadataMsgs ["Hello, World!", "This one is a reaaaaaaaally long message, so long that it exceeds the 64 byte limit, so it will be split into multiple chunks.", "do you see that?"]
+-- Just (fromList [(674,GYTxMetaMap [(GYTxMetaText "msg",GYTxMetaList [GYTxMetaText "Hello, World!",GYTxMetaText "This one is a reaaaaaaaally long message, so long that it exceed",GYTxMetaText "s the 64 byte limit, so it will be split into multiple chunks.",GYTxMetaText "do you see that?"])])])
+--
 metadataMsgs :: [Text] -> Maybe GYTxMetadata
 metadataMsgs msgs = case metaValue of
-  Api.TxMetaList [] -> Nothing
-  _                 -> Just . metadataFromApi . makeApiTransactionMetadata $
-                       Map.fromList [(674, gyTxMetaMap [(gyTxMetaText "msg", metaValue)])]
+  GYTxMetaList [] -> Nothing
+  _               -> Just $ GYTxMetadata $ Map.fromList [(674, GYTxMetaMap [(GYTxMetaText "msg", metaValue)])]
   where
     metaValue :: GYTxMetadataValue
-    metaValue = foldr metaAppend (Api.TxMetaList []) (gyMetaTextChunks <$> msgs)
-    
-    metaAppend :: GYTxMetadataValue -> GYTxMetadataValue -> GYTxMetadataValue
-    metaAppend (Api.TxMetaList xs) (Api.TxMetaList ys) = Api.TxMetaList (xs ++ ys)
-    metaAppend _ _ = error "Unexpected error while using 'gyMetaTextChunks'"
-
+    metaValue = txMetadataValueFromApi $ Api.TxMetaList $ concatMap constructTxMetadataTextChunks' msgs

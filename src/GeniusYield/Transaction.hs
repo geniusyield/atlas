@@ -155,8 +155,9 @@ buildUnsignedTxBody :: forall m v.
         -> Maybe GYSlot
         -> Maybe GYSlot
         -> Set GYPubKeyHash
+        -> Maybe GYTxMetadata
         -> m (Either BuildTxException GYTxBody)
-buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers = buildTxLoop cstrat extraLovelaceStart
+buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers mbTxMetadata = buildTxLoop cstrat extraLovelaceStart
   where
 
     step :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
@@ -214,6 +215,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers = build
                     , gybtxInvalidAfter  = ub
                     , gybtxSigners       = signers
                     , gybtxRefIns        = refIns
+                    , gybtxMetadata      = mbTxMetadata
                     }
                 (length outsOld)
 
@@ -304,6 +306,7 @@ finalizeGYBalancedTx
         , gybtxInvalidAfter  = ub
         , gybtxSigners       = signers
         , gybtxRefIns        = utxosRefInputs
+        , gybtxMetadata      = mbTxMetadata
         }
     = makeTransactionBodyAutoBalanceWrapper
         collaterals
@@ -391,6 +394,13 @@ finalizeGYBalancedTx
         collateralTotalValue :: GYValue
         collateralTotalValue = foldMapUTxOs utxoValue collaterals
 
+    txMetadata :: Api.TxMetadataInEra Api.BabbageEra
+    txMetadata = maybe Api.TxMetadataNone toMetaInEra mbTxMetadata
+      where
+        toMetaInEra :: GYTxMetadata -> Api.TxMetadataInEra Api.BabbageEra
+        toMetaInEra gymd = let md = txMetadataToApi gymd in
+          if md == mempty then Api.TxMetadataNone else Api.TxMetadataInEra Api.TxMetadataInBabbageEra md
+
     body :: Api.TxBodyContent Api.BuildTx Api.BabbageEra
     body = Api.TxBodyContent
         ins'
@@ -401,7 +411,7 @@ finalizeGYBalancedTx
         dummyRetCol
         fee
         (lb', ub')
-        Api.TxMetadataNone
+        txMetadata
         Api.TxAuxScriptsNone
         extra
         (Api.BuildTxWith $ Just $ Api.S.unbundleProtocolParams pp)

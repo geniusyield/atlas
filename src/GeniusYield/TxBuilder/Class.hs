@@ -57,6 +57,7 @@ module GeniusYield.TxBuilder.Class
     , mustHaveRefInput
     , mustHaveOutput
     , mustHaveOptionalOutput
+    , mustHaveTxMetadata
     , mustMint
     , mustBeSignedBy
     , isInvalidBefore
@@ -344,6 +345,7 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
     , gytxSigs          :: !(Set GYPubKeyHash)
     , gytxInvalidBefore :: !(Maybe GYSlot)
     , gytxInvalidAfter  :: !(Maybe GYSlot)
+    , gytxMetadata      :: !(Maybe GYTxMetadata)
     } deriving Show
 
 data GYTxSkeletonRefIns :: PlutusVersion -> Type where
@@ -375,6 +377,7 @@ emptyGYTxSkeleton = GYTxSkeleton
     , gytxSigs          = Set.empty
     , gytxInvalidBefore = Nothing
     , gytxInvalidAfter  = Nothing
+    , gytxMetadata      = Nothing
     }
 
 instance Semigroup (GYTxSkeleton v) where
@@ -386,6 +389,7 @@ instance Semigroup (GYTxSkeleton v) where
         , gytxSigs          = Set.union (gytxSigs x) (gytxSigs y)
         , gytxInvalidBefore = combineInvalidBefore (gytxInvalidBefore x) (gytxInvalidBefore y)
         , gytxInvalidAfter  = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
+        , gytxMetadata      = gytxMetadata x <> gytxMetadata y
         }
       where
         -- we keep only one input per utxo to spend
@@ -628,6 +632,9 @@ mustHaveOutput o = emptyGYTxSkeleton {gytxOuts = [o]}
 
 mustHaveOptionalOutput :: Maybe (GYTxOut v) -> GYTxSkeleton v
 mustHaveOptionalOutput = maybe mempty $ \o -> emptyGYTxSkeleton {gytxOuts = [o]}
+
+mustHaveTxMetadata :: Maybe GYTxMetadata -> GYTxSkeleton v
+mustHaveTxMetadata m = emptyGYTxSkeleton {gytxMetadata = m}
 
 mustMint :: GYMintScript v -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkeleton v
 mustMint _ _ _ 0  = mempty

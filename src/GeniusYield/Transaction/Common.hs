@@ -37,6 +37,7 @@ data GYBalancedTx v = GYBalancedTx
     , gybtxInvalidAfter  :: !(Maybe GYSlot)
     , gybtxSigners       :: !(Set GYPubKeyHash)
     , gybtxRefIns        :: !GYUTxOs
+    , gybtxMetadata      :: !(Maybe GYTxMetadata)
     }
 
 -- | A further detailed version of 'GYTxIn', containing all information about a UTxO.

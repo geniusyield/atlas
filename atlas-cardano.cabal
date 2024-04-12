@@ -133,6 +133,8 @@ library
     GeniusYield.Types.Tx
     GeniusYield.Types.TxBody
     GeniusYield.Types.TxIn
+    GeniusYield.Types.TxMetadata
+    GeniusYield.Types.TxMetadata.Internal
     GeniusYield.Types.TxOut
     GeniusYield.Types.TxOutRef
     GeniusYield.Types.UTxO
@@ -141,52 +143,52 @@ library
 
   other-modules:   GeniusYield.Utils
   build-depends:
-    , aeson                  ^>=2.1.2.1
-    , attoparsec             ^>=0.14.4
-    , base                   ^>=4.16.4.0
-    , base16-bytestring      ^>=1.0.2.0
-    , blockfrost-client      ^>=0.7.1.1
-    , bytestring             ^>=0.11.4.0
-    , cache                  ^>=0.1.3.0
-    , cassava                ^>=0.5.3.0
-    , cborg                  ^>=0.2.9.0
-    , containers             ^>=0.6.5.1
-    , data-default           ^>=0.7.1.1
-    , deriving-aeson         ^>=0.2.9
-    , directory              ^>=1.3.6.2
-    , either                 ^>=5.0.2
-    , filepath               ^>=1.4.2.2
-    , fixed-vector           ^>=1.2.2.1
-    , hashable               ^>=1.4.2.0
-    , http-api-data          ^>=0.5
-    , http-client            ^>=0.7.13.1
-    , http-client-tls        ^>=0.3.6.1
-    , http-types             ^>=0.12.3
-    , indexed-traversable    ^>=0.1.2.1
-    , katip                  ^>=0.8.7.4
-    , lens                   ^>=5.1.1
-    , MonadRandom            ^>=0.6
-    , mtl                    ^>=2.2.2
-    , network-uri            ^>=2.6.4.2
-    , postgresql-simple      ^>=0.6.5
-    , raven-haskell          ^>=0.1.4.1
-    , safe-money             ^>=0.9.1
-    , scientific             ^>=0.3.7.0
-    , servant                ^>=0.19.1
-    , servant-client         ^>=0.19
-    , servant-client-core    ^>=0.19
-    , some                   ^>=1.0.5
-    , swagger2               ^>=2.8.7
-    , tasty                  ^>=1.4.3
-    , tasty-hunit            ^>=0.10.0.3
-    , tasty-quickcheck       ^>=0.10.2
-    , template-haskell       ^>=2.18.0.0
-    , text                   ^>=1.2.5.0
-    , time                   ^>=1.11.1.1
-    , transformers           ^>=0.5.6.2
-    , unordered-containers   ^>=0.2.19.1
-    , vector                 ^>=0.12.3.1
-    , witherable             ^>=0.4.2
+    , aeson                 ^>=2.1.2.1
+    , attoparsec            ^>=0.14.4
+    , base                  ^>=4.16.4.0
+    , base16-bytestring     ^>=1.0.2.0
+    , blockfrost-client     ^>=0.7.1.1
+    , bytestring            ^>=0.11.4.0
+    , cache                 ^>=0.1.3.0
+    , cassava               ^>=0.5.3.0
+    , cborg                 ^>=0.2.9.0
+    , containers            ^>=0.6.5.1
+    , data-default          ^>=0.7.1.1
+    , deriving-aeson        ^>=0.2.9
+    , directory             ^>=1.3.6.2
+    , either                ^>=5.0.2
+    , filepath              ^>=1.4.2.2
+    , fixed-vector          ^>=1.2.2.1
+    , hashable              ^>=1.4.2.0
+    , http-api-data         ^>=0.5
+    , http-client           ^>=0.7.13.1
+    , http-client-tls       ^>=0.3.6.1
+    , http-types            ^>=0.12.3
+    , indexed-traversable   ^>=0.1.2.1
+    , katip                 ^>=0.8.7.4
+    , lens                  ^>=5.1.1
+    , MonadRandom           ^>=0.6
+    , mtl                   ^>=2.2.2
+    , network-uri           ^>=2.6.4.2
+    , postgresql-simple     ^>=0.6.5
+    , raven-haskell         ^>=0.1.4.1
+    , safe-money            ^>=0.9.1
+    , scientific            ^>=0.3.7.0
+    , servant               ^>=0.19.1
+    , servant-client        ^>=0.19
+    , servant-client-core   ^>=0.19
+    , some                  ^>=1.0.5
+    , swagger2              ^>=2.8.7
+    , tasty                 ^>=1.4.3
+    , tasty-hunit           ^>=0.10.0.3
+    , tasty-quickcheck      ^>=0.10.2
+    , template-haskell      ^>=2.18.0.0
+    , text                  ^>=1.2.5.0
+    , time                  ^>=1.11.1.1
+    , transformers          ^>=0.5.6.2
+    , unordered-containers  ^>=0.2.19.1
+    , vector                ^>=0.12.3.1
+    , witherable            ^>=0.4.2
 
   -- Dependencies whose version is fixed by @cabal.project@ file.
   build-depends:

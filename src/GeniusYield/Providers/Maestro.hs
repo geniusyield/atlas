@@ -474,7 +474,6 @@ maestroProtocolParams env = do
                                                 )
                                               ]
       , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ toInteger protocolParametersCoinsPerUtxoByte
-      , protocolParamUTxOCostPerWord     = Nothing  -- Deprecated in Babbage.
       }
 
 -- | Returns a set of all Stake Pool's 'Api.S.PoolId'.
@@ -499,7 +498,7 @@ maestroSystemStart env = fmap (CTime.SystemStart . Time.localTimeToUTC Time.utc)
     <=< try $ Maestro.getTimestampedData <$> Maestro.getSystemStart env
 
 -- | Returns the 'Api.EraHistory' queried from Maestro.
-maestroEraHistory :: Maestro.MaestroEnv 'Maestro.V1 -> IO (Api.EraHistory Api.CardanoMode)
+maestroEraHistory :: Maestro.MaestroEnv 'Maestro.V1 -> IO Api.EraHistory
 maestroEraHistory env = do
   eraSumms <- handleMaestroError "EraHistory" =<< try (Maestro.getTimestampedData <$> Maestro.getEraHistory env)
   maybe (throwIO $ MspvIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms

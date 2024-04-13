@@ -362,11 +362,6 @@ blockfrostProtocolParams proj = do
         , protocolParamPoolPledgeInfluence = _protocolParamsA0
         , protocolParamMonetaryExpansion   = _protocolParamsRho
         , protocolParamTreasuryCut         = _protocolParamsTau
-        , protocolParamUTxOCostPerWord     = Nothing  -- Deprecated in Babbage.
-        -- , protocolParamUTxOCostPerWord     = if majorProtVers < babbageProtocolVersion
-        --                                         -- This is only used for pre-babbage protocols.
-        --                                         then Just . Api.Lovelace $ lovelacesToInteger _protocolParamsCoinsPerUtxoWord
-        --                                         else Nothing
         , protocolParamPrices              = Just $ Api.S.ExecutionUnitPrices _protocolParamsPriceStep _protocolParamsPriceMem
         , protocolParamMaxTxExUnits        = Just $ Api.ExecutionUnits (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExSteps) (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExMem)
         , protocolParamMaxBlockExUnits     = Just $ Api.ExecutionUnits (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExSteps) (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExMem)
@@ -409,7 +404,7 @@ blockfrostSystemStart proj = do
   genesisParams <- Blockfrost.runBlockfrost proj Blockfrost.getLedgerGenesis >>= handleBlockfrostError "LedgerGenesis"
   pure . CTime.SystemStart . Time.posixSecondsToUTCTime $ Blockfrost._genesisSystemStart genesisParams
 
-blockfrostEraHistory :: Blockfrost.Project -> IO (Api.EraHistory Api.CardanoMode)
+blockfrostEraHistory :: Blockfrost.Project -> IO (Api.EraHistory)
 blockfrostEraHistory proj = do
   eraSumms <- Blockfrost.runBlockfrost proj Blockfrost.getNetworkEras >>= handleBlockfrostError "EraHistory"
   maybe (throwIO $ BlpvIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms

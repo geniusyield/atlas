@@ -92,7 +92,7 @@ userStakePkh = fmap (stakeKeyHash . stakeVerificationKey) . userStakeSKey
 
 data Ctx = Ctx
     { ctxEra              :: !GYEra
-    , ctxInfo             :: !(Api.LocalNodeConnectInfo Api.CardanoMode)
+    , ctxInfo             :: !Api.LocalNodeConnectInfo
     , ctxUserF            :: !User  -- ^ Funder. All other users begin with same status of funds.
     , ctxUser2            :: !User
     , ctxUser3            :: !User

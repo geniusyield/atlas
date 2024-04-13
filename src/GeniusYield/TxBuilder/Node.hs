@@ -21,6 +21,8 @@ module GeniusYield.TxBuilder.Node (
 ) where
 
 import qualified Cardano.Api                     as Api
+-- import qualified Cardano.Api.Shelley             as Api.S
+
 import           Control.Monad.IO.Class          (MonadIO (..))
 import qualified Data.ByteString                 as BS
 import qualified Data.List.NonEmpty              as NE
@@ -336,16 +338,20 @@ runGYTxMonadNodeCore ownUtxoUpdateF cstrat nid providers addrs change collateral
     -- Obtain constant parameters to be used across several 'GYTxBody' generations.
     ss          <- gyGetSystemStart providers
     eh          <- gyGetEraHistory providers
-    pp          <- gyGetProtocolParameters providers
+    apiPp       <- gyGetProtocolParameters providers
     ps          <- gyGetStakePools providers
 
-    bpp <- case Api.bundleProtocolParams Api.BabbageEra pp of
-                Left e     -> throwIO $ BuildTxPPConversionError e
-                Right bpp' -> pure bpp'
+    -- bpp <- case Api.bundleProtocolParams Api.BabbageEra pp of
+    --             Left e     -> throwIO $ BuildTxPPConversionError e
+    --             Right bpp' -> pure bpp'
+
+    pp <- case Api.toLedgerPParams Api.ShelleyBasedEraBabbage apiPp of
+                Left e   -> throwIO $ BuildTxPPConversionError e
+                Right pp -> pure pp
 
     collateral' <- obtainCollateral
 
-    e <- unGYTxMonadNode (buildTxCore ss eh bpp ps cstrat ownUtxoUpdateF addrs change collateral' loggedAction) GYTxNodeEnv
+    e <- unGYTxMonadNode (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral' loggedAction) GYTxNodeEnv
             { envNid           = nid
             , envProviders     = providers
             , envAddrs         = addrs

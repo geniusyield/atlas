@@ -34,18 +34,24 @@ import qualified Cardano.CoinSelection.Context                 as CCoinSelection
 import           Cardano.Ledger.Babbage                        (Babbage)
 import qualified Cardano.Ledger.Binary                         as CBOR
 
-import qualified Cardano.Tx.Balance.Internal.CoinSelection     as CBalanceInternal
+import qualified Internal.Cardano.Write.Tx.Balance.CoinSelection as CBalanceInternal (
+  SelectionBalanceError (..),
+  WalletUTxO (..)
+ )
 import qualified Cardano.Wallet.Primitive.Types.Address        as CWallet
 import qualified Cardano.Wallet.Primitive.Types.Coin           as CWallet
 import qualified Cardano.Wallet.Primitive.Types.Hash           as CWallet
 import qualified Cardano.Wallet.Primitive.Types.TokenBundle    as CTokenBundle
 import qualified Cardano.Wallet.Primitive.Types.TokenMap       as CWTokenMap
-import qualified Cardano.Wallet.Primitive.Types.TokenPolicy    as CWallet
+import qualified Cardano.Wallet.Primitive.Types.TokenPolicyId  as CWallet
 import qualified Cardano.Wallet.Primitive.Types.TokenQuantity  as CWallet
 import qualified Cardano.Wallet.Primitive.Types.Tx.Constraints as CWallet
 import qualified Cardano.Wallet.Primitive.Types.Tx.TxIn        as CWallet
-import qualified Cardano.Wallet.Primitive.Types.UTxOIndex      as CWallet
-import qualified Cardano.Wallet.Primitive.Types.UTxOSelection  as CWallet
+import qualified Cardano.CoinSelection.Size                    as CWallet
+import qualified Cardano.CoinSelection.UTxOIndex               as CWallet
+import qualified Cardano.Wallet.Primitive.Types.AssetId        as CTokenBundle
+import qualified Cardano.Wallet.Primitive.Types.AssetName      as CWallet
+import qualified Cardano.CoinSelection.UTxOSelection           as CWallet
 
 import           Cardano.Ledger.Alonzo.Core                    (eraProtVerHigh)
 import           GeniusYield.Imports
@@ -199,8 +205,7 @@ selectInputs
         pure (addIns, changeOuts)
   where
     selectionConstraints = CBalance.SelectionConstraints
-            { assessTokenBundleSize = CWallet.assessTokenBundleSize
-                . tokenBundleSizeAssessor
+            { tokenBundleSizeAssessor = tokenBundleSizeAssessor
                 $ CWallet.TxSize maxValueSize
             , computeMinimumAdaQuantity = \addr tkMap -> do
                 -- This function is ran for generated change outputs which do not have datum & reference script.
@@ -216,10 +221,10 @@ selectInputs
             For simplicity, we simply use the extraLovelace parameter.
             -}
             , computeMinimumCost = const $ CWallet.Coin extraLovelace
-            , maximumLengthChangeAddress = toCWalletAddress changeAddr  -- Since our change address is fixed.
-            , nullAddress = CWallet.Address ""
             , maximumOutputAdaQuantity = CWallet.txOutMaxCoin
             , maximumOutputTokenQuantity = CWallet.txOutMaxTokenQuantity
+            , maximumLengthChangeAddress = toCWalletAddress changeAddr  -- Since our change address is fixed.
+            , nullAddress = CWallet.Address ""
             }
     selectionParams = CBalance.SelectionParams
             { assetsToMint                = toTokenMap mintedVal
@@ -317,8 +322,8 @@ toCardanoValue tb = Api.S.valueFromList $
     toCardanoAssetId (CTokenBundle.AssetId pid name) =
         Api.S.AssetId (toCardanoPolicyId pid) (toCardanoAssetName name)
 
-    toCardanoAssetName :: CWallet.TokenName -> Api.S.AssetName
-    toCardanoAssetName (CWallet.UnsafeTokenName tn) =
+    toCardanoAssetName :: CWallet.AssetName -> Api.S.AssetName
+    toCardanoAssetName (CWallet.UnsafeAssetName tn) =
         either (\e -> error $ "toCardanoValue: unable to deserialise, error: " <> show e) id
         $ Api.S.deserialiseFromRawBytes Api.S.AsAssetName tn
 
@@ -345,14 +350,14 @@ toWalletAssetId GYLovelace = error "toWalletAssetId: unable to deserialize"
 toWalletAssetId tkn@(GYToken policyId (GYTokenName tokenName)) = CTokenBundle.AssetId tokenPolicy nTokenName
   where
     tokenPolicy = either (customError tkn)  id $ fromText $ mintingPolicyIdToText policyId
-    nTokenName  = either (customError tkn)  id $ CWallet.mkTokenName tokenName
+    nTokenName  = either (customError tkn)  id $ CWallet.fromByteString tokenName
     customError t = error $ printf "toWalletAssetId: unable to deserialize \n %s"  t
 
 fromWalletAssetId :: CTokenBundle.AssetId -> GYAssetClass
 fromWalletAssetId (CTokenBundle.AssetId tokenPolicy nTokenName) = GYToken policyId tkName
   where
     policyId   = fromRight customError $ mintingPolicyIdFromText $ toText tokenPolicy
-    tkName = fromMaybe customError $ tokenNameFromBS $ CWallet.unTokenName nTokenName
+    tkName = fromMaybe customError $ tokenNameFromBS $ CWallet.unAssetName nTokenName
     customError = error "fromWalletAssetId: unable to deserialize"
 
 toTokenBundle :: GYValue -> CTokenBundle.TokenBundle

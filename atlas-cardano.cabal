@@ -216,7 +216,7 @@ library
   build-depends:
     , cardano-addresses
     , cardano-api
-    , cardano-balance-tx
+    , cardano-balance-tx:{cardano-balance-tx, internal}
     , cardano-coin-selection
     , cardano-crypto-class
     , cardano-ledger-alonzo

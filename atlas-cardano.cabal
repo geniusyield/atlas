@@ -137,6 +137,7 @@ library
     GeniusYield.Types.TxMetadata.Internal
     GeniusYield.Types.TxOut
     GeniusYield.Types.TxOutRef
+    GeniusYield.Types.TxWdrl
     GeniusYield.Types.UTxO
     GeniusYield.Types.Value
     GeniusYield.Types.Wallet

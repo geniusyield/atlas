@@ -75,11 +75,32 @@ module GeniusYield.Types.Script (
     mintingPolicyIdFromCurrencySymbol,
     mintingPolicyIdCurrencySymbol,
 
+    -- * StakeValidator
+    GYStakeValidator,
+    stakeValidatorVersion,
+    stakeValidatorVersionFromWitness,
+    stakeValidatorFromPlutus,
+    stakeValidatorFromSerialisedScript,
+    stakeValidatorToSerialisedScript,
+    stakeValidatorToApi,
+    stakeValidatorFromApi,
+    stakeValidatorToApiPlutusScriptWitness,
+
+    -- * Witness for stake validator
+    GYStakeValScript (..),
+    gyStakeValScriptToSerialisedScript,
+    gyStakeValScriptWitnessToApiPlutusSW,
+
+    -- ** File operations
+    writeStakeValidator,
+    readStakeValidator,
+
     -- * Script
     GYScript,
     scriptVersion,
     validatorToScript,
     mintingPolicyToScript,
+    stakeValidatorToScript,
     scriptToApi,
     scriptFromCBOR,
     scriptFromCBOR',
@@ -457,6 +478,96 @@ mintingPolicyIdFromText policyid = bimap customError mintingPolicyIdFromApi
     $ TE.encodeUtf8 policyid
   where
     customError err = "Invalid minting policy: " ++ show policyid ++ "; Reason: " ++ show err
+
+-------------------------------------------------------------------------------
+-- Stake validator
+-------------------------------------------------------------------------------
+
+newtype GYStakeValidator v = GYStakeValidator (GYScript v)
+  deriving stock (Eq, Ord, Show)
+
+deriving newtype instance GEq GYStakeValidator
+deriving newtype instance GCompare GYStakeValidator
+
+instance GShow GYStakeValidator where
+  gshowsPrec = showsPrec
+
+stakeValidatorVersion :: GYStakeValidator v -> SingPlutusVersion v
+stakeValidatorVersion = coerce scriptVersion
+
+stakeValidatorVersionFromWitness :: GYStakeValScript v -> PlutusVersion
+stakeValidatorVersionFromWitness (GYStakeValScript mp) = fromSingPlutusVersion $ stakeValidatorVersion mp
+stakeValidatorVersionFromWitness (GYStakeValReference _ s) = fromSingPlutusVersion $ stakeValidatorVersion $ coerce s
+
+stakeValidatorFromPlutus :: forall v. SingPlutusVersionI v => PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ()) -> GYStakeValidator v
+stakeValidatorFromPlutus = coerce (scriptFromPlutus @v)
+
+stakeValidatorFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYStakeValidator v
+stakeValidatorFromSerialisedScript = coerce . scriptFromSerialisedScript
+
+stakeValidatorToSerialisedScript :: GYStakeValidator v -> Plutus.SerialisedScript
+stakeValidatorToSerialisedScript = coerce >>> scriptToSerialisedScript >>> coerce
+
+stakeValidatorToScript :: GYStakeValidator v -> GYScript v
+stakeValidatorToScript = coerce
+
+stakeValidatorToApi :: GYStakeValidator v -> Api.PlutusScript (PlutusVersionToApi v)
+stakeValidatorToApi = coerce scriptToApi
+
+stakeValidatorFromApi :: forall v. SingPlutusVersionI v => Api.PlutusScript (PlutusVersionToApi v) -> GYStakeValidator v
+stakeValidatorFromApi = coerce (scriptFromApi @v)
+
+stakeValidatorToApiPlutusScriptWitness
+    :: GYStakeValidator v
+    -> Api.ScriptRedeemer
+    -> Api.ExecutionUnits
+    -> Api.ScriptWitness Api.WitCtxStake Api.BabbageEra
+stakeValidatorToApiPlutusScriptWitness (GYStakeValidator s) =
+    scriptToApiPlutusScriptWitness s Api.NoScriptDatumForStake
+
+data GYStakeValScript (u :: PlutusVersion) where
+    -- | 'VersionIsGreaterOrEqual' restricts which version scripts can be used in this transaction.
+    GYStakeValScript    :: v `VersionIsGreaterOrEqual` u => GYStakeValidator v -> GYStakeValScript u
+
+    -- | Reference inputs can be only used in V2 transactions.
+    GYStakeValReference :: !GYTxOutRef -> !(GYScript 'PlutusV2) -> GYStakeValScript 'PlutusV2
+
+deriving instance Show (GYStakeValScript v)
+
+instance Eq (GYStakeValScript v) where
+    GYStakeValReference r s == GYStakeValReference r' s' = r == r' && s == s'
+    GYStakeValScript p == GYStakeValScript p'            = defaultEq p p'
+    _ == _                                               = False
+
+instance Ord (GYStakeValScript v) where
+    GYStakeValReference r s `compare` GYStakeValReference r' s' = compare r r' <> compare s s'
+    GYStakeValReference _ _ `compare` _ = LT
+    GYStakeValScript p `compare` GYStakeValScript p' = defaultCompare p p'
+    GYStakeValScript _ `compare` _ = GT
+
+gyStakeValScriptToSerialisedScript :: GYStakeValScript u -> Plutus.SerialisedScript
+gyStakeValScriptToSerialisedScript (GYStakeValScript mp) = coerce mp & scriptToSerialisedScript & coerce
+gyStakeValScriptToSerialisedScript (GYStakeValReference _ s) = scriptToSerialisedScript s & coerce
+
+gyStakeValScriptWitnessToApiPlutusSW
+  :: GYStakeValScript u
+  -> Api.S.ScriptRedeemer
+  -> Api.S.ExecutionUnits
+  -> Api.S.ScriptWitness Api.S.WitCtxStake Api.S.BabbageEra
+gyStakeValScriptWitnessToApiPlutusSW (GYStakeValScript p) = stakeValidatorToApiPlutusScriptWitness p
+gyStakeValScriptWitnessToApiPlutusSW (GYStakeValReference r s) =
+    referenceScriptToApiPlutusScriptWitness r s
+    Api.NoScriptDatumForStake
+
+-- | Writes a stake validator to a file.
+--
+writeStakeValidator :: FilePath -> GYStakeValidator v -> IO ()
+writeStakeValidator file = writeScriptCore "Stake Validator" file . coerce
+
+-- | Reads a stake validator from a file.
+--
+readStakeValidator :: SingPlutusVersionI v => FilePath -> IO (GYStakeValidator v)
+readStakeValidator = coerce readScript
 
 -------------------------------------------------------------------------------
 -- Script

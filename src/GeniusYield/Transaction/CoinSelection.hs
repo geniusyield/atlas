@@ -86,6 +86,8 @@ data GYCoinSelectionEnv v = GYCoinSelectionEnv
     -- ^ Extra lovelace to look for on top of outputs, mainly for fee and any remaining would be given as change output by @makeTransactionBodyAutoBalance@, thus amount remaining besides fees, should satisfy minimum ada requirement else we would have to increase `extraLovelace` parameter.
     , minimumUTxOF    :: GYTxOut v -> Natural
     , maxValueSize    :: Natural
+    , totalWithdrawal :: Natural
+    -- ^ Total lovelaces being withdrawn from reward accounts.
     }
 
 data GYCoinSelectionStrategy
@@ -156,6 +158,7 @@ selectInputs
         , extraLovelace
         , minimumUTxOF
         , maxValueSize
+        , totalWithdrawal
         }
     cstrat = do
         CBalance.SelectionResult
@@ -208,7 +211,7 @@ selectInputs
     selectionParams = CBalance.SelectionParams
             { assetsToMint                = toTokenMap mintedVal
             , assetsToBurn                = toTokenMap burnedVal
-            , extraCoinSource             = CWallet.Coin 0
+            , extraCoinSource             = CWallet.Coin totalWithdrawal
             , extraCoinSink               = CWallet.Coin 0
             , outputsToCover              = map (bimap toCWalletAddress toTokenBundle) requiredOutputs
             , utxoAvailable               = CWallet.fromIndexPair (ownUtxosIndex, existingInpsIndex)  -- `fromIndexPair` would actually make first element to be @ownUtxosIndex `UTxOIndex.difference` existingInpsIndex@.

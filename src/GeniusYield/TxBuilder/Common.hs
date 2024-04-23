@@ -154,6 +154,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                     gytxOuts
                     (utxosFromList refInsUtxos)
                     gytxMint'
+                    gytxWdrls
                     gytxInvalidBefore
                     gytxInvalidAfter
                     gytxSigs

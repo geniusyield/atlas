@@ -78,12 +78,14 @@ import           Cardano.Slotting.Time                 (SystemStart)
 import           Cardano.Ledger.Core                   (EraTx (sizeTxF))
 import           Control.Lens                          (view)
 import           Control.Monad.Random
+import           Data.Semigroup                        (Sum (..))
 import           GeniusYield.HTTP.Errors               (IsGYApiError)
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Transaction.CoinSelection
 import           GeniusYield.Transaction.Common
 import           GeniusYield.Types
+import           GeniusYield.Types.TxWdrl
 
 -- | A container for various network parameters, and user wallet information, used by balancer.
 data GYBuildTxEnv = GYBuildTxEnv
@@ -152,16 +154,17 @@ buildUnsignedTxBody :: forall m v.
         -> [GYTxOut v]
         -> GYUTxOs  -- ^ reference inputs
         -> Maybe (GYValue, [(GYMintScript v, GYRedeemer)])  -- ^ minted values
+        -> [GYTxWdrl v]  -- ^ withdrawals
         -> Maybe GYSlot
         -> Maybe GYSlot
         -> Set GYPubKeyHash
         -> Maybe GYTxMetadata
         -> m (Either BuildTxException GYTxBody)
-buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers mbTxMetadata = buildTxLoop cstrat extraLovelaceStart
+buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls lb ub signers mbTxMetadata = buildTxLoop cstrat extraLovelaceStart
   where
 
     step :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
-    step stepStrat = fmap (first BuildTxBalancingError) . balanceTxStep env mmint insOld outsOld stepStrat
+    step stepStrat = fmap (first BuildTxBalancingError) . balanceTxStep env mmint (getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls) insOld outsOld stepStrat
 
     buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException GYTxBody)
     buildTxLoop stepStrat n
@@ -211,6 +214,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint lb ub signers mbTxMet
                     , gybtxCollaterals   = collaterals
                     , gybtxOuts          = outs
                     , gybtxMint          = mmint
+                    , gybtxWdrls         = wdrls
                     , gybtxInvalidBefore = lb
                     , gybtxInvalidAfter  = ub
                     , gybtxSigners       = signers
@@ -236,6 +240,7 @@ the tx with 'finalizeGYBalancedTx'. If such is the case, 'balanceTxStep' should 
 balanceTxStep :: (HasCallStack, MonadRandom m)
     => GYBuildTxEnv
     -> Maybe (GYValue, [(GYMintScript v, GYRedeemer)])  -- ^ minting
+    -> Natural                                          -- ^ total withdrawal
     -> [GYTxInDetailed v]                               -- ^ transaction inputs
     -> [GYTxOut v]                                      -- ^ transaction outputs
     -> GYCoinSelectionStrategy                          -- ^ Coin selection strategy to use
@@ -249,6 +254,7 @@ balanceTxStep
         , gyBTxEnvCollateral     = collateral
         }
     mmint
+    totalWithdrawal
     ins
     outs
     cstrat
@@ -278,6 +284,7 @@ balanceTxStep
                     , maxValueSize    = fromMaybe
                                             (error "protocolParamMaxValueSize missing from protocol params")
                                             $ Api.S.protocolParamMaxValueSize $ Api.S.unbundleProtocolParams pp
+                    , totalWithdrawal = totalWithdrawal
                     }
                 cstrat
             pure (ins ++ addIns, collaterals, adjustedOuts ++ changeOuts)
@@ -302,6 +309,7 @@ finalizeGYBalancedTx
         , gybtxCollaterals   = collaterals
         , gybtxOuts          = outs
         , gybtxMint          = mmint
+        , gybtxWdrls         = wdrls
         , gybtxInvalidBefore = lb
         , gybtxInvalidAfter  = ub
         , gybtxSigners       = signers
@@ -401,6 +409,9 @@ finalizeGYBalancedTx
         toMetaInEra gymd = let md = txMetadataToApi gymd in
           if md == mempty then Api.TxMetadataNone else Api.TxMetadataInEra Api.TxMetadataInBabbageEra md
 
+    wdrls' :: Api.TxWithdrawals Api.BuildTx Api.BabbageEra
+    wdrls' = if wdrls == mempty then Api.TxWithdrawalsNone else Api.TxWithdrawals Api.WithdrawalsInBabbageEra $ map txWdrlToApi wdrls
+
     body :: Api.TxBodyContent Api.BuildTx Api.BabbageEra
     body = Api.TxBodyContent
         ins'
@@ -415,7 +426,7 @@ finalizeGYBalancedTx
         Api.TxAuxScriptsNone
         extra
         (Api.BuildTxWith $ Just $ Api.S.unbundleProtocolParams pp)
-        Api.TxWithdrawalsNone
+        wdrls'
         Api.TxCertificatesNone
         Api.TxUpdateProposalNone
         mint

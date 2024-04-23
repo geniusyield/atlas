@@ -59,6 +59,7 @@ module GeniusYield.TxBuilder.Class
     , mustHaveOptionalOutput
     , mustHaveTxMetadata
     , mustMint
+    , mustHaveWithdrawal
     , mustBeSignedBy
     , isInvalidBefore
     , isInvalidAfter
@@ -88,6 +89,7 @@ import qualified PlutusLedgerApi.V1.Value     as Plutus (AssetClass)
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+import           GeniusYield.Types.TxWdrl     (GYTxWdrl (..))
 
 -------------------------------------------------------------------------------
 -- Class
@@ -342,6 +344,7 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
     , gytxOuts          :: ![GYTxOut v]
     , gytxRefIns        :: !(GYTxSkeletonRefIns v)
     , gytxMint          :: !(Map (GYMintScript v) (Map GYTokenName Integer, GYRedeemer))
+    , gytxWdrls         :: ![GYTxWdrl v]
     , gytxSigs          :: !(Set GYPubKeyHash)
     , gytxInvalidBefore :: !(Maybe GYSlot)
     , gytxInvalidAfter  :: !(Maybe GYSlot)
@@ -374,6 +377,7 @@ emptyGYTxSkeleton = GYTxSkeleton
     , gytxOuts          = []
     , gytxRefIns        = GYTxSkeletonNoRefIns
     , gytxMint          = Map.empty
+    , gytxWdrls         = []
     , gytxSigs          = Set.empty
     , gytxInvalidBefore = Nothing
     , gytxInvalidAfter  = Nothing
@@ -386,6 +390,7 @@ instance Semigroup (GYTxSkeleton v) where
         , gytxOuts          = gytxOuts x ++ gytxOuts y
         , gytxRefIns        = gytxRefIns x <> gytxRefIns y
         , gytxMint          = combineMint (gytxMint x) (gytxMint y)
+        , gytxWdrls         = combineWdrls (gytxWdrls x) (gytxWdrls y)
         , gytxSigs          = Set.union (gytxSigs x) (gytxSigs y)
         , gytxInvalidBefore = combineInvalidBefore (gytxInvalidBefore x) (gytxInvalidBefore y)
         , gytxInvalidAfter  = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
@@ -396,6 +401,8 @@ instance Semigroup (GYTxSkeleton v) where
         combineIns u v = nubBy ((==) `on` gyTxInTxOutRef) (u ++ v)
         -- we cannot combine redeemers, so we just pick first.
         combineMint = Map.unionWith (\(amt, r) (amt', _r) -> (Map.unionWith (+) amt amt', r))
+        -- we keep only one withdrawal per stake address
+        combineWdrls u v = nubBy ((==) `on` gyTxWdrlStakeAddress) (u ++ v)
 
         combineInvalidBefore :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
         combineInvalidBefore m        Nothing  = m
@@ -639,6 +646,9 @@ mustHaveTxMetadata m = emptyGYTxSkeleton {gytxMetadata = m}
 mustMint :: GYMintScript v -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkeleton v
 mustMint _ _ _ 0  = mempty
 mustMint p r tn n = emptyGYTxSkeleton {gytxMint = Map.singleton p (Map.singleton tn n, r)}
+
+mustHaveWithdrawal :: GYTxWdrl v -> GYTxSkeleton v
+mustHaveWithdrawal w = emptyGYTxSkeleton {gytxWdrls = [w]}
 
 mustBeSignedBy :: CanSignTx a => a -> GYTxSkeleton v
 mustBeSignedBy pkh = emptyGYTxSkeleton {gytxSigs = Set.singleton $ toPubKeyHash pkh}

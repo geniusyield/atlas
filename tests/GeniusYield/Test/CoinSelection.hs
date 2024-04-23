@@ -405,6 +405,7 @@ buildEnvWith ownUtxos existingInps targetOuts mintVal = GYCoinSelectionEnv
     , extraLovelace   = mockExtraLovelace
     , minimumUTxOF    = mockMinimumUtxo . gyTxOutValue
     , maxValueSize    = 5000 -- Current max value size (obtained from protocol params)
+    , totalWithdrawal = 0
     }
 
 buildInps :: [GYValue] -> [GYValue] -> [GYTxInDetailed v]

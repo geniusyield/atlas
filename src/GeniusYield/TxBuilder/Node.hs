@@ -115,6 +115,9 @@ instance GYTxQueryMonad GYTxMonadNode where
     utxosAtTxOutRefsWithDatums refs = GYTxMonadNode $ \env ->
         gyQueryUtxosAtTxOutRefsWithDatums (envProviders env) refs
 
+    stakeAddressInfo stakeAddr = GYTxMonadNode $ \env ->
+        gyGetStakeAddressInfo (envProviders env) stakeAddr
+
     slotConfig = GYTxMonadNode $ \env ->
         gyGetSlotConfig (envProviders env)
 

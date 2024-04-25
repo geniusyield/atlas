@@ -128,7 +128,9 @@ library
     GeniusYield.Types.Script
     GeniusYield.Types.Slot
     GeniusYield.Types.SlotConfig
+    GeniusYield.Types.StakeAddressInfo
     GeniusYield.Types.StakeKeyHash
+    GeniusYield.Types.StakePoolId
     GeniusYield.Types.Time
     GeniusYield.Types.Tx
     GeniusYield.Types.TxBody

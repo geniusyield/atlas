@@ -21,6 +21,7 @@ module GeniusYield.Providers.Maestro
   , maestroLookupDatum
   , maestroUtxosAtAddressesWithDatums
   , maestroUtxosAtPaymentCredentialsWithDatums
+  , maestroStakeAddressInfo
   ) where
 
 import qualified Cardano.Api                          as Api
@@ -42,6 +43,7 @@ import           GeniusYield.Providers.Common
 import           GeniusYield.Types
 import           GHC.Natural                          (wordToNatural)
 import qualified Maestro.Client.V1                    as Maestro
+import qualified Maestro.Client.V1.Accounts           as Maestro
 import qualified Maestro.Types.V1                     as Maestro
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
 import qualified PlutusTx.Builtins                    as Plutus
@@ -534,3 +536,20 @@ maestroLookupDatum env dh = do
     -- This particular error is fine in this case, we can just return 'Nothing'.
     handler (Left Maestro.MaestroNotFound) = pure Nothing
     handler other = handleMaestroError locationIdent $ Just <$> other
+
+-------------------------------------------------------------------------------
+-- Account info
+-------------------------------------------------------------------------------
+
+-- | Returns the 'GYStakeAddressInfo' queried from Maestro.
+maestroStakeAddressInfo :: Maestro.MaestroEnv 'Maestro.V1 -> GYStakeAddress -> IO GYStakeAddressInfo
+maestroStakeAddressInfo env saddr = do
+  handler <=< try $ Maestro.getTimestampedData <$> Maestro.accountInfo env (coerce stakeAddressToText saddr)
+  where
+    -- This particular error is fine.
+    handler (Left Maestro.MaestroNotFound) = pure $ GYStakeAddressInfo Nothing 0
+    handler other = handleMaestroError "AccountInfo" $ other <&> \accInfo ->
+      GYStakeAddressInfo
+        { gyStakeAddressInfoDelegatedPool = Maestro.accountInfoDelegatedPool accInfo >>= stakePoolIdFromTextMaybe . coerce
+        , gyStakeAddressInfoAvailableRewards = fromIntegral $ Maestro.accountInfoRewardsAvailable accInfo
+        }

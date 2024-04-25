@@ -9,6 +9,7 @@ module GeniusYield.Providers.Blockfrost
     , blockfrostGetSlotOfCurrentBlock
     , blockfrostSubmitTx
     , blockfrostAwaitTxConfirmed
+    , blockfrostStakeAddressInfo
     , networkIdToProject
     ) where
 
@@ -445,6 +446,18 @@ blockfrostLookupDatum p dh = do
     handler (Left Blockfrost.BlockfrostNotFound) = pure Nothing
     handler other                                = handleBlockfrostError locationIdent $ Just <$> other
     locationIdent = "LookupDatum"
+
+-------------------------------------------------------------------------------
+-- Account info
+-------------------------------------------------------------------------------
+
+blockfrostStakeAddressInfo :: Blockfrost.Project -> GYStakeAddress -> IO GYStakeAddressInfo
+blockfrostStakeAddressInfo p saddr = do
+  accInfo <- Blockfrost.runBlockfrost p (Blockfrost.getAccount (Blockfrost.mkAddress $ stakeAddressToText saddr)) >>= handleBlockfrostError "Account"
+  pure $ GYStakeAddressInfo
+    { gyStakeAddressInfoDelegatedPool = Blockfrost._accountInfoPoolId accInfo >>= stakePoolIdFromTextMaybe . Blockfrost.unPoolId
+    , gyStakeAddressInfoAvailableRewards = fromInteger $ lovelacesToInteger $ Blockfrost._accountInfoWithdrawableAmount accInfo
+    }
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions

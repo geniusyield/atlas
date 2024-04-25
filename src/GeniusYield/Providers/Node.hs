@@ -16,6 +16,7 @@ module GeniusYield.Providers.Node
     , nodeUtxosAtAddress
     , nodeUtxoAtTxOutRef
     , nodeUtxosAtTxOutRefs
+    , nodeStakeAddressInfo
     -- * Auxiliary
     , networkIdToLocalNodeConnectInfo
     ) where
@@ -24,15 +25,14 @@ import qualified Cardano.Api                                       as Api
 import qualified Cardano.Api.Shelley                               as Api.S
 import           Cardano.Slotting.Time                             (SystemStart)
 import           Control.Exception                                 (throwIO)
+import qualified Data.Map.Strict                                   as Map
 import qualified Data.Set                                          as Set
 import qualified Data.Text                                         as Txt
-
-import           Ouroboros.Network.Protocol.LocalTxSubmission.Type (SubmitResult (..))
-
 import           GeniusYield.CardanoApi.Query
 import           GeniusYield.Providers.Common                      (SubmitTxException (SubmitTxException))
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+import           Ouroboros.Network.Protocol.LocalTxSubmission.Type (SubmitResult (..))
 
 -------------------------------------------------------------------------------
 -- Submit
@@ -104,6 +104,16 @@ nodeGetProtocolParameters GYBabbage info = queryBabbageEra info Api.QueryProtoco
 stakePools :: GYEra -> Api.LocalNodeConnectInfo Api.CardanoMode -> IO (Set.Set Api.S.PoolId)
 stakePools GYAlonzo  info = queryAlonzoEra  info Api.QueryStakePools
 stakePools GYBabbage info = queryBabbageEra info Api.QueryStakePools
+
+nodeStakeAddressInfo :: Api.LocalNodeConnectInfo Api.CardanoMode -> GYStakeAddress -> IO GYStakeAddressInfo
+nodeStakeAddressInfo info saddr = resolveStakeAddressInfoFromApi saddr <$> queryBabbageEra info (Api.QueryStakeAddresses (Set.singleton $ stakeCredentialToApi $ stakeAddressToCredential saddr) (Api.localNodeNetworkId info))
+
+resolveStakeAddressInfoFromApi :: GYStakeAddress -> (Map.Map Api.StakeAddress Api.Lovelace, Map.Map Api.StakeAddress Api.S.PoolId) -> GYStakeAddressInfo
+resolveStakeAddressInfoFromApi (stakeAddressToApi -> stakeAddr) (rewards, delegations) =
+    GYStakeAddressInfo
+        { gyStakeAddressInfoAvailableRewards = fromIntegral $ Map.findWithDefault 0 stakeAddr rewards
+        , gyStakeAddressInfoDelegatedPool = stakePoolIdFromApi <$> Map.lookup stakeAddr delegations
+        }
 
 systemStart :: Api.LocalNodeConnectInfo Api.CardanoMode -> IO SystemStart
 systemStart info = queryCardanoMode info Api.QuerySystemStart

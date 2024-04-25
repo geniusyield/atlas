@@ -97,7 +97,7 @@ import           GeniusYield.Types.TxWdrl     (GYTxWdrl (..))
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, slotConfig, slotOfCurrentBlock, logMsg #-}
+    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg #-}
 
     -- | Get the network id
     networkId :: m GYNetworkId
@@ -166,6 +166,8 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     utxosAtPaymentCredentialsWithDatums :: [GYPaymentCredential] -> m [(GYUTxO, Maybe GYDatum)]
     utxosAtPaymentCredentialsWithDatums = gyQueryUtxosAtPaymentCredsWithDatumsDefault utxosAtPaymentCredentials lookupDatum
 
+    stakeAddressInfo :: GYStakeAddress -> m GYStakeAddressInfo
+
     {- | Obtain the slot config for the network.
 
     Implementations using era history to create slot config may raise 'GYEraSummariesToSlotConfigError'.
@@ -212,6 +214,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
     utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
     utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
+    stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
@@ -237,6 +240,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
     utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
     utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
+    stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
@@ -262,6 +266,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
     utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
     utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
+    stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s

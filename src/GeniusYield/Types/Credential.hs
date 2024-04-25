@@ -18,6 +18,7 @@ module GeniusYield.Types.Credential (
   , GYStakeCredential (..)
   , stakeCredentialFromApi
   , stakeCredentialToApi
+  , stakeCredentialToPlutus
   , stakeCredentialToHexText
   ) where
 
@@ -30,6 +31,7 @@ import           GeniusYield.Types.PaymentKeyHash (GYPaymentKeyHash,
                                                    paymentKeyHashFromApi,
                                                    paymentKeyHashToApi,
                                                    paymentKeyHashToPlutus)
+import           GeniusYield.Types.PubKeyHash     (CanSignTx (fromPubKeyHash, toPubKeyHash))
 import           GeniusYield.Types.Script         (GYValidatorHash,
                                                    validatorHashFromApi,
                                                    validatorHashToApi,
@@ -100,6 +102,11 @@ stakeCredentialToApi (GYStakeCredentialByScript sh) = Api.StakeCredentialByScrip
 stakeCredentialFromApi :: Api.StakeCredential -> GYStakeCredential
 stakeCredentialFromApi (Api.StakeCredentialByKey skh) = GYStakeCredentialByKey (stakeKeyHashFromApi skh)
 stakeCredentialFromApi (Api.StakeCredentialByScript sh) = GYStakeCredentialByScript (validatorHashFromApi sh)
+
+-- | Convert @GY@ type to corresponding type in @plutus@ library.
+stakeCredentialToPlutus :: GYStakeCredential -> Plutus.Credential
+stakeCredentialToPlutus (GYStakeCredentialByKey pkh) = Plutus.PubKeyCredential (paymentKeyHashToPlutus $ fromPubKeyHash $ toPubKeyHash pkh)
+stakeCredentialToPlutus (GYStakeCredentialByScript sh) = Plutus.ScriptCredential (validatorHashToPlutus sh)
 
 -- | Get hexadecimal value of stake credential.
 stakeCredentialToHexText :: GYStakeCredential -> Text

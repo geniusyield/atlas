@@ -188,6 +188,7 @@ ctxProviders ctx = GYProviders
     , gyGetParameters    = ctxGetParams ctx
     , gyQueryUTxO        = ctxQueryUtxos ctx
     , gyLog'             = ctxLog ctx
+    , gyGetStakeAddressInfo = nodeStakeAddressInfo (ctxInfo ctx)
     }
 
 submitTx :: Ctx -> User -> GYTxBody -> IO GYTxId

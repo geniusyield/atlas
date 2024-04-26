@@ -65,6 +65,7 @@ import           Data.Foldable                         (Foldable (foldMap'),
 import           Data.List                             (delete)
 import qualified Data.Map                              as Map
 import           Data.Ratio                            ((%))
+import qualified Data.Set                              as Set
 
 import           Data.Either.Combinators               (maybeToRight)
 import           Data.Maybe                            (fromJust)
@@ -75,6 +76,7 @@ import qualified Cardano.Ledger.Alonzo.Scripts         as AlonzoScripts
 import qualified Cardano.Ledger.Alonzo.Tx              as AlonzoTx
 import           Cardano.Slotting.Time                 (SystemStart)
 
+import qualified Cardano.Api.Shelley                   as Api
 import           Cardano.Ledger.Core                   (EraTx (sizeTxF))
 import           Control.Lens                          (view)
 import           Control.Monad.Random
@@ -337,11 +339,12 @@ finalizeGYBalancedTx
         collaterals
         ss
         eh
-        pp
+        unbundledPP
         ps
         (utxosToApi utxos)
         body
         changeAddr
+        unregisteredStakeCredsMap
   where
 
     inRefs :: Api.TxInsReference Api.BuildTx Api.BabbageEra
@@ -442,6 +445,12 @@ finalizeGYBalancedTx
                   ) (mempty, mempty) certs
           in Api.TxCertificates Api.S.CertificatesInBabbageEra (reverse $ fst apiCertsFromGY) $ Api.BuildTxWith (snd apiCertsFromGY)
 
+    unbundledPP = Api.S.unbundleProtocolParams pp
+
+    ppStakeAddressDeposit = fromIntegral $ Api.S.protocolParamStakeAddressDeposit unbundledPP
+
+    unregisteredStakeCredsMap = Map.fromList [ (stakeCredentialToApi sc, ppStakeAddressDeposit) | GYStakeAddressDeregistrationCertificate sc  <- map gyTxCertCertificate certs]
+
     body :: Api.TxBodyContent Api.BuildTx Api.BabbageEra
     body = Api.TxBodyContent
         ins'
@@ -455,7 +464,7 @@ finalizeGYBalancedTx
         txMetadata
         Api.TxAuxScriptsNone
         extra
-        (Api.BuildTxWith $ Just $ Api.S.unbundleProtocolParams pp)
+        (Api.BuildTxWith $ Just unbundledPP)
         wdrls'
         certs'
         Api.TxUpdateProposalNone
@@ -469,34 +478,37 @@ If not checked, the returned txbody may fail during submission.
 makeTransactionBodyAutoBalanceWrapper :: GYUTxOs
                                       -> SystemStart
                                       -> Api.S.EraHistory Api.S.CardanoMode
-                                      -> Api.S.BundledProtocolParameters Api.S.BabbageEra
+                                      -> Api.ProtocolParameters
                                       -> Set Api.S.PoolId
                                       -> Api.S.UTxO Api.S.BabbageEra
                                       -> Api.S.TxBodyContent Api.S.BuildTx Api.S.BabbageEra
                                       -> GYAddress
+                                      -> Map.Map Api.StakeCredential Api.Lovelace
                                       -> Int
                                       -> Either BuildTxException GYTxBody
-makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeAddr numSkeletonOuts = do
+makeTransactionBodyAutoBalanceWrapper collaterals ss eh unbundledPP _ps utxos body changeAddr stakeDelegDeposits numSkeletonOuts = do
+    let poolids = Set.empty -- TODO: This denotes the set of registered stake pools, that are being unregistered in this transaction.
+        nkeys = Api.estimateTransactionKeyWitnessCount body
+
     Api.ExecutionUnits
         { executionSteps  = maxSteps
         , executionMemory = maxMemory
-        } <- maybeToRight BuildTxMissingMaxExUnitsParam $ Api.S.protocolParamMaxTxExUnits $ Api.S.unbundleProtocolParams pp
-    let maxTxSize = Api.S.protocolParamMaxTxSize $ Api.S.unbundleProtocolParams pp
+        } <- maybeToRight BuildTxMissingMaxExUnitsParam $ Api.S.protocolParamMaxTxExUnits unbundledPP
+    let maxTxSize = Api.S.protocolParamMaxTxSize unbundledPP
         changeAddrApi :: Api.S.AddressInEra Api.S.BabbageEra = addressToApi' changeAddr
-        stakeDelegDeposits = mempty  -- TODO: Currently it's empty as we don't support for unregistration!
 
     -- First we obtain the calculated fees to correct for our collaterals.
     bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ _ (Api.Lovelace feeOld)) <-
       first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
         ss
         (Api.toLedgerEpochInfo eh)
-        (Api.S.unbundleProtocolParams pp)
-        ps
+        unbundledPP
+        poolids
         stakeDelegDeposits
         utxos
         body
         changeAddrApi
-        Nothing
+        (Just nkeys)
 
     -- We should call `makeTransactionBodyAutoBalance` again with updated values of collaterals so as to get slightly lower fee estimate.
     Api.BalancedTxBody txBodyContent txBody extraOut _ <- if collaterals == mempty then return bodyBeforeCollUpdate else
@@ -505,7 +517,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
 
         collateralTotalValue :: GYValue = foldMapUTxOs utxoValue collaterals
         collateralTotalLovelace :: Integer = fst $ valueSplitAda collateralTotalValue
-        balanceNeeded :: Integer = ceiling $ (feeOld * toInteger (fromJust $ Api.S.protocolParamCollateralPercent $ Api.S.unbundleProtocolParams pp)) % 100
+        balanceNeeded :: Integer = ceiling $ (feeOld * toInteger (fromJust $ Api.S.protocolParamCollateralPercent unbundledPP)) % 100
 
       in do
 
@@ -521,13 +533,13 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp ps utxos body changeA
         first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
           ss
           (Api.toLedgerEpochInfo eh)
-          (Api.S.unbundleProtocolParams pp)
-          ps
+          unbundledPP
+          poolids
           stakeDelegDeposits
           utxos
           body {Api.txTotalCollateral = txColl, Api.txReturnCollateral = collRet}
           changeAddrApi
-          Nothing
+          (Just nkeys)
 
     let Api.S.ShelleyTx _ ltx = Api.Tx txBody []
         -- This sums up the ExUnits for all embedded Plutus Scripts anywhere in the transaction:
@@ -561,9 +573,9 @@ collapseExtraOut
   :: Api.TxOut Api.S.CtxTx Api.S.BabbageEra
   -- ^ The extra output generated by @makeTransactionBodyAutoBalance@.
   -> Api.TxBodyContent Api.S.BuildTx Api.S.BabbageEra
-  -- ^ The body content generted by @makeTransactionBodyAutoBalance@.
+  -- ^ The body content generated by @makeTransactionBodyAutoBalance@.
   -> Api.TxBody Api.S.BabbageEra
-  -- ^ The body generted by @makeTransactionBodyAutoBalance@.
+  -- ^ The body generated by @makeTransactionBodyAutoBalance@.
   -> Int
   -- ^ The number of skeleton outputs we don't want to touch.
   -> Either Api.S.TxBodyError (Api.TxBody Api.S.BabbageEra)

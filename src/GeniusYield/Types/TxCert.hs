@@ -23,6 +23,12 @@ import           GeniusYield.Types.TxCert.Internal
 mkStakeAddressRegistrationCertificate :: GYStakeCredential -> GYTxCert v
 mkStakeAddressRegistrationCertificate sc = GYTxCert (GYStakeAddressRegistrationCertificate sc) Nothing
 
+{-| Note that deregistration certificate requires following preconditions:
+
+1. The stake address must be registered.
+
+2. The corresponding rewards balance is zero.
+-}
 mkStakeAddressDeregistrationCertificate :: GYStakeCredential -> GYTxCertWitness v -> GYTxCert v
 mkStakeAddressDeregistrationCertificate sc wit = GYTxCert (GYStakeAddressDeregistrationCertificate sc) (Just wit)
 

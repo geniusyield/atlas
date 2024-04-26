@@ -112,19 +112,31 @@ selectInputs :: forall m v. MonadRandom m
              -> ExceptT BalancingError m ([GYTxInDetailed v], [GYTxOut v])
 selectInputs
     GYCoinSelectionEnv
-        { existingInputs
+        { existingInputs = existingInputs'
         , requiredOutputs
         , mintValue
         , changeAddr
         , ownUtxos
         , extraLovelace
         , minimumUTxOF
+        , adaSource
+        , adaSink
         }
     GYLegacy = do
+    additionalInputForReplayProtection <- except $
+          if existingInputs' == mempty then -- For replay protection, every transaction must spend at least one UTxO.
+            -- We pick the UTxO having most value.
+            let ownUtxosList = utxosToList ownUtxos
+            in case ownUtxosList of
+                [] -> Left BalancingErrorEmptyOwnUTxOs
+                _  -> pure . pure $ utxoAsPubKeyInp $ maximumBy (compare `on` utxoValue) ownUtxosList
+          else pure Nothing
     let
+        additionalInputForReplayProtectionAsList = maybe [] pure additionalInputForReplayProtection
+        existingInputs = additionalInputForReplayProtectionAsList <> existingInputs'
         valueIn, valueOut :: GYValue
-        valueIn         = foldMap gyTxInDetValue existingInputs
-        valueOut        = foldMap snd requiredOutputs
+        valueIn         = foldMap gyTxInDetValue existingInputs <> valueFromLovelace (fromIntegral adaSource)
+        valueOut        = foldMap snd requiredOutputs <> valueFromLovelace (fromIntegral adaSink)
         valueMissing    = missing (valueFromLovelace (fromIntegral extraLovelace) <> valueOut `valueMinus` (valueIn <> mintValue))
     (addIns, addVal) <- except $ selectInputsLegacy
         ownUtxos
@@ -136,7 +148,7 @@ selectInputs
             [adjustTxOut minimumUTxOF (GYTxOut changeAddr tokenChange Nothing Nothing)
             | not $ isEmptyValue tokenChange
             ]
-    pure (addIns, changeOuts)
+    pure (additionalInputForReplayProtectionAsList <> addIns, changeOuts)
   where
     missing :: GYValue -> Map GYAssetClass Natural
     missing v = foldl' f Map.empty $ valueToList v

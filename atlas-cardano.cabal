@@ -312,7 +312,7 @@ test-suite atlas-privnet-tests
   ghc-options:    -threaded -rtsopts
   hs-source-dirs: tests-privnet
   main-is:        atlas-privnet-tests.hs
-  other-modules:
+  other-modules:  GeniusYield.Test.Privnet.Stake
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:

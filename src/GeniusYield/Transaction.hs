@@ -85,7 +85,7 @@ import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Transaction.CoinSelection
 import           GeniusYield.Transaction.Common
 import           GeniusYield.Types
-import           GeniusYield.Types.TxWdrl
+import           GeniusYield.Types.TxCert.Internal
 
 -- | A container for various network parameters, and user wallet information, used by balancer.
 data GYBuildTxEnv = GYBuildTxEnv
@@ -155,16 +155,28 @@ buildUnsignedTxBody :: forall m v.
         -> GYUTxOs  -- ^ reference inputs
         -> Maybe (GYValue, [(GYMintScript v, GYRedeemer)])  -- ^ minted values
         -> [GYTxWdrl v]  -- ^ withdrawals
+        -> [GYTxCert v]  -- ^ certificates
         -> Maybe GYSlot
         -> Maybe GYSlot
         -> Set GYPubKeyHash
         -> Maybe GYTxMetadata
         -> m (Either BuildTxException GYTxBody)
-buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls lb ub signers mbTxMetadata = buildTxLoop cstrat extraLovelaceStart
+buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata = buildTxLoop cstrat extraLovelaceStart
   where
-
+    ppStakeAddressDeposit = Api.S.protocolParamStakeAddressDeposit $ Api.S.unbundleProtocolParams $ gyBTxEnvProtocolParams env
+    (stakeCredDeregsAmt :: Natural, stakeCredRegsAmt :: Natural) = foldl' (\acc@(!accDeregs, !accRegs) (gyTxCertCertificate -> cert) -> case cert of
+            GYStakeAddressDeregistrationCertificate _ -> (accDeregs + 1, accRegs)
+            GYStakeAddressRegistrationCertificate _   -> (accDeregs, accRegs + 1)
+            _                                         -> acc) (0, 0) certs
+    -- Extra ada is received from withdrawals and stake credential deregistration.
+    adaSource =
+      let wdrlsAda = getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls
+          stakeCredDeregsAda = stakeCredDeregsAmt * fromIntegral ppStakeAddressDeposit
+      in wdrlsAda + stakeCredDeregsAda
+    -- Ada lost due to stake credential registration.
+    adaSink = stakeCredRegsAmt * fromIntegral ppStakeAddressDeposit
     step :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
-    step stepStrat = fmap (first BuildTxBalancingError) . balanceTxStep env mmint (getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls) insOld outsOld stepStrat
+    step stepStrat = fmap (first BuildTxBalancingError) . balanceTxStep env mmint adaSource adaSink insOld outsOld stepStrat
 
     buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException GYTxBody)
     buildTxLoop stepStrat n
@@ -215,6 +227,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls lb ub signers m
                     , gybtxOuts          = outs
                     , gybtxMint          = mmint
                     , gybtxWdrls         = wdrls
+                    , gybtxCerts         = certs
                     , gybtxInvalidBefore = lb
                     , gybtxInvalidAfter  = ub
                     , gybtxSigners       = signers
@@ -240,7 +253,8 @@ the tx with 'finalizeGYBalancedTx'. If such is the case, 'balanceTxStep' should 
 balanceTxStep :: (HasCallStack, MonadRandom m)
     => GYBuildTxEnv
     -> Maybe (GYValue, [(GYMintScript v, GYRedeemer)])  -- ^ minting
-    -> Natural                                          -- ^ total withdrawal
+    -> Natural                                          -- ^ ada source
+    -> Natural                                          -- ^ ada sink
     -> [GYTxInDetailed v]                               -- ^ transaction inputs
     -> [GYTxOut v]                                      -- ^ transaction outputs
     -> GYCoinSelectionStrategy                          -- ^ Coin selection strategy to use
@@ -254,7 +268,8 @@ balanceTxStep
         , gyBTxEnvCollateral     = collateral
         }
     mmint
-    totalWithdrawal
+    adaSource
+    adaSink
     ins
     outs
     cstrat
@@ -284,7 +299,8 @@ balanceTxStep
                     , maxValueSize    = fromMaybe
                                             (error "protocolParamMaxValueSize missing from protocol params")
                                             $ Api.S.protocolParamMaxValueSize $ Api.S.unbundleProtocolParams pp
-                    , totalWithdrawal = totalWithdrawal
+                    , adaSource = adaSource
+                    , adaSink   = adaSink
                     }
                 cstrat
             pure (ins ++ addIns, collaterals, adjustedOuts ++ changeOuts)
@@ -310,6 +326,7 @@ finalizeGYBalancedTx
         , gybtxOuts          = outs
         , gybtxMint          = mmint
         , gybtxWdrls         = wdrls
+        , gybtxCerts         = certs
         , gybtxInvalidBefore = lb
         , gybtxInvalidAfter  = ub
         , gybtxSigners       = signers
@@ -412,6 +429,19 @@ finalizeGYBalancedTx
     wdrls' :: Api.TxWithdrawals Api.BuildTx Api.BabbageEra
     wdrls' = if wdrls == mempty then Api.TxWithdrawalsNone else Api.TxWithdrawals Api.WithdrawalsInBabbageEra $ map txWdrlToApi wdrls
 
+    certs' =
+      if certs == mempty
+        then Api.TxCertificatesNone
+        else
+          let apiCertsFromGY =
+                foldl'
+                  (\(accCerts, accWits) cert ->
+                    let (apiCert, mapiWit) = txCertToApi cert
+                        apiWit = maybe Map.empty (uncurry Map.singleton) mapiWit
+                    in (apiCert : accCerts, accWits <> apiWit)
+                  ) (mempty, mempty) certs
+          in Api.TxCertificates Api.S.CertificatesInBabbageEra (reverse $ fst apiCertsFromGY) $ Api.BuildTxWith (snd apiCertsFromGY)
+
     body :: Api.TxBodyContent Api.BuildTx Api.BabbageEra
     body = Api.TxBodyContent
         ins'
@@ -427,7 +457,7 @@ finalizeGYBalancedTx
         extra
         (Api.BuildTxWith $ Just $ Api.S.unbundleProtocolParams pp)
         wdrls'
-        Api.TxCertificatesNone
+        certs'
         Api.TxUpdateProposalNone
         mint
         Api.TxScriptValidityNone

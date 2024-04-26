@@ -16,13 +16,12 @@ module GeniusYield.Transaction.Common (
     adjustTxOut
 ) where
 
-import qualified Cardano.Api              as Api
-import qualified Cardano.Api.Shelley      as Api.S
+import qualified Cardano.Api         as Api
+import qualified Cardano.Api.Shelley as Api.S
 
 import           GeniusYield.Imports
 import           GeniusYield.Types
-import           GeniusYield.Types.TxWdrl (GYTxWdrl)
-import qualified Text.Printf              as Printf
+import qualified Text.Printf         as Printf
 
 {- | An *almost* finalized Tx.
 
@@ -35,6 +34,7 @@ data GYBalancedTx v = GYBalancedTx
     , gybtxOuts          :: ![GYTxOut v]
     , gybtxMint          :: !(Maybe (GYValue, [(GYMintScript v, GYRedeemer)]))
     , gybtxWdrls         :: ![GYTxWdrl v]
+    , gybtxCerts         :: ![GYTxCert v]
     , gybtxInvalidBefore :: !(Maybe GYSlot)
     , gybtxInvalidAfter  :: !(Maybe GYSlot)
     , gybtxSigners       :: !(Set GYPubKeyHash)

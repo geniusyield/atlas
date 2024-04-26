@@ -60,6 +60,7 @@ module GeniusYield.TxBuilder.Class
     , mustHaveTxMetadata
     , mustMint
     , mustHaveWithdrawal
+    , mustHaveCertificate
     , mustBeSignedBy
     , isInvalidBefore
     , isInvalidAfter
@@ -89,7 +90,6 @@ import qualified PlutusLedgerApi.V1.Value     as Plutus (AssetClass)
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
-import           GeniusYield.Types.TxWdrl     (GYTxWdrl (..))
 
 -------------------------------------------------------------------------------
 -- Class
@@ -351,6 +351,7 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
     , gytxMint          :: !(Map (GYMintScript v) (Map GYTokenName Integer, GYRedeemer))
     , gytxWdrls         :: ![GYTxWdrl v]
     , gytxSigs          :: !(Set GYPubKeyHash)
+    , gytxCerts         :: ![GYTxCert v]
     , gytxInvalidBefore :: !(Maybe GYSlot)
     , gytxInvalidAfter  :: !(Maybe GYSlot)
     , gytxMetadata      :: !(Maybe GYTxMetadata)
@@ -384,6 +385,7 @@ emptyGYTxSkeleton = GYTxSkeleton
     , gytxMint          = Map.empty
     , gytxWdrls         = []
     , gytxSigs          = Set.empty
+    , gytxCerts         = []
     , gytxInvalidBefore = Nothing
     , gytxInvalidAfter  = Nothing
     , gytxMetadata      = Nothing
@@ -397,6 +399,7 @@ instance Semigroup (GYTxSkeleton v) where
         , gytxMint          = combineMint (gytxMint x) (gytxMint y)
         , gytxWdrls         = combineWdrls (gytxWdrls x) (gytxWdrls y)
         , gytxSigs          = Set.union (gytxSigs x) (gytxSigs y)
+        , gytxCerts         = gytxCerts x <> gytxCerts y
         , gytxInvalidBefore = combineInvalidBefore (gytxInvalidBefore x) (gytxInvalidBefore y)
         , gytxInvalidAfter  = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
         , gytxMetadata      = gytxMetadata x <> gytxMetadata y
@@ -653,7 +656,10 @@ mustMint _ _ _ 0  = mempty
 mustMint p r tn n = emptyGYTxSkeleton {gytxMint = Map.singleton p (Map.singleton tn n, r)}
 
 mustHaveWithdrawal :: GYTxWdrl v -> GYTxSkeleton v
-mustHaveWithdrawal w = emptyGYTxSkeleton {gytxWdrls = [w]}
+mustHaveWithdrawal w = mempty {gytxWdrls = [w]}
+
+mustHaveCertificate :: GYTxCert v -> GYTxSkeleton v
+mustHaveCertificate c = mempty {gytxCerts = [c]}
 
 mustBeSignedBy :: CanSignTx a => a -> GYTxSkeleton v
 mustBeSignedBy pkh = emptyGYTxSkeleton {gytxSigs = Set.singleton $ toPubKeyHash pkh}

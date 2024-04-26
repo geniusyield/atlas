@@ -318,5 +318,6 @@ test-suite atlas-privnet-tests
   build-depends:
     , atlas-cardano
     , base
+    , containers
     , tasty
     , tasty-hunit

@@ -2,11 +2,15 @@ module GeniusYield.Test.Privnet.Stake (
     tests,
 ) where
 
+import           Control.Concurrent             (threadDelay)
 import           Data.Maybe                     (fromJust)
+import qualified Data.Set                       as Set
 import           GeniusYield.Imports
 import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Setup
-import           GeniusYield.TxBuilder          (mustHaveCertificate)
+import           GeniusYield.TxBuilder          (GYTxQueryMonad (stakeAddressInfo),
+                                                 mustHaveCertificate,
+                                                 mustHaveWithdrawal)
 import           GeniusYield.Types
 import           Test.Tasty                     (TestTree, testGroup)
 import           Test.Tasty.HUnit               (testCaseSteps)
@@ -14,25 +18,69 @@ import           Test.Tasty.HUnit               (testCaseSteps)
 -- This will check if we are able to register a stake credential without it's signature.
 registerStakeCredentialSteps :: (String -> IO ()) -> Ctx -> IO User
 registerStakeCredentialSteps info ctx = do
-  newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 1_000_000_000) (CreateUserConfig {cucGenerateCollateral = False, cucGenerateStakeKey = True})
+  newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 100_000_000_000) (CreateUserConfig {cucGenerateCollateral = False, cucGenerateStakeKey = True})
   pp <- ctxGetParams ctx & gyGetProtocolParameters'
   info $ "-- Protocol parameters --\n" <> show pp <> "\n-- x --\n"
   txBodyReg <- ctxRunI ctx newUser $ do
-    return $ mustHaveCertificate (mkStakeAddressRegistrationCertificate (userStakePkh newUser & fromJust & GYStakeCredentialByKey))
-  info $ "-- Tx body --\n" <> show txBodyReg <> "\n-- x --\n"
+    return $ mustHaveCertificate (mkStakeAddressRegistrationCertificate (userStakeCredential newUser))
+  info $ "-- Registration tx body --\n" <> show txBodyReg <> "\n-- x --\n"
   void $ submitTx ctx newUser txBodyReg
   pure newUser
+
+delegateStakeCredentialSteps :: User -> GYStakePoolId -> (String -> IO ()) -> Ctx -> IO ()
+delegateStakeCredentialSteps user@User{..} spId info ctx = do
+  txBodyDel <- ctxRunI ctx user $ do
+    return $ mustHaveCertificate (mkStakeAddressPoolDelegationCertificate (userStakePkh user & fromJust & GYStakeCredentialByKey) spId GYTxCertWitnessKey)
+  info $ "-- Delegation tx body --\n" <> show txBodyDel <> "\n-- x --\n"
+  void $ submitTx' ctx $ signGYTxBody txBodyDel [GYSomeSigningKey userPaymentSKey, userStakeSKey & fromJust & GYSomeSigningKey]
 
 deregisterStakeCredentialSteps :: User -> (String -> IO ()) -> Ctx -> IO ()
 deregisterStakeCredentialSteps user@User{..} info ctx = do
   txBodyDereg <- ctxRunI ctx user $ do
     return $ mustHaveCertificate (mkStakeAddressDeregistrationCertificate (userStakePkh user & fromJust & GYStakeCredentialByKey) GYTxCertWitnessKey)
-  info $ "-- Tx body --\n" <> show txBodyDereg <> "\n-- x --\n"
+  info $ "-- Deregistration tx body --\n" <> show txBodyDereg <> "\n-- x --\n"
   void $ submitTx' ctx $ signGYTxBody txBodyDereg [GYSomeSigningKey userPaymentSKey, userStakeSKey & fromJust & GYSomeSigningKey]
+
+userStakeAddress :: User -> GYStakeAddress
+userStakeAddress user =  userStakeCredential user & stakeAddressFromCredential GYPrivnet
+
+userStakeCredential :: User -> GYStakeCredential
+userStakeCredential user = userStakePkh user & fromJust & GYStakeCredentialByKey
+
+waitTillAccumulatedRewards :: User -> (String -> IO ()) -> Ctx -> IO Natural
+waitTillAccumulatedRewards user info ctx = do
+  go
+  where
+    go = do
+      GYStakeAddressInfo {..} <- ctxRunC ctx user $ stakeAddressInfo (userStakeAddress user)
+      if gyStakeAddressInfoAvailableRewards == 0 then do
+        threadDelay 10_000_000
+        go
+      else do
+        info $ "Available rewards: " <> show gyStakeAddressInfoAvailableRewards <> "\n"
+        pure gyStakeAddressInfoAvailableRewards
+
+withdrawRewardsSteps :: User -> Natural -> (String -> IO ()) -> Ctx -> IO ()
+withdrawRewardsSteps user@User{..} rewards info ctx = do
+  txBodyWithdraw <- ctxRunI ctx user $ do
+    return $ mustHaveWithdrawal (GYTxWdrl (userStakeAddress user) rewards GYTxWdrlWitnessKey)
+  info $ "-- Withdrawal tx body --\n" <> show txBodyWithdraw <> "\n-- x --\n"
+  void $ submitTx' ctx $ signGYTxBody txBodyWithdraw [GYSomeSigningKey userPaymentSKey, userStakeSKey & fromJust & GYSomeSigningKey]
 
 tests :: IO Setup -> TestTree
 tests setup = testGroup "stake"
-  [ testCaseSteps "able to deregister a registered stake credential" $ \info -> withSetup setup info $ \ctx -> do
+  [ testCaseSteps "exercising stake credential registration, delegation, rewards claiming & de-registration" $ \info -> withSetup setup info $ \ctx -> do
     newUser <- registerStakeCredentialSteps info ctx
+    sps <- ctx & ctxGetParams & gyGetStakePools'
+    info $ "Total stake pools: " <> show sps <> "\n"
+    let spId = Set.findMin sps & stakePoolIdFromApi
+    info $ "Stake pool id: " <> show spId <> "\n"
+    delegateStakeCredentialSteps newUser spId info ctx
+    rewards <- waitTillAccumulatedRewards newUser info ctx
+    withdrawRewardsSteps newUser rewards info ctx
     deregisterStakeCredentialSteps newUser info ctx
+  -- , testCaseSteps "testing out non-zero withdrawal" $ \info -> withSetup setup info $ \ctx -> do
+  --   let user = ctxUserF ctx
+  --   rewards <- waitTillAccumulatedRewards user info ctx
+  --   withdrawRewardsSteps user rewards info ctx
   ]

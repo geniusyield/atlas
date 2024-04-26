@@ -453,11 +453,15 @@ blockfrostLookupDatum p dh = do
 
 blockfrostStakeAddressInfo :: Blockfrost.Project -> GYStakeAddress -> IO GYStakeAddressInfo
 blockfrostStakeAddressInfo p saddr = do
-  accInfo <- Blockfrost.runBlockfrost p (Blockfrost.getAccount (Blockfrost.mkAddress $ stakeAddressToText saddr)) >>= handleBlockfrostError "Account"
-  pure $ GYStakeAddressInfo
-    { gyStakeAddressInfoDelegatedPool = Blockfrost._accountInfoPoolId accInfo >>= stakePoolIdFromTextMaybe . Blockfrost.unPoolId
-    , gyStakeAddressInfoAvailableRewards = fromInteger $ lovelacesToInteger $ Blockfrost._accountInfoWithdrawableAmount accInfo
-    }
+  Blockfrost.runBlockfrost p (Blockfrost.getAccount (Blockfrost.mkAddress $ stakeAddressToText saddr)) >>= handler
+  where
+    -- This particular error is fine.
+    handler (Left Blockfrost.BlockfrostNotFound) = pure $ GYStakeAddressInfo Nothing 0
+    handler other                                = handleBlockfrostError "Account" $ other <&> \accInfo ->
+      GYStakeAddressInfo
+        { gyStakeAddressInfoDelegatedPool = Blockfrost._accountInfoPoolId accInfo >>= stakePoolIdFromTextMaybe . Blockfrost.unPoolId
+        , gyStakeAddressInfoAvailableRewards = fromInteger $ lovelacesToInteger $ Blockfrost._accountInfoWithdrawableAmount accInfo
+        }
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions

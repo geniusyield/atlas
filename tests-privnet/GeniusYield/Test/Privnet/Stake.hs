@@ -58,7 +58,7 @@ withdrawRewardsSteps strat user@User{..} rewards info ctx = do
 tests :: IO Setup -> TestTree
 tests setup = testGroup "stake"
   [ testCaseSteps "exercising stake credential registration, delegation, rewards claiming & de-registration" $ \info -> withSetup setup info $ \ctx -> do
-    for_ [GYRandomImproveMultiAsset, GYLegacy] $ \strat -> do
+    for_ [minBound .. maxBound] $ \strat -> do
       newUser <- registerStakeCredentialSteps strat info ctx
       sps <- ctx & ctxGetParams & gyGetStakePools'
       info $ "Total stake pools: " <> show sps <> "\n"

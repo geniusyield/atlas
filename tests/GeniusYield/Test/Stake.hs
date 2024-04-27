@@ -25,7 +25,7 @@ stakeTests config =
           -- Check if the withdrawal amount is positive.
           stakeAddrInfo <- gyGetStakeAddressInfo stakeAddr
           assertBool "No positive rewards available for withdrawal" $ gyStakeAddressInfoAvailableRewards stakeAddrInfo > 0
-          for_ [GYRandomImproveMultiAsset, GYLegacy] $ \strat ->
+          for_ [minBound .. maxBound] $ \strat ->
             testWithdrawalWithStrategy strat stakeAddrInfo addr stakeAddr config provider
     ]
 

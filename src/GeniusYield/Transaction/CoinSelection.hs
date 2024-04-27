@@ -94,7 +94,7 @@ data GYCoinSelectionStrategy
     = GYLargestFirstMultiAsset
     | GYRandomImproveMultiAsset
     | GYLegacy
-    deriving stock (Eq, Show)
+    deriving stock (Eq, Show, Enum, Bounded)
 
 {- | Select additional inputs from the set of own utxos given, such that when combined with given existing inputs,
 they cover for all the given outputs, as well as extraLovelace.

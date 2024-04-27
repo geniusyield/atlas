@@ -2,7 +2,6 @@ module GeniusYield.Test.Privnet.Stake (
     tests,
 ) where
 
-import           Control.Concurrent             (threadDelay)
 import           Data.Maybe                     (fromJust)
 import qualified Data.Set                       as Set
 import           GeniusYield.Imports
@@ -13,12 +12,12 @@ import           GeniusYield.TxBuilder          (GYTxQueryMonad (stakeAddressInf
                                                  mustHaveWithdrawal)
 import           GeniusYield.Types
 import           Test.Tasty                     (TestTree, testGroup)
-import           Test.Tasty.HUnit               (testCaseSteps)
+import           Test.Tasty.HUnit               (assertBool, testCaseSteps)
 
 -- This will check if we are able to register a stake credential without it's signature.
 registerStakeCredentialSteps :: (String -> IO ()) -> Ctx -> IO User
 registerStakeCredentialSteps info ctx = do
-  newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 100_000_000_000) (CreateUserConfig {cucGenerateCollateral = False, cucGenerateStakeKey = True})
+  newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 1_000_000_000) (CreateUserConfig {cucGenerateCollateral = False, cucGenerateStakeKey = True})
   pp <- ctxGetParams ctx & gyGetProtocolParameters'
   info $ "-- Protocol parameters --\n" <> show pp <> "\n-- x --\n"
   txBodyReg <- ctxRunI ctx newUser $ do
@@ -47,19 +46,6 @@ userStakeAddress user =  userStakeCredential user & stakeAddressFromCredential G
 userStakeCredential :: User -> GYStakeCredential
 userStakeCredential user = userStakePkh user & fromJust & GYStakeCredentialByKey
 
-waitTillAccumulatedRewards :: User -> (String -> IO ()) -> Ctx -> IO Natural
-waitTillAccumulatedRewards user info ctx = do
-  go
-  where
-    go = do
-      GYStakeAddressInfo {..} <- ctxRunC ctx user $ stakeAddressInfo (userStakeAddress user)
-      if gyStakeAddressInfoAvailableRewards == 0 then do
-        threadDelay 10_000_000
-        go
-      else do
-        info $ "Available rewards: " <> show gyStakeAddressInfoAvailableRewards <> "\n"
-        pure gyStakeAddressInfoAvailableRewards
-
 withdrawRewardsSteps :: User -> Natural -> (String -> IO ()) -> Ctx -> IO ()
 withdrawRewardsSteps user@User{..} rewards info ctx = do
   txBodyWithdraw <- ctxRunI ctx user $ do
@@ -76,11 +62,8 @@ tests setup = testGroup "stake"
     let spId = Set.findMin sps & stakePoolIdFromApi
     info $ "Stake pool id: " <> show spId <> "\n"
     delegateStakeCredentialSteps newUser spId info ctx
-    rewards <- waitTillAccumulatedRewards newUser info ctx
-    withdrawRewardsSteps newUser rewards info ctx
+    GYStakeAddressInfo {..} <- ctxRunC ctx newUser $ stakeAddressInfo (userStakeAddress newUser)
+    assertBool "Delegation failed" $ gyStakeAddressInfoDelegatedPool == Just spId
+    withdrawRewardsSteps newUser gyStakeAddressInfoAvailableRewards info ctx
     deregisterStakeCredentialSteps newUser info ctx
-  -- , testCaseSteps "testing out non-zero withdrawal" $ \info -> withSetup setup info $ \ctx -> do
-  --   let user = ctxUserF ctx
-  --   rewards <- waitTillAccumulatedRewards user info ctx
-  --   withdrawRewardsSteps user rewards info ctx
   ]

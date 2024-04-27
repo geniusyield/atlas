@@ -270,6 +270,7 @@ test-suite atlas-tests
     GeniusYield.Test.Providers.Mashup
     GeniusYield.Test.RefInput
     GeniusYield.Test.SlotConfig
+    GeniusYield.Test.Stake
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:

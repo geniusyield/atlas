@@ -217,10 +217,14 @@ instance GYTxQueryMonad GYTxMonadRun where
     stakeAddressInfo saddr = do
         ms <- liftRun $ gets mockStake
         let sc = stakeAddressToCredential saddr & stakeCredentialToPlutus & Plutus.StakingHash
-        pure $ GYStakeAddressInfo {
-            gyStakeAddressInfoAvailableRewards = fromInteger $ fromMaybe 0 $ lookupReward sc ms,
-            gyStakeAddressInfoDelegatedPool = Map.toList (stake'pools ms) & find (\(_pid, scs) -> sc `elem` pool'stakes scs) >>= (fst >>> unPoolId >>> pubKeyHashFromPlutus >>> rightToMaybe) >>= (pubKeyHashToApi >>> Api.serialiseToRawBytesHexText >>> Text.encodeUtf8 >>> Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsStakePoolKey) >>> rightToMaybe) <&> stakePoolIdFromApi
-        }
+            mscRewards = lookupReward sc ms
+        pure $ case mscRewards of
+            Nothing -> Nothing
+            Just r -> Just $
+              GYStakeAddressInfo {
+                  gyStakeAddressInfoAvailableRewards = fromInteger r,
+                  gyStakeAddressInfoDelegatedPool = Map.toList (stake'pools ms) & find (\(_pid, scs) -> sc `elem` pool'stakes scs) >>= (fst >>> unPoolId >>> pubKeyHashFromPlutus >>> rightToMaybe) >>= (pubKeyHashToApi >>> Api.serialiseToRawBytesHexText >>> Text.encodeUtf8 >>> Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsStakePoolKey) >>> rightToMaybe) <&> stakePoolIdFromApi
+              }
 
     slotConfig = do
         (zero, len) <- slotConfig'

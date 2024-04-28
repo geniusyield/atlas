@@ -62,7 +62,8 @@ main = do
 
           , GeniusYield.Test.Privnet.Examples.tests setup
 
-          , GeniusYield.Test.Privnet.Stake.tests setup
+          , GeniusYield.Test.Privnet.Stake.stakeKeyTests setup
+          , GeniusYield.Test.Privnet.Stake.stakeValidatorTests setup
 
           ]
 

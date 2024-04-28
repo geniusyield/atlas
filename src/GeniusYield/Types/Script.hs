@@ -91,6 +91,18 @@ module GeniusYield.Types.Script (
     gyStakeValScriptToSerialisedScript,
     gyStakeValScriptWitnessToApiPlutusSW,
 
+    -- ** Stake validator selectors
+    stakeValidatorHash,
+    stakeValidatorPlutusHash,
+    stakeValidatorApiHash,
+
+    -- * StakeValidatorHash
+    GYStakeValidatorHash,
+    stakeValidatorHashToApi,
+    stakeValidatorHashToPlutus,
+    stakeValidatorHashFromApi,
+    stakeValidatorHashFromPlutus,
+
     -- ** File operations
     writeStakeValidator,
     readStakeValidator,
@@ -558,6 +570,58 @@ gyStakeValScriptWitnessToApiPlutusSW (GYStakeValScript p) = stakeValidatorToApiP
 gyStakeValScriptWitnessToApiPlutusSW (GYStakeValReference r s) =
     referenceScriptToApiPlutusScriptWitness r s
     Api.NoScriptDatumForStake
+
+stakeValidatorHash :: GYStakeValidator v -> GYStakeValidatorHash
+stakeValidatorHash = coerce scriptApiHash
+
+stakeValidatorPlutusHash :: GYStakeValidator v -> PlutusV1.ScriptHash
+stakeValidatorPlutusHash = coerce scriptPlutusHash
+
+stakeValidatorApiHash :: GYStakeValidator v -> Api.ScriptHash
+stakeValidatorApiHash = coerce scriptApiHash
+
+newtype GYStakeValidatorHash = GYStakeValidatorHash Api.ScriptHash
+  deriving stock (Show, Eq, Ord)
+
+-- |
+--
+-- >>> "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYStakeValidatorHash
+-- GYStakeValidatorHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
+--
+instance IsString GYStakeValidatorHash where
+    fromString = GYStakeValidatorHash . fromString
+
+-- |
+--
+-- >>> printf "%s" ("cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYStakeValidatorHash)
+-- cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0
+--
+instance Printf.PrintfArg GYStakeValidatorHash where
+    formatArg (GYStakeValidatorHash h) = formatArg $ init $ tail $ show h
+
+stakeValidatorHashToPlutus :: GYStakeValidatorHash -> PlutusV1.ScriptHash
+stakeValidatorHashToPlutus = apiHashToPlutus . stakeValidatorHashToApi
+
+stakeValidatorHashToApi :: GYStakeValidatorHash -> Api.ScriptHash
+stakeValidatorHashToApi = coerce
+
+stakeValidatorHashFromApi :: Api.ScriptHash -> GYStakeValidatorHash
+stakeValidatorHashFromApi = coerce
+
+-- |
+--
+-- >>> stakeValidatorHashFromPlutus "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
+-- Right (GYStakeValidatorHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0")
+--
+-- >>> stakeValidatorHashFromPlutus "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7"
+-- Left (DeserialiseRawBytesError {ptceTag = "stakeValidatorHashFromPlutus: cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7, error: SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Enable to deserialise ScriptHash\"}"})
+--
+stakeValidatorHashFromPlutus :: PlutusV1.ScriptHash -> Either PlutusToCardanoError GYStakeValidatorHash
+stakeValidatorHashFromPlutus vh@(PlutusV1.ScriptHash ibs) =
+    bimap
+        (\e -> DeserialiseRawBytesError $ Text.pack $ "stakeValidatorHashFromPlutus: " <> show vh <> ", error: " <> show e)
+        stakeValidatorHashFromApi
+    $ Api.deserialiseFromRawBytes Api.AsScriptHash $ PlutusTx.fromBuiltin ibs
 
 -- | Writes a stake validator to a file.
 --

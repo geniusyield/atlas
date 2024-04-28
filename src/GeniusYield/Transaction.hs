@@ -165,20 +165,8 @@ buildUnsignedTxBody :: forall m v.
         -> m (Either BuildTxException GYTxBody)
 buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata = buildTxLoop cstrat extraLovelaceStart
   where
-    ppStakeAddressDeposit = Api.S.protocolParamStakeAddressDeposit $ Api.S.unbundleProtocolParams $ gyBTxEnvProtocolParams env
-    (stakeCredDeregsAmt :: Natural, stakeCredRegsAmt :: Natural) = foldl' (\acc@(!accDeregs, !accRegs) (gyTxCertCertificate -> cert) -> case cert of
-            GYStakeAddressDeregistrationCertificate _ -> (accDeregs + 1, accRegs)
-            GYStakeAddressRegistrationCertificate _   -> (accDeregs, accRegs + 1)
-            _                                         -> acc) (0, 0) certs
-    -- Extra ada is received from withdrawals and stake credential deregistration.
-    adaSource =
-      let wdrlsAda = getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls
-          stakeCredDeregsAda = stakeCredDeregsAmt * fromIntegral ppStakeAddressDeposit
-      in wdrlsAda + stakeCredDeregsAda
-    -- Ada lost due to stake credential registration.
-    adaSink = stakeCredRegsAmt * fromIntegral ppStakeAddressDeposit
     step :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
-    step stepStrat = fmap (first BuildTxBalancingError) . balanceTxStep env mmint adaSource adaSink insOld outsOld stepStrat
+    step stepStrat = fmap (first BuildTxBalancingError) . balanceTxStep env mmint wdrls certs insOld outsOld stepStrat
 
     buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException GYTxBody)
     buildTxLoop stepStrat n
@@ -255,8 +243,8 @@ the tx with 'finalizeGYBalancedTx'. If such is the case, 'balanceTxStep' should 
 balanceTxStep :: (HasCallStack, MonadRandom m)
     => GYBuildTxEnv
     -> Maybe (GYValue, [(GYMintScript v, GYRedeemer)])  -- ^ minting
-    -> Natural                                          -- ^ ada source
-    -> Natural                                          -- ^ ada sink
+    -> [GYTxWdrl v]                                     -- ^ withdrawals
+    -> [GYTxCert v]                                     -- ^ certificates
     -> [GYTxInDetailed v]                               -- ^ transaction inputs
     -> [GYTxOut v]                                      -- ^ transaction outputs
     -> GYCoinSelectionStrategy                          -- ^ Coin selection strategy to use
@@ -270,14 +258,27 @@ balanceTxStep
         , gyBTxEnvCollateral     = collateral
         }
     mmint
-    adaSource
-    adaSink
+    wdrls
+    certs
     ins
     outs
     cstrat
     = let adjustedOuts = map (adjustTxOut (minimumUTxO pp)) outs
           valueMint       = maybe mempty fst mmint
-          needsCollateral = valueMint /= mempty || any (isScriptWitness . gyTxInWitness . gyTxInDet) ins
+          needsCollateral = valueMint /= mempty || any (isScriptWitness . gyTxInWitness . gyTxInDet) ins || any (isCertScriptWitness . gyTxCertWitness) certs || any (isWdrlScriptWitness . gyTxWdrlWitness) wdrls
+          unbundledPP = Api.S.unbundleProtocolParams pp
+          ppStakeAddressDeposit = Api.S.protocolParamStakeAddressDeposit unbundledPP
+          (stakeCredDeregsAmt :: Natural, stakeCredRegsAmt :: Natural) = foldl' (\acc@(!accDeregs, !accRegs) (gyTxCertCertificate -> cert) -> case cert of
+                  GYStakeAddressDeregistrationCertificate _ -> (accDeregs + 1, accRegs)
+                  GYStakeAddressRegistrationCertificate _   -> (accDeregs, accRegs + 1)
+                  _                                         -> acc) (0, 0) certs
+          -- Extra ada is received from withdrawals and stake credential deregistration.
+          adaSource =
+            let wdrlsAda = getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls
+                stakeCredDeregsAda = stakeCredDeregsAmt * fromIntegral ppStakeAddressDeposit
+            in wdrlsAda + stakeCredDeregsAda
+          -- Ada lost due to stake credential registration.
+          adaSink = stakeCredRegsAmt * fromIntegral ppStakeAddressDeposit
           collaterals
             | needsCollateral = utxosFromUTxO collateral
             | otherwise       = mempty
@@ -300,7 +301,7 @@ balanceTxStep
                             . adjustTxOut (minimumUTxO pp)
                     , maxValueSize    = fromMaybe
                                             (error "protocolParamMaxValueSize missing from protocol params")
-                                            $ Api.S.protocolParamMaxValueSize $ Api.S.unbundleProtocolParams pp
+                                            $ Api.S.protocolParamMaxValueSize unbundledPP
                     , adaSource = adaSource
                     , adaSink   = adaSink
                     }
@@ -309,6 +310,10 @@ balanceTxStep
   where
     isScriptWitness GYTxInWitnessKey      = False
     isScriptWitness GYTxInWitnessScript{} = True
+    isCertScriptWitness (Just GYTxCertWitnessScript{}) = True
+    isCertScriptWitness _                              = False
+    isWdrlScriptWitness GYTxWdrlWitnessScript{} = True
+    isWdrlScriptWitness _                       = False
 
 retColSup :: Api.S.TxTotalAndReturnCollateralSupportedInEra Api.S.BabbageEra
 retColSup = Api.TxTotalAndReturnCollateralInBabbageEra

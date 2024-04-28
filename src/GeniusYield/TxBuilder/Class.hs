@@ -166,7 +166,8 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     utxosAtPaymentCredentialsWithDatums :: [GYPaymentCredential] -> m [(GYUTxO, Maybe GYDatum)]
     utxosAtPaymentCredentialsWithDatums = gyQueryUtxosAtPaymentCredsWithDatumsDefault utxosAtPaymentCredentials lookupDatum
 
-    stakeAddressInfo :: GYStakeAddress -> m GYStakeAddressInfo
+    -- | Obtain delegation information for a stake address. Note that in case stake address is not registered, this function should return `Nothing`.
+    stakeAddressInfo :: GYStakeAddress -> m (Maybe GYStakeAddressInfo)
 
     {- | Obtain the slot config for the network.
 

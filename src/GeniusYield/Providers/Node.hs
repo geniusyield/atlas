@@ -105,15 +105,17 @@ stakePools :: GYEra -> Api.LocalNodeConnectInfo Api.CardanoMode -> IO (Set.Set A
 stakePools GYAlonzo  info = queryAlonzoEra  info Api.QueryStakePools
 stakePools GYBabbage info = queryBabbageEra info Api.QueryStakePools
 
-nodeStakeAddressInfo :: Api.LocalNodeConnectInfo Api.CardanoMode -> GYStakeAddress -> IO GYStakeAddressInfo
+nodeStakeAddressInfo :: Api.LocalNodeConnectInfo Api.CardanoMode -> GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
 nodeStakeAddressInfo info saddr = resolveStakeAddressInfoFromApi saddr <$> queryBabbageEra info (Api.QueryStakeAddresses (Set.singleton $ stakeCredentialToApi $ stakeAddressToCredential saddr) (Api.localNodeNetworkId info))
 
-resolveStakeAddressInfoFromApi :: GYStakeAddress -> (Map.Map Api.StakeAddress Api.Lovelace, Map.Map Api.StakeAddress Api.S.PoolId) -> GYStakeAddressInfo
+resolveStakeAddressInfoFromApi :: GYStakeAddress -> (Map.Map Api.StakeAddress Api.Lovelace, Map.Map Api.StakeAddress Api.S.PoolId) -> Maybe GYStakeAddressInfo
 resolveStakeAddressInfoFromApi (stakeAddressToApi -> stakeAddr) (rewards, delegations) =
-    GYStakeAddressInfo
+    if Map.member stakeAddr rewards
+    then Just $ GYStakeAddressInfo
         { gyStakeAddressInfoAvailableRewards = fromIntegral $ Map.findWithDefault 0 stakeAddr rewards
         , gyStakeAddressInfoDelegatedPool = stakePoolIdFromApi <$> Map.lookup stakeAddr delegations
         }
+    else Nothing
 
 systemStart :: Api.LocalNodeConnectInfo Api.CardanoMode -> IO SystemStart
 systemStart info = queryCardanoMode info Api.QuerySystemStart

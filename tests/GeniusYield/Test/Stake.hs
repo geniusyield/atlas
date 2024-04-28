@@ -2,14 +2,13 @@ module GeniusYield.Test.Stake
   ( stakeTests
   ) where
 
-import           Data.Foldable           (find, for_)
-import           Data.Maybe              (isJust)
+import           Data.Foldable           (for_)
 import           GeniusYield.GYConfig
-import           GeniusYield.Transaction (GYCoinSelectionStrategy (GYLegacy, GYRandomImproveMultiAsset))
+import           GeniusYield.Transaction (GYCoinSelectionStrategy)
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 import           Test.Tasty              (TestTree, testGroup)
-import           Test.Tasty.HUnit        (assertBool, testCase)
+import           Test.Tasty.HUnit        (assertBool, assertFailure, testCase)
 
 stakeTests :: GYCoreConfig -> TestTree
 stakeTests config =
@@ -21,9 +20,11 @@ stakeTests config =
               stakeAddr = unsafeStakeAddressFromText "stake_test1upx0fuqcjqs4h5vp687d8j2cng4y5wkmelc6wzm5szq04qsm5d0l6"
           -- Check if there is a UTxO in the given addr, with value greater than 5 ada.
           utxos <- gyQueryUtxosAtAddress provider addr Nothing
-          assertBool "Not a single UTxO found at given address with value greater than 5 ada" $ isJust $ find (\utxo -> utxoValue utxo `valueGreaterOrEqual` valueFromLovelace 5_000_000) (utxosToList utxos)
+          assertBool "Not a single UTxO found at given address with value greater than 5 ada" $ any (\utxo -> utxoValue utxo `valueGreaterOrEqual` valueFromLovelace 5_000_000) (utxosToList utxos)
           -- Check if the withdrawal amount is positive.
-          stakeAddrInfo <- gyGetStakeAddressInfo stakeAddr
+          stakeAddrInfo <- do
+            mstakeAddrInfo <- gyGetStakeAddressInfo stakeAddr
+            maybe (assertFailure "Stake address info not found") pure mstakeAddrInfo
           assertBool "No positive rewards available for withdrawal" $ gyStakeAddressInfoAvailableRewards stakeAddrInfo > 0
           for_ [minBound .. maxBound] $ \strat ->
             testWithdrawalWithStrategy strat stakeAddrInfo addr stakeAddr config provider

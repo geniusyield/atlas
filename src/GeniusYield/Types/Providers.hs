@@ -132,7 +132,7 @@ data GYProviders = GYProviders
     , gySlotActions         :: !GYSlotActions
     , gyGetParameters       :: !GYGetParameters
     , gyQueryUTxO           :: !GYQueryUTxO
-    , gyGetStakeAddressInfo :: !(GYStakeAddress -> IO GYStakeAddressInfo)
+    , gyGetStakeAddressInfo :: !(GYStakeAddress -> IO (Maybe GYStakeAddressInfo))
     , gyLog'                :: !GYLog
     }
 

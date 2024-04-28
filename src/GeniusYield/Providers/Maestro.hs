@@ -542,14 +542,16 @@ maestroLookupDatum env dh = do
 -------------------------------------------------------------------------------
 
 -- | Returns the 'GYStakeAddressInfo' queried from Maestro.
-maestroStakeAddressInfo :: Maestro.MaestroEnv 'Maestro.V1 -> GYStakeAddress -> IO GYStakeAddressInfo
+maestroStakeAddressInfo :: Maestro.MaestroEnv 'Maestro.V1 -> GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
 maestroStakeAddressInfo env saddr = do
   handler <=< try $ Maestro.getTimestampedData <$> Maestro.accountInfo env (coerce stakeAddressToText saddr)
   where
     -- This particular error is fine.
-    handler (Left Maestro.MaestroNotFound) = pure $ GYStakeAddressInfo Nothing 0
+    handler (Left Maestro.MaestroNotFound) = pure Nothing
     handler other = handleMaestroError "AccountInfo" $ other <&> \accInfo ->
-      GYStakeAddressInfo
-        { gyStakeAddressInfoDelegatedPool = Maestro.accountInfoDelegatedPool accInfo >>= stakePoolIdFromTextMaybe . coerce
-        , gyStakeAddressInfoAvailableRewards = fromIntegral $ Maestro.accountInfoRewardsAvailable accInfo
-        }
+      if Maestro.accountInfoRegistered accInfo then Just $
+        GYStakeAddressInfo
+          { gyStakeAddressInfoDelegatedPool = Maestro.accountInfoDelegatedPool accInfo >>= stakePoolIdFromTextMaybe . coerce
+          , gyStakeAddressInfoAvailableRewards = fromIntegral $ Maestro.accountInfoRewardsAvailable accInfo
+          }
+      else Nothing

@@ -31,7 +31,7 @@ import           GeniusYield.Types.PaymentKeyHash (GYPaymentKeyHash,
                                                    paymentKeyHashFromApi,
                                                    paymentKeyHashToApi,
                                                    paymentKeyHashToPlutus)
-import           GeniusYield.Types.PubKeyHash     (CanSignTx (fromPubKeyHash, toPubKeyHash))
+import           GeniusYield.Types.PubKeyHash     (AsPubKeyHash (fromPubKeyHash, toPubKeyHash))
 import           GeniusYield.Types.Script         (GYStakeValidatorHash,
                                                    GYValidatorHash,
                                                    stakeValidatorHashFromApi,

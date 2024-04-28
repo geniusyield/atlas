@@ -56,7 +56,6 @@ import qualified PlutusTx.Builtins.Internal                as Plutus
 
 import qualified Cardano.Simple.PlutusLedgerApi.V1.Scripts as Fork
 import           Data.Sequence                             (ViewR (..), viewr)
-import qualified Data.Text.Encoding                        as Text
 import           GeniusYield.Imports
 import           GeniusYield.Transaction                   (BuildTxException (BuildTxBalancingError),
                                                             GYCoinSelectionStrategy (GYRandomImproveMultiAsset))
@@ -223,7 +222,7 @@ instance GYTxQueryMonad GYTxMonadRun where
             Just r -> Just $
               GYStakeAddressInfo {
                   gyStakeAddressInfoAvailableRewards = fromInteger r,
-                  gyStakeAddressInfoDelegatedPool = Map.toList (stake'pools ms) & find (\(_pid, scs) -> sc `elem` pool'stakes scs) >>= (fst >>> unPoolId >>> pubKeyHashFromPlutus >>> rightToMaybe) >>= (pubKeyHashToApi >>> Api.serialiseToRawBytesHexText >>> Text.encodeUtf8 >>> Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsStakePoolKey) >>> rightToMaybe) <&> stakePoolIdFromApi
+                  gyStakeAddressInfoDelegatedPool = Map.toList (stake'pools ms) & find (\(_pid, scs) -> sc `elem` pool'stakes scs) >>= (fst >>> unPoolId >>> pubKeyHashFromPlutus >>> rightToMaybe) <&> fromPubKeyHash
               }
 
     slotConfig = do

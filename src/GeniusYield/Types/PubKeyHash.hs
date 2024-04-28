@@ -8,7 +8,8 @@ Stability   : develop
 -}
 module GeniusYield.Types.PubKeyHash (
     GYPubKeyHash (..),
-    CanSignTx (..),
+    AsPubKeyHash (..),
+    CanSignTx,
     pubKeyHashFromPlutus,
     pubKeyHashToPlutus,
     pubKeyHashToApi,
@@ -43,13 +44,17 @@ newtype GYPubKeyHash = GYPubKeyHash (Api.Hash Api.PaymentKey)
     deriving stock Show
     deriving newtype (Eq, Ord, IsString)
 
-class CanSignTx a where
+class AsPubKeyHash a where
   toPubKeyHash :: a -> GYPubKeyHash
   fromPubKeyHash :: GYPubKeyHash -> a
 
-instance CanSignTx GYPubKeyHash where
+class AsPubKeyHash a => CanSignTx a
+
+instance AsPubKeyHash GYPubKeyHash where
   toPubKeyHash = id
   fromPubKeyHash = id
+
+instance CanSignTx GYPubKeyHash
 
 -- |
 --

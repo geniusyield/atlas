@@ -21,7 +21,7 @@ import qualified Data.Csv                     as Csv
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text.Encoding           as Text
-import           GeniusYield.Types.PubKeyHash (CanSignTx (..))
+import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..), CanSignTx)
 import qualified Text.Printf                  as Printf
 import           Unsafe.Coerce                (unsafeCoerce)
 
@@ -37,9 +37,11 @@ newtype GYStakeKeyHash = GYStakeKeyHash (Api.Hash Api.StakeKey)
     deriving stock Show
     deriving newtype (Eq, Ord, IsString)
 
-instance CanSignTx GYStakeKeyHash where
+instance AsPubKeyHash GYStakeKeyHash where
   toPubKeyHash = unsafeCoerce
   fromPubKeyHash = unsafeCoerce
+
+instance CanSignTx GYStakeKeyHash
 
 -- |
 --

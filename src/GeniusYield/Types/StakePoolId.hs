@@ -28,6 +28,9 @@ import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
 import           GeniusYield.Imports
+import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..),
+                                               pubKeyHashFromApi,
+                                               pubKeyHashToApi)
 import qualified Text.Printf                  as Printf
 import qualified Web.HttpApiData              as Web
 
@@ -69,6 +72,12 @@ stakePoolIdToApi = coerce
 --
 stakePoolIdFromApi :: Api.Hash Api.StakePoolKey -> GYStakePoolId
 stakePoolIdFromApi = coerce
+
+-- >>> fromPubKeyHash @GYStakePoolId (toPubKeyHash spId)
+-- unsafeStakePoolIdFromText "pool1cjz6kg9a8ug9uk0nc59q60a67c2628ms58rd98gq587jwa2x5qt"
+instance AsPubKeyHash GYStakePoolId where
+  toPubKeyHash = stakePoolIdToApi >>> Api.serialiseToRawBytesHex >>> Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsPaymentKey) >>> either (error "AsPubKeyHash.toPubKeyHash: Absurd (GYStakePoolId)") id >>> pubKeyHashFromApi
+  fromPubKeyHash = pubKeyHashToApi >>> Api.serialiseToRawBytesHex >>> Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsStakePoolKey) >>> either (error "AsPubKeyHash.fromPubKeyHash: Absurd (GYStakePoolId)") id >>> stakePoolIdFromApi
 
 -- |
 --

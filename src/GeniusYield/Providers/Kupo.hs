@@ -12,6 +12,7 @@ module GeniusYield.Providers.Kupo (
   newKupoApiEnv,
   kupoLookupDatum,
   kupoLookupScript,
+  KupoUtxo (..),
   kupoQueryUtxo,
   kupoAwaitTxConfirmed
 ) where

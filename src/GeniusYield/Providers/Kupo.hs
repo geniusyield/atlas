@@ -54,10 +54,12 @@ import           Servant.API                  (Capture, Get, Header,
                                                Headers (getResponse), JSON,
                                                QueryFlag, QueryParam,
                                                ResponseHeader (Header),
+                                               ToHttpApiData,
                                                lookupResponseHeader,
                                                type (:<|>) (..), (:>))
 import           Servant.Client               (ClientEnv, ClientError, ClientM,
                                                client, runClientM)
+import           Web.HttpApiData              (ToHttpApiData (..))
 
 -- $setup
 -- >>> import qualified Data.Aeson as Aeson
@@ -184,7 +186,14 @@ data KupoUtxo = KupoUtxo
 
 findDatumByHash :: GYDatumHash -> ClientM KupoDatum
 findScriptByHash :: GYScriptHash -> ClientM KupoScript
-fetchUtxosByPattern :: Pattern -> Bool -> Maybe Text -> Maybe Text -> ClientM (Headers '[Header "X-Most-Recent-Checkpoint" Word64] [KupoUtxo])
+fetchUtxosByPattern :: Pattern -> Bool -> Maybe KupoOrder -> Maybe Text -> Maybe Text -> ClientM (Headers '[Header "X-Most-Recent-Checkpoint" Word64] [KupoUtxo])
+
+data KupoOrder = KOMostRecentFirst | KOOldestFirst
+  deriving stock (Show, Eq, Ord, Enum, Bounded)
+
+instance ToHttpApiData KupoOrder where
+  toUrlPiece KOMostRecentFirst = "most-recent-first"
+  toUrlPiece KOOldestFirst     = "oldest-first"
 
 type KupoApi =
          "datums"
@@ -196,6 +205,7 @@ type KupoApi =
     :<|> "matches"
       :> Capture "pattern" Pattern
       :> QueryFlag "unspent"
+      :> QueryParam "order" KupoOrder
       :> QueryParam "policy_id" Text
       :> QueryParam "asset_name" Text
       :> Get '[JSON] (Headers '[Header "X-Most-Recent-Checkpoint" Word64] [KupoUtxo])

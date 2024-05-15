@@ -13,6 +13,7 @@ module GeniusYield.Providers.Kupo (
   kupoLookupDatum,
   kupoLookupScript,
   KupoUtxo (..),
+  KupoOrder (..),
   kupoQueryUtxo,
   kupoAwaitTxConfirmed,
   findDatumByHash,

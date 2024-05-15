@@ -232,7 +232,7 @@ kupoLookupScript env sh = do
 kupoUtxosAtAddress :: KupoApiEnv -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
 kupoUtxosAtAddress env addr mAssetClass = do
   let extractedAssetClass = extractAssetClass mAssetClass
-      commonRequestPart = fetchUtxosByPattern (addressToText addr) True
+      commonRequestPart = fetchUtxosByPattern (addressToText addr) True Nothing
   addrUtxos <-
     handleKupoError locationIdent <=< runKupoClient env $
       case extractedAssetClass of
@@ -247,7 +247,7 @@ kupoUtxoAtTxOutRef env oref = do
   let (txId, utxoIdx) = txOutRefToTuple' oref
   utxo <-
     handleKupoError locationIdent <=< runKupoClient env $
-      fetchUtxosByPattern (Text.pack (show utxoIdx) <> "@" <> txId) True Nothing Nothing
+      fetchUtxosByPattern (Text.pack (show utxoIdx) <> "@" <> txId) True Nothing Nothing Nothing
   listToMaybe <$> traverse (transformUtxo env) (getResponse utxo)
  where
   locationIdent = "UtxoByRef"
@@ -255,7 +255,7 @@ kupoUtxoAtTxOutRef env oref = do
 kupoUtxosAtPaymentCredential :: KupoApiEnv -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
 kupoUtxosAtPaymentCredential env cred mAssetClass = do
   let extractedAssetClass = extractAssetClass mAssetClass
-      commonRequestPart = fetchUtxosByPattern (paymentCredentialToHexText cred <> "/*") True
+      commonRequestPart = fetchUtxosByPattern (paymentCredentialToHexText cred <> "/*") True Nothing
   credUtxos <-
     handleKupoError locationIdent <=< runKupoClient env $
       case extractedAssetClass of
@@ -317,7 +317,7 @@ kupoAwaitTxConfirmed env p@GYAwaitTxParameters{..} txId = go 0
       | otherwise = do
           utxos <-
             handleKupoError locationIdent <=< runKupoClient env $
-              fetchUtxosByPattern (Text.pack $ "*@" <> show txId) False Nothing Nothing  -- We don't require for only @unspent@. Kupo with @--prune-utxo@ option would still keep spent UTxOs until their spent record is truly immutable (see Kupo docs for more details).
+              fetchUtxosByPattern (Text.pack $ "*@" <> show txId) False Nothing Nothing Nothing  -- We don't require for only @unspent@. Kupo with @--prune-utxo@ option would still keep spent UTxOs until their spent record is truly immutable (see Kupo docs for more details).
           case listToMaybe (getResponse utxos) of
             Nothing -> threadDelay checkInterval >> go (attempt + 1)
             Just u  -> do

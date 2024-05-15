@@ -10,6 +10,7 @@ Stability   : develop
 module GeniusYield.Providers.Kupo (
   KupoApiEnv,
   newKupoApiEnv,
+  runKupoClient,
   kupoLookupDatum,
   kupoLookupScript,
   KupoUtxo (..),

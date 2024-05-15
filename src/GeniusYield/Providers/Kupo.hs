@@ -14,7 +14,10 @@ module GeniusYield.Providers.Kupo (
   kupoLookupScript,
   KupoUtxo (..),
   kupoQueryUtxo,
-  kupoAwaitTxConfirmed
+  kupoAwaitTxConfirmed,
+  findDatumByHash,
+  findScriptByHash,
+  fetchUtxosByPattern,
 ) where
 
 import qualified Cardano.Api                  as Api

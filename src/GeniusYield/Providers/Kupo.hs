@@ -185,7 +185,7 @@ data KupoUtxo = KupoUtxo
   , datumType     :: !(Maybe KupoDatumType)
   , scriptHash    :: !(Maybe GYScriptHash)
   , createdAt     :: !KupoCreatedAt
-  , spentAt       :: !KupoCreatedAt
+  , spentAt       :: !(Maybe KupoCreatedAt)
   }
   deriving stock (Show, Eq, Ord, Generic)
   deriving (FromJSON) via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoUtxo

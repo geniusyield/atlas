@@ -24,10 +24,11 @@ import           GeniusYield.Imports
 import qualified Cardano.Api         as Api
 import qualified Data.Swagger        as Swagger
 import qualified Text.Printf         as Printf
+import           Web.HttpApiData     (FromHttpApiData, ToHttpApiData)
 
 newtype GYSlot = GYSlot Word64
   deriving (Show, Read, Eq, Ord)
-  deriving newtype (Swagger.ToParamSchema, Swagger.ToSchema, ToJSON, FromJSON)
+  deriving newtype (Swagger.ToParamSchema, Swagger.ToSchema, ToJSON, FromJSON, ToHttpApiData, FromHttpApiData)
 
 slotFromWord64 :: Word64 -> GYSlot
 slotFromWord64 = GYSlot

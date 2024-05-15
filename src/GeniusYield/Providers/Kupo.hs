@@ -23,7 +23,6 @@ import           Data.Aeson                   (Value (Null), withObject, (.:))
 import           Data.Char                    (toLower)
 import           Data.Maybe                   (listToMaybe)
 import qualified Data.Text                    as Text
-import           Data.Word                    (Word64)
 import           Deriving.Aeson
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common (datumFromCBOR, extractAssetClass,
@@ -50,6 +49,7 @@ import           GeniusYield.Types            (GYAddress, GYAddressBech32,
                                                txOutRefToTuple', utxosFromList,
                                                valueFromLovelace)
 import qualified GeniusYield.Types            as GYTypes (PlutusVersion (..))
+import           GeniusYield.Types.Slot       (GYSlot, unsafeAdvanceSlot)
 import           Servant.API                  (Capture, Get, Header,
                                                Headers (getResponse), JSON,
                                                QueryFlag, QueryParam,
@@ -165,7 +165,7 @@ data KupoDatumType = Hash | Inline
   deriving (FromJSON) via CustomJSON '[ConstructorTagModifier '[LowerFirst]] KupoDatumType
 
 newtype KupoCreatedAt = KupoCreatedAt
-  { slotNo     :: Word64
+  { slotNo     :: GYSlot
   }
   deriving stock (Show, Eq, Ord, Generic)
   deriving (FromJSON) via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoCreatedAt
@@ -184,9 +184,11 @@ data KupoUtxo = KupoUtxo
   deriving stock (Show, Eq, Ord, Generic)
   deriving (FromJSON) via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoUtxo
 
+type MostRecentCheckpointHeader = Header "X-Most-Recent-Checkpoint" GYSlot
+
 findDatumByHash :: GYDatumHash -> ClientM KupoDatum
 findScriptByHash :: GYScriptHash -> ClientM KupoScript
-fetchUtxosByPattern :: Pattern -> Bool -> Maybe KupoOrder -> Maybe Text -> Maybe Text -> ClientM (Headers '[Header "X-Most-Recent-Checkpoint" Word64] [KupoUtxo])
+fetchUtxosByPattern :: Pattern -> Bool -> Maybe KupoOrder -> Maybe Text -> Maybe Text -> ClientM (Headers '[MostRecentCheckpointHeader] [KupoUtxo])
 
 data KupoOrder = KOMostRecentFirst | KOOldestFirst
   deriving stock (Show, Eq, Ord, Enum, Bounded)
@@ -208,7 +210,7 @@ type KupoApi =
       :> QueryParam "order" KupoOrder
       :> QueryParam "policy_id" Text
       :> QueryParam "asset_name" Text
-      :> Get '[JSON] (Headers '[Header "X-Most-Recent-Checkpoint" Word64] [KupoUtxo])
+      :> Get '[JSON] (Headers '[MostRecentCheckpointHeader] [KupoUtxo])
 
 findDatumByHash :<|> findScriptByHash :<|> fetchUtxosByPattern = client @KupoApi Proxy
 
@@ -321,9 +323,9 @@ kupoAwaitTxConfirmed env p@GYAwaitTxParameters{..} txId = go 0
           case listToMaybe (getResponse utxos) of
             Nothing -> threadDelay checkInterval >> go (attempt + 1)
             Just u  -> do
-              let slotsToWait = 3 * confirmations * 20  -- Ouroboros Praos guarantees that there are at least @k@ blocks in a window of @3k / f@ slots where @f@ is the active slot coefficient, which is @0.05@ for Mainnet, Preprod & Preview.
-              case (lookupResponseHeader utxos :: ResponseHeader "X-Most-Recent-Checkpoint" Word64) of
-                Header slotOfCurrentBlock -> unless (slotNo (createdAt u) + slotsToWait <= slotOfCurrentBlock) $ threadDelay checkInterval >> go (attempt + 1)
+              let slotsToWait :: Natural = 3 * fromIntegral confirmations * 20  -- Ouroboros Praos guarantees that there are at least @k@ blocks in a window of @3k / f@ slots where @f@ is the active slot coefficient, which is @0.05@ for Mainnet, Preprod & Preview.
+              case (lookupResponseHeader utxos :: ResponseHeader "X-Most-Recent-Checkpoint" GYSlot) of
+                Header slotOfCurrentBlock -> unless (let s = unsafeAdvanceSlot (slotNo (createdAt u)) slotsToWait in s <= slotOfCurrentBlock) $ threadDelay checkInterval >> go (attempt + 1)  -- @Word64@ wraps back to zero in case of overflow, so it's safe.
                 _ -> handleKupoAbsurdResponse locationIdent "Header 'X-Most-Recent-Checkpoint' isn't seen in response"
 
           where

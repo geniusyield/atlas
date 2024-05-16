@@ -119,10 +119,10 @@ In JSON format, this essentially corresponds to:
 = { coreProvider: GYCoreProviderInfo, networkId: NetworkId, logging: [GYLogScribeConfig], utxoCacheEnable: boolean }
 -}
 data GYCoreConfig = GYCoreConfig
-  { cfgCoreProvider  :: !GYCoreProviderInfo
-  , cfgNetworkId     :: !GYNetworkId
-  , cfgLogging       :: ![GYLogScribeConfig]
-  , cfgMaestroTiming :: !Bool
+  { cfgCoreProvider :: !GYCoreProviderInfo
+  , cfgNetworkId    :: !GYNetworkId
+  , cfgLogging      :: ![GYLogScribeConfig]
+  , cfgLogTiming    :: !Bool
   -- , cfgUtxoCacheEnable :: !Bool
   }
   deriving stock (Show)
@@ -150,7 +150,7 @@ withCfgProviders
     { cfgCoreProvider
     , cfgNetworkId
     , cfgLogging
-    , cfgMaestroTiming
+    , cfgLogTiming
     }
     ns
     f =
@@ -213,17 +213,15 @@ withCfgProviders
               let gySlotActions = gySlotActions' { gyWaitForNextBlock' = purgeCache >> gyWaitForNextBlock' gySlotActions'}
               pure (gyQueryUTxO, gySlotActions, f)
           else pure (gyQueryUTxO', gySlotActions', f) -}
-          if cfgMaestroTiming then case cfgCoreProvider of
-              GYMaestro {} -> do
-                let fT = \provider -> do
-                      start <- getCurrentTime
-                      a <- f provider
-                      end   <- getCurrentTime
-                      let duration = diffUTCTime end start
-                      logRun gyLog' mempty GYDebug $ printf "Maestro took: " ++ show duration
-                      return a
-                pure (gyQueryUTxO', gySlotActions', fT)
-              _            -> pure (gyQueryUTxO', gySlotActions', f)
+          if cfgLogTiming then do
+              let fT = \provider -> do
+                    start <- getCurrentTime
+                    a <- f provider
+                    end   <- getCurrentTime
+                    let duration = diffUTCTime end start
+                    logRun gyLog' mempty GYDebug $ printf "Maestro took: " ++ show duration
+                    return a
+              pure (gyQueryUTxO', gySlotActions', fT)
             else pure (gyQueryUTxO', gySlotActions', f)
         e <- try $ fT GYProviders {..}
         case e of

@@ -27,7 +27,7 @@ import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy             as LBS
 import           Data.Char                        (toLower)
 import qualified Data.Text                        as Text
-import           Data.Time                        (NominalDiffTime)
+import           Data.Time                        (NominalDiffTime, getCurrentTime, diffUTCTime)
 
 import qualified Cardano.Api                      as Api
 
@@ -119,9 +119,10 @@ In JSON format, this essentially corresponds to:
 = { coreProvider: GYCoreProviderInfo, networkId: NetworkId, logging: [GYLogScribeConfig], utxoCacheEnable: boolean }
 -}
 data GYCoreConfig = GYCoreConfig
-  { cfgCoreProvider :: !GYCoreProviderInfo
-  , cfgNetworkId    :: !GYNetworkId
-  , cfgLogging      :: ![GYLogScribeConfig]
+  { cfgCoreProvider  :: !GYCoreProviderInfo
+  , cfgNetworkId     :: !GYNetworkId
+  , cfgLogging       :: ![GYLogScribeConfig]
+  , cfgMaestroTiming :: !Bool
   -- , cfgUtxoCacheEnable :: !Bool
   }
   deriving stock (Show)
@@ -149,6 +150,7 @@ withCfgProviders
     { cfgCoreProvider
     , cfgNetworkId
     , cfgLogging
+    , cfgMaestroTiming
     }
     ns
     f =
@@ -203,15 +205,27 @@ withCfgProviders
             )
 
       bracket (Katip.mkKatipLog ns cfgLogging) logCleanUp $ \gyLog' -> do
-        (gyQueryUTxO, gySlotActions) <-
-            {-if cfgUtxoCacheEnable
-            then do
-                (gyQueryUTxO, purgeCache) <- CachedQuery.makeCachedQueryUTxO gyQueryUTxO' gyLog'
-                -- waiting for the next block will purge the utxo cache.
-                let gySlotActions = gySlotActions' { gyWaitForNextBlock' = purgeCache >> gyWaitForNextBlock' gySlotActions'}
-                pure (gyQueryUTxO, gySlotActions)
-            else-} pure (gyQueryUTxO', gySlotActions')
-        e <- try $ f GYProviders {..}
+        (gyQueryUTxO, gySlotActions, fT) <-
+          {-if cfgUtxoCacheEnable
+          then do
+              (gyQueryUTxO, purgeCache) <- CachedQuery.makeCachedQueryUTxO gyQueryUTxO' gyLog'
+              -- waiting for the next block will purge the utxo cache.
+              let gySlotActions = gySlotActions' { gyWaitForNextBlock' = purgeCache >> gyWaitForNextBlock' gySlotActions'}
+              pure (gyQueryUTxO, gySlotActions, f)
+          else pure (gyQueryUTxO', gySlotActions', f) -}
+          if cfgMaestroTiming then case cfgCoreProvider of
+              GYMaestro {} -> do
+                let fT = \provider -> do
+                      start <- getCurrentTime
+                      a <- f provider
+                      end   <- getCurrentTime
+                      let duration = diffUTCTime end start
+                      logRun gyLog' mempty GYDebug $ printf "Maestro took: " ++ show duration
+                      return a
+                pure (gyQueryUTxO', gySlotActions', fT)
+              _            -> pure (gyQueryUTxO', gySlotActions', f)
+            else pure (gyQueryUTxO', gySlotActions', f)
+        e <- try $ fT GYProviders {..}
         case e of
             Right a                     -> pure a
             Left (err :: SomeException) -> do

@@ -20,6 +20,7 @@ import           GeniusYield.Types
 import           GeniusYield.Test.Privnet.Ctx
 import qualified GeniusYield.Test.Privnet.Examples
 import           GeniusYield.Test.Privnet.Setup
+import qualified GeniusYield.Test.Privnet.Stake
 
 main :: IO ()
 main = do
@@ -60,6 +61,9 @@ main = do
               info $ printf "Protocol parameters: %s" (show pp)
 
           , GeniusYield.Test.Privnet.Examples.tests setup
+
+          , GeniusYield.Test.Privnet.Stake.stakeKeyTests setup
+          , GeniusYield.Test.Privnet.Stake.stakeValidatorTests setup
 
           ]
 

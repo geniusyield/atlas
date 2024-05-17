@@ -24,7 +24,7 @@ import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
-import           GeniusYield.Types.PubKeyHash (CanSignTx (..))
+import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..), CanSignTx)
 import qualified PlutusLedgerApi.V1.Crypto    as Plutus
 import qualified PlutusTx.Builtins            as Plutus
 import qualified PlutusTx.Builtins.Internal   as Plutus
@@ -43,9 +43,11 @@ newtype GYPaymentKeyHash = GYPaymentKeyHash (Api.Hash Api.PaymentKey)
     deriving stock Show
     deriving newtype (Eq, Ord, IsString)
 
-instance CanSignTx GYPaymentKeyHash where
+instance AsPubKeyHash GYPaymentKeyHash where
   toPubKeyHash = unsafeCoerce  -- We could have exported `GYPubKeyHash` from an internal module but `GYPubKeyHash` needs an overhaul anyways.
   fromPubKeyHash = unsafeCoerce
+
+instance CanSignTx GYPaymentKeyHash
 
 -- |
 --

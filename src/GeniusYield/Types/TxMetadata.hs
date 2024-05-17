@@ -32,7 +32,7 @@ import qualified Data.ByteString                       as BS
 import qualified Data.Map.Strict                       as Map
 import qualified Data.Text.Encoding                    as TE
 import           Data.Word                             (Word64)
-import           GeniusYield.Imports                   (Text, foldl')
+import           GeniusYield.Imports                   (Text)
 import           GeniusYield.Types.TxMetadata.Internal (GYTxMetadataValue (..),
                                                         txMetadataValueFromApi,
                                                         txMetadataValueToApi)

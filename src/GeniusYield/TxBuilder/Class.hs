@@ -59,6 +59,8 @@ module GeniusYield.TxBuilder.Class
     , mustHaveOptionalOutput
     , mustHaveTxMetadata
     , mustMint
+    , mustHaveWithdrawal
+    , mustHaveCertificate
     , mustBeSignedBy
     , isInvalidBefore
     , isInvalidAfter
@@ -95,7 +97,7 @@ import           GeniusYield.Types
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, slotConfig, slotOfCurrentBlock, logMsg #-}
+    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg #-}
 
     -- | Get the network id
     networkId :: m GYNetworkId
@@ -164,6 +166,9 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     utxosAtPaymentCredentialsWithDatums :: [GYPaymentCredential] -> m [(GYUTxO, Maybe GYDatum)]
     utxosAtPaymentCredentialsWithDatums = gyQueryUtxosAtPaymentCredsWithDatumsDefault utxosAtPaymentCredentials lookupDatum
 
+    -- | Obtain delegation information for a stake address. Note that in case stake address is not registered, this function should return `Nothing`.
+    stakeAddressInfo :: GYStakeAddress -> m (Maybe GYStakeAddressInfo)
+
     {- | Obtain the slot config for the network.
 
     Implementations using era history to create slot config may raise 'GYEraSummariesToSlotConfigError'.
@@ -210,6 +215,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
     utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
     utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
+    stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
@@ -235,6 +241,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
     utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
     utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
+    stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
@@ -260,6 +267,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
     utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
     utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
+    stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = lift . logMsg ns s
@@ -342,7 +350,9 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
     , gytxOuts          :: ![GYTxOut v]
     , gytxRefIns        :: !(GYTxSkeletonRefIns v)
     , gytxMint          :: !(Map (GYMintScript v) (Map GYTokenName Integer, GYRedeemer))
+    , gytxWdrls         :: ![GYTxWdrl v]
     , gytxSigs          :: !(Set GYPubKeyHash)
+    , gytxCerts         :: ![GYTxCert v]
     , gytxInvalidBefore :: !(Maybe GYSlot)
     , gytxInvalidAfter  :: !(Maybe GYSlot)
     , gytxMetadata      :: !(Maybe GYTxMetadata)
@@ -374,7 +384,9 @@ emptyGYTxSkeleton = GYTxSkeleton
     , gytxOuts          = []
     , gytxRefIns        = GYTxSkeletonNoRefIns
     , gytxMint          = Map.empty
+    , gytxWdrls         = []
     , gytxSigs          = Set.empty
+    , gytxCerts         = []
     , gytxInvalidBefore = Nothing
     , gytxInvalidAfter  = Nothing
     , gytxMetadata      = Nothing
@@ -386,7 +398,9 @@ instance Semigroup (GYTxSkeleton v) where
         , gytxOuts          = gytxOuts x ++ gytxOuts y
         , gytxRefIns        = gytxRefIns x <> gytxRefIns y
         , gytxMint          = combineMint (gytxMint x) (gytxMint y)
+        , gytxWdrls         = combineWdrls (gytxWdrls x) (gytxWdrls y)
         , gytxSigs          = Set.union (gytxSigs x) (gytxSigs y)
+        , gytxCerts         = gytxCerts x <> gytxCerts y
         , gytxInvalidBefore = combineInvalidBefore (gytxInvalidBefore x) (gytxInvalidBefore y)
         , gytxInvalidAfter  = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
         , gytxMetadata      = gytxMetadata x <> gytxMetadata y
@@ -396,6 +410,8 @@ instance Semigroup (GYTxSkeleton v) where
         combineIns u v = nubBy ((==) `on` gyTxInTxOutRef) (u ++ v)
         -- we cannot combine redeemers, so we just pick first.
         combineMint = Map.unionWith (\(amt, r) (amt', _r) -> (Map.unionWith (+) amt amt', r))
+        -- we keep only one withdrawal per stake address
+        combineWdrls u v = nubBy ((==) `on` gyTxWdrlStakeAddress) (u ++ v)
 
         combineInvalidBefore :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
         combineInvalidBefore m        Nothing  = m
@@ -639,6 +655,12 @@ mustHaveTxMetadata m = emptyGYTxSkeleton {gytxMetadata = m}
 mustMint :: GYMintScript v -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkeleton v
 mustMint _ _ _ 0  = mempty
 mustMint p r tn n = emptyGYTxSkeleton {gytxMint = Map.singleton p (Map.singleton tn n, r)}
+
+mustHaveWithdrawal :: GYTxWdrl v -> GYTxSkeleton v
+mustHaveWithdrawal w = mempty {gytxWdrls = [w]}
+
+mustHaveCertificate :: GYTxCert v -> GYTxSkeleton v
+mustHaveCertificate c = mempty {gytxCerts = [c]}
 
 mustBeSignedBy :: CanSignTx a => a -> GYTxSkeleton v
 mustBeSignedBy pkh = emptyGYTxSkeleton {gytxSigs = Set.singleton $ toPubKeyHash pkh}

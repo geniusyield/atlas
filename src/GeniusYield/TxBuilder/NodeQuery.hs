@@ -117,6 +117,11 @@ instance GYTxQueryMonad GYTxQueryMonadNode where
       GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyQueryUtxosAtTxOutRefsWithDatums providers orefs
 
+    stakeAddressInfo saddr = do
+      logMsg mempty GYInfo $ printf "Querying Stake Address Info: %s" saddr
+      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+        gyGetStakeAddressInfo providers saddr
+
     slotConfig = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
         gyGetSlotConfig providers
 

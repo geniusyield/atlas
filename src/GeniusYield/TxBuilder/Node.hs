@@ -10,6 +10,7 @@ module GeniusYield.TxBuilder.Node (
     GYTxMonadNode,
     GYTxBuildResult(..),
     runGYTxMonadNode,
+    runGYTxMonadNodeWithStrategy,
     runGYTxMonadNodeC,
     runGYTxMonadNodeF,
     runGYTxMonadNodeParallel,
@@ -115,6 +116,9 @@ instance GYTxQueryMonad GYTxMonadNode where
     utxosAtTxOutRefsWithDatums refs = GYTxMonadNode $ \env ->
         gyQueryUtxosAtTxOutRefsWithDatums (envProviders env) refs
 
+    stakeAddressInfo stakeAddr = GYTxMonadNode $ \env ->
+        gyGetStakeAddressInfo (envProviders env) stakeAddr
+
     slotConfig = GYTxMonadNode $ \env ->
         gyGetSlotConfig (envProviders env)
 
@@ -175,6 +179,17 @@ runGYTxMonadNode
     -> GYTxMonadNode (GYTxSkeleton v)  -- ^ Skeleton.
     -> IO GYTxBody
 runGYTxMonadNode = coerce (runGYTxMonadNodeF @Identity GYRandomImproveMultiAsset)
+
+runGYTxMonadNodeWithStrategy
+    :: GYCoinSelectionStrategy        -- ^ Coin selection strategy.
+    -> GYNetworkId                     -- ^ Network ID.
+    -> GYProviders                     -- ^ Provider.
+    -> [GYAddress]                     -- ^ Addresses belonging to wallet.
+    -> GYAddress                       -- ^ Change address.
+    -> Maybe (GYTxOutRef, Bool)        -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
+    -> GYTxMonadNode (GYTxSkeleton v)  -- ^ Skeleton.
+    -> IO GYTxBody
+runGYTxMonadNodeWithStrategy strat = coerce (runGYTxMonadNodeF @Identity strat)
 
 runGYTxMonadNodeParallel
     :: GYNetworkId                     -- ^ Network ID.

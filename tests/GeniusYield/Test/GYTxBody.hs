@@ -112,6 +112,7 @@ balanceTxStepTests =
         res <- balanceTxStep
                 (mockBuildTxEnv mempty)
                 Nothing
+                [] []
                 []
                 []
                 GYRandomImproveMultiAsset
@@ -121,6 +122,7 @@ balanceTxStepTests =
         Right (_, collaterals, _) <- balanceTxStep
                                         (mockBuildTxEnv [valueFromLovelace 10_000_000])
                                         Nothing
+                                        [] []
                                         []
                                         []
                                         GYRandomImproveMultiAsset
@@ -131,6 +133,7 @@ balanceTxStepTests =
         Right (_, collaterals, _) <- balanceTxStep
                                         (mockBuildTxEnv [valueFromLovelace 10_000_000])
                                         (Just (valueSingleton (mockAsset "A") 100, []))
+                                        [] []
                                         []
                                         []
                                         GYRandomImproveMultiAsset

@@ -37,6 +37,7 @@ import qualified GeniusYield.Providers.Blockfrost as Blockfrost
 import qualified GeniusYield.Providers.Katip      as Katip
 import qualified GeniusYield.Providers.Kupo       as KupoApi
 import qualified GeniusYield.Providers.Maestro    as MaestroApi
+import           GeniusYield.Providers.Node       (nodeStakeAddressInfo)
 import qualified GeniusYield.Providers.Node       as Node
 import           GeniusYield.Types
 
@@ -155,7 +156,7 @@ withCfgProviders
     ns
     f =
     do
-      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed) <- case cfgCoreProvider of
+      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo) <- case cfgCoreProvider of
         GYNodeKupo path kupoUrl -> do
           let info = nodeConnectInfo path cfgNetworkId
               era = networkIdToEra cfgNetworkId
@@ -168,6 +169,7 @@ withCfgProviders
             , KupoApi.kupoLookupDatum kEnv
             , Node.nodeSubmitTx info
             , KupoApi.kupoAwaitTxConfirmed kEnv
+            , nodeStakeAddressInfo info
             )
         GYMaestro (Confidential apiToken) turboSubmit -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
@@ -185,6 +187,7 @@ withCfgProviders
             , MaestroApi.maestroLookupDatum maestroApiEnv
             , MaestroApi.maestroSubmitTx (Just True == turboSubmit) maestroApiEnv
             , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
+            , MaestroApi.maestroStakeAddressInfo maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
@@ -202,6 +205,7 @@ withCfgProviders
             , Blockfrost.blockfrostLookupDatum proj
             , Blockfrost.blockfrostSubmitTx proj
             , Blockfrost.blockfrostAwaitTxConfirmed proj
+            , Blockfrost.blockfrostStakeAddressInfo proj
             )
 
       bracket (Katip.mkKatipLog ns cfgLogging) logCleanUp $ \gyLog' -> do

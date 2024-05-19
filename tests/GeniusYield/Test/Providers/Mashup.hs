@@ -24,7 +24,7 @@ providersMashupTests configs =
     [ testCase "Datum lookup - GYLookupDatum" $ do
         delayBySecond
         dats <- forM configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> fromJust <$> gyLookupDatum "a7ed3e81ef2e98a85c8d5649ed6344b7f7b36a31103ab18395ef4e80b8cac565"  -- A datum hash seen at always fail script's address.
-        assertBool "Datums are not all equal" $ all (== head dats) (tail dats)
+        assertBool "Datums are not all equal" $ allEqual dats
     , testCase "Parameters" $ do
         paramsList <- forM configs $ \config -> withCfgProviders config mempty $ \provider -> do
            delayBySecond
@@ -38,7 +38,12 @@ providersMashupTests configs =
            delayBySecond
            slotConfig' <- gyGetSlotConfig provider
            pure (protocolParams, systemStart, (show mode, interpreter), stakePools, slotConfig')
-        assertBool "Parameters are not all equal" $ all (== head paramsList) (tail paramsList)
+        assertBool "Parameters are not all equal" $ allEqual paramsList
+    , testCase "Stake address info" $ do
+        saInfos <- forM configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> do
+          delayBySecond
+          gyGetStakeAddressInfo $ unsafeStakeAddressFromText "stake_test1upx0fuqcjqs4h5vp687d8j2cng4y5wkmelc6wzm5szq04qsm5d0l6"
+        assertBool "Stake address info are not all equal" $ allEqual saInfos
     , testCase "Query UTxOs" $ do
         let
             -- Blockfrost is unable to get the preimage of the involved datum hash, thus it's being deleted for in our set so that test still passes.
@@ -92,7 +97,7 @@ providersMashupTests configs =
           pure (utxosAtAddresses', Set.fromList utxosAtAddressesWithDatums' `Set.difference` utxoBugSet, utxosAtRefs, Set.fromList utxoRefsAtAddress', Set.fromList utxosAtRefsWithDatums', utxoAtRefWithDatum', utxosAtScriptCredential <> utxosAtKeyCredential, Set.fromList utxosAtScriptCredentialWithDatums `Set.difference` utxoBugSet, utxosAtScriptAddressWithAsset, utxosAtScriptCredentialWithAsset, utxosAtPaymentCredentials', Set.fromList utxosAtPaymentCredentialsWithDatums' `Set.difference` utxoBugSet
              -- , Set.fromList utxosAtScriptAddressWithAssetAndDatums
                )
-        assertBool "Utxos are not all equal" $ all (== head utxosProviders) (tail utxosProviders)
+        assertBool "Utxos are not all equal" $ allEqual utxosProviders
     , testCase "Checking presence of error message when submitting an invalid transaction" $ do
         let
             handler :: SubmitTxException -> IO GYTxId
@@ -135,3 +140,7 @@ providersMashupTests configs =
     ]
   where
     delayBySecond = threadDelay 1_000_000
+
+allEqual :: Eq a => [a] -> Bool
+allEqual []     = True
+allEqual (x:xs) = all (== x) xs

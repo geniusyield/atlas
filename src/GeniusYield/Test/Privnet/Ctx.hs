@@ -21,8 +21,11 @@ module GeniusYield.Test.Privnet.Ctx (
     userStakeVKey,
     -- * Operations
     ctxRunI,
+    ctxRunIWithStrategy,
     ctxRunC,
+    ctxRunCWithStrategy,
     ctxRunF,
+    ctxRunFWithStrategy,
     ctxRunFWithCollateral,
     ctxSlotOfCurrentBlock,
     ctxWaitNextBlock,
@@ -146,6 +149,9 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
 ctxRunF :: forall t v. Traversable t => Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
 ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr Nothing
 
+ctxRunFWithStrategy :: forall t v. Traversable t => GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
+ctxRunFWithStrategy strat ctx User {..} =  runGYTxMonadNodeF strat GYPrivnet (ctxProviders ctx) [userAddr] userAddr Nothing
+
 -- | Variant of `ctxRunF` where caller can also give the UTxO to be used as collateral.
 ctxRunFWithCollateral :: forall t v. Traversable t
                       => Ctx
@@ -159,8 +165,14 @@ ctxRunFWithCollateral ctx User {..} coll toCheck5Ada =  runGYTxMonadNodeF GYRand
 ctxRunC :: forall a. Ctx -> User -> GYTxMonadNode a -> IO a
 ctxRunC = coerce (ctxRunF @(Const a))
 
+ctxRunCWithStrategy :: forall a. GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadNode a -> IO a
+ctxRunCWithStrategy = coerce (ctxRunFWithStrategy @(Const a))
+
 ctxRunI :: Ctx -> User -> GYTxMonadNode (GYTxSkeleton v) -> IO GYTxBody
 ctxRunI = coerce (ctxRunF @Identity)
+
+ctxRunIWithStrategy :: GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadNode (GYTxSkeleton v) -> IO GYTxBody
+ctxRunIWithStrategy = coerce (ctxRunFWithStrategy @Identity)
 
 ctxSlotOfCurrentBlock :: Ctx -> IO GYSlot
 ctxSlotOfCurrentBlock (ctxProviders -> providers) =
@@ -188,6 +200,7 @@ ctxProviders ctx = GYProviders
     , gyGetParameters    = ctxGetParams ctx
     , gyQueryUTxO        = ctxQueryUtxos ctx
     , gyLog'             = ctxLog ctx
+    , gyGetStakeAddressInfo = nodeStakeAddressInfo (ctxInfo ctx)
     }
 
 submitTx :: Ctx -> User -> GYTxBody -> IO GYTxId

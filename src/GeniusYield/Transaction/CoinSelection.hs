@@ -86,13 +86,15 @@ data GYCoinSelectionEnv v = GYCoinSelectionEnv
     -- ^ Extra lovelace to look for on top of outputs, mainly for fee and any remaining would be given as change output by @makeTransactionBodyAutoBalance@, thus amount remaining besides fees, should satisfy minimum ada requirement else we would have to increase `extraLovelace` parameter.
     , minimumUTxOF    :: GYTxOut v -> Natural
     , maxValueSize    :: Natural
+    , adaSource       :: Natural
+    , adaSink         :: Natural
     }
 
 data GYCoinSelectionStrategy
     = GYLargestFirstMultiAsset
     | GYRandomImproveMultiAsset
     | GYLegacy
-    deriving stock (Eq, Show)
+    deriving stock (Eq, Show, Enum, Bounded)
 
 {- | Select additional inputs from the set of own utxos given, such that when combined with given existing inputs,
 they cover for all the given outputs, as well as extraLovelace.
@@ -110,19 +112,31 @@ selectInputs :: forall m v. MonadRandom m
              -> ExceptT BalancingError m ([GYTxInDetailed v], [GYTxOut v])
 selectInputs
     GYCoinSelectionEnv
-        { existingInputs
+        { existingInputs = existingInputs'
         , requiredOutputs
         , mintValue
         , changeAddr
         , ownUtxos
         , extraLovelace
         , minimumUTxOF
+        , adaSource
+        , adaSink
         }
     GYLegacy = do
+    additionalInputForReplayProtection <- except $
+          if existingInputs' == mempty then -- For replay protection, every transaction must spend at least one UTxO.
+            -- We pick the UTxO having most value.
+            let ownUtxosList = utxosToList ownUtxos
+            in case ownUtxosList of
+                [] -> Left BalancingErrorEmptyOwnUTxOs
+                _  -> pure . pure $ utxoAsPubKeyInp $ maximumBy (compare `on` utxoValue) ownUtxosList
+          else pure Nothing
     let
+        additionalInputForReplayProtectionAsList = maybe [] pure additionalInputForReplayProtection
+        existingInputs = additionalInputForReplayProtectionAsList <> existingInputs'
         valueIn, valueOut :: GYValue
-        valueIn         = foldMap gyTxInDetValue existingInputs
-        valueOut        = foldMap snd requiredOutputs
+        valueIn         = foldMap gyTxInDetValue existingInputs <> valueFromLovelace (fromIntegral adaSource)
+        valueOut        = foldMap snd requiredOutputs <> valueFromLovelace (fromIntegral adaSink)
         valueMissing    = missing (valueFromLovelace (fromIntegral extraLovelace) <> valueOut `valueMinus` (valueIn <> mintValue))
     (addIns, addVal) <- except $ selectInputsLegacy
         ownUtxos
@@ -134,7 +148,7 @@ selectInputs
             [adjustTxOut minimumUTxOF (GYTxOut changeAddr tokenChange Nothing Nothing)
             | not $ isEmptyValue tokenChange
             ]
-    pure (addIns, changeOuts)
+    pure (additionalInputForReplayProtectionAsList <> addIns, changeOuts)
   where
     missing :: GYValue -> Map GYAssetClass Natural
     missing v = foldl' f Map.empty $ valueToList v
@@ -156,6 +170,8 @@ selectInputs
         , extraLovelace
         , minimumUTxOF
         , maxValueSize
+        , adaSource
+        , adaSink
         }
     cstrat = do
         CBalance.SelectionResult
@@ -208,8 +224,8 @@ selectInputs
     selectionParams = CBalance.SelectionParams
             { assetsToMint                = toTokenMap mintedVal
             , assetsToBurn                = toTokenMap burnedVal
-            , extraCoinSource             = CWallet.Coin 0
-            , extraCoinSink               = CWallet.Coin 0
+            , extraCoinSource             = CWallet.Coin adaSource
+            , extraCoinSink               = CWallet.Coin adaSink
             , outputsToCover              = map (bimap toCWalletAddress toTokenBundle) requiredOutputs
             , utxoAvailable               = CWallet.fromIndexPair (ownUtxosIndex, existingInpsIndex)  -- `fromIndexPair` would actually make first element to be @ownUtxosIndex `UTxOIndex.difference` existingInpsIndex@.
             , selectionStrategy           = case cstrat of

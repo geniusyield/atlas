@@ -110,6 +110,7 @@ library
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
+    GeniusYield.Types.Certificate
     GeniusYield.Types.Credential
     GeniusYield.Types.Datum
     GeniusYield.Types.Era
@@ -128,15 +129,20 @@ library
     GeniusYield.Types.Script
     GeniusYield.Types.Slot
     GeniusYield.Types.SlotConfig
+    GeniusYield.Types.StakeAddressInfo
     GeniusYield.Types.StakeKeyHash
+    GeniusYield.Types.StakePoolId
     GeniusYield.Types.Time
     GeniusYield.Types.Tx
     GeniusYield.Types.TxBody
+    GeniusYield.Types.TxCert
+    GeniusYield.Types.TxCert.Internal
     GeniusYield.Types.TxIn
     GeniusYield.Types.TxMetadata
     GeniusYield.Types.TxMetadata.Internal
     GeniusYield.Types.TxOut
     GeniusYield.Types.TxOutRef
+    GeniusYield.Types.TxWdrl
     GeniusYield.Types.UTxO
     GeniusYield.Types.Value
     GeniusYield.Types.Wallet
@@ -230,6 +236,8 @@ library framework-onchain-plutustx
   import:          common, plutus-ghc-options
   hs-source-dirs:  src-plutustx
   exposed-modules:
+    GeniusYield.OnChain.AStakeValidator
+    GeniusYield.OnChain.AStakeValidator.Compiled
     GeniusYield.OnChain.Examples.ReadOracle
     GeniusYield.OnChain.Examples.ReadOracle.Compiled
     GeniusYield.OnChain.TestToken
@@ -264,6 +272,7 @@ test-suite atlas-tests
     GeniusYield.Test.Providers.Mashup
     GeniusYield.Test.RefInput
     GeniusYield.Test.SlotConfig
+    GeniusYield.Test.Stake
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
@@ -307,10 +316,15 @@ test-suite atlas-privnet-tests
   hs-source-dirs: tests-privnet
   main-is:        atlas-privnet-tests.hs
   other-modules:
+    GeniusYield.Test.Privnet.Stake
+    GeniusYield.Test.Privnet.Stake.Key
+    GeniusYield.Test.Privnet.Stake.Utils
+    GeniusYield.Test.Privnet.Stake.Validator
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
-    , atlas-cardano
+    , atlas-cardano:{atlas-cardano, framework-onchain-plutustx}
     , base
+    , containers
     , tasty
     , tasty-hunit

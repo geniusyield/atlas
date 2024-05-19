@@ -33,6 +33,8 @@ data GYBalancedTx v = GYBalancedTx
     , gybtxCollaterals   :: !GYUTxOs
     , gybtxOuts          :: ![GYTxOut v]
     , gybtxMint          :: !(Maybe (GYValue, [(GYMintScript v, GYRedeemer)]))
+    , gybtxWdrls         :: ![GYTxWdrl v]
+    , gybtxCerts         :: ![GYTxCert v]
     , gybtxInvalidBefore :: !(Maybe GYSlot)
     , gybtxInvalidAfter  :: !(Maybe GYSlot)
     , gybtxSigners       :: !(Set GYPubKeyHash)

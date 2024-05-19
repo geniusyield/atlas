@@ -205,28 +205,93 @@ withCfgProviders
             )
 
       bracket (Katip.mkKatipLog ns cfgLogging) logCleanUp $ \gyLog' -> do
-        (gyQueryUTxO, gySlotActions, fT) <-
+        (gyQueryUTxO, gySlotActions) <-
           {-if cfgUtxoCacheEnable
           then do
               (gyQueryUTxO, purgeCache) <- CachedQuery.makeCachedQueryUTxO gyQueryUTxO' gyLog'
               -- waiting for the next block will purge the utxo cache.
               let gySlotActions = gySlotActions' { gyWaitForNextBlock' = purgeCache >> gyWaitForNextBlock' gySlotActions'}
               pure (gyQueryUTxO, gySlotActions, f)
-          else pure (gyQueryUTxO', gySlotActions', f) -}
-          if cfgLogTiming then do
-              let fT = \provider -> do
-                    start <- getCurrentTime
-                    a <- f provider
-                    end   <- getCurrentTime
-                    let duration = diffUTCTime end start
-                    logRun gyLog' mempty GYDebug $ printf "Maestro took: " ++ show duration
-                    return a
-              pure (gyQueryUTxO', gySlotActions', fT)
-            else pure (gyQueryUTxO', gySlotActions', f)
-        e <- try $ fT GYProviders {..}
+          else -} pure (gyQueryUTxO', gySlotActions')
+        let f' = if cfgLogTiming then f . logTiming else f
+        e <- try $ f' GYProviders {..}
         case e of
             Right a                     -> pure a
             Left (err :: SomeException) -> do
                 logRun gyLog' mempty GYError $ printf "ERROR: %s" $ show err
                 throwIO err
 
+logTiming :: GYProviders -> GYProviders
+logTiming providers@GYProviders {..} = GYProviders
+    { gyLookupDatum      = gyLookupDatum'
+    , gySubmitTx         = gySubmitTx'
+    , gyAwaitTxConfirmed = gyAwaitTxConfirmed'
+    , gySlotActions      = gySlotActions'
+    , gyGetParameters    = gyGetParameters'
+    , gyQueryUTxO        = gyQueryUTxO'
+    , gyLog'             = gyLog'
+    }
+  where
+    wrap :: String -> IO a -> IO a
+    wrap msg m = do
+        (a, t) <- duration m
+        gyLog providers "" GYDebug $ msg <> " took " <> show t
+        pure a
+
+    gyLookupDatum' :: GYLookupDatum
+    gyLookupDatum' = wrap "gyLookupDatum" . gyLookupDatum
+
+    gySubmitTx' :: GYSubmitTx
+    gySubmitTx' = wrap "gySubmitTx" . gySubmitTx
+
+    gyAwaitTxConfirmed' :: GYAwaitTx
+    gyAwaitTxConfirmed' p = wrap "gyAwaitTxConfirmed" . gyAwaitTxConfirmed p
+
+    gySlotActions' :: GYSlotActions
+    gySlotActions' = GYSlotActions
+        { gyGetSlotOfCurrentBlock' = wrap "gyGetSlotOfCurrentBlock" $ gyGetSlotOfCurrentBlock providers
+        , gyWaitForNextBlock'      = wrap "gyWaitForNextBlock" $ gyWaitForNextBlock providers
+        , gyWaitUntilSlot'         = wrap "gyWaitUntilSlot" . gyWaitUntilSlot providers
+        }
+
+    gyGetParameters' :: GYGetParameters
+    gyGetParameters' = GYGetParameters
+        { gyGetProtocolParameters' = wrap "gyGetProtocolParameters" $ gyGetProtocolParameters providers
+        , gyGetSystemStart'        = wrap "gyGetSystemStart" $ gyGetSystemStart providers
+        , gyGetEraHistory'         = wrap "gyGetEraHistory" $ gyGetEraHistory providers
+        , gyGetStakePools'         = wrap "gyGetStakePools" $ gyGetStakePools providers
+        , gyGetSlotConfig'         = wrap "gyGetSlotConfig" $ gyGetSlotConfig providers
+        }
+
+    gyQueryUTxO' :: GYQueryUTxO
+    gyQueryUTxO' = GYQueryUTxO
+        { gyQueryUtxosAtTxOutRefs'              = wrap "gyQueryUtxosAtTxOutRefs" . gyQueryUtxosAtTxOutRefs providers
+        , gyQueryUtxosAtTxOutRefsWithDatums'    = case gyQueryUtxosAtTxOutRefsWithDatums' gyQueryUTxO of
+            Nothing -> Nothing
+            Just q  -> Just $ wrap "gyQueryUtxosAtTxOutRefsWithDatums" . q
+        , gyQueryUtxoAtTxOutRef'                = wrap "gyQueryUtxoAtTxOutRef" . gyQueryUtxoAtTxOutRef providers
+        , gyQueryUtxoRefsAtAddress'             = wrap "gyQueryUtxoRefsAtAddress" . gyQueryUtxoRefsAtAddress providers
+        , gyQueryUtxosAtAddress'                = \addr mac -> wrap "gyQueryUtxosAtAddress'" $ gyQueryUtxosAtAddress providers addr mac
+        , gyQueryUtxosAtAddressWithDatums'      = case gyQueryUtxosAtAddressWithDatums' gyQueryUTxO of
+            Nothing -> Nothing
+            Just q  -> Just $ \addr mac -> wrap "gyQueryUtxosAtAddressWithDatums'" $ q addr mac
+        , gyQueryUtxosAtAddresses'              = wrap "gyQueryUtxosAtAddresses" . gyQueryUtxosAtAddresses providers
+        , gyQueryUtxosAtAddressesWithDatums'    = case gyQueryUtxosAtAddressesWithDatums' gyQueryUTxO of
+            Nothing -> Nothing
+            Just q  -> Just $ wrap "gyQueryUtxosAtAddressesWithDatums" . q
+        , gyQueryUtxosAtPaymentCredential'      = \cred -> wrap "gyQueryUtxosAtTxOutRefs" . gyQueryUtxosAtPaymentCredential providers cred
+        , gyQueryUtxosAtPaymentCredWithDatums'  = case gyQueryUtxosAtPaymentCredWithDatums' gyQueryUTxO of
+            Nothing -> Nothing
+            Just q  -> Just $ \cred mac -> wrap "gyQueryUtxosAtPaymentCredWithDatums" $ q cred mac
+        , gyQueryUtxosAtPaymentCredentials'     = wrap "gyQueryUtxosAtPaymentCredentials" . gyQueryUtxosAtPaymentCredentials providers
+        , gyQueryUtxosAtPaymentCredsWithDatums' = case gyQueryUtxosAtPaymentCredsWithDatums' gyQueryUTxO of
+            Nothing -> Nothing
+            Just q  -> Just $ wrap "gyQueryUtxosAtPaymentCredsWithDatums" . q
+        }
+
+duration :: IO a -> IO (a, NominalDiffTime)
+duration m = do
+    start <- getCurrentTime
+    a <- m
+    end <- getCurrentTime
+    pure (a, end `diffUTCTime` start)

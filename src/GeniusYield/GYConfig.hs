@@ -227,13 +227,14 @@ withCfgProviders
 
 logTiming :: GYProviders -> GYProviders
 logTiming providers@GYProviders {..} = GYProviders
-    { gyLookupDatum      = gyLookupDatum'
-    , gySubmitTx         = gySubmitTx'
-    , gyAwaitTxConfirmed = gyAwaitTxConfirmed'
-    , gySlotActions      = gySlotActions'
-    , gyGetParameters    = gyGetParameters'
-    , gyQueryUTxO        = gyQueryUTxO'
-    , gyLog'             = gyLog'
+    { gyLookupDatum         = gyLookupDatum'
+    , gySubmitTx            = gySubmitTx'
+    , gyAwaitTxConfirmed    = gyAwaitTxConfirmed'
+    , gySlotActions         = gySlotActions'
+    , gyGetParameters       = gyGetParameters'
+    , gyQueryUTxO           = gyQueryUTxO'
+    , gyGetStakeAddressInfo = gyGetStakeAddressInfo'
+    , gyLog'                = gyLog'
     }
   where
     wrap :: String -> IO a -> IO a
@@ -292,6 +293,9 @@ logTiming providers@GYProviders {..} = GYProviders
             Nothing -> Nothing
             Just q  -> Just $ wrap "gyQueryUtxosAtPaymentCredsWithDatums" . q
         }
+
+    gyGetStakeAddressInfo' :: GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
+    gyGetStakeAddressInfo' = wrap "gyGetStakeAddressInfo" . gyGetStakeAddressInfo
 
 duration :: IO a -> IO (a, NominalDiffTime)
 duration m = do

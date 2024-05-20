@@ -123,7 +123,7 @@ data GYCoreConfig = GYCoreConfig
   { cfgCoreProvider :: !GYCoreProviderInfo
   , cfgNetworkId    :: !GYNetworkId
   , cfgLogging      :: ![GYLogScribeConfig]
-  , cfgLogTiming    :: !Bool
+  , cfgLogTiming    :: !(Maybe Bool)
   -- , cfgUtxoCacheEnable :: !Bool
   }
   deriving stock (Show)
@@ -217,7 +217,9 @@ withCfgProviders
               let gySlotActions = gySlotActions' { gyWaitForNextBlock' = purgeCache >> gyWaitForNextBlock' gySlotActions'}
               pure (gyQueryUTxO, gySlotActions, f)
           else -} pure (gyQueryUTxO', gySlotActions')
-        let f' = if cfgLogTiming then f . logTiming else f
+        let f' = maybe f (\case
+                             True  -> f . logTiming
+                             False -> f) cfgLogTiming
         e <- try $ f' GYProviders {..}
         case e of
             Right a                     -> pure a

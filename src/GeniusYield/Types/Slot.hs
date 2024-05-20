@@ -8,6 +8,7 @@ Stability   : develop
 -}
 module GeniusYield.Types.Slot (
     GYSlot,
+    slotFromWord64,
     slotToApi,
     slotFromApi,
     advanceSlot,
@@ -21,20 +22,19 @@ import           Data.Word           (Word64)
 import           GeniusYield.Imports
 
 import qualified Cardano.Api         as Api
-import qualified Data.Aeson.Types    as Aeson
 import qualified Data.Swagger        as Swagger
 import qualified Text.Printf         as Printf
+import           Web.HttpApiData     (FromHttpApiData, ToHttpApiData)
 
 newtype GYSlot = GYSlot Word64
   deriving (Show, Read, Eq, Ord)
-  deriving newtype (Swagger.ToParamSchema, Swagger.ToSchema)
+  deriving newtype (Swagger.ToParamSchema, Swagger.ToSchema, ToJSON, FromJSON, ToHttpApiData, FromHttpApiData)
+
+slotFromWord64 :: Word64 -> GYSlot
+slotFromWord64 = GYSlot
 
 instance Printf.PrintfArg GYSlot where
     formatArg (GYSlot n) = Printf.formatArg (show n)
-
-instance ToJSON GYSlot where
-    toEncoding (GYSlot n) = Aeson.toEncoding n
-    toJSON     (GYSlot n) = Aeson.toJSON n
 
 slotToApi :: GYSlot -> Api.SlotNo
 slotToApi = coerce

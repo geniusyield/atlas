@@ -10,10 +10,26 @@ Stability   : develop
 module GeniusYield.Providers.Kupo (
   KupoApiEnv,
   newKupoApiEnv,
+  KupoProviderException (..),
+  handleKupoError,
+  handleKupoAbsurdResponse,
+  runKupoClient,
+  KupoDatum (..),
+  KupoScriptLanguage (..),
+  KupoScript (..),
+  KupoValue (..),
+  KupoDatumType (..),
+  KupoCreatedAt (..),
+  KupoUtxo (..),
+  findDatumByHash,
+  findScriptByHash,
+  fetchUtxosByPattern,
   kupoLookupDatum,
   kupoLookupScript,
+  KupoOrder (..),
   kupoQueryUtxo,
-  kupoAwaitTxConfirmed
+  transformUtxo,
+  kupoAwaitTxConfirmed,
 ) where
 
 import qualified Cardano.Api                  as Api
@@ -23,7 +39,6 @@ import           Data.Aeson                   (Value (Null), withObject, (.:))
 import           Data.Char                    (toLower)
 import           Data.Maybe                   (listToMaybe)
 import qualified Data.Text                    as Text
-import           Data.Word                    (Word64)
 import           Deriving.Aeson
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common (datumFromCBOR, extractAssetClass,
@@ -50,14 +65,17 @@ import           GeniusYield.Types            (GYAddress, GYAddressBech32,
                                                txOutRefToTuple', utxosFromList,
                                                valueFromLovelace)
 import qualified GeniusYield.Types            as GYTypes (PlutusVersion (..))
+import           GeniusYield.Types.Slot       (GYSlot, unsafeAdvanceSlot)
 import           Servant.API                  (Capture, Get, Header,
                                                Headers (getResponse), JSON,
                                                QueryFlag, QueryParam,
                                                ResponseHeader (Header),
+                                               ToHttpApiData,
                                                lookupResponseHeader,
                                                type (:<|>) (..), (:>))
 import           Servant.Client               (ClientEnv, ClientError, ClientM,
                                                client, runClientM)
+import           Web.HttpApiData              (ToHttpApiData (..))
 
 -- $setup
 -- >>> import qualified Data.Aeson as Aeson
@@ -163,7 +181,7 @@ data KupoDatumType = Hash | Inline
   deriving (FromJSON) via CustomJSON '[ConstructorTagModifier '[LowerFirst]] KupoDatumType
 
 newtype KupoCreatedAt = KupoCreatedAt
-  { slotNo     :: Word64
+  { slotNo     :: GYSlot
   }
   deriving stock (Show, Eq, Ord, Generic)
   deriving (FromJSON) via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoCreatedAt
@@ -177,13 +195,23 @@ data KupoUtxo = KupoUtxo
   , datumType     :: !(Maybe KupoDatumType)
   , scriptHash    :: !(Maybe GYScriptHash)
   , createdAt     :: !KupoCreatedAt
+  , spentAt       :: !(Maybe KupoCreatedAt)
   }
   deriving stock (Show, Eq, Ord, Generic)
   deriving (FromJSON) via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoUtxo
 
+type MostRecentCheckpointHeader = Header "X-Most-Recent-Checkpoint" GYSlot
+
 findDatumByHash :: GYDatumHash -> ClientM KupoDatum
 findScriptByHash :: GYScriptHash -> ClientM KupoScript
-fetchUtxosByPattern :: Pattern -> Bool -> Maybe Text -> Maybe Text -> ClientM (Headers '[Header "X-Most-Recent-Checkpoint" Word64] [KupoUtxo])
+fetchUtxosByPattern :: Pattern -> Bool -> Maybe KupoOrder -> Maybe GYSlot -> Maybe GYSlot -> Maybe Text -> Maybe Text -> ClientM (Headers '[MostRecentCheckpointHeader] [KupoUtxo])
+
+data KupoOrder = KOMostRecentFirst | KOOldestFirst
+  deriving stock (Show, Eq, Ord, Enum, Bounded)
+
+instance ToHttpApiData KupoOrder where
+  toUrlPiece KOMostRecentFirst = "most_recent_first"
+  toUrlPiece KOOldestFirst     = "oldest_first"
 
 type KupoApi =
          "datums"
@@ -195,9 +223,12 @@ type KupoApi =
     :<|> "matches"
       :> Capture "pattern" Pattern
       :> QueryFlag "unspent"
+      :> QueryParam "order" KupoOrder
+      :> QueryParam "created_after" GYSlot
+      :> QueryParam "created_before" GYSlot
       :> QueryParam "policy_id" Text
       :> QueryParam "asset_name" Text
-      :> Get '[JSON] (Headers '[Header "X-Most-Recent-Checkpoint" Word64] [KupoUtxo])
+      :> Get '[JSON] (Headers '[MostRecentCheckpointHeader] [KupoUtxo])
 
 findDatumByHash :<|> findScriptByHash :<|> fetchUtxosByPattern = client @KupoApi Proxy
 
@@ -221,7 +252,7 @@ kupoLookupScript env sh = do
 kupoUtxosAtAddress :: KupoApiEnv -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
 kupoUtxosAtAddress env addr mAssetClass = do
   let extractedAssetClass = extractAssetClass mAssetClass
-      commonRequestPart = fetchUtxosByPattern (addressToText addr) True
+      commonRequestPart = fetchUtxosByPattern (addressToText addr) True Nothing Nothing Nothing
   addrUtxos <-
     handleKupoError locationIdent <=< runKupoClient env $
       case extractedAssetClass of
@@ -236,7 +267,7 @@ kupoUtxoAtTxOutRef env oref = do
   let (txId, utxoIdx) = txOutRefToTuple' oref
   utxo <-
     handleKupoError locationIdent <=< runKupoClient env $
-      fetchUtxosByPattern (Text.pack (show utxoIdx) <> "@" <> txId) True Nothing Nothing
+      fetchUtxosByPattern (Text.pack (show utxoIdx) <> "@" <> txId) True Nothing Nothing Nothing Nothing Nothing
   listToMaybe <$> traverse (transformUtxo env) (getResponse utxo)
  where
   locationIdent = "UtxoByRef"
@@ -244,7 +275,7 @@ kupoUtxoAtTxOutRef env oref = do
 kupoUtxosAtPaymentCredential :: KupoApiEnv -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
 kupoUtxosAtPaymentCredential env cred mAssetClass = do
   let extractedAssetClass = extractAssetClass mAssetClass
-      commonRequestPart = fetchUtxosByPattern (paymentCredentialToHexText cred <> "/*") True
+      commonRequestPart = fetchUtxosByPattern (paymentCredentialToHexText cred <> "/*") True Nothing Nothing Nothing
   credUtxos <-
     handleKupoError locationIdent <=< runKupoClient env $
       case extractedAssetClass of
@@ -306,13 +337,13 @@ kupoAwaitTxConfirmed env p@GYAwaitTxParameters{..} txId = go 0
       | otherwise = do
           utxos <-
             handleKupoError locationIdent <=< runKupoClient env $
-              fetchUtxosByPattern (Text.pack $ "*@" <> show txId) False Nothing Nothing  -- We don't require for only @unspent@. Kupo with @--prune-utxo@ option would still keep spent UTxOs until their spent record is truly immutable (see Kupo docs for more details).
+              fetchUtxosByPattern (Text.pack $ "*@" <> show txId) False Nothing Nothing Nothing Nothing Nothing  -- We don't require for only @unspent@. Kupo with @--prune-utxo@ option would still keep spent UTxOs until their spent record is truly immutable (see Kupo docs for more details).
           case listToMaybe (getResponse utxos) of
             Nothing -> threadDelay checkInterval >> go (attempt + 1)
             Just u  -> do
-              let slotsToWait = 3 * confirmations * 20  -- Ouroboros Praos guarantees that there are at least @k@ blocks in a window of @3k / f@ slots where @f@ is the active slot coefficient, which is @0.05@ for Mainnet, Preprod & Preview.
-              case (lookupResponseHeader utxos :: ResponseHeader "X-Most-Recent-Checkpoint" Word64) of
-                Header slotOfCurrentBlock -> unless (slotNo (createdAt u) + slotsToWait <= slotOfCurrentBlock) $ threadDelay checkInterval >> go (attempt + 1)
+              let slotsToWait :: Natural = 3 * fromIntegral confirmations * 20  -- Ouroboros Praos guarantees that there are at least @k@ blocks in a window of @3k / f@ slots where @f@ is the active slot coefficient, which is @0.05@ for Mainnet, Preprod & Preview.
+              case (lookupResponseHeader utxos :: ResponseHeader "X-Most-Recent-Checkpoint" GYSlot) of
+                Header slotOfCurrentBlock -> unless (let s = unsafeAdvanceSlot (slotNo (createdAt u)) slotsToWait in s <= slotOfCurrentBlock) $ threadDelay checkInterval >> go (attempt + 1)  -- @Word64@ wraps back to zero in case of overflow, so it's safe.
                 _ -> handleKupoAbsurdResponse locationIdent "Header 'X-Most-Recent-Checkpoint' isn't seen in response"
 
           where

@@ -55,6 +55,8 @@ module GeniusYield.Types.Providers
     , gyQueryUtxoAtAddressesDefault
     , gyQueryUtxoAtPaymentCredentialsDefault
     , gyQueryUtxosAtTxOutRefsDefault
+    , utxosDatumResolver
+    , utxoDatumResolver
       -- * Logging
     , GYLog (..)
     , gyLog
@@ -490,15 +492,19 @@ gyQueryUtxosAtPaymentCredWithDatumsDefault utxosAtPaymentCredFun lookupDatumFun 
   utxosWithoutDatumResolutions <- utxosAtPaymentCredFun cred mAssetClass
   utxosDatumResolver utxosWithoutDatumResolutions lookupDatumFun
 
--- | Append UTxO information with their fetched datum.
+-- | Append UTxOs information with their fetched datum.
 utxosDatumResolver :: Monad m => GYUTxOs -> (GYDatumHash -> m (Maybe GYDatum)) -> m [(GYUTxO, Maybe GYDatum)]
 utxosDatumResolver utxos lookupDatumFun = do
   let utxosWithoutDatumResolutions = utxosToList utxos
-  forM utxosWithoutDatumResolutions $ \utxo -> do
-    case utxoOutDatum utxo of
-      GYOutDatumNone     -> return (utxo, Nothing)
-      GYOutDatumInline d -> return (utxo, Just d)
-      GYOutDatumHash h   -> (utxo, ) <$> lookupDatumFun h
+  forM utxosWithoutDatumResolutions $ utxoDatumResolver lookupDatumFun
+
+-- | Append UTxO information with their fetched datum.
+utxoDatumResolver :: Monad m => (GYDatumHash -> m (Maybe GYDatum)) -> GYUTxO -> m (GYUTxO, Maybe GYDatum)
+utxoDatumResolver lookupDatumFun utxo = do
+  case utxoOutDatum utxo of
+    GYOutDatumNone     -> return (utxo, Nothing)
+    GYOutDatumInline d -> return (utxo, Just d)
+    GYOutDatumHash h   -> (utxo, ) <$> lookupDatumFun h
 
 -- | Lookup UTxOs at zero or more 'GYTxOutRef' with their datums. This is a default implementation using `utxosAtTxOutRefs` and `lookupDatum`.
 gyQueryUtxosAtTxOutRefsWithDatumsDefault :: Monad m => ([GYTxOutRef] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYTxOutRef] -> m [(GYUTxO, Maybe GYDatum)]

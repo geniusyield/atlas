@@ -210,8 +210,8 @@ data KupoOrder = KOMostRecentFirst | KOOldestFirst
   deriving stock (Show, Eq, Ord, Enum, Bounded)
 
 instance ToHttpApiData KupoOrder where
-  toUrlPiece KOMostRecentFirst = "most-recent-first"
-  toUrlPiece KOOldestFirst     = "oldest-first"
+  toUrlPiece KOMostRecentFirst = "most_recent_first"
+  toUrlPiece KOOldestFirst     = "oldest_first"
 
 type KupoApi =
          "datums"

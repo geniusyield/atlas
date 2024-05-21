@@ -32,7 +32,7 @@ providersMashupTests configs =
            delayBySecond
            systemStart <- gyGetSystemStart provider
            delayBySecond
-           Api.EraHistory mode interpreter <- gyGetEraHistory provider  -- `mode` here doesn't appear to have `Eq` instance, comparing via it's `Show` instance should be fine.
+           Api.EraHistory interpreter <- gyGetEraHistory provider  -- `mode` here doesn't appear to have `Eq` instance, comparing via it's `Show` instance should be fine.
            delayBySecond
            stakePools <- gyGetStakePools provider
            delayBySecond

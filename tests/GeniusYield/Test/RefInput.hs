@@ -14,7 +14,6 @@ module GeniusYield.Test.RefInput
     ) where
 
 import           Control.Monad.Reader
-import           Plutus.Model
 import           Test.Tasty                                           (TestTree,
                                                                        testGroup)
 

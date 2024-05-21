@@ -204,12 +204,8 @@ library
   build-depends:
     , bech32
     , maestro-sdk
+    , clb
     , openapi3
-
-  -- -- Custom forks (version pinned by @source-repository-package@ stanza in @cabal.project@ file).
-  -- build-depends:
-  --   , cardano-simple
-  --   , plutus-simple-model
 
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file or derived from other related dependencies.
   build-depends:
@@ -286,8 +282,8 @@ test-suite atlas-tests
     , atlas-cardano
     , base
     , bytestring
-    , cardano-api
-    -- , cardano-simple
+    , cardano-api           ^>= 8.38.0.0
+    , clb
     , containers
     , data-default
     , directory
@@ -298,9 +294,7 @@ test-suite atlas-tests
     , mtl
     , ouroboros-consensus
     , plutus-ledger-api
-    -- , plutus-simple-model
     , plutus-tx
-    , plutus-tx-plugin
     , some
     , tasty
     , tasty-hunit

@@ -28,9 +28,20 @@
         overlays = [ haskellNix.overlay
           (final: prev: {
             hixProject =
-              final.haskell-nix.hix.project {
+              final.haskell-nix.project' {
                 src = ./.;
-                evalSystem = system;
+                compiler-nix-name = "ghc964";
+                # This is used by `nix develop .` to open a shell for use with
+                # `cabal`, `hlint` and `haskell-language-server`
+                shell.tools = {
+                  cabal = {}  ;
+                  hlint = {};
+                  haskell-language-server = {};
+                };
+                # Non-Haskell shell tools go here
+                shell.buildInputs = with pkgs; [
+                  nixpkgs-fmt
+                ];
                 inputMap = { "https://input-output-hk.github.io/cardano-haskell-packages" = CHaP; };
               };
           })
@@ -41,14 +52,4 @@
       in flake // {
         legacyPackages = pkgs;
       });
-
-  # --- Flake Local Nix Configuration ----------------------------
-  nixConfig = {
-    # This sets the flake to use the IOG nix cache.
-    # Nix should ask for permission before using it,
-    # but remove it here if you do not want it to.
-    extra-substituters = ["https://cache.iog.io"];
-    extra-trusted-public-keys = ["hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="];
-    allow-import-from-derivation = "true";
-  };
 }

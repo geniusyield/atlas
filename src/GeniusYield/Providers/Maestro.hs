@@ -26,6 +26,7 @@ module GeniusYield.Providers.Maestro
 
 import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api.S
+import qualified Cardano.Ledger.BaseTypes             as Ledger
 import qualified Cardano.Slotting.Slot                as CSlot
 import qualified Cardano.Slotting.Time                as CTime
 import           Control.Concurrent                   (threadDelay)
@@ -448,7 +449,8 @@ maestroProtocolParams env = do
       , protocolParamStakeAddressDeposit = Api.Lovelace $ toInteger protocolParametersStakeKeyDeposit
       , protocolParamStakePoolDeposit    = Api.Lovelace $ toInteger protocolParametersPoolDeposit
       , protocolParamMinPoolCost         = Api.Lovelace $ toInteger protocolParametersMinPoolCost
-      , protocolParamPoolRetireMaxEpoch  = Api.EpochNo $ Maestro.unEpochNo protocolParametersPoolRetirementEpochBound
+      , protocolParamPoolRetireMaxEpoch  = Ledger.EpochInterval . fromIntegral
+                                              $ Maestro.unEpochNo protocolParametersPoolRetirementEpochBound
       , protocolParamStakePoolTargetNum  = protocolParametersDesiredNumberOfPools
       , protocolParamPoolPledgeInfluence = Maestro.unMaestroRational protocolParametersPoolInfluence
       , protocolParamMonetaryExpansion   = Maestro.unMaestroRational protocolParametersMonetaryExpansion

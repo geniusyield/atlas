@@ -16,6 +16,7 @@ module GeniusYield.Providers.Blockfrost
 import qualified Blockfrost.Client                    as Blockfrost
 import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api.S
+import qualified Cardano.Ledger.BaseTypes             as Ledger
 import qualified Cardano.Slotting.Slot                as CSlot
 import qualified Cardano.Slotting.Time                as CTime
 import           Control.Concurrent                   (threadDelay)
@@ -357,7 +358,7 @@ blockfrostProtocolParams proj = do
         , protocolParamStakeAddressDeposit = Api.Lovelace $ lovelacesToInteger _protocolParamsKeyDeposit
         , protocolParamStakePoolDeposit    = Api.Lovelace $ lovelacesToInteger _protocolParamsPoolDeposit
         , protocolParamMinPoolCost         = Api.Lovelace $ lovelacesToInteger _protocolParamsMinPoolCost
-        , protocolParamPoolRetireMaxEpoch  = Api.EpochNo $ fromInteger _protocolParamsEMax
+        , protocolParamPoolRetireMaxEpoch  = Ledger.EpochInterval $ fromInteger _protocolParamsEMax
         , protocolParamStakePoolTargetNum  = fromInteger _protocolParamsNOpt
         , protocolParamPoolPledgeInfluence = _protocolParamsA0
         , protocolParamMonetaryExpansion   = _protocolParamsRho

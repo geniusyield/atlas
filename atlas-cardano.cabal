@@ -295,6 +295,7 @@ test-suite atlas-tests
     , ouroboros-consensus
     , plutus-ledger-api
     , plutus-tx
+    , plutus-tx-plugin
     , some
     , tasty
     , tasty-hunit

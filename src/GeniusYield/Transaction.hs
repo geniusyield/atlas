@@ -115,7 +115,7 @@ utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref _witns) addr val d ms) = GYUTxO
 
 data BuildTxException
     = BuildTxBalancingError !BalancingError
-    | BuildTxBodyErrorAutoBalance !Api.TxBodyErrorAutoBalance
+    | BuildTxBodyErrorAutoBalance !(Api.TxBodyErrorAutoBalance Api.S.BabbageEra)
     | BuildTxPPConversionError !Api.ProtocolParametersConversionError
     | BuildTxMissingMaxExUnitsParam
     -- ^ Missing max ex units in protocol params

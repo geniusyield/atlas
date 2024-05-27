@@ -200,6 +200,7 @@ library
   build-depends:
     , bech32
     , maestro-sdk
+    , openapi3
 
   -- Custom forks (version pinned by @source-repository-package@ stanza in @cabal.project@ file).
   build-depends:

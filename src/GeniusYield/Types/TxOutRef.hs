@@ -32,22 +32,25 @@ import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString.Base16           as Base16
 import qualified Data.ByteString.Lazy             as LBS
 import qualified Data.Csv                         as Csv
+import           Data.Either.Combinators          (mapLeft)
 import           Data.Hashable                    (Hashable (..))
+import qualified Data.OpenApi                     as OpenApi
+import           Data.OpenApi                     (ToSchema(..))
 import qualified Data.Swagger                     as Swagger
 import qualified Data.Swagger.Internal.Schema     as Swagger
 import qualified Data.Swagger.Lens                ()
 import qualified Data.Text                        as T
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as TE
+import           GeniusYield.Imports
+import           GeniusYield.Types.Ledger
+import           GeniusYield.Types.Tx
+import           GeniusYield.Utils                (swaggerToOpenApiSchema)
 import qualified PlutusLedgerApi.V1               as Plutus (TxOutRef (..), TxId (..))
 import qualified PlutusTx.Builtins.Internal       as Plutus
 import qualified Text.Printf                      as Printf
 import qualified Web.HttpApiData                  as Web
 
-import           Data.Either.Combinators          (mapLeft)
-import           GeniusYield.Imports
-import           GeniusYield.Types.Ledger
-import           GeniusYield.Types.Tx
 
 -- $setup
 --
@@ -191,7 +194,7 @@ instance Csv.FromField GYTxOutRef where
     parseField = either (fail . T.unpack) return . Web.parseUrlPiece . decodeUtf8Lenient
 
 -------------------------------------------------------------------------------
--- swagger schema
+-- openapi & swagger schema
 -------------------------------------------------------------------------------
 
 instance Swagger.ToParamSchema GYTxOutRef where
@@ -204,11 +207,18 @@ instance Swagger.ToSchema GYTxOutRef where
   declareNamedSchema _ = pure $ Swagger.named "GYTxOutRef" $ Swagger.paramSchemaToSchema (Proxy @GYTxOutRef)
                        & Swagger.example ?~ toJSON ("4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189#1" :: Text)
 
+instance OpenApi.ToSchema GYTxOutRef where
+  declareNamedSchema _ = pure $ swaggerToOpenApiSchema "GYTxOutRef" (Proxy @GYTxOutRef) $ Just $
+                         toJSON ("4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189#1" :: Text)
+
 -------------------------------------------------------------------------------
 -- GYTxOutRefCbor
 -------------------------------------------------------------------------------
 
 newtype GYTxOutRefCbor = GYTxOutRefCbor { getTxOutRefHex :: GYTxOutRef }
+  deriving Generic
+
+instance ToJSON GYTxOutRefCbor
 
 -- |
 --
@@ -244,7 +254,7 @@ instance Aeson.FromJSON GYTxOutRefCbor where
             Right ref -> return ref
 
 -------------------------------------------------------------------------------
--- swagger schema
+-- openapi & swagger schema
 -------------------------------------------------------------------------------
 
 instance Swagger.ToParamSchema GYTxOutRefCbor where
@@ -256,3 +266,7 @@ instance Swagger.ToParamSchema GYTxOutRefCbor where
 instance Swagger.ToSchema GYTxOutRefCbor where
   declareNamedSchema p = Swagger.plain $ Swagger.paramSchemaToSchema p
                        & Swagger.example ?~ toJSON ("8282582004ffecdf5f3ced5c5c788833415bcbef26e3e21290fcebcf8216327e21569e420082583900e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d1b930e9f7add78a174a21000e989ff551366dcd127028cb2aa39f6161a004c4b40" :: Text)
+
+instance OpenApi.ToSchema GYTxOutRefCbor where
+  declareNamedSchema _ = pure $ swaggerToOpenApiSchema "GYTxOutRefCbor" (Proxy @GYTxOutRefCbor) $ Just $
+                         toJSON ("8282582004ffecdf5f3ced5c5c788833415bcbef26e3e21290fcebcf8216327e21569e420082583900e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d1b930e9f7add78a174a21000e989ff551366dcd127028cb2aa39f6161a004c4b40" :: Text)

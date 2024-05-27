@@ -18,18 +18,23 @@ import qualified Cardano.Api                  as Api
 import           Control.Lens                 ((?~))
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.Csv                     as Csv
+import qualified Data.OpenApi                 as OpenApi
 import qualified Data.Swagger                 as Swagger
+import qualified Data.Swagger.Declare         as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..), CanSignTx)
+import           GeniusYield.Utils            (convertNamedSchema)
 import qualified PlutusLedgerApi.V1.Crypto    as Plutus
 import qualified PlutusTx.Builtins            as Plutus
 import qualified PlutusTx.Builtins.Internal   as Plutus
 import qualified Text.Printf                  as Printf
 import           Unsafe.Coerce                (unsafeCoerce)
+
+
 
 -- $setup
 --
@@ -148,7 +153,7 @@ instance Csv.FromField GYPaymentKeyHash where
     parseField = either (fail . show) (return . paymentKeyHashFromApi) . Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsPaymentKey)
 
 -------------------------------------------------------------------------------
--- swagger schema
+-- openapi & swagger schema
 -------------------------------------------------------------------------------
 
 instance Swagger.ToSchema GYPaymentKeyHash where
@@ -159,3 +164,8 @@ instance Swagger.ToSchema GYPaymentKeyHash where
                        & Swagger.example         ?~ toJSON ("e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d" :: Text)
                        & Swagger.maxLength       ?~ 56
                        & Swagger.minLength ?~ 56
+
+instance OpenApi.ToSchema GYPaymentKeyHash where
+  declareNamedSchema _ = do
+    let swaggerSchema = runIdentity $ Swagger.evalDeclare (fmap return $ Swagger.declareNamedSchema (Proxy :: Proxy GYPaymentKeyHash)) mempty
+    pure $ convertNamedSchema swaggerSchema

@@ -286,7 +286,7 @@ logTiming providers@GYProviders {..} = GYProviders
         , gyQueryUtxosAtAddressesWithDatums'    = case gyQueryUtxosAtAddressesWithDatums' gyQueryUTxO of
             Nothing -> Nothing
             Just q  -> Just $ wrap "gyQueryUtxosAtAddressesWithDatums" . q
-        , gyQueryUtxosAtPaymentCredential'      = \cred -> wrap "gyQueryUtxosAtTxOutRefs" . gyQueryUtxosAtPaymentCredential providers cred
+        , gyQueryUtxosAtPaymentCredential'      = \cred -> wrap "gyQueryUtxosAtPaymentCredential" . gyQueryUtxosAtPaymentCredential providers cred
         , gyQueryUtxosAtPaymentCredWithDatums'  = case gyQueryUtxosAtPaymentCredWithDatums' gyQueryUTxO of
             Nothing -> Nothing
             Just q  -> Just $ \cred mac -> wrap "gyQueryUtxosAtPaymentCredWithDatums" $ q cred mac

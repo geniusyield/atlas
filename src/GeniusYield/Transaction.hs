@@ -545,13 +545,15 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body cha
         changeAddrApi :: Api.S.AddressInEra Api.S.BabbageEra = addressToApi' changeAddr
         drepDelegDeposits = mempty -- TODO:
 
+    ledgerPP <- first BuildTxPPConversionError $ Api.S.convertToLedgerProtocolParameters Api.ShelleyBasedEraBabbage apiPP
+
     -- First we obtain the calculated fees to correct for our collaterals.
     bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ _ (Api.Lovelace feeOld)) <-
       first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
         Api.ShelleyBasedEraBabbage
         ss
         (Api.toLedgerEpochInfo eh)
-        (Api.S.convertToLedgerProtocolParameters pp)
+        ledgerPP
         poolids
         stakeDelegDeposits
         drepDelegDeposits
@@ -587,7 +589,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body cha
           Api.ShelleyBasedEraBabbage
           ss
           (Api.toLedgerEpochInfo eh)
-          (Api.S.convertToLedgerProtocolParameters apiPP)
+          ledgerPP
           poolids
           stakeDelegDeposits
           drepDelegDeposits

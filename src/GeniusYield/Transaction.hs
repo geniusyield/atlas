@@ -471,10 +471,10 @@ finalizeGYBalancedTx
       where
         toMetaInEra :: GYTxMetadata -> Api.TxMetadataInEra Api.BabbageEra
         toMetaInEra gymd = let md = txMetadataToApi gymd in
-          if md == mempty then Api.TxMetadataNone else Api.TxMetadataInEra Api.TxMetadataInBabbageEra md
+          if md == mempty then Api.TxMetadataNone else Api.TxMetadataInEra Api.ShelleyBasedEraBabbage md
 
     wdrls' :: Api.TxWithdrawals Api.BuildTx Api.BabbageEra
-    wdrls' = if wdrls == mempty then Api.TxWithdrawalsNone else Api.TxWithdrawals Api.WithdrawalsInBabbageEra $ map txWdrlToApi wdrls
+    wdrls' = if wdrls == mempty then Api.TxWithdrawalsNone else Api.TxWithdrawals Api.ShelleyBasedEraBabbage $ map txWdrlToApi wdrls
 
     certs' =
       if certs == mempty
@@ -487,7 +487,7 @@ finalizeGYBalancedTx
                         apiWit = maybe Map.empty (uncurry Map.singleton) mapiWit
                     in (apiCert : accCerts, accWits <> apiWit)
                   ) (mempty, mempty) certs
-          in Api.TxCertificates Api.S.CertificatesInBabbageEra (reverse $ fst apiCertsFromGY) $ Api.BuildTxWith (snd apiCertsFromGY)
+          in Api.TxCertificates Api.ShelleyBasedEraBabbage (reverse $ fst apiCertsFromGY) $ Api.BuildTxWith (snd apiCertsFromGY)
 
     apiPP = Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage pp
 

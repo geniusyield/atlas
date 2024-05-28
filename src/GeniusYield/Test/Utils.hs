@@ -55,6 +55,7 @@ import Clb qualified (
   runClb,
   intToKeyPair,
   defaultBabbage,
+  waitSlot,
  )
 import qualified Cardano.Ledger.Api as L
 import qualified Test.Cardano.Ledger.Core.KeyPair as TL
@@ -140,18 +141,18 @@ instance FromFakeCoin GYAssetClass      where fromFakeCoin = fromRight (error "i
 instance FromFakeCoin Plutus.AssetClass where fromFakeCoin = fakeCoin
 
 -- | This allows to write e.g. @'fakeGold' 1000 :: GYValue@.
--- instance (a ~ Integer, b ~ GYValue) => FromFakeCoin (a -> b) where
-    -- fromFakeCoin c = fromRight (error "invalid value") . valueFromPlutus . fakeValue c
+instance (a ~ Integer, b ~ GYValue) => FromFakeCoin (a -> b) where
+    fromFakeCoin c = fromRight (error "invalid value") . valueFromPlutus . fakeValue c
 
--- -- | Fake \"Gold\" coin to use during tests.
--- -- Can represent a 'GYAssetClass' or a Plutus 'Plutus.AssetClass'
--- fakeGold :: FromFakeCoin a => a
--- fakeGold = fromFakeCoin $ FakeCoin "Gold"
+-- | Fake \"Gold\" coin to use during tests.
+-- Can represent a 'GYAssetClass' or a Plutus 'Plutus.AssetClass'
+fakeGold :: FromFakeCoin a => a
+fakeGold = fromFakeCoin $ FakeCoin "Gold"
 
--- -- | Fake \"Iron\" coin to use during tests
--- -- Can represent a 'GYAssetClass' or a Plutus 'Plutus.AssetClass'
--- fakeIron :: FromFakeCoin a => a
--- fakeIron = fromFakeCoin $ FakeCoin "Iron"
+-- | Fake \"Iron\" coin to use during tests
+-- Can represent a 'GYAssetClass' or a Plutus 'Plutus.AssetClass'
+fakeIron :: FromFakeCoin a => a
+fakeIron = fromFakeCoin $ FakeCoin "Iron"
 
 -------------------------------------------------------------------------------
 -- helpers

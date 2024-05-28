@@ -41,7 +41,7 @@ import           Data.List.NonEmpty                        (NonEmpty (..))
 import qualified Data.Map.Strict                           as Map
 import           Data.Semigroup                            (Sum (..))
 import qualified Data.Set                                  as Set
-import           Data.SOP.Counting                         (NonEmpty (NonEmptyCons, NonEmptyOne))
+import           Data.SOP.NonEmpty                         (NonEmpty (NonEmptyCons, NonEmptyOne))
 import           Data.Time.Clock                           (NominalDiffTime,
                                                             UTCTime)
 import           Data.Time.Clock.POSIX                     (posixSecondsToUTCTime)
@@ -52,7 +52,7 @@ import qualified PlutusLedgerApi.V2                        as Plutus
 import qualified PlutusTx.Builtins.Internal                as Plutus
 import           Data.Sequence                             (ViewR (..), viewr)
 import           GeniusYield.Imports
-import           GeniusYield.Transaction                   (GYCoinSelectionStrategy (GYRandomImproveMultiAsset))
+import           GeniusYield.Transaction                   (GYCoinSelectionStrategy (GYRandomImproveMultiAsset), BuildTxException (BuildTxBalancingError), BalancingError(BalancingErrorInsufficientFunds))
 import           GeniusYield.Transaction.Common            (adjustTxOut,
                                                             minimumUTxO)
 import           GeniusYield.TxBuilder.Class
@@ -64,13 +64,13 @@ import Cardano.Api (ShelleyBasedEra(ShelleyBasedEraBabbage))
 import Cardano.Api.Script (fromShelleyBasedScript, fromShelleyScriptToReferenceScript)
 import Cardano.Api.Shelley qualified as ApiS
 import Cardano.Ledger.Address (unCompactAddr, decompactAddr)
-import Cardano.Ledger.Alonzo.TxInfo qualified as L
 import Cardano.Ledger.Api (binaryDataToData, getPlutusData)
-import Cardano.Ledger.Babbage.TxBody (addrEitherBabbageTxOutL, valueEitherBabbageTxOutL, getDatumBabbageTxOut, Datum (..))
-import Cardano.Ledger.Babbage.TxBody qualified as L
+import Cardano.Ledger.Plutus.TxInfo qualified as L
+import Cardano.Ledger.Babbage.TxOut qualified as L
+import Cardano.Ledger.Plutus.Data qualified as L
+import qualified Cardano.Ledger.Alonzo.Core           as AlonzoCore
 import Cardano.Ledger.BaseTypes (SlotNo, StrictMaybe (SJust, SNothing))
 import Cardano.Ledger.Compactible qualified as L
-import Cardano.Ledger.Pretty (ppLedgerState)
 import Cardano.Ledger.Shelley.API (LedgerState(..), UTxOState (utxosUtxo), StakeReference (..))
 import Cardano.Ledger.UTxO (UTxO(..))
 import Control.Lens ((^.))
@@ -82,7 +82,7 @@ import Clb (
   MockConfig(..),
   EmulatedLedgerState (..),
 
-  Clb,
+  ClbT,
   ClbState (..),
 
   txOutRefAt,
@@ -107,6 +107,7 @@ import Prettyprinter (pretty)
 import Control.Monad.Extra (maybeM)
 import GeniusYield.Test.Address
 
+type Clb = ClbT Identity
 
 type WalletName = String
 
@@ -244,18 +245,19 @@ instance GYTxQueryMonad GYTxMonadClb where
                 Left _     -> return Nothing -- TODO: should it error?
                 Right ref' -> utxoAtTxOutRef ref'
 
-    utxosAtPaymentCredential :: GYPaymentCredential -> GYTxMonadClb GYUTxOs
-    utxosAtPaymentCredential cred = do
+    utxosAtPaymentCredential :: GYPaymentCredential -> Maybe GYAssetClass -> GYTxMonadClb GYUTxOs
+    utxosAtPaymentCredential cred mAssetClass = do
         refs  <- liftClb $ txOutRefAtPaymentCred $ paymentCredentialToPlutus cred
         utxos <- wither f refs
-        return $ utxosFromList utxos
+        pure
+            . utxosFromList
+            $ filter (\GYUTxO{utxoValue} -> maybe True (>0) $ valueAssetClass utxoValue <$> mAssetClass)
+            utxos
       where
         f :: Plutus.TxOutRef -> GYTxMonadClb (Maybe GYUTxO)
-        f ref = do
-            case txOutRefFromPlutus ref of
-                Left _     -> return Nothing
-                Right ref' -> utxoAtTxOutRef ref'
-
+        f ref = case txOutRefFromPlutus ref of
+            Left _     -> return Nothing
+            Right ref' -> utxoAtTxOutRef ref'
 
     utxoAtTxOutRef ref = do
         -- All UTxOs map
@@ -267,16 +269,16 @@ instance GYTxQueryMonad GYTxMonadClb where
             o <- Map.lookup (txOutRefToPlutus ref) m
 
             -- FIXME: rightToMaybe
-            a <- addressFromApi . Api.S.fromShelleyAddrToAny . decompactAddr <$> rightToMaybe (o ^. addrEitherBabbageTxOutL)
+            a <- addressFromApi . Api.S.fromShelleyAddrToAny . decompactAddr <$> rightToMaybe (o ^. L.addrEitherBabbageTxOutL)
 
             -- FIXME: rightToMaybe
-            v <- valueFromApi . ApiS.fromMaryValue . L.fromCompact <$> rightToMaybe (o ^. valueEitherBabbageTxOutL)
+            v <- valueFromApi . ApiS.fromMaryValue . L.fromCompact <$> rightToMaybe (o ^. L.valueEitherBabbageTxOutL)
 
             -- FIXME: fromJust
-            d <- case o ^. L.datumTxOutF of
-                NoDatum -> pure GYOutDatumNone
-                DatumHash dh -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus $ fromJust $ L.transDataHash $ SJust dh)
-                Datum binaryData -> pure $
+            d <- case o ^. L.datumBabbageTxOutL of
+                L.NoDatum -> pure GYOutDatumNone
+                L.DatumHash dh -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus $ L.transDataHash dh)
+                L.Datum binaryData -> pure $
                     GYOutDatumInline
                     . datumFromPlutus
                     . PV2.Datum
@@ -285,7 +287,7 @@ instance GYTxQueryMonad GYTxMonadClb where
                     . binaryDataToData
                     $ binaryData
 
-            let s = case o ^. L.referenceScriptTxOutL of
+            let s = case o ^. L.referenceScriptBabbageTxOutL of
                         SJust x  -> someScriptFromReferenceApi $ fromShelleyScriptToReferenceScript ShelleyBasedEraBabbage x
                         SNothing -> Nothing
 
@@ -367,8 +369,7 @@ sendSkeleton' skeleton = do
     vRes <- liftClb $ sendTx $ txToApi tx
     case vRes of
         Success _state onChainTx -> pure (onChainTx, txBodyTxId body)
-        FailPhase1 _ err -> fail $ show err
-        FailPhase2 _ err _ -> fail $ show err
+        Fail _ err -> fail $ show err
 
   where
 
@@ -414,7 +415,8 @@ sendSkeleton' skeleton = do
             Left err  -> throwAppError err
             Right res -> case res of
                 GYTxBuildSuccess (Identity body :| _) -> return body
-                GYTxBuildFailure v                    -> throwAppError $ InsufficientFundsErr v
+                GYTxBuildFailure (BalancingErrorInsufficientFunds v) -> throwAppError . BuildTxBalancingError $ BalancingErrorInsufficientFunds v
+                GYTxBuildFailure _                    -> error "impossible case"
                 GYTxBuildPartialSuccess _ _           -> error "impossible case"
                 GYTxBuildNoInputs                     -> error "impossible case"
 
@@ -428,14 +430,10 @@ slotConfig' = liftClb $ do
 systemStart :: GYTxMonadClb Api.SystemStart
 systemStart = gyscSystemStart <$> slotConfig
 
-protocolParameters :: GYTxMonadClb (Api.S.BundledProtocolParameters Api.S.BabbageEra)
+protocolParameters :: GYTxMonadClb (AlonzoCore.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra))
 protocolParameters = do
     pparams <- liftClb $ gets $ mockConfigProtocol . mockConfig
-    case pparams of
-        AlonzoParams  _ -> error "Run.hs/protocolParameters: Only support babbage era parameters"
-        BabbageParams p -> do
-            -- gyLogDebug' "" $ show p
-            pure $ Api.BundleAsShelleyBasedProtocolParameters Api.ShelleyBasedEraBabbage (Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage p) p
+    pure $ coerce pparams
 
 
 stakePools :: GYTxMonadClb (Set Api.S.PoolId)
@@ -452,10 +450,10 @@ stakePools = pure Set.empty
 --       where
 --         Plutus.BuiltinByteString bs = Plutus.getPubKeyHash $ unPoolId pid
 
-eraHistory :: GYTxMonadClb (Api.EraHistory Api.CardanoMode)
+eraHistory :: GYTxMonadClb Api.EraHistory
 eraHistory = do
     (_, len) <- slotConfig'
-    return $ Api.EraHistory Api.CardanoMode $ eh len
+    return $ Api.EraHistory $ eh len
   where
     eh :: NominalDiffTime -> Ouroboros.Interpreter (Ouroboros.CardanoEras Ouroboros.StandardCrypto)
     eh = Ouroboros.mkInterpreter . Ouroboros.Summary

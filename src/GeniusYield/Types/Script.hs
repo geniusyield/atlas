@@ -143,6 +143,8 @@ import           Data.Aeson.Types                 (FromJSONKey (fromJSONKey),
                                                    toJSONKeyText)
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString.Base16           as BS16
+import qualified Data.OpenApi                     as OpenApi
+import           Data.OpenApi                     (ToSchema(..))
 import qualified Data.Swagger                     as Swagger
 import qualified Data.Swagger.Internal.Schema     as Swagger
 import qualified Data.Text                        as Text
@@ -160,6 +162,8 @@ import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger         (PlutusToCardanoError (..))
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.TxOutRef       (GYTxOutRef, txOutRefToApi)
+import           GeniusYield.Utils                (swaggerToOpenApiSchema')
+
 
 -- $setup
 --
@@ -443,6 +447,9 @@ instance Web.FromHttpApiData GYMintingPolicyId where
 
 instance Web.ToHttpApiData GYMintingPolicyId where
   toUrlPiece = mintingPolicyIdToText
+
+instance OpenApi.ToSchema GYMintingPolicyId where
+  declareNamedSchema _ = pure $ swaggerToOpenApiSchema' "GYMintingPolicyId" (Proxy @GYMintingPolicyId)
 
 instance Swagger.ToParamSchema GYMintingPolicyId where
   toParamSchema _ = mempty

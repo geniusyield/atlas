@@ -14,22 +14,20 @@ module GeniusYield.Utils
     , modifyException
     , serialiseToBech32WithPrefix
     , swaggerToOpenApiSchema
-    , convertNamedSchema
+    , swaggerToOpenApiSchema'
     ) where
 
-import           Cardano.Api          (SerialiseAsRawBytes (serialiseToRawBytes))
-import           Codec.Binary.Bech32  as Bech32
-import           Control.Monad.Except (ExceptT (..))
-import           Data.Char            (toLower)
+import           Cardano.Api                  (SerialiseAsRawBytes (serialiseToRawBytes))
+import           Codec.Binary.Bech32          as Bech32
+import           Control.Monad.Except         (ExceptT (..))
+import           Data.Char                    (toLower)
+import           Control.Lens                 ((.~), (^.))
+import qualified Data.OpenApi                 as OpenApi
+import           Data.OpenApi                 (OpenApiType(..))
+import qualified Data.Swagger                 as Swagger
+import qualified Data.Swagger.Internal        as Swagger
+import qualified Data.Swagger.Internal.Schema as Swagger
 import           GeniusYield.Imports
-
-import           Data.Aeson    (Value)
-import           Control.Lens                     ((.~), (^.))
-import qualified Data.OpenApi                     as OpenApi
-import           Data.OpenApi                     (OpenApiType(..))  -- , ToSchema(..))
-import qualified Data.Swagger                     as Swagger
-import qualified Data.Swagger.Internal            as Swagger
--- import qualified Data.Swagger.Internal.Schema     as Swagger
 
 
 -- | @fieldNamePrefixStrip2 "muAssets" == "assets"@
@@ -71,34 +69,31 @@ convertSwaggerType (Just Swagger.SwaggerArray)   = Just OpenApiArray
 convertSwaggerType (Just Swagger.SwaggerObject)  = Just OpenApiObject
 convertSwaggerType _                             = Nothing
 
--- Convert Swagger.Format to Maybe Text
-convertSwaggerFormat :: Maybe Swagger.Format -> Maybe Text
-convertSwaggerFormat = id
-
--- Lift Swagger schema to OpenApi schema
-swaggerToOpenApiSchema :: forall a. (Swagger.ToSchema a, Swagger.ToParamSchema a, ToJSON a, FromJSON a) => Text -> Proxy a -> Maybe Value -> OpenApi.NamedSchema
-swaggerToOpenApiSchema name proxy example = OpenApi.NamedSchema (Just name) schema
-  where
-    swaggerSchema = Swagger.paramSchemaToSchema proxy
-    schema = mempty
-             & OpenApi.type_   .~ convertSwaggerType (swaggerSchema ^. Swagger.type_)
-             & OpenApi.format  .~ convertSwaggerFormat (swaggerSchema ^. Swagger.format)
-             & OpenApi.pattern .~ (swaggerSchema ^. Swagger.pattern)
-             & OpenApi.description .~ (swaggerSchema ^. Swagger.description)
-             & OpenApi.example .~ example
-
--- Convert a Swagger.Schema to an OpenApi.Schema
-liftSwagger :: Swagger.Schema -> OpenApi.Schema
-liftSwagger swaggerSchema = 
+-- Lift a 'Swagger.Schema' to an 'OpenApi.Schema'
+liftSwaggerSchema :: Swagger.Schema -> OpenApi.Schema
+liftSwaggerSchema swaggerSchema = 
   mempty
   & OpenApi.type_       .~ convertSwaggerType (swaggerSchema ^. Swagger.type_)
   & OpenApi.format      .~ (swaggerSchema ^. Swagger.format)
+  & OpenApi.pattern     .~ (swaggerSchema ^. Swagger.pattern)
   & OpenApi.description .~ (swaggerSchema ^. Swagger.description)
   & OpenApi.example     .~ (swaggerSchema ^. Swagger.example)
   & OpenApi.maxLength   .~ (swaggerSchema ^. Swagger.maxLength)
   & OpenApi.minLength   .~ (swaggerSchema ^. Swagger.minLength)
+  -- & OpenApi.additionalProperties .~ (swaggerSchema ^. Swagger.additionalProperties)  --TODO
 
 -- Convert a Swagger.NamedSchema to an OpenApi.NamedSchema
 convertNamedSchema :: Swagger.NamedSchema -> OpenApi.NamedSchema
 convertNamedSchema (Swagger.NamedSchema name swaggerSchema) =
-  OpenApi.NamedSchema name (liftSwagger swaggerSchema)
+  OpenApi.NamedSchema name (liftSwaggerSchema swaggerSchema)
+
+-- | Lift Swagger schema to OpenApi schema (without ToParamSchema instance)
+swaggerToOpenApiSchema :: forall a. Swagger.ToSchema a => Proxy a -> OpenApi.NamedSchema
+swaggerToOpenApiSchema proxy = convertNamedSchema $ Swagger.toNamedSchema proxy
+
+-- | Lift Swagger schema to OpenApi schema (with ToParamSchema instance)
+swaggerToOpenApiSchema' :: forall a. (Swagger.ToSchema a, Swagger.ToParamSchema a)
+                        => Text -> Proxy a -> OpenApi.NamedSchema
+swaggerToOpenApiSchema' name proxy = OpenApi.NamedSchema (Just name) . liftSwaggerSchema $
+                                     Swagger.paramSchemaToSchema proxy
+

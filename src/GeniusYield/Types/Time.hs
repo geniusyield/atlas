@@ -19,10 +19,13 @@ module GeniusYield.Types.Time
     ) where
 
 import           GeniusYield.Imports
+import           GeniusYield.Utils            (swaggerToOpenApiSchema')
 
 import           Control.Lens                 ((?~))
 import qualified Data.Aeson                   as Aeson
 import qualified Data.Csv                     as Csv
+import qualified Data.OpenApi                 as OpenApi
+import           Data.OpenApi                 (ToSchema(..))
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
@@ -65,6 +68,9 @@ instance IsString GYTime where
 instance ParseTime GYTime where
     parseTimeSpecifier _ = parseTimeSpecifier $ Proxy @Time.POSIXTime
     buildTime loc xs     = GYTime <$> buildTime loc xs
+
+instance OpenApi.ToSchema GYTime where
+  declareNamedSchema p = pure $ swaggerToOpenApiSchema' "GYTime" p
 
 instance Swagger.ToParamSchema GYTime where
   toParamSchema _ = mempty

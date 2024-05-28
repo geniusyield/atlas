@@ -86,6 +86,8 @@ import qualified Data.ByteString                  as BS
 import qualified Data.ByteString.Base16           as Base16
 import qualified Data.ByteString.Lazy             as LBS
 import qualified Data.Map.Strict                  as Map
+import qualified Data.OpenApi                     as OpenApi
+import           Data.OpenApi                     (ToSchema(..))
 import qualified Data.Swagger                     as Swagger
 import qualified Data.Swagger.Internal.Schema     as Swagger
 import qualified Data.Text                        as T
@@ -100,6 +102,7 @@ import           Data.Hashable                    (Hashable (..))
 import qualified GeniusYield.Imports              as TE
 import qualified GeniusYield.Types.Ada            as Ada
 import           GeniusYield.Types.Script
+import           GeniusYield.Utils                (swaggerToOpenApiSchema, swaggerToOpenApiSchema')
 
 -- $setup
 --
@@ -300,6 +303,9 @@ instance Aeson.FromJSON GYValue where  -- TODO: Do we need this? Can't this be d
             Left d  -> fail $ "Expected amount to be an integer; amount: " <> show d
             Right i -> pure (ac, i)
 
+instance OpenApi.ToSchema GYValue where
+  declareNamedSchema _ = pure $ swaggerToOpenApiSchema (Proxy @GYValue)
+
 instance Swagger.ToSchema GYValue where
     declareNamedSchema _ = do
         integerSchema <- Swagger.declareSchemaRef @Integer Proxy
@@ -424,6 +430,9 @@ instance Aeson.ToJSONKey GYAssetClass where
 
 instance Aeson.FromJSONKey GYAssetClass where
     fromJSONKey = Aeson.FromJSONKeyTextParser (either (fail . show) pure . Web.parseUrlPiece)
+
+instance OpenApi.ToSchema GYAssetClass where
+  declareNamedSchema p = pure $ swaggerToOpenApiSchema' "GYAssetClass" p
 
 instance Swagger.ToParamSchema GYAssetClass where
   toParamSchema _ = mempty
@@ -627,6 +636,9 @@ instance IsString GYTokenName where
         (tokenNameFromBS bs)
       where
         bs = fromString s -- TODO: utf8-encode #33 (https://github.com/geniusyield/atlas/issues/33)
+
+instance OpenApi.ToSchema GYTokenName where
+  declareNamedSchema _ = pure $ swaggerToOpenApiSchema' "GYTokenName" (Proxy @GYTokenName)
 
 instance Swagger.ToParamSchema GYTokenName where
   toParamSchema _ = mempty

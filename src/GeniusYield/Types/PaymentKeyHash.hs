@@ -20,14 +20,13 @@ import qualified Data.Aeson.Types             as Aeson
 import qualified Data.Csv                     as Csv
 import qualified Data.OpenApi                 as OpenApi
 import qualified Data.Swagger                 as Swagger
-import qualified Data.Swagger.Declare         as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..), CanSignTx)
-import           GeniusYield.Utils            (convertNamedSchema)
+import           GeniusYield.Utils            (swaggerToOpenApiSchema)
 import qualified PlutusLedgerApi.V1.Crypto    as Plutus
 import qualified PlutusTx.Builtins            as Plutus
 import qualified PlutusTx.Builtins.Internal   as Plutus
@@ -166,6 +165,4 @@ instance Swagger.ToSchema GYPaymentKeyHash where
                        & Swagger.minLength   ?~ 56
 
 instance OpenApi.ToSchema GYPaymentKeyHash where
-  declareNamedSchema _ = do
-    let swaggerSchema = runIdentity $ Swagger.evalDeclare (pure <$> Swagger.declareNamedSchema (Proxy :: Proxy GYPaymentKeyHash)) mempty
-    pure $ convertNamedSchema swaggerSchema
+  declareNamedSchema _ = pure $ swaggerToOpenApiSchema (Proxy @GYPaymentKeyHash)

@@ -304,7 +304,12 @@ instance Aeson.FromJSON GYValue where  -- TODO: Do we need this? Can't this be d
             Right i -> pure (ac, i)
 
 instance OpenApi.ToSchema GYValue where
-  declareNamedSchema _ = pure $ swaggerToOpenApiSchema (Proxy @GYValue)
+  declareNamedSchema _ = do
+    integerSchema <- OpenApi.declareSchemaRef @Integer Proxy
+    let OpenApi.NamedSchema mName openApiSchema = swaggerToOpenApiSchema (Proxy @GYValue)
+        modifiedSchema = openApiSchema
+                         & OpenApi.additionalProperties ?~ OpenApi.AdditionalPropertiesSchema integerSchema
+    pure $ OpenApi.NamedSchema mName modifiedSchema
 
 instance Swagger.ToSchema GYValue where
     declareNamedSchema _ = do

@@ -12,6 +12,7 @@ module GeniusYield.Utils
     , fieldNamePrefixStrip4
     , fieldNamePrefixStripN
     , modifyException
+    , printOpenApiSchema
     , serialiseToBech32WithPrefix
     , swaggerToOpenApiSchema
     , swaggerToOpenApiSchema'
@@ -20,13 +21,15 @@ module GeniusYield.Utils
 import           Cardano.Api                  (SerialiseAsRawBytes (serialiseToRawBytes))
 import           Codec.Binary.Bech32          as Bech32
 import           Control.Monad.Except         (ExceptT (..))
-import           Data.Char                    (toLower)
 import           Control.Lens                 ((.~), (^.))
+import           Data.Char                    (toLower)
 import qualified Data.OpenApi                 as OpenApi
 import           Data.OpenApi                 (OpenApiType(..))
+import qualified Data.OpenApi.Declare         as OpenApi
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal        as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
+
 import           GeniusYield.Imports
 
 
@@ -80,7 +83,6 @@ liftSwaggerSchema swaggerSchema =
   & OpenApi.example     .~ (swaggerSchema ^. Swagger.example)
   & OpenApi.maxLength   .~ (swaggerSchema ^. Swagger.maxLength)
   & OpenApi.minLength   .~ (swaggerSchema ^. Swagger.minLength)
-  -- & OpenApi.additionalProperties .~ (swaggerSchema ^. Swagger.additionalProperties)  --TODO
 
 -- Convert a Swagger.NamedSchema to an OpenApi.NamedSchema
 convertNamedSchema :: Swagger.NamedSchema -> OpenApi.NamedSchema
@@ -97,3 +99,8 @@ swaggerToOpenApiSchema' :: forall a. (Swagger.ToSchema a, Swagger.ToParamSchema 
 swaggerToOpenApiSchema' name proxy = OpenApi.NamedSchema (Just name) . liftSwaggerSchema $
                                      Swagger.paramSchemaToSchema proxy
 
+-- Testing: print schemas for manual verification
+printOpenApiSchema :: (OpenApi.ToSchema a) => Proxy a -> IO ()
+printOpenApiSchema proxy = do
+  let namedSchema = OpenApi.runDeclare (OpenApi.declareNamedSchema proxy) mempty
+  print namedSchema

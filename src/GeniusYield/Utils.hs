@@ -84,7 +84,7 @@ liftSwaggerSchema swaggerSchema =
   & OpenApi.maxLength   .~ (swaggerSchema ^. Swagger.maxLength)
   & OpenApi.minLength   .~ (swaggerSchema ^. Swagger.minLength)
 
--- Convert a Swagger.NamedSchema to an OpenApi.NamedSchema
+-- Convert a 'Swagger.NamedSchema' to an 'OpenApi.NamedSchema'
 convertNamedSchema :: Swagger.NamedSchema -> OpenApi.NamedSchema
 convertNamedSchema (Swagger.NamedSchema name swaggerSchema) =
   OpenApi.NamedSchema name (liftSwaggerSchema swaggerSchema)

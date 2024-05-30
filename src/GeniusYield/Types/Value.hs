@@ -112,6 +112,8 @@ import           GeniusYield.Utils                (swaggerToOpenApiSchema, swagg
 -- >>> import qualified Data.ByteString.Char8      as BS8
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 -- >>> import qualified Data.Csv                   as Csv
+-- >>> import           Data.Proxy
+-- >>> import           GeniusYield.Utils
 -- >>> import qualified Text.Printf                as Printf
 -- >>> import qualified Web.HttpApiData            as Web
 
@@ -303,6 +305,11 @@ instance Aeson.FromJSON GYValue where  -- TODO: Do we need this? Can't this be d
             Left d  -> fail $ "Expected amount to be an integer; amount: " <> show d
             Right i -> pure (ac, i)
 
+-- |
+--
+-- >>> printOpenApiSchema (Proxy @GYValue)
+-- (fromList [],NamedSchema {_namedSchemaName = Just "GYValue", _namedSchemaSchema = Schema {_schemaTitle = Nothing, _schemaDescription = Just "A multi asset quantity, represented as map where each key represents an asset: policy ID and token name in hex concatenated by a dot.", _schemaRequired = [], _schemaNullable = Nothing, _schemaAllOf = Nothing, _schemaOneOf = Nothing, _schemaNot = Nothing, _schemaAnyOf = Nothing, _schemaProperties = fromList [], _schemaAdditionalProperties = Just (AdditionalPropertiesSchema (Inline (Schema {_schemaTitle = Nothing, _schemaDescription = Nothing, _schemaRequired = [], _schemaNullable = Nothing, _schemaAllOf = Nothing, _schemaOneOf = Nothing, _schemaNot = Nothing, _schemaAnyOf = Nothing, _schemaProperties = fromList [], _schemaAdditionalProperties = Nothing, _schemaDiscriminator = Nothing, _schemaReadOnly = Nothing, _schemaWriteOnly = Nothing, _schemaXml = Nothing, _schemaExternalDocs = Nothing, _schemaExample = Nothing, _schemaDeprecated = Nothing, _schemaMaxProperties = Nothing, _schemaMinProperties = Nothing, _schemaDefault = Nothing, _schemaType = Just OpenApiInteger, _schemaFormat = Nothing, _schemaItems = Nothing, _schemaMaximum = Nothing, _schemaExclusiveMaximum = Nothing, _schemaMinimum = Nothing, _schemaExclusiveMinimum = Nothing, _schemaMaxLength = Nothing, _schemaMinLength = Nothing, _schemaPattern = Nothing, _schemaMaxItems = Nothing, _schemaMinItems = Nothing, _schemaUniqueItems = Nothing, _schemaEnum = Nothing, _schemaMultipleOf = Nothing}))), _schemaDiscriminator = Nothing, _schemaReadOnly = Nothing, _schemaWriteOnly = Nothing, _schemaXml = Nothing, _schemaExternalDocs = Nothing, _schemaExample = Just (Object (fromList [("ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.474f4c44",Number 101.0),("lovelace",Number 22.0)])), _schemaDeprecated = Nothing, _schemaMaxProperties = Nothing, _schemaMinProperties = Nothing, _schemaDefault = Nothing, _schemaType = Just OpenApiObject, _schemaFormat = Nothing, _schemaItems = Nothing, _schemaMaximum = Nothing, _schemaExclusiveMaximum = Nothing, _schemaMinimum = Nothing, _schemaExclusiveMinimum = Nothing, _schemaMaxLength = Nothing, _schemaMinLength = Nothing, _schemaPattern = Nothing, _schemaMaxItems = Nothing, _schemaMinItems = Nothing, _schemaUniqueItems = Nothing, _schemaEnum = Nothing, _schemaMultipleOf = Nothing}})
+--
 instance OpenApi.ToSchema GYValue where
   declareNamedSchema _ = do
     integerSchema <- OpenApi.declareSchemaRef @Integer Proxy

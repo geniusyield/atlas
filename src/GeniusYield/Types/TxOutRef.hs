@@ -56,7 +56,9 @@ import qualified Web.HttpApiData                  as Web
 --
 -- >>> :set -XOverloadedStrings -XTypeApplications
 -- >>> import qualified Data.Csv                   as Csv
+-- >>> import           Data.Proxy
 -- >>> import qualified PlutusLedgerApi.V1         as Plutus
+-- >>> import           GeniusYield.Utils 
 -- >>> import qualified Web.HttpApiData            as Web
 --
 
@@ -197,6 +199,11 @@ instance Csv.FromField GYTxOutRef where
 -- openapi & swagger schema
 -------------------------------------------------------------------------------
 
+-- |
+--
+-- >>> printOpenApiSchema (Proxy @GYTxOutRef)
+-- (fromList [],NamedSchema {_namedSchemaName = Just "GYTxOutRef", _namedSchemaSchema = Schema {_schemaTitle = Nothing, _schemaDescription = Nothing, _schemaRequired = [], _schemaNullable = Nothing, _schemaAllOf = Nothing, _schemaOneOf = Nothing, _schemaNot = Nothing, _schemaAnyOf = Nothing, _schemaProperties = fromList [], _schemaAdditionalProperties = Nothing, _schemaDiscriminator = Nothing, _schemaReadOnly = Nothing, _schemaWriteOnly = Nothing, _schemaXml = Nothing, _schemaExternalDocs = Nothing, _schemaExample = Nothing, _schemaDeprecated = Nothing, _schemaMaxProperties = Nothing, _schemaMinProperties = Nothing, _schemaDefault = Nothing, _schemaType = Just OpenApiString, _schemaFormat = Just "hex", _schemaItems = Nothing, _schemaMaximum = Nothing, _schemaExclusiveMaximum = Nothing, _schemaMinimum = Nothing, _schemaExclusiveMinimum = Nothing, _schemaMaxLength = Nothing, _schemaMinLength = Nothing, _schemaPattern = Just "[0-9a-fA-F]{64}#\"d+", _schemaMaxItems = Nothing, _schemaMinItems = Nothing, _schemaUniqueItems = Nothing, _schemaEnum = Nothing, _schemaMultipleOf = Nothing}})
+--
 instance OpenApi.ToSchema GYTxOutRef where
   declareNamedSchema _ = pure $ swaggerToOpenApiSchema' "GYTxOutRef" (Proxy @GYTxOutRef)
 

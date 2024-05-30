@@ -41,7 +41,9 @@ import           Unsafe.Coerce                (unsafeCoerce)
 -- >>> import qualified Data.Aeson                 as Aeson
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 -- >>> import qualified Data.Csv                   as Csv
+-- >>> import           Data.Proxy
 -- >>> import qualified Text.Printf                as Printf
+-- >>> import           GeniusYield.Utils 
 
 newtype GYPaymentKeyHash = GYPaymentKeyHash (Api.Hash Api.PaymentKey)
     deriving stock Show
@@ -155,6 +157,14 @@ instance Csv.FromField GYPaymentKeyHash where
 -- openapi & swagger schema
 -------------------------------------------------------------------------------
 
+-- |
+--
+-- >>> printOpenApiSchema (Proxy @GYPaymentKeyHash)
+-- (fromList [],NamedSchema {_namedSchemaName = Just "GYPaymentKeyHash", _namedSchemaSchema = Schema {_schemaTitle = Nothing, _schemaDescription = Just "The hash of a payment public key.", _schemaRequired = [], _schemaNullable = Nothing, _schemaAllOf = Nothing, _schemaOneOf = Nothing, _schemaNot = Nothing, _schemaAnyOf = Nothing, _schemaProperties = fromList [], _schemaAdditionalProperties = Nothing, _schemaDiscriminator = Nothing, _schemaReadOnly = Nothing, _schemaWriteOnly = Nothing, _schemaXml = Nothing, _schemaExternalDocs = Nothing, _schemaExample = Just (String "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"), _schemaDeprecated = Nothing, _schemaMaxProperties = Nothing, _schemaMinProperties = Nothing, _schemaDefault = Nothing, _schemaType = Just OpenApiString, _schemaFormat = Just "hex", _schemaItems = Nothing, _schemaMaximum = Nothing, _schemaExclusiveMaximum = Nothing, _schemaMinimum = Nothing, _schemaExclusiveMinimum = Nothing, _schemaMaxLength = Just 56, _schemaMinLength = Just 56, _schemaPattern = Nothing, _schemaMaxItems = Nothing, _schemaMinItems = Nothing, _schemaUniqueItems = Nothing, _schemaEnum = Nothing, _schemaMultipleOf = Nothing}})
+--
+instance OpenApi.ToSchema GYPaymentKeyHash where
+  declareNamedSchema _ = pure $ swaggerToOpenApiSchema (Proxy @GYPaymentKeyHash)
+
 instance Swagger.ToSchema GYPaymentKeyHash where
   declareNamedSchema _ = pure $ Swagger.named "GYPaymentKeyHash" $ mempty
                        & Swagger.type_       ?~ Swagger.SwaggerString
@@ -163,6 +173,3 @@ instance Swagger.ToSchema GYPaymentKeyHash where
                        & Swagger.example     ?~ toJSON ("e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d" :: Text)
                        & Swagger.maxLength   ?~ 56
                        & Swagger.minLength   ?~ 56
-
-instance OpenApi.ToSchema GYPaymentKeyHash where
-  declareNamedSchema _ = pure $ swaggerToOpenApiSchema (Proxy @GYPaymentKeyHash)

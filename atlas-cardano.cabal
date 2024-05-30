@@ -146,8 +146,9 @@ library
     GeniusYield.Types.UTxO
     GeniusYield.Types.Value
     GeniusYield.Types.Wallet
+    GeniusYield.Utils
 
-  other-modules:   GeniusYield.Utils
+--  other-modules:   GeniusYield.Utils
   build-depends:
     , aeson                 ^>=2.1.2.1
     , attoparsec            ^>=0.14.4

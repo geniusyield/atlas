@@ -102,8 +102,7 @@ import           Data.Hashable                    (Hashable (..))
 import qualified GeniusYield.Imports              as TE
 import qualified GeniusYield.Types.Ada            as Ada
 import           GeniusYield.Types.Script
-import           GeniusYield.Utils                (printOpenApiSchema,
-                                                   swaggerToOpenApiSchema, swaggerToOpenApiSchema')
+import           GeniusYield.Utils                (swaggerToOpenApiSchema, swaggerToOpenApiSchema')
 
 -- $setup
 --
@@ -114,6 +113,7 @@ import           GeniusYield.Utils                (printOpenApiSchema,
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 -- >>> import qualified Data.Csv                   as Csv
 -- >>> import           Data.Proxy
+-- >>> import           GeniusYield.Utils
 -- >>> import qualified Text.Printf                as Printf
 -- >>> import qualified Web.HttpApiData            as Web
 

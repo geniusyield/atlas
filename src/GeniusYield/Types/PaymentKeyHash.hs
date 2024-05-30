@@ -26,7 +26,7 @@ import qualified Data.Text.Encoding           as Text
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..), CanSignTx)
-import           GeniusYield.Utils            (swaggerToOpenApiSchema)
+import           GeniusYield.Utils            (printOpenApiSchema, swaggerToOpenApiSchema)
 import qualified PlutusLedgerApi.V1.Crypto    as Plutus
 import qualified PlutusTx.Builtins            as Plutus
 import qualified PlutusTx.Builtins.Internal   as Plutus
@@ -43,7 +43,6 @@ import           Unsafe.Coerce                (unsafeCoerce)
 -- >>> import qualified Data.Csv                   as Csv
 -- >>> import           Data.Proxy
 -- >>> import qualified Text.Printf                as Printf
--- >>> import           GeniusYield.Utils 
 
 newtype GYPaymentKeyHash = GYPaymentKeyHash (Api.Hash Api.PaymentKey)
     deriving stock Show

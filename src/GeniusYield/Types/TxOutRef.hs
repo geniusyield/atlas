@@ -45,7 +45,7 @@ import qualified Data.Text.Encoding               as TE
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.Tx
-import           GeniusYield.Utils                (swaggerToOpenApiSchema')
+import           GeniusYield.Utils                (printOpenApiSchema, swaggerToOpenApiSchema')
 import qualified PlutusLedgerApi.V1               as Plutus (TxOutRef (..), TxId (..))
 import qualified PlutusTx.Builtins.Internal       as Plutus
 import qualified Text.Printf                      as Printf
@@ -58,7 +58,6 @@ import qualified Web.HttpApiData                  as Web
 -- >>> import qualified Data.Csv                   as Csv
 -- >>> import           Data.Proxy
 -- >>> import qualified PlutusLedgerApi.V1         as Plutus
--- >>> import           GeniusYield.Utils 
 -- >>> import qualified Web.HttpApiData            as Web
 --
 

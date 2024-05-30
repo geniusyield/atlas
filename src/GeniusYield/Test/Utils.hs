@@ -33,6 +33,9 @@ module GeniusYield.Test.Utils
     , fakeIron
     ) where
 import           Control.Monad.Random
+import           Control.Monad.State
+import Data.Semigroup (Sum(getSum))
+import qualified Data.Map.Strict            as Map
 import Control.Lens ((^.))
 import           Data.Maybe                 (fromJust)
 import qualified PlutusLedgerApi.V1.Value   as Plutus
@@ -353,7 +356,28 @@ withWalletBalanceCheck ((w, v) : xs) m = do
         fail $ printf "expected balance difference of %s for wallet %s, but the actual difference was %s" v (walletName w) diff
     return b
 
-withWalletBalancesCheckSimple = undefined
+{- | Computes a 'GYTxMonadRun' action, checking that the 'Wallet' balances
+        change according to the input list. This is a simplified version of `withWalletBalancesCheck` where the input list need not consider lovelaces required for fees & to satisfy the min ada requirements as these are added automatically. It is therefore recommended to use this function over `withWalletBalancesCheck` to avoid hardcoding the lovelaces required for fees & min ada constraints.
+Notes:
+* An empty list means no checks are performed.
+* The 'GYValue' should be negative to check if the Wallet lost those funds.
+-}
+withWalletBalancesCheckSimple :: [(Wallet, GYValue)] -> GYTxMonadClb a -> GYTxMonadClb a
+withWalletBalancesCheckSimple wallValueDiffs m = do
+  bs <- mapM (balance . fst) wallValueDiffs
+  a <- m
+  walletExtraLovelaceMap <- gets walletExtraLovelace
+  bs' <- mapM (balance . fst) wallValueDiffs
+
+  forM_ (zip3 wallValueDiffs bs' bs) $
+    \((w, v), b', b) ->
+      let newBalance = case Map.lookup (walletName w) walletExtraLovelaceMap of
+            Nothing -> b'
+            Just (extraLovelaceForFees, extraLovelaceForMinAda) -> b' <> valueFromLovelace (getSum $ extraLovelaceForFees <> extraLovelaceForMinAda)
+          diff = newBalance `valueMinus` b
+        in unless (diff == v) $ fail $
+            printf "Wallet: %s. Old balance: %s. New balance: %s. New balance after adding extra lovelaces %s. Expected balance difference of %s, but the actual difference was %s" (walletName w) b b' newBalance v diff
+  return a
 
 -- | Waits until a certain 'GYSlot'.
 -- Silently returns if the given slot is greater than the current slot.

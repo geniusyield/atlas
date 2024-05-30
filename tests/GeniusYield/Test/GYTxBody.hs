@@ -59,7 +59,7 @@ adjustTxTests =
     , testCase "Few ADA" $
         2_000_000 `lovelacesAdjustedShouldEqual` 2_000_000
     , testCase "Very Few ADA" $
-        100_000 `lovelacesAdjustedShouldEqual` 978_370
+        100_000 `lovelacesAdjustedShouldEqual` 969_750
     , testCase "ADA and Assets" $ do
         let val = valueFromList [ (GYLovelace, 10_000_000)
                                   , (mockAsset "A", 100)
@@ -77,7 +77,7 @@ adjustTxTests =
                                 , (mockAsset "A", 100)
                                 , (mockAsset "B", 200)
                                 ]
-        val `adjustedShouldEqual` (val <> valueFromLovelace 1_055_080)
+        val `adjustedShouldEqual` (val <> valueFromLovelace 1_046_460)
     , testCase "Very Few ADA and a lot of Assets" $ do
         let val = valueFromList [ (GYLovelace, 100_000)
                                 , (mockAsset "A", 1000)
@@ -89,7 +89,7 @@ adjustTxTests =
                                 , (mockAsset "G", 7000)
                                 , (mockAsset "H", 8000)
                                 ]
-        val `adjustedShouldEqual` (val <> valueFromLovelace 1_193_000)
+        val `adjustedShouldEqual` (val <> valueFromLovelace 1_184_380)
     ]
   where
     mockAdjust :: GYTxOut v -> GYTxOut v

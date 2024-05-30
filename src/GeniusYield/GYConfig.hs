@@ -122,7 +122,9 @@ In JSON format, this essentially corresponds to:
 data GYCoreConfig = GYCoreConfig
   { cfgCoreProvider :: !GYCoreProviderInfo
   , cfgNetworkId    :: !GYNetworkId
+  -- | List of scribes to register.
   , cfgLogging      :: ![GYLogScribeConfig]
+  -- | Optional switch to enable timing and logging of requests sent to provider.
   , cfgLogTiming    :: !(Maybe Bool)
   -- , cfgUtxoCacheEnable :: !Bool
   }

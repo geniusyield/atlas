@@ -103,8 +103,6 @@ import Clb (
  )
 import Clb qualified (dumpUtxoState)
 import PlutusLedgerApi.V2 qualified as PV2
-import Prettyprinter (pretty)
-import Control.Monad.Extra (maybeM)
 import GeniusYield.Test.Address
 
 type Clb = ClbT Identity
@@ -203,8 +201,9 @@ mustFail act = do
       msg = "Unnamed failure action"
 
 getNetworkId :: GYTxMonadClb GYNetworkId
-getNetworkId = maybeM (fail "Unsupported network") pure $
-    liftClb $ gets (networkIdFromApi . mockConfigNetworkId . mockConfig)
+getNetworkId = do
+    res <- liftClb $ gets (networkIdFromApi . mockConfigNetworkId . mockConfig)
+    maybe (fail "Unsupported network") pure res
 
 instance MonadFail GYTxMonadClb where
     fail = GYTxMonadClb . throwError . Left

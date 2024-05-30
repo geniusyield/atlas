@@ -37,7 +37,7 @@ providersMashupTests configs =
            stakePools <- gyGetStakePools provider
            delayBySecond
            slotConfig' <- gyGetSlotConfig provider
-           pure (protocolParams, systemStart, (show mode, interpreter), stakePools, slotConfig')
+           pure (protocolParams, systemStart, interpreter, stakePools, slotConfig')
         assertBool "Parameters are not all equal" $ allEqual paramsList
     , testCase "Stake address info" $ do
         saInfos <- forM configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> do

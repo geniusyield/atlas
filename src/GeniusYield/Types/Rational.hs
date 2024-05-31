@@ -15,7 +15,7 @@ module GeniusYield.Types.Rational
     ) where
 
 import           GeniusYield.Imports
-import           GeniusYield.Utils            (swaggerToOpenApiSchema')
+import           GeniusYield.Swagger.Utils    (fromOpenApi2Schema')
 
 import           Control.Lens                 ((?~))
 import qualified Data.Aeson                   as Aeson
@@ -101,7 +101,7 @@ instance Aeson.FromJSON GYRational where
 -------------------------------------------------------------------------------
 
 instance OpenApi.ToSchema GYRational where
-  declareNamedSchema p = pure $ swaggerToOpenApiSchema' "GYRational" p
+  declareNamedSchema p = pure $ fromOpenApi2Schema' "GYRational" p
 
 instance Swagger.ToSchema GYRational where
   declareNamedSchema p = Swagger.plain $ Swagger.paramSchemaToSchema p

@@ -67,7 +67,7 @@ import qualified Web.HttpApiData                    as Web
 
 import           Cardano.Ledger.Core                (eraProtVerHigh)
 import           GeniusYield.Imports
-import           GeniusYield.Utils                  (swaggerToOpenApiSchema)
+import           GeniusYield.Swagger.Utils          (fromOpenApi2Schema)
 
 -- $setup
 --
@@ -108,7 +108,7 @@ instance Aeson.ToJSON GYTx where
     toJSON = Aeson.toJSON . txToHex
 
 instance OpenApi.ToSchema GYTx where
-  declareNamedSchema _ = pure $ swaggerToOpenApiSchema (Proxy @GYTx)
+  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYTx)
 
 instance Swagger.ToSchema GYTx where
     declareNamedSchema _ = pure $ Swagger.named "GYTx" $ mempty
@@ -213,7 +213,7 @@ instance ToJSON GYTxId where
                        $ Api.serialiseToRawBytesHex txid
 
 instance OpenApi.ToSchema GYTxId where
-  declareNamedSchema _ = pure $ swaggerToOpenApiSchema (Proxy @GYTxId)
+  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYTxId)
 
 instance Swagger.ToSchema GYTxId where
   declareNamedSchema _ = pure $ Swagger.named "GYTxId" $ mempty
@@ -259,7 +259,7 @@ newtype GYTxWitness = GYTxWitness (AlonzoTxWits (Babbage.BabbageEra Crypto.Stand
   deriving newtype Show
 
 instance OpenApi.ToSchema GYTxWitness where
-  declareNamedSchema _ = pure $ swaggerToOpenApiSchema (Proxy @GYTxWitness)
+  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYTxWitness)
 
 instance Swagger.ToSchema GYTxWitness where
     declareNamedSchema _ = pure $ Swagger.named "GYTxWitness" $ mempty

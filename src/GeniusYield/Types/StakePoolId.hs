@@ -32,7 +32,7 @@ import           GeniusYield.Imports
 import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..),
                                                pubKeyHashFromApi,
                                                pubKeyHashToApi)
-import           GeniusYield.Utils            (swaggerToOpenApiSchema)
+import           GeniusYield.Swagger.Utils    (fromOpenApi2Schema)
 import qualified Text.Printf                  as Printf
 import qualified Web.HttpApiData              as Web
 
@@ -136,7 +136,7 @@ instance Csv.FromField GYStakePoolId where
     parseField = either (fail . show) (return . stakePoolIdFromApi) . Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsStakePoolKey)
 
 instance OpenApi.ToSchema GYStakePoolId where
-  declareNamedSchema _ = pure $ swaggerToOpenApiSchema (Proxy @GYStakePoolId)
+  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYStakePoolId)
 
 instance Swagger.ToSchema GYStakePoolId where
   declareNamedSchema _ = pure $ Swagger.named "GYStakePoolId" $ mempty

@@ -18,7 +18,7 @@ module GeniusYield.Types.PubKeyHash (
 
 import           Control.Lens                 ((?~))
 import           GeniusYield.Imports
-import           GeniusYield.Utils            (swaggerToOpenApiSchema)
+import           GeniusYield.Swagger.Utils    (fromOpenApi2Schema)
 
 import qualified Cardano.Api                  as Api
 import qualified Data.Aeson.Types             as Aeson
@@ -161,7 +161,7 @@ instance Csv.FromField GYPubKeyHash where
 -------------------------------------------------------------------------------
 
 instance OpenApi.ToSchema GYPubKeyHash where
-  declareNamedSchema _ = pure $ swaggerToOpenApiSchema (Proxy @GYPubKeyHash)
+  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYPubKeyHash)
 
 instance Swagger.ToSchema GYPubKeyHash where
   declareNamedSchema _ = pure $ Swagger.named "GYPubKeyHash" $ mempty

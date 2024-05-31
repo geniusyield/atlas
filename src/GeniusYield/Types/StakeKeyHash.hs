@@ -14,7 +14,7 @@ module GeniusYield.Types.StakeKeyHash (
 
 import           Control.Lens                 ((?~))
 import           GeniusYield.Imports
-import           GeniusYield.Utils            (swaggerToOpenApiSchema)
+import           GeniusYield.Swagger.Utils    (fromOpenApi2Schema)
 
 import qualified Cardano.Api                  as Api
 import qualified Data.Aeson.Types             as Aeson
@@ -117,7 +117,7 @@ instance Csv.FromField GYStakeKeyHash where
     parseField = either (fail . show) (return . stakeKeyHashFromApi) . Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsStakeKey)
 
 instance OpenApi.ToSchema GYStakeKeyHash where
-  declareNamedSchema _ = pure $ swaggerToOpenApiSchema (Proxy @GYStakeKeyHash)
+  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYStakeKeyHash)
 
 instance Swagger.ToSchema GYStakeKeyHash where
   declareNamedSchema _ = pure $ Swagger.named "GYStakeKeyHash" $ mempty

@@ -19,7 +19,7 @@ module GeniusYield.Types.Time
     ) where
 
 import           GeniusYield.Imports
-import           GeniusYield.Utils            (swaggerToOpenApiSchema')
+import           GeniusYield.Swagger.Utils    (fromOpenApi2Schema')
 
 import           Control.Lens                 ((?~))
 import qualified Data.Aeson                   as Aeson
@@ -70,7 +70,7 @@ instance ParseTime GYTime where
     buildTime loc xs     = GYTime <$> buildTime loc xs
 
 instance OpenApi.ToSchema GYTime where
-  declareNamedSchema p = pure $ swaggerToOpenApiSchema' "GYTime" p
+  declareNamedSchema p = pure $ fromOpenApi2Schema' "GYTime" p
 
 instance Swagger.ToParamSchema GYTime where
   toParamSchema _ = mempty

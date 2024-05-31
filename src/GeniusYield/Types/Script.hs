@@ -162,7 +162,7 @@ import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger         (PlutusToCardanoError (..))
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.TxOutRef       (GYTxOutRef, txOutRefToApi)
-import           GeniusYield.Utils                (swaggerToOpenApiSchema')
+import           GeniusYield.Swagger.Utils        (fromOpenApi2Schema')
 
 
 -- $setup
@@ -449,7 +449,7 @@ instance Web.ToHttpApiData GYMintingPolicyId where
   toUrlPiece = mintingPolicyIdToText
 
 instance OpenApi.ToSchema GYMintingPolicyId where
-  declareNamedSchema _ = pure $ swaggerToOpenApiSchema' "GYMintingPolicyId" (Proxy @GYMintingPolicyId)
+  declareNamedSchema _ = pure $ fromOpenApi2Schema' "GYMintingPolicyId" (Proxy @GYMintingPolicyId)
 
 instance Swagger.ToParamSchema GYMintingPolicyId where
   toParamSchema _ = mempty

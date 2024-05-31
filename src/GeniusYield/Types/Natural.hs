@@ -13,7 +13,7 @@ module GeniusYield.Types.Natural
     ) where
 
 import           GeniusYield.Imports
-import           GeniusYield.Utils            (swaggerToOpenApiSchema')
+import           GeniusYield.Swagger.Utils    (fromOpenApi2Schema')
 
 import           Control.Lens                 ((?~))
 import qualified Data.Aeson                   as Aeson
@@ -92,7 +92,7 @@ instance Aeson.ToJSON GYNatural where
     toJSON = Aeson.toJSON . Web.toUrlPiece
 
 instance OpenApi.ToSchema GYNatural where
-  declareNamedSchema p = pure $ swaggerToOpenApiSchema' "GYNatural" p
+  declareNamedSchema p = pure $ fromOpenApi2Schema' "GYNatural" p
 
 instance Swagger.ToParamSchema GYNatural where
   toParamSchema _ = mempty

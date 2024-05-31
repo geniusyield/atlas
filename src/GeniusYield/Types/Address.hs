@@ -98,7 +98,7 @@ import           GeniusYield.Types.PaymentKeyHash     (GYPaymentKeyHash,
                                                        paymentKeyHashToApi)
 import           GeniusYield.Types.PubKeyHash
 import           GeniusYield.Types.Script
-import           GeniusYield.Utils                    (swaggerToOpenApiSchema')
+import           GeniusYield.Swagger.Utils            (fromOpenApi2Schema')
 
 -- $setup
 --
@@ -472,7 +472,7 @@ instance Csv.FromRecord GYAddress where
 -------------------------------------------------------------------------------
 
 instance OpenApi.ToSchema GYAddress where
-  declareNamedSchema _ = pure $ swaggerToOpenApiSchema' "GYAddress" (Proxy @GYAddress)
+  declareNamedSchema _ = pure $ fromOpenApi2Schema' "GYAddress" (Proxy @GYAddress)
 
 instance Swagger.ToParamSchema GYAddress where
   toParamSchema _ = mempty

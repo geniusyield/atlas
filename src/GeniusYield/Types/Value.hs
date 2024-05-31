@@ -102,7 +102,7 @@ import           Data.Hashable                    (Hashable (..))
 import qualified GeniusYield.Imports              as TE
 import qualified GeniusYield.Types.Ada            as Ada
 import           GeniusYield.Types.Script
-import           GeniusYield.Utils                (swaggerToOpenApiSchema, swaggerToOpenApiSchema')
+import           GeniusYield.Swagger.Utils        (fromOpenApi2Schema, fromOpenApi2Schema')
 
 -- $setup
 --
@@ -112,8 +112,8 @@ import           GeniusYield.Utils                (swaggerToOpenApiSchema, swagg
 -- >>> import qualified Data.ByteString.Char8      as BS8
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 -- >>> import qualified Data.Csv                   as Csv
+-- >>> import qualified Data.OpenApi               as OpenApi
 -- >>> import           Data.Proxy
--- >>> import           GeniusYield.Utils
 -- >>> import qualified Text.Printf                as Printf
 -- >>> import qualified Web.HttpApiData            as Web
 
@@ -307,13 +307,13 @@ instance Aeson.FromJSON GYValue where  -- TODO: Do we need this? Can't this be d
 
 -- |
 --
--- >>> printOpenApiSchema (Proxy @GYValue)
--- (fromList [],NamedSchema {_namedSchemaName = Just "GYValue", _namedSchemaSchema = Schema {_schemaTitle = Nothing, _schemaDescription = Just "A multi asset quantity, represented as map where each key represents an asset: policy ID and token name in hex concatenated by a dot.", _schemaRequired = [], _schemaNullable = Nothing, _schemaAllOf = Nothing, _schemaOneOf = Nothing, _schemaNot = Nothing, _schemaAnyOf = Nothing, _schemaProperties = fromList [], _schemaAdditionalProperties = Just (AdditionalPropertiesSchema (Inline (Schema {_schemaTitle = Nothing, _schemaDescription = Nothing, _schemaRequired = [], _schemaNullable = Nothing, _schemaAllOf = Nothing, _schemaOneOf = Nothing, _schemaNot = Nothing, _schemaAnyOf = Nothing, _schemaProperties = fromList [], _schemaAdditionalProperties = Nothing, _schemaDiscriminator = Nothing, _schemaReadOnly = Nothing, _schemaWriteOnly = Nothing, _schemaXml = Nothing, _schemaExternalDocs = Nothing, _schemaExample = Nothing, _schemaDeprecated = Nothing, _schemaMaxProperties = Nothing, _schemaMinProperties = Nothing, _schemaDefault = Nothing, _schemaType = Just OpenApiInteger, _schemaFormat = Nothing, _schemaItems = Nothing, _schemaMaximum = Nothing, _schemaExclusiveMaximum = Nothing, _schemaMinimum = Nothing, _schemaExclusiveMinimum = Nothing, _schemaMaxLength = Nothing, _schemaMinLength = Nothing, _schemaPattern = Nothing, _schemaMaxItems = Nothing, _schemaMinItems = Nothing, _schemaUniqueItems = Nothing, _schemaEnum = Nothing, _schemaMultipleOf = Nothing}))), _schemaDiscriminator = Nothing, _schemaReadOnly = Nothing, _schemaWriteOnly = Nothing, _schemaXml = Nothing, _schemaExternalDocs = Nothing, _schemaExample = Just (Object (fromList [("ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.474f4c44",Number 101.0),("lovelace",Number 22.0)])), _schemaDeprecated = Nothing, _schemaMaxProperties = Nothing, _schemaMinProperties = Nothing, _schemaDefault = Nothing, _schemaType = Just OpenApiObject, _schemaFormat = Nothing, _schemaItems = Nothing, _schemaMaximum = Nothing, _schemaExclusiveMaximum = Nothing, _schemaMinimum = Nothing, _schemaExclusiveMinimum = Nothing, _schemaMaxLength = Nothing, _schemaMinLength = Nothing, _schemaPattern = Nothing, _schemaMaxItems = Nothing, _schemaMinItems = Nothing, _schemaUniqueItems = Nothing, _schemaEnum = Nothing, _schemaMultipleOf = Nothing}})
+-- >>> LBS8.putStrLn $ Aeson.encode (OpenApi.toSchema (Proxy :: Proxy GYValue))
+-- {"additionalProperties":{"type":"integer"},"description":"A multi asset quantity, represented as map where each key represents an asset: policy ID and token name in hex concatenated by a dot.","example":{"ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.474f4c44":101,"lovelace":22},"type":"object"}
 --
 instance OpenApi.ToSchema GYValue where
   declareNamedSchema _ = do
     integerSchema <- OpenApi.declareSchemaRef @Integer Proxy
-    let OpenApi.NamedSchema mName openApiSchema = swaggerToOpenApiSchema (Proxy @GYValue)
+    let OpenApi.NamedSchema mName openApiSchema = fromOpenApi2Schema (Proxy @GYValue)
         modifiedSchema = openApiSchema
                          & OpenApi.additionalProperties ?~ OpenApi.AdditionalPropertiesSchema integerSchema
     pure $ OpenApi.NamedSchema mName modifiedSchema
@@ -444,7 +444,7 @@ instance Aeson.FromJSONKey GYAssetClass where
     fromJSONKey = Aeson.FromJSONKeyTextParser (either (fail . show) pure . Web.parseUrlPiece)
 
 instance OpenApi.ToSchema GYAssetClass where
-  declareNamedSchema p = pure $ swaggerToOpenApiSchema' "GYAssetClass" p
+  declareNamedSchema p = pure $ fromOpenApi2Schema' "GYAssetClass" p
 
 instance Swagger.ToParamSchema GYAssetClass where
   toParamSchema _ = mempty
@@ -650,7 +650,7 @@ instance IsString GYTokenName where
         bs = fromString s -- TODO: utf8-encode #33 (https://github.com/geniusyield/atlas/issues/33)
 
 instance OpenApi.ToSchema GYTokenName where
-  declareNamedSchema _ = pure $ swaggerToOpenApiSchema' "GYTokenName" (Proxy @GYTokenName)
+  declareNamedSchema _ = pure $ fromOpenApi2Schema' "GYTokenName" (Proxy @GYTokenName)
 
 instance Swagger.ToParamSchema GYTokenName where
   toParamSchema _ = mempty

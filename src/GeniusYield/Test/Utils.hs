@@ -174,8 +174,7 @@ fakeIron = fromFakeCoin $ FakeCoin "Iron"
 mkTestFor :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
 mkTestFor name action =
     testNoErrorsTraceClb v w Clb.defaultBabbage name $ do
-      asClb pureGen TODO $ action wallets
-
+      asClb pureGen (w1 wallets) $ action wallets
   where
     v = valueFromLovelace 1_000_000_000_000_000 <>
         fakeGold                  1_000_000_000 <>
@@ -247,13 +246,12 @@ findLockedUtxosInBody :: Num a => GYAddress -> Clb.OnChainTx -> Maybe [a]
 findLockedUtxosInBody addr tx =
   let
     os = toList . StrictSeq.fromStrict . fmap sizedValue . btbOutputs . body . extractTx $ Clb.getOnChainTx tx
-    findAllMatches (_    , []                             , acc) = Just acc
-    findAllMatches (index, txOut : os', acc) = either
-        (const Nothing)
-        (\addr'' -> if addr'' == addr
+    findAllMatches (_, [], acc) = Just acc
+    findAllMatches (index, txOut : os', acc) =
+        let txOutAddr = addressFromApi . Api.S.fromShelleyAddrToAny . either id decompactAddr $ getEitherAddrBabbageTxOut txOut
+        in if txOutAddr == addr
             then findAllMatches (index + 1, os', index : acc)
-            else findAllMatches (index + 1, os', acc))
-        (addressFromApi . Api.S.fromShelleyAddrToAny . decompactAddr <$> getEitherAddrBabbageTxOut txOut)
+            else findAllMatches (index + 1, os', acc)
   in
     findAllMatches (0, os, [])
 
@@ -266,10 +264,9 @@ utxosInBody tx txId = do
 addRefScript :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadClb (Maybe GYTxOutRef)
 addRefScript addr script = do
     let script' = validatorToScript script
-    (tx, txId) <- sendSkeleton' (mustHaveOutput (mkGYTxOutNoDatum addr mempty) { gyTxOutRefS = Just $ GYPlutusScript script' })
+    (tx, txId) <- sendSkeleton' (mustHaveOutput (mkGYTxOutNoDatum addr mempty) { gyTxOutRefS = Just $ GYPlutusScript script' }) []
     let outputs = btbOutputs $ body $ extractTx $ Clb.getOnChainTx tx
 
-    -- TODO: factor out
     let index = StrictSeq.findIndexL
             (\o ->
                 let lsh = fmap (apiHashToPlutus . Api.ScriptHash) $ L.hashScript <$> (sizedValue o ^. referenceScriptBabbageTxOutL)
@@ -288,13 +285,14 @@ addRefInput toInline addr dat = do
         (mustHaveOutput
             $ GYTxOut addr mempty (Just (dat, if toInline then GYTxOutUseInlineDatum else GYTxOutDontUseInlineDatum)) Nothing
         )
+        []
     let outputs = btbOutputs $ body $ extractTx $ Clb.getOnChainTx tx
 
     outputsWithResolvedDatums <- mapM
-            (\o ->
-                resolveDatumFromLedger $ sizedValue o ^. datumBabbageTxOutL
-            )
-            outputs
+        (\o ->
+            resolveDatumFromLedger $ sizedValue o ^. datumBabbageTxOutL
+        )
+        outputs
     let mIndex = StrictSeq.findIndexL (\d -> Just dat == d) outputsWithResolvedDatums
     pure $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< mIndex
 

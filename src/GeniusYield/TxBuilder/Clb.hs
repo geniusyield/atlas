@@ -17,10 +17,9 @@ module GeniusYield.TxBuilder.Clb
     , asClb
     , asRandClb
     , liftClb
-    -- , ownAddress
+    , ownAddress
     , sendSkeleton
     , sendSkeleton'
-    -- , networkIdRun
     , dumpUtxoState
     , mustFail
     ) where
@@ -52,7 +51,11 @@ import qualified PlutusLedgerApi.V2                        as Plutus
 import qualified PlutusTx.Builtins.Internal                as Plutus
 import           Data.Sequence                             (ViewR (..), viewr)
 import           GeniusYield.Imports
-import           GeniusYield.Transaction                   (GYCoinSelectionStrategy (GYRandomImproveMultiAsset), BuildTxException (BuildTxBalancingError), BalancingError(BalancingErrorInsufficientFunds))
+import           GeniusYield.Transaction                   (
+    GYCoinSelectionStrategy (GYRandomImproveMultiAsset),
+    BuildTxException (BuildTxBalancingError),
+    BalancingError(BalancingErrorInsufficientFunds)
+    )
 import           GeniusYield.Transaction.Common            (adjustTxOut,
                                                             minimumUTxO)
 import           GeniusYield.TxBuilder.Class
@@ -85,6 +88,7 @@ import Clb (
   ClbT,
   ClbState (..),
 
+  getCurrentSlot,
   txOutRefAt,
   txOutRefAtPaymentCred,
 
@@ -163,10 +167,10 @@ asClb :: StdGen
       -> Clb (Maybe a)
 asClb g w m = evalRandT (asRandClb w m) g
 
--- ownAddress :: GYTxMonadClb GYAddress
--- ownAddress = do
---     nid <- networkId
---     asks $ addressFromPubKeyHash nid . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
+ownAddress :: GYTxMonadClb GYAddress
+ownAddress = do
+    nid <- networkId
+    asks $ addressFromPubKeyHash nid . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
 
 liftClb :: Clb a -> GYTxMonadClb a
 liftClb = GYTxMonadClb . lift . lift . lift . lift
@@ -267,13 +271,9 @@ instance GYTxQueryMonad GYTxMonadClb where
         return $ do
             o <- Map.lookup (txOutRefToPlutus ref) m
 
-            -- FIXME: rightToMaybe
-            a <- addressFromApi . Api.S.fromShelleyAddrToAny . decompactAddr <$> rightToMaybe (o ^. L.addrEitherBabbageTxOutL)
+            let a = addressFromApi . Api.S.fromShelleyAddrToAny . either id decompactAddr $ o ^. L.addrEitherBabbageTxOutL
+                v = valueFromApi . ApiS.fromMaryValue . either id L.fromCompact $ o ^. L.valueEitherBabbageTxOutL
 
-            -- FIXME: rightToMaybe
-            v <- valueFromApi . ApiS.fromMaryValue . L.fromCompact <$> rightToMaybe (o ^. L.valueEitherBabbageTxOutL)
-
-            -- FIXME: fromJust
             d <- case o ^. L.datumBabbageTxOutL of
                 L.NoDatum -> pure GYOutDatumNone
                 L.DatumHash dh -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus $ L.transDataHash dh)
@@ -302,12 +302,7 @@ instance GYTxQueryMonad GYTxMonadClb where
         (zero, len) <- slotConfig'
         return $ simpleSlotConfig zero len
 
-    -- TODO: Make it actually the last seen block's slot.
-    slotOfCurrentBlock = do
-        s <- undefined -- FIXME: liftClb $ Fork.getSlot <$> Plutus.Model.currentSlot
-        case slotFromInteger s of
-            Nothing -> throwError $ GYConversionException $ GYInvalidSlot s
-            Just s' -> return s'
+    slotOfCurrentBlock = liftClb $ slotFromApi <$> Clb.getCurrentSlot
 
     logMsg _ns s msg = do
         -- let doc = lines msg
@@ -322,7 +317,7 @@ instance GYTxMonad GYTxMonadClb where
 
     ownAddresses = singleton <$> do
         nid <- networkId
-        asks $ addressFromPubKeyHash nid . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
+        asks $ addressFromPaymentKeyHash nid . paymentKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
 
     availableUTxOs = do
         addrs <- ownAddresses
@@ -344,24 +339,18 @@ instance GYTxMonad GYTxMonadClb where
     randSeed = return 42
 
 sendSkeleton :: GYTxSkeleton v -> GYTxMonadClb GYTxId
-sendSkeleton skeleton = snd <$> sendSkeleton' skeleton
+sendSkeleton skeleton = snd <$> sendSkeleton' skeleton []
 
-sendSkeleton' :: GYTxSkeleton v -> GYTxMonadClb (OnChainTx, GYTxId)
-sendSkeleton' skeleton = do
-    -- Tx body
+sendSkeleton' :: GYTxSkeleton v -> [Wallet] -> GYTxMonadClb (OnChainTx, GYTxId)
+sendSkeleton' skeleton ws = do
+    w <- asks runEnvWallet
+    let sigs = map walletPaymentSigningKey $ w : ws
     body <- skeletonToTxBody skeleton
+    pp <- protocolParameters
+    modify (updateWalletState w pp body)
     dumpBody body
 
-    -- FIXME: not needed now?
-    -- pp <- protocolParameters
-    -- modify (updateWalletState w pp body)
-    -- signature
-    -- let sigs = walletSignatures (w:ws)
-
-    -- Sign tx
-    -- TODO: support multi-sigs
-    Wallet{walletPaymentSigningKey} <- asks runEnvWallet
-    let tx = signGYTxBody body [walletPaymentSigningKey]
+    let tx = signGYTxBody body sigs
     gyLogDebug' "" $ "encoded tx: " <> txToHex tx
 
     -- Submit
@@ -371,6 +360,21 @@ sendSkeleton' skeleton = do
         Fail _ err -> fail $ show err
 
   where
+    -- Updates the wallet state.
+    -- Updates extra lovelace required for fees & minimum ada requirements against the wallet sending this transaction.
+    updateWalletState :: Wallet -> AlonzoCore.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra) -> GYTxBody -> GYTxRunState -> GYTxRunState
+    updateWalletState w@Wallet {..} pp body GYTxRunState {..} = GYTxRunState $ Map.insertWith mappend walletName v walletExtraLovelace
+      where
+        v = ( coerce $ txBodyFee body
+            , coerce $ flip valueAssetClass GYLovelace $
+                foldMap'
+                  (\o ->
+                    -- If this additional ada is coming back to one's own self, we need not account for it.
+                    if gyTxOutAddress o == walletAddress w then
+                      mempty
+                    else gyTxOutValue (adjustTxOut (minimumUTxO pp) o) `valueMinus` gyTxOutValue o
+                  ) $ gytxOuts skeleton
+            )
 
     -- TODO: use Prettyprinter
     dumpBody :: GYTxBody -> GYTxMonadClb ()
@@ -401,23 +405,23 @@ sendSkeleton' skeleton = do
                              printf "   datum:      %s\n"   (show utxoOutDatum) <>
                              printf "   ref script: %s\n\n" (show utxoRefScript)
 
-    skeletonToTxBody :: GYTxSkeleton v -> GYTxMonadClb GYTxBody
-    skeletonToTxBody skeleton = do
-        ss <- systemStart
-        eh <- eraHistory
-        pp <- protocolParameters
-        ps <- stakePools
+skeletonToTxBody :: GYTxSkeleton v -> GYTxMonadClb GYTxBody
+skeletonToTxBody skeleton = do
+    ss <- systemStart
+    eh <- eraHistory
+    pp <- protocolParameters
+    ps <- stakePools
 
-        addr        <- (!! 0) <$> ownAddresses -- FIXME
-        e <- buildTxCore ss eh pp ps GYRandomImproveMultiAsset (const id) [addr] addr Nothing (return [Identity skeleton])
-        case e of
-            Left err  -> throwAppError err
-            Right res -> case res of
-                GYTxBuildSuccess (Identity body :| _) -> return body
-                GYTxBuildFailure (BalancingErrorInsufficientFunds v) -> throwAppError . BuildTxBalancingError $ BalancingErrorInsufficientFunds v
-                GYTxBuildFailure _                    -> error "impossible case"
-                GYTxBuildPartialSuccess _ _           -> error "impossible case"
-                GYTxBuildNoInputs                     -> error "impossible case"
+    addr        <- ownAddress
+    e <- buildTxCore ss eh pp ps GYRandomImproveMultiAsset (const id) [addr] addr Nothing (return [Identity skeleton])
+    case e of
+        Left err  -> throwAppError err
+        Right res -> case res of
+            GYTxBuildSuccess (Identity body :| _) -> return body
+            GYTxBuildFailure (BalancingErrorInsufficientFunds v) -> throwAppError . BuildTxBalancingError $ BalancingErrorInsufficientFunds v
+            GYTxBuildFailure _                    -> error "impossible case"
+            GYTxBuildPartialSuccess _ _           -> error "impossible case"
+            GYTxBuildNoInputs                     -> error "impossible case"
 
 slotConfig' :: GYTxMonadClb (UTCTime, NominalDiffTime)
 slotConfig' = liftClb $ do

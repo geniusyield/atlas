@@ -67,12 +67,12 @@ refInputTrace :: Bool -> Integer -> Integer -> Wallets -> GYTxMonadClb ()
 refInputTrace toInline actual guess Wallets{..} = do
   let myGuess :: Integer = guess
       outValue :: GYValue = valueFromLovelace 20_000_000
-  mMOref <- runWalletGYClb w1 $ addRefInput toInline (walletAddress w9) (datumFromPlutusData (RefInputDatum actual))
+  mMOref <- runWallet w1 $ addRefInput toInline (walletAddress w9) (datumFromPlutusData (RefInputDatum actual))
   case mMOref of
     Nothing -> fail "Unable to create utxo to reference"
     Just Nothing -> fail "Couldn't find index for reference utxo in outputs"
     Just (Just refInputORef) ->
-      void $ runWalletGYClb w1 $ withWalletBalancesCheckSimple [w1 := valueFromLovelace 0] $ do
+      void $ runWallet w1 $ withWalletBalancesCheckSimple [w1 := valueFromLovelace 0] $ do
         -- liftClb $ logInfo $ printf "Reference input ORef %s" refInputORef
         addr <- scriptAddress gyGuessRefInputDatumValidator
         (tx, txId) <- sendSkeleton' (mustHaveOutput $ mkGYTxOut addr outValue (datumFromPlutusData ())) []
@@ -87,7 +87,7 @@ refInputTrace toInline actual guess Wallets{..} = do
 tryRefInputConsume :: Wallets -> GYTxMonadClb ()
 tryRefInputConsume Wallets{..} = do
   -- Approach: Create a new output with 60% of total ada. Mark this UTxO as reference input and try sending this same 60%, or any amount greater than 40% of this original balance. Since coin balancer can't consume this UTxO, it won't be able to build for it.
-  void $ runWalletGYClb w1 $ do
+  void $ runWallet w1 $ do
     walletBalance <- balance w1
     let walletLovelaceBalance = fst $ valueSplitAda walletBalance
         lovelaceToSend = (walletLovelaceBalance `div` 10) * 6  -- send 60% of total ada

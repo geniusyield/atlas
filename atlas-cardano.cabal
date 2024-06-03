@@ -84,6 +84,8 @@ library
     GeniusYield.ReadJSON
     GeniusYield.Scripts.TestToken
     GeniusYield.Swagger.Utils
+    GeniusYield.Test.Address
+    GeniusYield.Test.FakeCoin
     GeniusYield.Test.Privnet.Asserts
     GeniusYield.Test.Privnet.Ctx
     GeniusYield.Test.Privnet.Examples
@@ -94,7 +96,6 @@ library
     GeniusYield.Test.Privnet.Paths
     GeniusYield.Test.Privnet.Setup
     GeniusYield.Test.Privnet.Utils
-    GeniusYield.Test.Address
     GeniusYield.Test.Utils
     GeniusYield.Transaction
     GeniusYield.Transaction.CBOR

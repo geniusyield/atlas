@@ -47,13 +47,13 @@ module GeniusYield.TxBuilder.Class
     , advanceSlot'
     , utxosDatums
     , utxosDatumsPure
-    , utxosDatumsPure'
+    , utxosDatumsPureWithOriginalDatum
     , utxoDatum
     , utxoDatumPure
     , utxoDatumPureWithOriginalDatum
     , utxoDatumHushed
     , utxoDatumPureHushed
-    , utxoDatumPureHushed'
+    , utxoDatumPureHushedWithOriginalDatum
     , utxoDatum'
     , utxoDatumPure'
     , utxoDatumPureWithOriginalDatum'
@@ -599,8 +599,8 @@ utxosDatumsPure :: Plutus.FromData a => [(GYUTxO, Maybe GYDatum)] -> Map GYTxOut
 utxosDatumsPure = Map.fromList . mapMaybe utxoDatumPureHushed
 
 -- | Like `utxosDatumsPure` but also returns original raw `GYDatum`.
-utxosDatumsPure' :: Plutus.FromData a => [(GYUTxO, Maybe GYDatum)] -> Map GYTxOutRef (GYAddress, GYValue, a, GYDatum)
-utxosDatumsPure' = Map.fromList . mapMaybe utxoDatumPureHushed'
+utxosDatumsPureWithOriginalDatum :: Plutus.FromData a => [(GYUTxO, Maybe GYDatum)] -> Map GYTxOutRef (GYAddress, GYValue, a, GYDatum)
+utxosDatumsPureWithOriginalDatum = Map.fromList . mapMaybe utxoDatumPureHushedWithOriginalDatum
 
 utxoDatum :: (GYTxQueryMonad m, Plutus.FromData a) => GYUTxO -> m (Either GYQueryDatumError (GYAddress, GYValue, a))
 utxoDatum utxo = case utxoOutDatum utxo of
@@ -623,9 +623,9 @@ utxoDatumPureHushed (GYUTxO {..}, Just d) =
   datumToPlutus' d & Plutus.fromBuiltinData <&> \d' -> (utxoRef, (utxoAddress, utxoValue, d'))
 
 -- | Like `utxoDatumPureHushed` but also returns original raw `GYDatum`.
-utxoDatumPureHushed' :: Plutus.FromData a => (GYUTxO, Maybe GYDatum) -> Maybe (GYTxOutRef, (GYAddress, GYValue, a, GYDatum))
-utxoDatumPureHushed' (_utxo, Nothing) = Nothing
-utxoDatumPureHushed' (GYUTxO {..}, Just d) =
+utxoDatumPureHushedWithOriginalDatum :: Plutus.FromData a => (GYUTxO, Maybe GYDatum) -> Maybe (GYTxOutRef, (GYAddress, GYValue, a, GYDatum))
+utxoDatumPureHushedWithOriginalDatum (_utxo, Nothing) = Nothing
+utxoDatumPureHushedWithOriginalDatum (GYUTxO {..}, Just d) =
   datumToPlutus' d & Plutus.fromBuiltinData <&> \d' -> (utxoRef, (utxoAddress, utxoValue, d', d))
 
 -- | Pure variant of `utxoDatum`.

@@ -50,11 +50,13 @@ module GeniusYield.TxBuilder.Class
     , utxosDatumsPure'
     , utxoDatum
     , utxoDatumPure
+    , utxoDatumPureWithOriginalDatum
     , utxoDatumHushed
     , utxoDatumPureHushed
     , utxoDatumPureHushed'
     , utxoDatum'
     , utxoDatumPure'
+    , utxoDatumPureWithOriginalDatum'
     , mustHaveInput
     , mustHaveRefInput
     , mustHaveOutput
@@ -634,6 +636,14 @@ utxoDatumPure (GYUTxO {..}, Just d) =
     Nothing -> Left $ GYInvalidDatum d
     Just a  -> Right (utxoAddress, utxoValue, a)
 
+-- | Like `utxoDatumPure` but also returns original raw datum.
+utxoDatumPureWithOriginalDatum :: Plutus.FromData a => (GYUTxO, Maybe GYDatum) -> Either GYQueryDatumError (GYAddress, GYValue, a, GYDatum)
+utxoDatumPureWithOriginalDatum (utxo, Nothing) = Left $ GYNoDatumHash utxo
+utxoDatumPureWithOriginalDatum (GYUTxO {..}, Just d) =
+  case Plutus.fromBuiltinData $ datumToPlutus' d of
+    Nothing -> Left $ GYInvalidDatum d
+    Just a  -> Right (utxoAddress, utxoValue, a, d)
+
 -- | Version of 'utxoDatum' that throws 'GYTxMonadException'.
 utxoDatum' :: (GYTxQueryMonad m, Plutus.FromData a) => GYUTxO -> m (GYAddress, GYValue, a)
 utxoDatum' utxo = do
@@ -644,6 +654,12 @@ utxoDatum' utxo = do
 utxoDatumPure' :: (MonadError GYTxMonadException m, Plutus.FromData a) => (GYUTxO, Maybe GYDatum) -> m (GYAddress, GYValue, a)
 utxoDatumPure' utxoWithDatum = do
     let x = utxoDatumPure utxoWithDatum
+    liftEither $ first GYQueryDatumException x
+
+-- | Like `utxoDatumPure'` but also returns original raw datum.
+utxoDatumPureWithOriginalDatum' :: (MonadError GYTxMonadException m, Plutus.FromData a) => (GYUTxO, Maybe GYDatum) -> m (GYAddress, GYValue, a, GYDatum)
+utxoDatumPureWithOriginalDatum' utxoWithDatum = do
+    let x = utxoDatumPureWithOriginalDatum utxoWithDatum
     liftEither $ first GYQueryDatumException x
 
 utxoDatumHushed :: (GYTxQueryMonad m, Plutus.FromData a) => GYUTxO -> m (Maybe (GYAddress, GYValue, a))

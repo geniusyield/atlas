@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# LANGUAGE LambdaCase #-}
+
 {-|
 Module      : GeniusYield.TxBuilder.Run
 Copyright   : (c) 2023 GYELD GMBH
@@ -11,104 +11,75 @@ Stability   : develop
 module GeniusYield.TxBuilder.Clb
     ( Wallet (..)
     , WalletName
-    , walletAddress
     , GYTxRunState (..)
     , GYTxMonadClb
+    , walletAddress
     , asClb
     , asRandClb
     , liftClb
     , ownAddress
     , sendSkeleton
     , sendSkeleton'
+    , sendSkeletonWithWallets
     , dumpUtxoState
     , mustFail
+    , getNetworkId
     ) where
 
-import qualified Cardano.Api                               as Api
-import qualified Cardano.Api.Shelley                       as Api.S
-import qualified Cardano.Ledger.Alonzo.Language            as Ledger
-import qualified Cardano.Ledger.BaseTypes                  as Ledger
-import           Cardano.Slotting.Time                     (RelativeTime (RelativeTime),
-                                                            mkSlotLength)
+import           Control.Lens                              ((^.))
 import           Control.Monad.Except
 import           Control.Monad.Random
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.Foldable                             (foldMap')
-import           Data.List                                 (singleton, (\\))
+import           Data.List                                 (singleton)
 import           Data.List.NonEmpty                        (NonEmpty (..))
 import qualified Data.Map.Strict                           as Map
 import           Data.Semigroup                            (Sum (..))
+import qualified Data.Sequence                             as Seq
 import qualified Data.Set                                  as Set
 import           Data.SOP.NonEmpty                         (NonEmpty (NonEmptyCons, NonEmptyOne))
 import           Data.Time.Clock                           (NominalDiffTime,
                                                             UTCTime)
 import           Data.Time.Clock.POSIX                     (posixSecondsToUTCTime)
+
+import qualified Cardano.Api                               as Api
+import qualified Cardano.Api.Script                        as Api
+import qualified Cardano.Api.Shelley                       as Api.S
+import qualified Cardano.Ledger.Address                    as L
+import qualified Cardano.Ledger.Alonzo.Core                as AlonzoCore
+import qualified Cardano.Ledger.Api                        as L
+import qualified Cardano.Ledger.Babbage.TxOut              as L
+import qualified Cardano.Ledger.Compactible                as L
+import qualified Cardano.Ledger.Plutus.TxInfo              as L
+import qualified Cardano.Ledger.Shelley.API                as L.S
+import qualified Cardano.Ledger.UTxO                       as L
+import           Cardano.Slotting.Time                     (RelativeTime (RelativeTime),
+                                                            mkSlotLength)
+import           Clb                                       (ClbState (..), ClbT, EmulatedLedgerState (..),
+                                                            Log (Log), LogEntry (LogEntry), LogLevel (..),
+                                                            MockConfig(..), OnChainTx, SlotConfig(..),
+                                                            ValidationResult (..), getCurrentSlot, txOutRefAt,
+                                                            txOutRefAtPaymentCred, sendTx, fromLog, unLog, getFails,
+                                                            logInfo, logError)
+import qualified Clb                                       (dumpUtxoState)
 import qualified Ouroboros.Consensus.Cardano.Block         as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History      as Ouroboros
-import qualified PlutusLedgerApi.V1.Interval               as Plutus
 import qualified PlutusLedgerApi.V2                        as Plutus
-import qualified PlutusTx.Builtins.Internal                as Plutus
-import           Data.Sequence                             (ViewR (..), viewr)
+
 import           GeniusYield.Imports
-import           GeniusYield.Transaction                   (
-    GYCoinSelectionStrategy (GYRandomImproveMultiAsset),
-    BuildTxException (BuildTxBalancingError),
-    BalancingError(BalancingErrorInsufficientFunds)
-    )
+import           GeniusYield.Transaction                   (GYCoinSelectionStrategy (GYRandomImproveMultiAsset),
+                                                            BuildTxException (BuildTxBalancingError),
+                                                            BalancingError(BalancingErrorInsufficientFunds))
 import           GeniusYield.Transaction.Common            (adjustTxOut,
                                                             minimumUTxO)
+import           GeniusYield.Test.Address
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
 
-import Cardano.Api (ShelleyBasedEra(ShelleyBasedEraBabbage))
-import Cardano.Api.Script (fromShelleyBasedScript, fromShelleyScriptToReferenceScript)
-import Cardano.Api.Shelley qualified as ApiS
-import Cardano.Ledger.Address (unCompactAddr, decompactAddr)
-import Cardano.Ledger.Api (binaryDataToData, getPlutusData)
-import Cardano.Ledger.Plutus.TxInfo qualified as L
-import Cardano.Ledger.Babbage.TxOut qualified as L
-import Cardano.Ledger.Plutus.Data qualified as L
-import qualified Cardano.Ledger.Alonzo.Core           as AlonzoCore
-import Cardano.Ledger.BaseTypes (SlotNo, StrictMaybe (SJust, SNothing))
-import Cardano.Ledger.Compactible qualified as L
-import Cardano.Ledger.Shelley.API (LedgerState(..), UTxOState (utxosUtxo), StakeReference (..))
-import Cardano.Ledger.UTxO (UTxO(..))
-import Control.Lens ((^.))
-import Data.Maybe (fromJust)
-import Data.Sequence qualified as Seq
-import Clb (
-  PParams(..),
-  SlotConfig(..),
-  MockConfig(..),
-  EmulatedLedgerState (..),
-
-  ClbT,
-  ClbState (..),
-
-  getCurrentSlot,
-  txOutRefAt,
-  txOutRefAtPaymentCred,
-
-  sendTx,
-  ValidationResult (..),
-  OnChainTx,
-
-  LogEntry (LogEntry),
-  LogLevel (..),
-  Log (Log),
-  fromLog,
-  unLog,
-  getFails,
-  logInfo,
-  logError,
- )
-import Clb qualified (dumpUtxoState)
-import PlutusLedgerApi.V2 qualified as PV2
-import GeniusYield.Test.Address
-
+-- FIXME: Fix this type synonym upstream.
 type Clb = ClbT Identity
 
 type WalletName = String
@@ -121,16 +92,13 @@ data Wallet = Wallet
     }
     deriving (Show, Eq, Ord)
 
-instance HasAddress Wallet where
-    toAddress = addressToPlutus . walletAddress
-
 -- | Gets a GYAddress of a testing wallet.
 walletAddress :: Wallet -> GYAddress
-walletAddress Wallet{..} = addressFromPubKeyHash walletNetworkId $ pubKeyHash $
+walletAddress Wallet{..} = addressFromPaymentKeyHash walletNetworkId $ paymentKeyHash $
                            paymentVerificationKey walletPaymentSigningKey
 
--- instance HasAddress Wallet where
---     toAddress = addressToPlutus . walletAddress
+instance HasAddress Wallet where
+    toAddress = addressToPlutus . walletAddress
 
 newtype GYTxRunEnv = GYTxRunEnv { runEnvWallet :: Wallet }
 
@@ -170,7 +138,7 @@ asClb g w m = evalRandT (asRandClb w m) g
 ownAddress :: GYTxMonadClb GYAddress
 ownAddress = do
     nid <- networkId
-    asks $ addressFromPubKeyHash nid . pubKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
+    asks $ addressFromPaymentKeyHash nid . paymentKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
 
 liftClb :: Clb a -> GYTxMonadClb a
 liftClb = GYTxMonadClb . lift . lift . lift . lift
@@ -264,15 +232,15 @@ instance GYTxQueryMonad GYTxMonadClb where
 
     utxoAtTxOutRef ref = do
         -- All UTxOs map
-        utxos <- liftClb $ gets (unUTxO . utxosUtxo . lsUTxOState . _memPoolState . emulatedLedgerState)
+        utxos <- liftClb $ gets (L.unUTxO . L.S.utxosUtxo . L.S.lsUTxOState . _memPoolState . emulatedLedgerState)
         -- Maps keys to Plutus TxOutRef
         let m = Map.mapKeys (txOutRefToPlutus . txOutRefFromApi . Api.S.fromShelleyTxIn) utxos
 
         return $ do
             o <- Map.lookup (txOutRefToPlutus ref) m
 
-            let a = addressFromApi . Api.S.fromShelleyAddrToAny . either id decompactAddr $ o ^. L.addrEitherBabbageTxOutL
-                v = valueFromApi . ApiS.fromMaryValue . either id L.fromCompact $ o ^. L.valueEitherBabbageTxOutL
+            let a = addressFromApi . Api.S.fromShelleyAddrToAny . either id L.decompactAddr $ o ^. L.addrEitherBabbageTxOutL
+                v = valueFromApi . Api.S.fromMaryValue . either id L.fromCompact $ o ^. L.valueEitherBabbageTxOutL
 
             d <- case o ^. L.datumBabbageTxOutL of
                 L.NoDatum -> pure GYOutDatumNone
@@ -280,15 +248,16 @@ instance GYTxQueryMonad GYTxMonadClb where
                 L.Datum binaryData -> pure $
                     GYOutDatumInline
                     . datumFromPlutus
-                    . PV2.Datum
-                    . PV2.dataToBuiltinData
-                    . getPlutusData
-                    . binaryDataToData
+                    . Plutus.Datum
+                    . Plutus.dataToBuiltinData
+                    . L.getPlutusData
+                    . L.binaryDataToData
                     $ binaryData
 
             let s = case o ^. L.referenceScriptBabbageTxOutL of
-                        SJust x  -> someScriptFromReferenceApi $ fromShelleyScriptToReferenceScript ShelleyBasedEraBabbage x
-                        SNothing -> Nothing
+                        L.S.SJust x  -> someScriptFromReferenceApi
+                                        $ Api.fromShelleyScriptToReferenceScript Api.ShelleyBasedEraBabbage x
+                        L.S.SNothing -> Nothing
 
             return GYUTxO
                 { utxoRef       = ref
@@ -297,6 +266,8 @@ instance GYTxQueryMonad GYTxMonadClb where
                 , utxoOutDatum  = d
                 , utxoRefScript = s
                 }
+
+    stakeAddressInfo = const $ pure Nothing
 
     slotConfig = do
         (zero, len) <- slotConfig'
@@ -337,6 +308,10 @@ instance GYTxMonad GYTxMonadClb where
               Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
 
     randSeed = return 42
+
+-- Send skeletons with multiple signatures from wallet
+sendSkeletonWithWallets :: GYTxSkeleton v -> [Wallet] -> GYTxMonadClb GYTxId
+sendSkeletonWithWallets skeleton ws = snd <$> sendSkeleton' skeleton ws
 
 sendSkeleton :: GYTxSkeleton v -> GYTxMonadClb GYTxId
 sendSkeleton skeleton = snd <$> sendSkeleton' skeleton []
@@ -445,7 +420,7 @@ stakePools = pure Set.empty
 --     pids <- liftClb $ gets $ Map.keys . stake'pools . mockStake
 --     foldM f Set.empty pids
 --   where
---     f :: Set Api.S.PoolId -> PoolId -> GYTxMonadClb (Set Api.S.PoolId)
+--     f :: Set Api.S.PoolId -> Api.S.PoolId -> GYTxMonadClb (Set Api.S.PoolId)
 --     f s pid = either
 --         (\e -> throwError $ GYConversionException $ GYLedgerToCardanoError $ DeserialiseRawBytesError ("stakePools, error: " <> fromString (show e)))
 --         (\pid' -> return $ Set.insert pid' s)

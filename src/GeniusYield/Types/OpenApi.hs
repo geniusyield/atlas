@@ -68,3 +68,6 @@ convertNamedSchema (Swagger.NamedSchema name swaggerSchema) =
 
 instance {-# OVERLAPPABLE #-} (Swagger.ToSchema a, Typeable a) => OpenApi.ToSchema a where
   declareNamedSchema p = pure $ convertNamedSchema (Swagger.toNamedSchema p)
+
+instance {-# OVERLAPPABLE #-} Swagger.ToSchema a => OpenApi.ToParamSchema a where
+  toParamSchema p = liftSwaggerSchema $ Swagger.toSchema p

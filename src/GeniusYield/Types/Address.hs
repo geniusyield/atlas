@@ -62,8 +62,6 @@ import           Control.Lens                         ((?~))
 import qualified Data.Aeson.Types                     as Aeson
 import qualified Data.Csv                             as Csv
 import           Data.Hashable                        (Hashable (..))
-import qualified Data.OpenApi                         as OpenApi
-import           Data.OpenApi                         (ToSchema(..))
 import qualified Data.Swagger                         as Swagger
 import qualified Data.Swagger.Internal.Schema         as Swagger
 import qualified Data.Swagger.Lens                    ()
@@ -98,7 +96,6 @@ import           GeniusYield.Types.PaymentKeyHash     (GYPaymentKeyHash,
                                                        paymentKeyHashToApi)
 import           GeniusYield.Types.PubKeyHash
 import           GeniusYield.Types.Script
-import           GeniusYield.Swagger.Utils            (fromOpenApi2Schema')
 
 -- $setup
 --
@@ -468,11 +465,8 @@ instance Csv.FromRecord GYAddress where
         _    -> fail $ printf "expected exactly one field, but got: %s" $ show v
 
 -------------------------------------------------------------------------------
--- openapi & swagger schema
+-- swagger schema
 -------------------------------------------------------------------------------
-
-instance OpenApi.ToSchema GYAddress where
-  declareNamedSchema _ = pure $ fromOpenApi2Schema' "GYAddress" (Proxy @GYAddress)
 
 instance Swagger.ToParamSchema GYAddress where
   toParamSchema _ = mempty

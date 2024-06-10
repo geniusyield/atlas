@@ -52,7 +52,6 @@ import qualified Data.ByteString.Base16             as BS16
 import qualified Data.ByteString.Char8              as BS8
 import qualified Data.ByteString.Lazy               as LBS
 import qualified Data.Csv                           as Csv
-import qualified Data.OpenApi                       as OpenApi
 import qualified Data.Set                           as Set
 import qualified Data.Swagger                       as Swagger
 import qualified Data.Swagger.Internal.Schema       as Swagger
@@ -67,7 +66,6 @@ import qualified Web.HttpApiData                    as Web
 
 import           Cardano.Ledger.Core                (eraProtVerHigh)
 import           GeniusYield.Imports
-import           GeniusYield.Swagger.Utils          (fromOpenApi2Schema)
 
 -- $setup
 --
@@ -106,9 +104,6 @@ instance Aeson.FromJSON GYTx where
 --
 instance Aeson.ToJSON GYTx where
     toJSON = Aeson.toJSON . txToHex
-
-instance OpenApi.ToSchema GYTx where
-  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYTx)
 
 instance Swagger.ToSchema GYTx where
     declareNamedSchema _ = pure $ Swagger.named "GYTx" $ mempty
@@ -212,9 +207,6 @@ instance ToJSON GYTxId where
                        $ TE.decodeUtf8
                        $ Api.serialiseToRawBytesHex txid
 
-instance OpenApi.ToSchema GYTxId where
-  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYTxId)
-
 instance Swagger.ToSchema GYTxId where
   declareNamedSchema _ = pure $ Swagger.named "GYTxId" $ mempty
                        & Swagger.example ?~ toJSON ("a8d75b90a052302c1232bedd626720966b1697fe38de556c617c340233688935" :: Text)
@@ -258,8 +250,6 @@ txIdFromPlutus (Plutus.TxId (Plutus.BuiltinByteString bs)) = txIdFromApi <$> Api
 newtype GYTxWitness = GYTxWitness (AlonzoTxWits (Babbage.BabbageEra Crypto.StandardCrypto))
   deriving newtype Show
 
-instance OpenApi.ToSchema GYTxWitness where
-  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYTxWitness)
 
 instance Swagger.ToSchema GYTxWitness where
     declareNamedSchema _ = pure $ Swagger.named "GYTxWitness" $ mempty

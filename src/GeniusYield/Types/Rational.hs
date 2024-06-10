@@ -14,18 +14,14 @@ module GeniusYield.Types.Rational
     , rationalToPlutus
     ) where
 
-import           GeniusYield.Imports
-import           GeniusYield.Swagger.Utils    (fromOpenApi2Schema')
-
 import           Control.Lens                 ((?~))
 import qualified Data.Aeson                   as Aeson
-import qualified Data.OpenApi                 as OpenApi
-import           Data.OpenApi                 (ToSchema(..))
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Swagger.Lens            ()
 import qualified Data.Text                    as Text
 import qualified Data.Text.Read               as Text
+import           GeniusYield.Imports
 import qualified PlutusTx.Ratio               as Plutus
 import qualified Web.HttpApiData              as Web
 import qualified Web.Internal.HttpApiData     as Web
@@ -97,11 +93,8 @@ instance Aeson.FromJSON GYRational where
             Right x  -> return x
 
 -------------------------------------------------------------------------------
--- openapi & swagger schema
+-- swagger schema
 -------------------------------------------------------------------------------
-
-instance OpenApi.ToSchema GYRational where
-  declareNamedSchema p = pure $ fromOpenApi2Schema' "GYRational" p
 
 instance Swagger.ToSchema GYRational where
   declareNamedSchema p = Swagger.plain $ Swagger.paramSchemaToSchema p

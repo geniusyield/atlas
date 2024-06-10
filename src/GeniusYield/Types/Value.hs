@@ -86,8 +86,6 @@ import qualified Data.ByteString                  as BS
 import qualified Data.ByteString.Base16           as Base16
 import qualified Data.ByteString.Lazy             as LBS
 import qualified Data.Map.Strict                  as Map
-import qualified Data.OpenApi                     as OpenApi
-import           Data.OpenApi                     (ToSchema(..))
 import qualified Data.Swagger                     as Swagger
 import qualified Data.Swagger.Internal.Schema     as Swagger
 import qualified Data.Text                        as T
@@ -102,7 +100,6 @@ import           Data.Hashable                    (Hashable (..))
 import qualified GeniusYield.Imports              as TE
 import qualified GeniusYield.Types.Ada            as Ada
 import           GeniusYield.Types.Script
-import           GeniusYield.Swagger.Utils        (fromOpenApi2Schema, fromOpenApi2Schema')
 
 -- $setup
 --
@@ -112,7 +109,6 @@ import           GeniusYield.Swagger.Utils        (fromOpenApi2Schema, fromOpenA
 -- >>> import qualified Data.ByteString.Char8      as BS8
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 -- >>> import qualified Data.Csv                   as Csv
--- >>> import qualified Data.OpenApi               as OpenApi
 -- >>> import           Data.Proxy
 -- >>> import qualified Text.Printf                as Printf
 -- >>> import qualified Web.HttpApiData            as Web
@@ -305,19 +301,6 @@ instance Aeson.FromJSON GYValue where  -- TODO: Do we need this? Can't this be d
             Left d  -> fail $ "Expected amount to be an integer; amount: " <> show d
             Right i -> pure (ac, i)
 
--- |
---
--- >>> LBS8.putStrLn $ Aeson.encode (OpenApi.toSchema (Proxy :: Proxy GYValue))
--- {"additionalProperties":{"type":"integer"},"description":"A multi asset quantity, represented as map where each key represents an asset: policy ID and token name in hex concatenated by a dot.","example":{"ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.474f4c44":101,"lovelace":22},"type":"object"}
---
-instance OpenApi.ToSchema GYValue where
-  declareNamedSchema _ = do
-    integerSchema <- OpenApi.declareSchemaRef @Integer Proxy
-    let OpenApi.NamedSchema mName openApiSchema = fromOpenApi2Schema (Proxy @GYValue)
-        modifiedSchema = openApiSchema
-                         & OpenApi.additionalProperties ?~ OpenApi.AdditionalPropertiesSchema integerSchema
-    pure $ OpenApi.NamedSchema mName modifiedSchema
-
 instance Swagger.ToSchema GYValue where
     declareNamedSchema _ = do
         integerSchema <- Swagger.declareSchemaRef @Integer Proxy
@@ -443,9 +426,6 @@ instance Aeson.ToJSONKey GYAssetClass where
 instance Aeson.FromJSONKey GYAssetClass where
     fromJSONKey = Aeson.FromJSONKeyTextParser (either (fail . show) pure . Web.parseUrlPiece)
 
-instance OpenApi.ToSchema GYAssetClass where
-  declareNamedSchema p = pure $ fromOpenApi2Schema' "GYAssetClass" p
-
 instance Swagger.ToParamSchema GYAssetClass where
   toParamSchema _ = mempty
                   & Swagger.type_ ?~ Swagger.SwaggerString
@@ -457,6 +437,7 @@ instance Swagger.ToSchema GYAssetClass where
                              & Swagger.type_         ?~ Swagger.SwaggerString
                              & Swagger.description   ?~ "This is an asset class, i.e. either \"lovelace\" or some other token with its minting policy and token name delimited by dot (.)."
                              & Swagger.example       ?~ toJSON ("ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.474f4c44" :: Text)
+
 
 -- | Converts a 'GYAssetClass' into a Plutus 'Plutus.AssetClass'.
 assetClassToPlutus :: GYAssetClass -> Plutus.AssetClass
@@ -649,9 +630,6 @@ instance IsString GYTokenName where
       where
         bs = fromString s -- TODO: utf8-encode #33 (https://github.com/geniusyield/atlas/issues/33)
 
-instance OpenApi.ToSchema GYTokenName where
-  declareNamedSchema _ = pure $ fromOpenApi2Schema' "GYTokenName" (Proxy @GYTokenName)
-
 instance Swagger.ToParamSchema GYTokenName where
   toParamSchema _ = mempty
                   & Swagger.type_     ?~ Swagger.SwaggerString
@@ -663,6 +641,7 @@ instance Swagger.ToSchema GYTokenName where
   declareNamedSchema _ = pure $ Swagger.named "GYTokenName" $ Swagger.paramSchemaToSchema (Proxy @GYTokenName)
                        & Swagger.description ?~ "This is the name of a token."
                        & Swagger.example     ?~ toJSON ("476f6c64" :: Text)
+
 
 -- |
 --

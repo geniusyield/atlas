@@ -16,18 +16,15 @@ module GeniusYield.Types.PubKeyHash (
     pubKeyHashFromApi,
 ) where
 
-import           Control.Lens                 ((?~))
-import           GeniusYield.Imports
-import           GeniusYield.Swagger.Utils    (fromOpenApi2Schema)
-
 import qualified Cardano.Api                  as Api
+import           Control.Lens                 ((?~))
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.Csv                     as Csv
-import qualified Data.OpenApi                 as OpenApi
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
+import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
 import qualified PlutusLedgerApi.V1.Crypto    as Plutus
 import qualified PlutusTx.Builtins            as Plutus
@@ -157,11 +154,8 @@ instance Csv.FromField GYPubKeyHash where
     parseField = either (fail . show) (return . pubKeyHashFromApi) . Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsPaymentKey)
 
 -------------------------------------------------------------------------------
--- openapi & swagger schema
+-- swagger schema
 -------------------------------------------------------------------------------
-
-instance OpenApi.ToSchema GYPubKeyHash where
-  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYPubKeyHash)
 
 instance Swagger.ToSchema GYPubKeyHash where
   declareNamedSchema _ = pure $ Swagger.named "GYPubKeyHash" $ mempty

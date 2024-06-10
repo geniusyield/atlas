@@ -34,8 +34,6 @@ import qualified Data.ByteString.Lazy             as LBS
 import qualified Data.Csv                         as Csv
 import           Data.Either.Combinators          (mapLeft)
 import           Data.Hashable                    (Hashable (..))
-import qualified Data.OpenApi                     as OpenApi
-import           Data.OpenApi                     (ToSchema(..))
 import qualified Data.Swagger                     as Swagger
 import qualified Data.Swagger.Internal.Schema     as Swagger
 import qualified Data.Swagger.Lens                ()
@@ -45,8 +43,8 @@ import qualified Data.Text.Encoding               as TE
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.Tx
-import           GeniusYield.Swagger.Utils        (fromOpenApi2Schema')
-import qualified PlutusLedgerApi.V1               as Plutus (TxOutRef (..), TxId (..))
+import qualified PlutusLedgerApi.V1               as Plutus (TxId (..),
+                                                             TxOutRef (..))
 import qualified PlutusTx.Builtins.Internal       as Plutus
 import qualified Text.Printf                      as Printf
 import qualified Web.HttpApiData                  as Web
@@ -58,7 +56,6 @@ import qualified Web.HttpApiData                  as Web
 -- >>> import qualified Data.Aeson                 as Aeson
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 -- >>> import qualified Data.Csv                   as Csv
--- >>> import qualified Data.OpenApi               as OpenApi
 -- >>> import           Data.Proxy
 -- >>> import qualified PlutusLedgerApi.V1         as Plutus
 -- >>> import qualified Web.HttpApiData            as Web
@@ -198,16 +195,8 @@ instance Csv.FromField GYTxOutRef where
     parseField = either (fail . T.unpack) return . Web.parseUrlPiece . decodeUtf8Lenient
 
 -------------------------------------------------------------------------------
--- openapi & swagger schema
+-- swagger schema
 -------------------------------------------------------------------------------
-
--- |
---
--- >>> LBS8.putStrLn $ Aeson.encode (OpenApi.toSchema (Proxy :: Proxy GYTxOutRef))
--- {"format":"hex","pattern":"[0-9a-fA-F]{64}#\"d+","type":"string"}
---
-instance OpenApi.ToSchema GYTxOutRef where
-  declareNamedSchema _ = pure $ fromOpenApi2Schema' "GYTxOutRef" (Proxy @GYTxOutRef)
 
 instance Swagger.ToParamSchema GYTxOutRef where
   toParamSchema _ = mempty
@@ -259,11 +248,8 @@ instance Aeson.FromJSON GYTxOutRefCbor where
             Right ref -> return ref
 
 -------------------------------------------------------------------------------
--- openapi & swagger schema
+-- swagger schema
 -------------------------------------------------------------------------------
-
-instance OpenApi.ToSchema GYTxOutRefCbor where
-  declareNamedSchema p = pure $ fromOpenApi2Schema' "GYTxOutRefCbor" p
 
 instance Swagger.ToParamSchema GYTxOutRefCbor where
   toParamSchema _ = mempty

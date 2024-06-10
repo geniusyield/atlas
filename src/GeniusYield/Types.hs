@@ -24,6 +24,7 @@ import           GeniusYield.Types.Ledger           as X
 import           GeniusYield.Types.Logging          as X
 import           GeniusYield.Types.Natural          as X
 import           GeniusYield.Types.NetworkId        as X
+import           GeniusYield.Types.OpenApi          as X
 import           GeniusYield.Types.PaymentKeyHash   as X
 import           GeniusYield.Types.PlutusVersion    as X
 import           GeniusYield.Types.Providers        as X

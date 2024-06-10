@@ -23,7 +23,6 @@ import qualified Cardano.Api.Shelley          as Api
 import           Control.Lens                 ((?~))
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.Csv                     as Csv
-import qualified Data.OpenApi                 as OpenApi
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
@@ -32,7 +31,6 @@ import           GeniusYield.Imports
 import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..),
                                                pubKeyHashFromApi,
                                                pubKeyHashToApi)
-import           GeniusYield.Swagger.Utils    (fromOpenApi2Schema)
 import qualified Text.Printf                  as Printf
 import qualified Web.HttpApiData              as Web
 
@@ -134,9 +132,6 @@ instance Csv.ToField GYStakePoolId where
 --
 instance Csv.FromField GYStakePoolId where
     parseField = either (fail . show) (return . stakePoolIdFromApi) . Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsStakePoolKey)
-
-instance OpenApi.ToSchema GYStakePoolId where
-  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYStakePoolId)
 
 instance Swagger.ToSchema GYStakePoolId where
   declareNamedSchema _ = pure $ Swagger.named "GYStakePoolId" $ mempty

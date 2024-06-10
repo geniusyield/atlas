@@ -120,6 +120,7 @@ library
     GeniusYield.Types.Logging
     GeniusYield.Types.Natural
     GeniusYield.Types.NetworkId
+    GeniusYield.Types.OpenApi
     GeniusYield.Types.PaymentKeyHash
     GeniusYield.Types.PlutusVersion
     GeniusYield.Types.Providers

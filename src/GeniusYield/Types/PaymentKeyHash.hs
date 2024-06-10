@@ -18,7 +18,6 @@ import qualified Cardano.Api                  as Api
 import           Control.Lens                 ((?~))
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.Csv                     as Csv
-import qualified Data.OpenApi                 as OpenApi
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
@@ -26,7 +25,6 @@ import qualified Data.Text.Encoding           as Text
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..), CanSignTx)
-import           GeniusYield.Swagger.Utils    (fromOpenApi2Schema)
 import qualified PlutusLedgerApi.V1.Crypto    as Plutus
 import qualified PlutusTx.Builtins            as Plutus
 import qualified PlutusTx.Builtins.Internal   as Plutus
@@ -41,7 +39,6 @@ import           Unsafe.Coerce                (unsafeCoerce)
 -- >>> import qualified Data.Aeson                 as Aeson
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 -- >>> import qualified Data.Csv                   as Csv
--- >>> import qualified Data.OpenApi               as OpenApi
 -- >>> import           Data.Proxy
 -- >>> import qualified Text.Printf                as Printf
 
@@ -154,16 +151,8 @@ instance Csv.FromField GYPaymentKeyHash where
     parseField = either (fail . show) (return . paymentKeyHashFromApi) . Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsPaymentKey)
 
 -------------------------------------------------------------------------------
--- openapi & swagger schema
+-- swagger schema
 -------------------------------------------------------------------------------
-
--- |
---
--- >>> LBS8.putStrLn $ Aeson.encode (OpenApi.toSchema (Proxy :: Proxy GYPaymentKeyHash))
--- {"description":"The hash of a payment public key.","example":"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d","format":"hex","maxLength":56,"minLength":56,"type":"string"}
---
-instance OpenApi.ToSchema GYPaymentKeyHash where
-  declareNamedSchema _ = pure $ fromOpenApi2Schema (Proxy @GYPaymentKeyHash)
 
 instance Swagger.ToSchema GYPaymentKeyHash where
   declareNamedSchema _ = pure $ Swagger.named "GYPaymentKeyHash" $ mempty

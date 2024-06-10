@@ -2,13 +2,14 @@
 
 module GeniusYield.Types.OpenApi where
 
-import           Control.Lens                 ((&), (.~), (^.))
-import           Data.Data                    (Typeable)
-import           Data.OpenApi                 (OpenApiType (..))
-import qualified Data.OpenApi                 as OpenApi
-import qualified Data.Swagger                 as Swagger
-import qualified Data.Swagger.Internal        as Swagger
-import qualified Data.Swagger.Internal.Schema as Swagger
+import           Control.Lens          ((&), (.~), (^.))
+import           Data.Data             (Typeable)
+import           Data.OpenApi          (OpenApiType (..))
+import qualified Data.OpenApi          as OpenApi
+import qualified Data.OpenApi.Declare  as OpenApi
+import qualified Data.Swagger          as Swagger
+import qualified Data.Swagger.Declare  as Swagger
+import qualified Data.Swagger.Internal as Swagger
 
 -- | Lift a @Swagger.Schema@ to an @OpenApi.Schema@.
 liftSwaggerSchema :: Swagger.Schema -> OpenApi.Schema
@@ -66,8 +67,16 @@ convertNamedSchema :: Swagger.NamedSchema -> OpenApi.NamedSchema
 convertNamedSchema (Swagger.NamedSchema name swaggerSchema) =
   OpenApi.NamedSchema name (liftSwaggerSchema swaggerSchema)
 
-instance {-# OVERLAPPABLE #-} (Swagger.ToSchema a, Typeable a) => OpenApi.ToSchema a where
-  declareNamedSchema p = pure $ convertNamedSchema (Swagger.toNamedSchema p)
+liftSwagger :: Swagger.Declare (Swagger.Definitions Swagger.Schema) Swagger.NamedSchema -> OpenApi.Declare (OpenApi.Definitions OpenApi.Schema) OpenApi.NamedSchema
+liftSwagger swaggerDeclare =
+  let (swaggerSchemas, swaggerNamedSchema) = Swagger.runDeclare swaggerDeclare mempty
+      openApiNamedSchema = convertNamedSchema swaggerNamedSchema
+      openApiSchemas = liftSwaggerSchema <$> swaggerSchemas
+  in OpenApi.DeclareT $ \_ -> pure (openApiSchemas, openApiNamedSchema)
 
+instance {-# OVERLAPPABLE #-} (Swagger.ToSchema a, Typeable a) => OpenApi.ToSchema a where
+  declareNamedSchema p = liftSwagger (Swagger.declareNamedSchema p)
+
+-- Can it lead to issues if there are references being made use of inside @a@?
 instance {-# OVERLAPPABLE #-} Swagger.ToSchema a => OpenApi.ToParamSchema a where
   toParamSchema p = liftSwaggerSchema $ Swagger.toSchema p

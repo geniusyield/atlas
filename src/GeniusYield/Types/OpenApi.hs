@@ -10,15 +10,6 @@ import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal        as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 
--- $setup
---
--- >>> :set -XOverloadedStrings -XTypeApplications
--- >>> import qualified Data.Aeson                 as Aeson
--- >>> import qualified Data.ByteString.Char8      as BS8
--- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
--- >>> import qualified Data.OpenApi               as OpenApi
--- >>> import GeniusYield.Types
-
 -- | Lift a @Swagger.Schema@ to an @OpenApi.Schema@.
 liftSwaggerSchema :: Swagger.Schema -> OpenApi.Schema
 liftSwaggerSchema swaggerSchema =
@@ -77,6 +68,3 @@ convertNamedSchema (Swagger.NamedSchema name swaggerSchema) =
 
 instance {-# OVERLAPPABLE #-} (Swagger.ToSchema a, Typeable a) => OpenApi.ToSchema a where
   declareNamedSchema p = pure $ convertNamedSchema (Swagger.toNamedSchema p)
-
-
--- >>> LBS8.putStrLn $ Aeson.encode (OpenApi.toSchema (Proxy :: Proxy GYValue))

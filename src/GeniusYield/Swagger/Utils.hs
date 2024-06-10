@@ -1,5 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE UnicodeSyntax       #-}
+{-# LANGUAGE UnicodeSyntax #-}
 
 {- |
 Module      : GeniusYield.Swagger.Utils
@@ -8,17 +8,17 @@ License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
 -}
-module GeniusYield.Swagger.Utils
-  ( addSwaggerExample
-  , addSwaggerDescription
-  , dropSymbolAndCamelToSnake
-  ) where
+module GeniusYield.Swagger.Utils (
+  addSwaggerExample,
+  addSwaggerDescription,
+  dropSymbolAndCamelToSnake,
+) where
 
-import           Control.Lens        (mapped, (?~))
-import           Data.Aeson          (camelTo2)
-import qualified Data.Swagger        as Swagger
-import           GeniusYield.Imports
-import           GHC.TypeLits        (KnownSymbol, symbolVal)
+import Control.Lens (mapped, (?~))
+import Data.Aeson (camelTo2)
+import Data.Data (Proxy (Proxy))
+import Data.Swagger qualified as Swagger
+import GHC.TypeLits (KnownSymbol, symbolVal)
 
 -- | Utility function to add swagger description to a schema.
 addSwaggerDescription :: (Functor f1, Functor f2, Swagger.HasSchema b1 a, Swagger.HasDescription a (Maybe b2)) => b2 -> f1 (f2 b1) -> f1 (f2 b1)

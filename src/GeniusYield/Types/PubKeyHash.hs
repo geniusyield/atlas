@@ -16,15 +16,16 @@ module GeniusYield.Types.PubKeyHash (
     pubKeyHashFromApi,
 ) where
 
-import qualified Cardano.Api                  as Api
 import           Control.Lens                 ((?~))
+import           GeniusYield.Imports
+
+import qualified Cardano.Api                  as Api
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.Csv                     as Csv
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
-import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
 import qualified PlutusLedgerApi.V1.Crypto    as Plutus
 import qualified PlutusTx.Builtins            as Plutus
@@ -156,6 +157,7 @@ instance Csv.FromField GYPubKeyHash where
 -------------------------------------------------------------------------------
 -- swagger schema
 -------------------------------------------------------------------------------
+
 
 instance Swagger.ToSchema GYPubKeyHash where
   declareNamedSchema _ = pure $ Swagger.named "GYPubKeyHash" $ mempty

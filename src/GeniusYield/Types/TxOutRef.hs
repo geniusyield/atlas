@@ -32,7 +32,6 @@ import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString.Base16           as Base16
 import qualified Data.ByteString.Lazy             as LBS
 import qualified Data.Csv                         as Csv
-import           Data.Either.Combinators          (mapLeft)
 import           Data.Hashable                    (Hashable (..))
 import qualified Data.Swagger                     as Swagger
 import qualified Data.Swagger.Internal.Schema     as Swagger
@@ -40,15 +39,15 @@ import qualified Data.Swagger.Lens                ()
 import qualified Data.Text                        as T
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as TE
-import           GeniusYield.Imports
-import           GeniusYield.Types.Ledger
-import           GeniusYield.Types.Tx
-import qualified PlutusLedgerApi.V1               as Plutus (TxId (..),
-                                                             TxOutRef (..))
+import qualified PlutusLedgerApi.V1               as Plutus (TxOutRef (..), TxId (..))
 import qualified PlutusTx.Builtins.Internal       as Plutus
 import qualified Text.Printf                      as Printf
 import qualified Web.HttpApiData                  as Web
 
+import           Data.Either.Combinators          (mapLeft)
+import           GeniusYield.Imports
+import           GeniusYield.Types.Ledger
+import           GeniusYield.Types.Tx
 
 -- $setup
 --

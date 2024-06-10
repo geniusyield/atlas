@@ -207,6 +207,7 @@ instance ToJSON GYTxId where
                        $ TE.decodeUtf8
                        $ Api.serialiseToRawBytesHex txid
 
+
 instance Swagger.ToSchema GYTxId where
   declareNamedSchema _ = pure $ Swagger.named "GYTxId" $ mempty
                        & Swagger.example ?~ toJSON ("a8d75b90a052302c1232bedd626720966b1697fe38de556c617c340233688935" :: Text)

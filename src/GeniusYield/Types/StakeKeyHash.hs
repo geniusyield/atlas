@@ -12,14 +12,15 @@ module GeniusYield.Types.StakeKeyHash (
     stakeKeyHashFromApi,
 ) where
 
-import qualified Cardano.Api                  as Api
 import           Control.Lens                 ((?~))
+import           GeniusYield.Imports
+
+import qualified Cardano.Api                  as Api
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.Csv                     as Csv
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text.Encoding           as Text
-import           GeniusYield.Imports
 import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..), CanSignTx)
 import qualified Text.Printf                  as Printf
 import           Unsafe.Coerce                (unsafeCoerce)

@@ -153,9 +153,9 @@ instance Csv.FromField GYPaymentKeyHash where
 
 instance Swagger.ToSchema GYPaymentKeyHash where
   declareNamedSchema _ = pure $ Swagger.named "GYPaymentKeyHash" $ mempty
-                       & Swagger.type_       ?~ Swagger.SwaggerString
-                       & Swagger.format      ?~ "hex"
-                       & Swagger.description ?~ "The hash of a payment public key."
-                       & Swagger.example     ?~ toJSON ("e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d" :: Text)
-                       & Swagger.maxLength   ?~ 56
-                       & Swagger.minLength   ?~ 56
+                       & Swagger.type_           ?~ Swagger.SwaggerString
+                       & Swagger.format          ?~ "hex"
+                       & Swagger.description     ?~ "The hash of a payment public key."
+                       & Swagger.example         ?~ toJSON ("e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d" :: Text)
+                       & Swagger.maxLength       ?~ 56
+                       & Swagger.minLength ?~ 56

@@ -12,13 +12,14 @@ module GeniusYield.Types.Natural
     , naturalToGHC
     ) where
 
+import           GeniusYield.Imports
+
 import           Control.Lens                 ((?~))
 import qualified Data.Aeson                   as Aeson
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Swagger.Lens            ()
 import qualified Data.Text                    as Text
-import           GeniusYield.Imports
 import qualified Web.HttpApiData              as Web
 
 -- $setup

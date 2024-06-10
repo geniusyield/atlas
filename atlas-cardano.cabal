@@ -197,7 +197,7 @@ library
     , vector                ^>=0.12.3.1
     , witherable            ^>=0.4.2
 
-  -- Dependencies whose version is fixed by @cabal.project@ file.
+  -- Dependencies whose version is fixed/constrained by @cabal.project@ file.
   build-depends:
     , bech32
     , maestro-sdk

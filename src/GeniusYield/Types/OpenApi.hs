@@ -67,16 +67,15 @@ convertNamedSchema :: Swagger.NamedSchema -> OpenApi.NamedSchema
 convertNamedSchema (Swagger.NamedSchema name swaggerSchema) =
   OpenApi.NamedSchema name (liftSwaggerSchema swaggerSchema)
 
-liftSwagger :: Swagger.Declare (Swagger.Definitions Swagger.Schema) Swagger.NamedSchema -> OpenApi.Declare (OpenApi.Definitions OpenApi.Schema) OpenApi.NamedSchema
-liftSwagger swaggerDeclare =
+liftSwaggerDec :: Swagger.Declare (Swagger.Definitions Swagger.Schema) Swagger.NamedSchema -> OpenApi.Declare (OpenApi.Definitions OpenApi.Schema) OpenApi.NamedSchema
+liftSwaggerDec swaggerDeclare =
   let (swaggerSchemas, swaggerNamedSchema) = Swagger.runDeclare swaggerDeclare mempty
       openApiNamedSchema = convertNamedSchema swaggerNamedSchema
       openApiSchemas = liftSwaggerSchema <$> swaggerSchemas
   in OpenApi.DeclareT $ \_ -> pure (openApiSchemas, openApiNamedSchema)
 
 instance {-# OVERLAPPABLE #-} (Swagger.ToSchema a, Typeable a) => OpenApi.ToSchema a where
-  declareNamedSchema p = liftSwagger (Swagger.declareNamedSchema p)
+  declareNamedSchema p = liftSwaggerDec (Swagger.declareNamedSchema p)
 
--- Can it lead to issues if there are references being made use of inside @a@?
-instance {-# OVERLAPPABLE #-} Swagger.ToSchema a => OpenApi.ToParamSchema a where
+instance {-# OVERLAPPABLE #-} (Swagger.ToParamSchema a, Swagger.ToSchema a) => OpenApi.ToParamSchema a where
   toParamSchema p = liftSwaggerSchema $ Swagger.toSchema p

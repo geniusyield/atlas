@@ -250,7 +250,6 @@ txIdFromPlutus (Plutus.TxId (Plutus.BuiltinByteString bs)) = txIdFromApi <$> Api
 newtype GYTxWitness = GYTxWitness (AlonzoTxWits (Babbage.BabbageEra Crypto.StandardCrypto))
   deriving newtype Show
 
-
 instance Swagger.ToSchema GYTxWitness where
     declareNamedSchema _ = pure $ Swagger.named "GYTxWitness" $ mempty
                          & Swagger.type_ ?~ Swagger.SwaggerString

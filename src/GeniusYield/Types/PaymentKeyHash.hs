@@ -31,15 +31,12 @@ import qualified PlutusTx.Builtins.Internal   as Plutus
 import qualified Text.Printf                  as Printf
 import           Unsafe.Coerce                (unsafeCoerce)
 
-
-
 -- $setup
 --
 -- >>> :set -XOverloadedStrings -XTypeApplications
 -- >>> import qualified Data.Aeson                 as Aeson
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 -- >>> import qualified Data.Csv                   as Csv
--- >>> import           Data.Proxy
 -- >>> import qualified Text.Printf                as Printf
 
 newtype GYPaymentKeyHash = GYPaymentKeyHash (Api.Hash Api.PaymentKey)

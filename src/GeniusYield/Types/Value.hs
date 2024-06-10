@@ -109,7 +109,6 @@ import           GeniusYield.Types.Script
 -- >>> import qualified Data.ByteString.Char8      as BS8
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 -- >>> import qualified Data.Csv                   as Csv
--- >>> import           Data.Proxy
 -- >>> import qualified Text.Printf                as Printf
 -- >>> import qualified Web.HttpApiData            as Web
 
@@ -438,7 +437,6 @@ instance Swagger.ToSchema GYAssetClass where
                              & Swagger.description   ?~ "This is an asset class, i.e. either \"lovelace\" or some other token with its minting policy and token name delimited by dot (.)."
                              & Swagger.example       ?~ toJSON ("ff80aaaf03a273b8f5c558168dc0e2377eea810badbae6eceefc14ef.474f4c44" :: Text)
 
-
 -- | Converts a 'GYAssetClass' into a Plutus 'Plutus.AssetClass'.
 assetClassToPlutus :: GYAssetClass -> Plutus.AssetClass
 assetClassToPlutus GYLovelace      = Plutus.AssetClass (Ada.adaSymbol, Ada.adaToken)
@@ -641,7 +639,6 @@ instance Swagger.ToSchema GYTokenName where
   declareNamedSchema _ = pure $ Swagger.named "GYTokenName" $ Swagger.paramSchemaToSchema (Proxy @GYTokenName)
                        & Swagger.description ?~ "This is the name of a token."
                        & Swagger.example     ?~ toJSON ("476f6c64" :: Text)
-
 
 -- |
 --

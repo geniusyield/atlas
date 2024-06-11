@@ -128,6 +128,8 @@ library
     GeniusYield.Types.Rational
     GeniusYield.Types.Redeemer
     GeniusYield.Types.Script
+    GeniusYield.Types.Script.ScriptHash
+    GeniusYield.Types.Script.SimpleScript
     GeniusYield.Types.Slot
     GeniusYield.Types.SlotConfig
     GeniusYield.Types.StakeAddressInfo

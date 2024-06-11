@@ -308,8 +308,9 @@ balanceTxStep
                 cstrat
             pure (ins ++ addIns, collaterals, adjustedOuts ++ changeOuts)
   where
-    isScriptWitness GYTxInWitnessKey      = False
-    isScriptWitness GYTxInWitnessScript{} = True
+    isScriptWitness GYTxInWitnessKey            = False
+    isScriptWitness GYTxInWitnessScript{}       = True
+    isScriptWitness GYTxInWitnessSimpleScript{} = True  -- FIXME: Is it needed?
     isCertScriptWitness (Just GYTxCertWitnessScript{}) = True
     isCertScriptWitness _                              = False
     isWdrlScriptWitness GYTxWdrlWitnessScript{} = True

@@ -129,37 +129,41 @@ module GeniusYield.Types.Script (
     -- ** File operations
     writeScript,
     readScript,
+
+    -- * Any Script
+    GYAnyScript (..),
 ) where
 
+import qualified Cardano.Api                           as Api
+import qualified Cardano.Api.Shelley                   as Api.S
+import           Control.Lens                          ((?~))
+import           Data.Aeson.Types                      (FromJSONKey (fromJSONKey),
+                                                        FromJSONKeyFunction (FromJSONKeyTextParser),
+                                                        ToJSONKey (toJSONKey),
+                                                        toJSONKeyText)
+import qualified Data.Attoparsec.ByteString.Char8      as Atto
+import           Data.ByteString                       (ByteString)
+import qualified Data.ByteString.Base16                as BS16
+import           Data.ByteString.Short                 (ShortByteString)
 import           Data.GADT.Compare
 import           Data.GADT.Show
-
-import qualified Cardano.Api                      as Api
-import qualified Cardano.Api.Shelley              as Api.S
-import           Control.Lens                     ((?~))
-import           Data.Aeson.Types                 (FromJSONKey (fromJSONKey),
-                                                   FromJSONKeyFunction (FromJSONKeyTextParser),
-                                                   ToJSONKey (toJSONKey),
-                                                   toJSONKeyText)
-import qualified Data.Attoparsec.ByteString.Char8 as Atto
-import qualified Data.ByteString.Base16           as BS16
-import qualified Data.Swagger                     as Swagger
-import qualified Data.Swagger.Internal.Schema     as Swagger
-import qualified Data.Text                        as Text
-import qualified Data.Text.Encoding               as TE
-import qualified PlutusLedgerApi.Common           as Plutus
-import qualified PlutusLedgerApi.V1               as PlutusV1
-import qualified PlutusTx
-import qualified PlutusTx.Builtins                as PlutusTx
-import qualified Text.Printf                      as Printf
-import qualified Web.HttpApiData                  as Web
-
-import           Data.ByteString                  (ByteString)
-import           Data.ByteString.Short            (ShortByteString)
+import qualified Data.Swagger                          as Swagger
+import qualified Data.Swagger.Internal.Schema          as Swagger
+import qualified Data.Text                             as Text
+import qualified Data.Text.Encoding                    as TE
 import           GeniusYield.Imports
-import           GeniusYield.Types.Ledger         (PlutusToCardanoError (..))
+import           GeniusYield.Types.Ledger              (PlutusToCardanoError (..))
 import           GeniusYield.Types.PlutusVersion
-import           GeniusYield.Types.TxOutRef       (GYTxOutRef, txOutRefToApi)
+import           GeniusYield.Types.Script.ScriptHash
+import           GeniusYield.Types.Script.SimpleScript (GYSimpleScript)
+import           GeniusYield.Types.TxOutRef            (GYTxOutRef,
+                                                        txOutRefToApi)
+import qualified PlutusLedgerApi.Common                as Plutus
+import qualified PlutusLedgerApi.V1                    as PlutusV1
+import qualified PlutusTx
+import qualified PlutusTx.Builtins                     as PlutusTx
+import qualified Text.Printf                           as Printf
+import qualified Web.HttpApiData                       as Web
 
 -- $setup
 --
@@ -270,37 +274,6 @@ validatorHashFromPlutus vh@(PlutusV1.ScriptHash ibs) =
         validatorHashFromApi
     $ Api.deserialiseFromRawBytes Api.AsScriptHash $ PlutusTx.fromBuiltin ibs
 
-newtype GYScriptHash = GYScriptHash Api.ScriptHash
-  deriving stock (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON)
-
--- |
---
--- >>> "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYScriptHash
--- GYScriptHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
---
-instance IsString GYScriptHash where
-    fromString = GYScriptHash . fromString
-
--- |
---
--- >>> printf "%s" ("cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYScriptHash)
--- cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0
---
-instance Printf.PrintfArg GYScriptHash where
-    formatArg (GYScriptHash h) = formatArg $ init $ tail $ show h
-
--- >>> Web.toUrlPiece (GYScriptHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0")
--- "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
---
-instance Web.ToHttpApiData GYScriptHash where
-    toUrlPiece = Api.serialiseToRawBytesHexText . scriptHashToApi
-
-scriptHashToApi :: GYScriptHash -> Api.ScriptHash
-scriptHashToApi = coerce
-
-scriptHashFromApi :: Api.ScriptHash -> GYScriptHash
-scriptHashFromApi = coerce
 
 -------------------------------------------------------------------------------
 -- Minting Policy
@@ -817,3 +790,15 @@ writeScriptCore desc file s = do
     case e of
         Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
         Right ()                       -> return ()
+
+-- TODO: Haddock.
+data GYAnyScript where
+    GYSimpleScript :: !GYSimpleScript -> GYAnyScript
+    GYPlutusScript :: forall v. !(GYScript v) -> GYAnyScript
+
+deriving instance Show GYAnyScript
+
+instance Eq GYAnyScript where
+  GYSimpleScript s1 == GYSimpleScript s2 = s1 == s2
+  GYPlutusScript s1 == GYPlutusScript s2 = defaultEq s1 s2
+  _ == _                                 = False

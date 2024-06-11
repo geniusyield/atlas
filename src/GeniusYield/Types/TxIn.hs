@@ -9,6 +9,7 @@ Stability   : develop
 module GeniusYield.Types.TxIn (
     GYTxIn (..),
     GYInScript (..),
+    GYInSimpleScript (..),
     inScriptVersion,
     GYTxInWitness (..),
     txInToApi,

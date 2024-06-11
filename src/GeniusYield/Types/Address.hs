@@ -21,6 +21,8 @@ module GeniusYield.Types.Address (
     addressFromValidator,
     addressFromCredential,
     addressFromValidatorHash,
+    addressFromScriptHash,
+    addressFromSimpleScript,
     addressToText,
     addressFromTextMaybe,
     unsafeAddressFromText,
@@ -48,54 +50,55 @@ module GeniusYield.Types.Address (
     stakeAddressFromBech32
 ) where
 
-import qualified Cardano.Api                          as Api
-import qualified Cardano.Api.Byron                    as Api.B
-import qualified Cardano.Api.Shelley                  as Api.S
-import           Cardano.Chain.Common                 (addrToBase58)
-import qualified Cardano.Crypto.Hash.Class            as Crypto
-import qualified Cardano.Ledger.BaseTypes             as Ledger
-import qualified Cardano.Ledger.Credential            as Ledger
-import qualified Cardano.Ledger.Crypto                as Ledger
-import qualified Cardano.Ledger.Hashes                as Ledger
-import qualified Cardano.Ledger.Keys                  as Ledger
-import           Control.Lens                         ((?~))
-import qualified Data.Aeson.Types                     as Aeson
-import qualified Data.Csv                             as Csv
-import           Data.Hashable                        (Hashable (..))
-import qualified Data.Swagger                         as Swagger
-import qualified Data.Swagger.Internal.Schema         as Swagger
-import qualified Data.Swagger.Lens                    ()
-import qualified Data.Text                            as Text
-import qualified Data.Text.Encoding                   as TE
-import qualified Data.Vector                          as Vector
-import           Data.Word                            (Word64)
-import qualified Database.PostgreSQL.Simple           as PQ
-import qualified Database.PostgreSQL.Simple.FromField as PQ (FromField (..),
-                                                             returnError)
-import qualified Database.PostgreSQL.Simple.ToField   as PQ
-import qualified PlutusLedgerApi.V1.Address           as Plutus
-import qualified PlutusLedgerApi.V1.Credential        as Plutus
-import qualified PlutusLedgerApi.V1.Crypto            as Plutus
-import qualified PlutusLedgerApi.V1.Scripts           as Plutus
-import qualified PlutusTx.Builtins.Internal           as Plutus
-import qualified PlutusTx.Prelude                     as PlutusTx
-import qualified Text.Printf                          as Printf
-import qualified Web.HttpApiData                      as Web
+import qualified Cardano.Api                           as Api
+import qualified Cardano.Api.Byron                     as Api.B
+import qualified Cardano.Api.Shelley                   as Api.S
+import           Cardano.Chain.Common                  (addrToBase58)
+import qualified Cardano.Crypto.Hash.Class             as Crypto
+import qualified Cardano.Ledger.BaseTypes              as Ledger
+import qualified Cardano.Ledger.Credential             as Ledger
+import qualified Cardano.Ledger.Crypto                 as Ledger
+import qualified Cardano.Ledger.Hashes                 as Ledger
+import qualified Cardano.Ledger.Keys                   as Ledger
+import           Control.Lens                          ((?~))
+import qualified Data.Aeson.Types                      as Aeson
+import qualified Data.Csv                              as Csv
+import           Data.Hashable                         (Hashable (..))
+import qualified Data.Swagger                          as Swagger
+import qualified Data.Swagger.Internal.Schema          as Swagger
+import qualified Data.Swagger.Lens                     ()
+import qualified Data.Text                             as Text
+import qualified Data.Text.Encoding                    as TE
+import qualified Data.Vector                           as Vector
+import           Data.Word                             (Word64)
+import qualified Database.PostgreSQL.Simple            as PQ
+import qualified Database.PostgreSQL.Simple.FromField  as PQ (FromField (..),
+                                                              returnError)
+import qualified Database.PostgreSQL.Simple.ToField    as PQ
+import qualified PlutusLedgerApi.V1.Address            as Plutus
+import qualified PlutusLedgerApi.V1.Credential         as Plutus
+import qualified PlutusLedgerApi.V1.Crypto             as Plutus
+import qualified PlutusLedgerApi.V1.Scripts            as Plutus
+import qualified PlutusTx.Builtins.Internal            as Plutus
+import qualified PlutusTx.Prelude                      as PlutusTx
+import qualified Text.Printf                           as Printf
+import qualified Web.HttpApiData                       as Web
 
 import           GeniusYield.Imports
-import           GeniusYield.Types.Credential         (GYPaymentCredential,
-                                                       GYStakeCredential,
-                                                       paymentCredentialFromApi,
-                                                       paymentCredentialToApi,
-                                                       stakeCredentialFromApi,
-                                                       stakeCredentialToApi,
-                                                       stakeCredentialToHexText)
+import           GeniusYield.Types.Credential          (GYPaymentCredential,
+                                                        GYStakeCredential,
+                                                        paymentCredentialFromApi,
+                                                        paymentCredentialToApi,
+                                                        stakeCredentialFromApi,
+                                                        stakeCredentialToApi,
+                                                        stakeCredentialToHexText)
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.NetworkId
-import           GeniusYield.Types.PaymentKeyHash     (GYPaymentKeyHash,
-                                                       paymentKeyHashToApi)
+import           GeniusYield.Types.PaymentKeyHash      (GYPaymentKeyHash,
+                                                        paymentKeyHashToApi)
 import           GeniusYield.Types.PubKeyHash
 import           GeniusYield.Types.Script
+import           GeniusYield.Types.Script.SimpleScript
 
 -- $setup
 --
@@ -310,10 +313,21 @@ addressFromPaymentKeyHash nid pkh = addressFromApi $ Api.AddressShelley $ Api.S.
 -- /note:/ no stake credential.
 --
 addressFromValidatorHash :: GYNetworkId -> GYValidatorHash -> GYAddress
-addressFromValidatorHash nid vh = addressFromApi $ Api.AddressShelley $ Api.S.makeShelleyAddress
+addressFromValidatorHash nid vh = addressFromScriptHash' nid (validatorHashToApi vh)
+
+-- | Create address from 'GYScriptHash'.
+addressFromScriptHash :: GYNetworkId -> GYScriptHash -> GYAddress
+addressFromScriptHash nid sh = addressFromScriptHash' nid (scriptHashToApi sh)
+
+addressFromScriptHash' :: GYNetworkId -> Api.ScriptHash -> GYAddress
+addressFromScriptHash' nid sh = addressFromApi $ Api.AddressShelley $ Api.S.makeShelleyAddress
     (networkIdToApi nid)
-    (Api.S.PaymentCredentialByScript (validatorHashToApi vh))
+    (Api.S.PaymentCredentialByScript sh)
     Api.S.NoStakeAddress
+
+-- | Create address from `GYSimpleScript`.
+addressFromSimpleScript :: GYNetworkId -> GYSimpleScript -> GYAddress
+addressFromSimpleScript nid script = addressFromScriptHash' nid (hashSimpleScript' script)
 
 -- | Create an address from payment & optionally, a stake credential.
 addressFromCredential :: GYNetworkId -> GYPaymentCredential -> Maybe GYStakeCredential -> GYAddress

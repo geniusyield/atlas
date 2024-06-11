@@ -132,6 +132,9 @@ module GeniusYield.Types.Script (
 
     -- * Any Script
     GYAnyScript (..),
+
+    -- * Simple Script
+    module X
 ) where
 
 import qualified Cardano.Api                           as Api
@@ -155,7 +158,7 @@ import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger              (PlutusToCardanoError (..))
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.Script.ScriptHash
-import           GeniusYield.Types.Script.SimpleScript (GYSimpleScript)
+import           GeniusYield.Types.Script.SimpleScript as X
 import           GeniusYield.Types.TxOutRef            (GYTxOutRef,
                                                         txOutRefToApi)
 import qualified PlutusLedgerApi.Common                as Plutus

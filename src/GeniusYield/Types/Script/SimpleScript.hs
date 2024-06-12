@@ -1,12 +1,11 @@
 {-|
 Module      : GeniusYield.Types.Script.SimpleScript
+Description : Simple scripts API
 Copyright   : (c) 2024 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
--- TODO: Add the module description.
 module GeniusYield.Types.Script.SimpleScript (
   -- * Docspec setup
   -- $setup
@@ -15,6 +14,7 @@ module GeniusYield.Types.Script.SimpleScript (
   GYSimpleScript (..),
   simpleScriptToApi,
   simpleScriptFromApi,
+  readSimpleScript,
   getTotalKeysInSimpleScript,
   hashSimpleScript,
   hashSimpleScript',
@@ -24,6 +24,7 @@ import qualified Cardano.Api                         as Api
 import           Data.Foldable                       (foldMap')
 import qualified Data.Set                            as Set
 import           GeniusYield.Imports
+import           GeniusYield.ReadJSON                (readJSON)
 import           GeniusYield.Types.PaymentKeyHash    (GYPaymentKeyHash,
                                                       paymentKeyHashFromApi,
                                                       paymentKeyHashToApi)
@@ -39,7 +40,7 @@ import           GeniusYield.Types.Slot              (GYSlot, slotFromApi,
 -- >>> import GeniusYield.Types
 -- >>> import Data.Set qualified as Set
 
--- TODO: Haddock.
+-- | A simple (aka native / timelock) script that can be used in a transaction.
 data GYSimpleScript
   = RequireSignature !GYPaymentKeyHash
   | RequireTimeBefore !GYSlot
@@ -73,6 +74,10 @@ instance ToJSON GYSimpleScript where
 instance FromJSON GYSimpleScript where
   parseJSON = fmap simpleScriptFromApi . parseJSON
 
+-- | Read a 'GYSimpleScript' represented as JSON from a file.
+readSimpleScript :: FilePath -> IO GYSimpleScript
+readSimpleScript = readJSON
+
 -- | Count the total number of unique `GYPaymentKeyHash` mentioned in a 'GYSimpleScript'.
 --
 -- This is useful for estimating the number of signatures required for a transaction.
@@ -94,8 +99,6 @@ getTotalKeysInSimpleScript = \case
   RequireMOf _ ss -> f ss
  where
   f = foldMap' getTotalKeysInSimpleScript
-
--- TODO: Functions to parse from JSON?
 
 hashSimpleScript :: GYSimpleScript -> GYScriptHash
 hashSimpleScript = scriptHashFromApi . hashSimpleScript'

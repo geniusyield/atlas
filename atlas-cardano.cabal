@@ -81,6 +81,7 @@ library
     GeniusYield.Providers.Maestro
     GeniusYield.Providers.Node
     GeniusYield.Providers.Sentry
+    GeniusYield.ReadJSON
     GeniusYield.Scripts.TestToken
     GeniusYield.Swagger.Utils
     GeniusYield.Test.Privnet.Asserts

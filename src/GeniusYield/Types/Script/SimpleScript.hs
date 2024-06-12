@@ -15,12 +15,14 @@ module GeniusYield.Types.Script.SimpleScript (
   GYSimpleScript (..),
   simpleScriptToApi,
   simpleScriptFromApi,
-  countTotalKeysInSimpleScript,
+  getTotalKeysInSimpleScript,
   hashSimpleScript,
   hashSimpleScript',
 ) where
 
 import qualified Cardano.Api                         as Api
+import           Data.Foldable                       (foldMap')
+import qualified Data.Set                            as Set
 import           GeniusYield.Imports
 import           GeniusYield.Types.PaymentKeyHash    (GYPaymentKeyHash,
                                                       paymentKeyHashFromApi,
@@ -35,7 +37,7 @@ import           GeniusYield.Types.Slot              (GYSlot, slotFromApi,
 -- >>> :set -XOverloadedStrings -XTypeApplications
 -- >>>
 -- >>> import GeniusYield.Types
--- >>> let pkh = "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d" :: GYPaymentKeyHash
+-- >>> import Data.Set qualified as Set
 
 -- TODO: Haddock.
 data GYSimpleScript
@@ -71,25 +73,27 @@ instance ToJSON GYSimpleScript where
 instance FromJSON GYSimpleScript where
   parseJSON = fmap simpleScriptFromApi . parseJSON
 
--- | Count the total number of `GYPaymentKeyHash` mentioned in a 'GYSimpleScript'.
+-- | Count the total number of unique `GYPaymentKeyHash` mentioned in a 'GYSimpleScript'.
 --
 -- This is useful for estimating the number of signatures required for a transaction.
 --
--- Implementation does not take into account that a single key can be present multiple times in the script.
---
--- >>> reqASig = RequireSignature pkh
--- >>> countTotalKeysInSimpleScript $ RequireMOf 2 [RequireAllOf [reqASig, reqASig, reqASig], RequireAnyOf [reqASig, reqASig], reqASig]
--- 6
-countTotalKeysInSimpleScript :: GYSimpleScript -> Int
-countTotalKeysInSimpleScript = \case
-  RequireSignature _ -> 1
-  RequireTimeBefore _ -> 0
-  RequireTimeAfter _ -> 0
+-- >>> reqSigA = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38a"
+-- >>> reqSigB = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38b"
+-- >>> reqSigC = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38c"
+-- >>> reqSigD = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+-- >>> reqSigE = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38e"
+-- >>> Set.size $ getTotalKeysInSimpleScript $ RequireMOf 2 [RequireAllOf [reqSigA, reqSigB, reqSigC], RequireAnyOf [reqSigA, reqSigD], reqSigE]
+-- 5
+getTotalKeysInSimpleScript :: GYSimpleScript -> Set GYPaymentKeyHash
+getTotalKeysInSimpleScript = \case
+  RequireSignature pkh -> Set.singleton pkh
+  RequireTimeBefore _ -> Set.empty
+  RequireTimeAfter _ -> Set.empty
   RequireAllOf ss -> f ss
   RequireAnyOf ss -> f ss
   RequireMOf _ ss -> f ss
  where
-  f = foldl' (\acc s -> acc + countTotalKeysInSimpleScript s) 0
+  f = foldMap' getTotalKeysInSimpleScript
 
 -- TODO: Functions to parse from JSON?
 

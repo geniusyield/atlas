@@ -351,23 +351,34 @@ finalizeGYBalancedTx
         unregisteredStakeCredsMap
         estimateKeyWitnesses
   where
-    -- Over estimates the number of key witnesses required for the transaction.
-    estimateKeyWitnesses :: Word = fromIntegral $ countUnique (map utxoAddress $ utxosToList collaterals) + estimateKeyWitnessesFromInputs ins + Set.size signers + countUnique ([gyTxWdrlStakeAddress wdrl | wdrl@GYTxWdrl {gyTxWdrlWitness = GYTxWdrlWitnessKey} <- wdrls]) + countUnique ([(certificateToStakeCredential . gyTxCertCertificate) cert | cert@GYTxCert {gyTxCertWitness = Just GYTxCertWitnessKey} <- certs])
+    signersList = Set.toList signers
+    -- Over-estimate the number of key witnesses required for the transaction.
+    estimateKeyWitnesses :: Word = fromIntegral $ countUnique $
+         map (preferPaymentCredential . utxoAddress) (utxosToList collaterals)
+      <> ([(AGYStakeCredential . stakeAddressToCredential . gyTxWdrlStakeAddress) wdrl | wdrl@GYTxWdrl {gyTxWdrlWitness = GYTxWdrlWitnessKey} <- wdrls])
+      <> ([(AGYStakeCredential . certificateToStakeCredential . gyTxCertCertificate) cert | cert@GYTxCert {gyTxCertWitness = Just GYTxCertWitnessKey} <- certs])
+      <> estimateKeyWitnessesFromInputs ins
+      -- Since it is not clear whether the given pub key hash relates to payment or stake credential, we consider both.
+      <> (map (AGYPaymentCredential . GYPaymentCredentialByKey . fromPubKeyHash) signersList <> map (AGYStakeCredential . GYStakeCredentialByKey . fromPubKeyHash) signersList)
       where
+        preferPaymentCredential gyaddr = case addressToPaymentCredential gyaddr of
+          Nothing -> AGYAddress gyaddr
+          Just pc -> AGYPaymentCredential pc
+
         countUnique :: Ord a => [a] -> Int
         countUnique = Set.size . Set.fromList
 
         estimateKeyWitnessesFromInputs txInDets =
-          -- Count unique key witnesses. Though, following has a caveat in that it does not consider for case where two different Shelley addresses have same payment credential. Same is true when estimating for collaterals above.
-          countUnique [gyTxInDetAddress txInDet | txInDet@GYTxInDetailed {gyTxInDet = GYTxIn {gyTxInWitness = GYTxInWitnessKey}} <- txInDets]
-          +
+          -- Count key witnesses.
+          [(preferPaymentCredential . gyTxInDetAddress) txInDet | txInDet@GYTxInDetailed {gyTxInDet = GYTxIn {gyTxInWitness = GYTxInWitnessKey}} <- txInDets]
+          ++
           -- Estimate key witnesses required by native scripts.
-          foldl' estimateKeyWitnessesFromNativeScripts 0 txInDets
+          map (AGYPaymentCredential . GYPaymentCredentialByKey) (Set.toList $ foldl' estimateKeyWitnessesFromNativeScripts mempty txInDets)
             where
               estimateKeyWitnessesFromNativeScripts acc (gyTxInWitness . gyTxInDet -> GYTxInWitnessSimpleScript gyInSS) =
                 case gyInSS of
-                  GYInSimpleScript s -> acc + countTotalKeysInSimpleScript s
-                  GYInReferenceSimpleScript _ s -> acc + countTotalKeysInSimpleScript s
+                  GYInSimpleScript s -> getTotalKeysInSimpleScript s <> acc
+                  GYInReferenceSimpleScript _ s -> getTotalKeysInSimpleScript s <> acc
               estimateKeyWitnessesFromNativeScripts acc _ = acc
 
     inRefs :: Api.TxInsReference Api.BuildTx Api.BabbageEra

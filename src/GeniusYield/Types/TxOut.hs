@@ -15,16 +15,13 @@ module GeniusYield.Types.TxOut (
     txOutToApi,
 ) where
 
-import           Control.Lens                          (Traversal)
-
-import qualified Cardano.Api                           as Api
-import qualified Cardano.Api.Shelley                   as Api.S
-
+import qualified Cardano.Api                     as Api
+import qualified Cardano.Api.Shelley             as Api.S
+import           Control.Lens                    (Traversal)
 import           GeniusYield.Types.Address
 import           GeniusYield.Types.Datum
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.Script
-import           GeniusYield.Types.Script.SimpleScript (simpleScriptToApi)
 import           GeniusYield.Types.Value
 
 -- | Transaction output.

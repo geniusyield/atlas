@@ -78,7 +78,7 @@ instance FromJSON GYSimpleScript where
 readSimpleScript :: FilePath -> IO GYSimpleScript
 readSimpleScript = readJSON
 
--- | Count the total number of unique `GYPaymentKeyHash` mentioned in a 'GYSimpleScript'.
+-- | Get the total number of unique `GYPaymentKeyHash` mentioned in a 'GYSimpleScript'.
 --
 -- This is useful for estimating the number of signatures required for a transaction.
 --

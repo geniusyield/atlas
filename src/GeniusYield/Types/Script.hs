@@ -794,7 +794,7 @@ writeScriptCore desc file s = do
         Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
         Right ()                       -> return ()
 
--- | Type encapsulating both simple and Plutus scripts.
+-- | Type encapsulating both simple and plutus scripts.
 data GYAnyScript where
     GYSimpleScript :: !GYSimpleScript -> GYAnyScript
     GYPlutusScript :: forall v. !(GYScript v) -> GYAnyScript

@@ -1,3 +1,10 @@
+{-|
+Module      : GeniusYield.ReadJSON
+Copyright   : (c) 2023 GYELD GMBH
+License     : Apache 2.0
+Maintainer  : support@geniusyield.co
+Stability   : develop
+-}
 module GeniusYield.ReadJSON (
   readJSON
 ) where

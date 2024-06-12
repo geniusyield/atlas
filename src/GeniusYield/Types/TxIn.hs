@@ -15,18 +15,13 @@ module GeniusYield.Types.TxIn (
     txInToApi,
 ) where
 
-import           Data.GADT.Compare                     (defaultEq)
-
-import qualified Cardano.Api                           as Api
-import qualified Cardano.Api.Shelley                   as Api
-
+import qualified Cardano.Api                     as Api
+import qualified Cardano.Api.Shelley             as Api
+import           Data.GADT.Compare               (defaultEq)
 import           GeniusYield.Types.Datum
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.Redeemer
 import           GeniusYield.Types.Script
-import           GeniusYield.Types.Script.SimpleScript (GYSimpleScript,
-                                                        hashSimpleScript',
-                                                        simpleScriptToApi)
 import           GeniusYield.Types.TxOutRef
 -- | Transaction input:
 --

@@ -59,28 +59,26 @@ module GeniusYield.Transaction (
     GYTxInDetailed (..),
 ) where
 
+import qualified Cardano.Api                           as Api
+import qualified Cardano.Api.Shelley                   as Api
+import qualified Cardano.Api.Shelley                   as Api.S
+import qualified Cardano.Ledger.Alonzo.Scripts         as AlonzoScripts
+import qualified Cardano.Ledger.Alonzo.Tx              as AlonzoTx
+import           Cardano.Ledger.Core                   (EraTx (sizeTxF))
+import           Cardano.Slotting.Time                 (SystemStart)
+import           Control.Arrow                         ((&&&))
+import           Control.Lens                          (view)
+import           Control.Monad.Random
 import           Control.Monad.Trans.Except            (runExceptT, throwE)
+import           Data.Either.Combinators               (maybeToRight)
 import           Data.Foldable                         (Foldable (foldMap'),
                                                         for_)
 import           Data.List                             (delete)
 import qualified Data.Map                              as Map
-import           Data.Ratio                            ((%))
-import qualified Data.Set                              as Set
-
-import           Data.Either.Combinators               (maybeToRight)
 import           Data.Maybe                            (fromJust)
-
-import qualified Cardano.Api                           as Api
-import qualified Cardano.Api.Shelley                   as Api.S
-import qualified Cardano.Ledger.Alonzo.Scripts         as AlonzoScripts
-import qualified Cardano.Ledger.Alonzo.Tx              as AlonzoTx
-import           Cardano.Slotting.Time                 (SystemStart)
-
-import qualified Cardano.Api.Shelley                   as Api
-import           Cardano.Ledger.Core                   (EraTx (sizeTxF))
-import           Control.Lens                          (view)
-import           Control.Monad.Random
+import           Data.Ratio                            ((%))
 import           Data.Semigroup                        (Sum (..))
+import qualified Data.Set                              as Set
 import           GeniusYield.HTTP.Errors               (IsGYApiError)
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.CBOR
@@ -289,7 +287,7 @@ balanceTxStep
             (addIns, changeOuts) <- selectInputs
                 GYCoinSelectionEnv
                     { existingInputs  = ins
-                    , requiredOutputs = (\out -> (gyTxOutAddress out, gyTxOutValue out)) <$> adjustedOuts
+                    , requiredOutputs = (gyTxOutAddress &&& gyTxOutValue) <$> adjustedOuts
                     , mintValue       = valueMint
                     , changeAddr      = changeAddr
                     , ownUtxos        = ownUtxos
@@ -351,7 +349,26 @@ finalizeGYBalancedTx
         body
         changeAddr
         unregisteredStakeCredsMap
+        estimateKeyWitnesses
   where
+    -- Over estimates the number of key witnesses required for the transaction.
+    estimateKeyWitnesses :: Word = fromIntegral $ countUnique (map utxoAddress $ utxosToList collaterals) + estimateKeyWitnessesFromInputs ins + Set.size signers + countUnique ([gyTxWdrlStakeAddress wdrl | wdrl@GYTxWdrl {gyTxWdrlWitness = GYTxWdrlWitnessKey} <- wdrls]) + countUnique ([(certificateToStakeCredential . gyTxCertCertificate) cert | cert@GYTxCert {gyTxCertWitness = Just GYTxCertWitnessKey} <- certs])
+      where
+        countUnique :: Ord a => [a] -> Int
+        countUnique = Set.size . Set.fromList
+
+        estimateKeyWitnessesFromInputs txInDets =
+          -- Count unique key witnesses. Though, following has a caveat in that it does not consider for case where two different Shelley addresses have same payment credential. Same is true when estimating for collaterals above.
+          countUnique [gyTxInDetAddress txInDet | txInDet@GYTxInDetailed {gyTxInDet = GYTxIn {gyTxInWitness = GYTxInWitnessKey}} <- txInDets]
+          +
+          -- Estimate key witnesses required by native scripts.
+          foldl' estimateKeyWitnessesFromNativeScripts 0 txInDets
+            where
+              estimateKeyWitnessesFromNativeScripts acc (gyTxInWitness . gyTxInDet -> GYTxInWitnessSimpleScript gyInSS) =
+                case gyInSS of
+                  GYInSimpleScript s -> acc + countTotalKeysInSimpleScript s
+                  GYInReferenceSimpleScript _ s -> acc + countTotalKeysInSimpleScript s
+              estimateKeyWitnessesFromNativeScripts acc _ = acc
 
     inRefs :: Api.TxInsReference Api.BuildTx Api.BabbageEra
     inRefs = case inRefs' of
@@ -490,11 +507,11 @@ makeTransactionBodyAutoBalanceWrapper :: GYUTxOs
                                       -> Api.S.TxBodyContent Api.S.BuildTx Api.S.BabbageEra
                                       -> GYAddress
                                       -> Map.Map Api.StakeCredential Api.Lovelace
+                                      -> Word
                                       -> Int
                                       -> Either BuildTxException GYTxBody
-makeTransactionBodyAutoBalanceWrapper collaterals ss eh unbundledPP _ps utxos body changeAddr stakeDelegDeposits numSkeletonOuts = do
+makeTransactionBodyAutoBalanceWrapper collaterals ss eh unbundledPP _ps utxos body changeAddr stakeDelegDeposits nkeys numSkeletonOuts = do
     let poolids = Set.empty -- TODO: This denotes the set of registered stake pools, that are being unregistered in this transaction.
-        nkeys = Api.estimateTransactionKeyWitnessCount body
 
     Api.ExecutionUnits
         { executionSteps  = maxSteps
@@ -523,7 +540,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh unbundledPP _ps utxos bo
 
         collateralTotalValue :: GYValue = foldMapUTxOs utxoValue collaterals
         collateralTotalLovelace :: Integer = fst $ valueSplitAda collateralTotalValue
-        balanceNeeded :: Integer = ceiling $ (feeOld * toInteger (fromJust $ Api.S.protocolParamCollateralPercent unbundledPP)) % 100
+        balanceNeeded :: Integer = ceiling $ feeOld * toInteger (fromJust $ Api.S.protocolParamCollateralPercent unbundledPP) % 100
 
       in do
 

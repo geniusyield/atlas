@@ -134,7 +134,7 @@ module GeniusYield.Types.Script (
     GYAnyScript (..),
 
     -- * Simple Script
-    module X
+    module SimpleScript
 ) where
 
 import qualified Cardano.Api                           as Api
@@ -158,7 +158,7 @@ import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger              (PlutusToCardanoError (..))
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.Script.ScriptHash
-import           GeniusYield.Types.Script.SimpleScript as X
+import           GeniusYield.Types.Script.SimpleScript as SimpleScript
 import           GeniusYield.Types.TxOutRef            (GYTxOutRef,
                                                         txOutRefToApi)
 import qualified PlutusLedgerApi.Common                as Plutus
@@ -794,7 +794,7 @@ writeScriptCore desc file s = do
         Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
         Right ()                       -> return ()
 
--- TODO: Haddock.
+-- | Type encapsulating both simple and Plutus scripts.
 data GYAnyScript where
     GYSimpleScript :: !GYSimpleScript -> GYAnyScript
     GYPlutusScript :: forall v. !(GYScript v) -> GYAnyScript

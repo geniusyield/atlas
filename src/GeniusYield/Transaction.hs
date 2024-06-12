@@ -308,7 +308,7 @@ balanceTxStep
   where
     isScriptWitness GYTxInWitnessKey            = False
     isScriptWitness GYTxInWitnessScript{}       = True
-    isScriptWitness GYTxInWitnessSimpleScript{} = True  -- FIXME: Is it needed?
+    isScriptWitness GYTxInWitnessSimpleScript{} = False  -- Simple (native) scripts don't require collateral.
     isCertScriptWitness (Just GYTxCertWitnessScript{}) = True
     isCertScriptWitness _                              = False
     isWdrlScriptWitness GYTxWdrlWitnessScript{} = True

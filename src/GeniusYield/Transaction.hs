@@ -361,29 +361,31 @@ finalizeGYBalancedTx
         unregisteredStakeCredsMap
         estimateKeyWitnesses
   where
-    signersList = Set.toList signers
     -- Over-estimate the number of key witnesses required for the transaction.
+    -- We do not provide support for byron key witnesses in our estimate as @Api.makeTransactionBodyAutoBalance@ does not consider them, i.e., count of key witnesses returned here are considered as shelley key witnesses by cardano api.
     estimateKeyWitnesses :: Word = fromIntegral $ countUnique $
-         map (preferPaymentCredential . utxoAddress) (utxosToList collaterals)
-      <> ([(AGYStakeCredential . stakeAddressToCredential . gyTxWdrlStakeAddress) wdrl | wdrl@GYTxWdrl {gyTxWdrlWitness = GYTxWdrlWitnessKey} <- wdrls])
-      <> ([(AGYStakeCredential . certificateToStakeCredential . gyTxCertCertificate) cert | cert@GYTxCert {gyTxCertWitness = Just GYTxCertWitnessKey} <- certs])
+         mapMaybe (extractPaymentPkhFromAddress . utxoAddress) (utxosToList collaterals)
+      <> [apkh | GYTxWdrl {gyTxWdrlWitness = GYTxWdrlWitnessKey, gyTxWdrlStakeAddress = saddr} <- wdrls, let sc = stakeAddressToCredential saddr, Just apkh <- [preferSCByKey sc]]
+      <> [apkh | cert@GYTxCert {gyTxCertWitness = Just GYTxCertWitnessKey} <- certs, let sc = certificateToStakeCredential $ gyTxCertCertificate cert, Just apkh <- [preferSCByKey sc]]
       <> estimateKeyWitnessesFromInputs ins
-      -- Since it is not clear whether the given pub key hash relates to payment or stake credential, we consider both.
-      <> (map (AGYPaymentCredential . GYPaymentCredentialByKey . fromPubKeyHash) signersList <> map (AGYStakeCredential . GYStakeCredentialByKey . fromPubKeyHash) signersList)
+      <> Set.toList signers
       where
-        preferPaymentCredential gyaddr = case addressToPaymentCredential gyaddr of
-          Nothing -> AGYAddress gyaddr
-          Just pc -> AGYPaymentCredential pc
+        extractPaymentPkhFromAddress gyaddr = addressToPaymentCredential gyaddr >>= \case
+            GYPaymentCredentialByKey pkh -> Just $ toPubKeyHash pkh
+            GYPaymentCredentialByScript _ -> Nothing
+
+        preferSCByKey (GYStakeCredentialByKey pkh) = Just $ toPubKeyHash pkh
+        preferSCByKey _otherwise                   = Nothing
 
         countUnique :: Ord a => [a] -> Int
         countUnique = Set.size . Set.fromList
 
         estimateKeyWitnessesFromInputs txInDets =
           -- Count key witnesses.
-          [(preferPaymentCredential . gyTxInDetAddress) txInDet | txInDet@GYTxInDetailed {gyTxInDet = GYTxIn {gyTxInWitness = GYTxInWitnessKey}} <- txInDets]
+          [apkh | txInDet@GYTxInDetailed {gyTxInDet = GYTxIn {gyTxInWitness = GYTxInWitnessKey}} <- txInDets, let gyaddr = gyTxInDetAddress txInDet, Just apkh <- [extractPaymentPkhFromAddress gyaddr]]
           ++
           -- Estimate key witnesses required by native scripts.
-          map (AGYPaymentCredential . GYPaymentCredentialByKey) (Set.toList $ foldl' estimateKeyWitnessesFromNativeScripts mempty txInDets)
+          map toPubKeyHash (Set.toList $ foldl' estimateKeyWitnessesFromNativeScripts mempty txInDets)
             where
               estimateKeyWitnessesFromNativeScripts acc (gyTxInWitness . gyTxInDet -> GYTxInWitnessSimpleScript gyInSS) =
                 case gyInSS of

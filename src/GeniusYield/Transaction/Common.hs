@@ -12,7 +12,6 @@ module GeniusYield.Transaction.Common (
     GYBalancedTx (..),
     GYTxInDetailed (..),
     BalancingError (..),
-    SomeCredential (..),
     minimumUTxO,
     adjustTxOut
 ) where
@@ -72,9 +71,6 @@ instance Eq BalancingError where
     BalancingErrorEmptyOwnUTxOs == BalancingErrorEmptyOwnUTxOs = True
     BalancingErrorNonPositiveTxOut out1 == BalancingErrorNonPositiveTxOut out2 = txOutToApi out1 == txOutToApi out2
     _ == _ = False
-
-data SomeCredential = AGYAddress !GYAddress | AGYPaymentCredential !GYPaymentCredential | AGYStakeCredential !GYStakeCredential
-  deriving stock (Eq, Ord, Show)
 
 -------------------------------------------------------------------------------
 -- Transaction Utilities

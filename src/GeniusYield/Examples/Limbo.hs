@@ -93,14 +93,14 @@ addRefScript sc = do
 
     case Map.lookup (Some sc) refs of
         Just ref -> return $ Left ref
-        Nothing  -> return $ Right $ mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just sc }
+        Nothing  -> return $ Right $ mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just $ GYPlutusScript sc }
 
 -- | Create UTxO with a reference script.
 --
 addRefScript' :: GYTxMonad m => GYScript 'PlutusV2 -> m (GYTxSkeleton v)
 addRefScript' sc = do
     addr <- scriptAddress limboValidatorV2
-    return $ mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just sc }
+    return $ mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just $ GYPlutusScript sc }
 
 -- | Find reference scripts in transaction body.
 findRefScriptsInBody :: GYTxBody -> Map (Some GYScript) GYTxOutRef

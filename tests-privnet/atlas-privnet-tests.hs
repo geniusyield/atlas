@@ -21,6 +21,7 @@ import           GeniusYield.Test.Privnet.Ctx
 import qualified GeniusYield.Test.Privnet.Examples
 import           GeniusYield.Test.Privnet.Setup
 import qualified GeniusYield.Test.Privnet.Stake
+import qualified GeniusYield.Test.Privnet.SimpleScripts
 
 main :: IO ()
 main = do
@@ -64,6 +65,8 @@ main = do
 
           , GeniusYield.Test.Privnet.Stake.stakeKeyTests setup
           , GeniusYield.Test.Privnet.Stake.stakeValidatorTests setup
+
+          , GeniusYield.Test.Privnet.SimpleScripts.simpleScriptsTests setup
 
           ]
 

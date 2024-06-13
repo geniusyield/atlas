@@ -21,6 +21,8 @@ module GeniusYield.Types.Address (
     addressFromValidator,
     addressFromCredential,
     addressFromValidatorHash,
+    addressFromScriptHash,
+    addressFromSimpleScript,
     addressToText,
     addressFromTextMaybe,
     unsafeAddressFromText,
@@ -310,10 +312,21 @@ addressFromPaymentKeyHash nid pkh = addressFromApi $ Api.AddressShelley $ Api.S.
 -- /note:/ no stake credential.
 --
 addressFromValidatorHash :: GYNetworkId -> GYValidatorHash -> GYAddress
-addressFromValidatorHash nid vh = addressFromApi $ Api.AddressShelley $ Api.S.makeShelleyAddress
+addressFromValidatorHash nid vh = addressFromScriptHash' nid (validatorHashToApi vh)
+
+-- | Create address from 'GYScriptHash'.
+addressFromScriptHash :: GYNetworkId -> GYScriptHash -> GYAddress
+addressFromScriptHash nid sh = addressFromScriptHash' nid (scriptHashToApi sh)
+
+addressFromScriptHash' :: GYNetworkId -> Api.ScriptHash -> GYAddress
+addressFromScriptHash' nid sh = addressFromApi $ Api.AddressShelley $ Api.S.makeShelleyAddress
     (networkIdToApi nid)
-    (Api.S.PaymentCredentialByScript (validatorHashToApi vh))
+    (Api.S.PaymentCredentialByScript sh)
     Api.S.NoStakeAddress
+
+-- | Create address from `GYSimpleScript`.
+addressFromSimpleScript :: GYNetworkId -> GYSimpleScript -> GYAddress
+addressFromSimpleScript nid script = addressFromScriptHash' nid (hashSimpleScript' script)
 
 -- | Create an address from payment & optionally, a stake credential.
 addressFromCredential :: GYNetworkId -> GYPaymentCredential -> Maybe GYStakeCredential -> GYAddress

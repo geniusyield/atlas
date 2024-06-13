@@ -324,7 +324,7 @@ utxosInBody Fork.Tx{txOutputs = os} txId = mapM (\i -> utxoAtTxOutRef (txOutRefF
 addRefScript :: GYAddress -> GYValidator 'PlutusV2 -> GYTxMonadRun (Maybe GYTxOutRef)
 addRefScript addr script = do
     let script' = validatorToScript script
-    (Tx _ txBody, txId) <- sendSkeleton' (mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just script' }) []
+    (Tx _ txBody, txId) <- sendSkeleton' (mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just $ GYPlutusScript script' }) []
     -- now need to find utxo at given address which has the given reference script hm...
     let index = findIndex (\o -> Plutus2.txOutReferenceScript o == Just (scriptPlutusHash script')) (Fork.txOutputs txBody)
     return $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< index

@@ -27,7 +27,8 @@ import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy             as LBS
 import           Data.Char                        (toLower)
 import qualified Data.Text                        as Text
-import           Data.Time                        (NominalDiffTime, getCurrentTime, diffUTCTime)
+import           Data.Time                        (NominalDiffTime, diffUTCTime,
+                                                   getCurrentTime)
 
 import qualified Cardano.Api                      as Api
 
@@ -39,6 +40,7 @@ import qualified GeniusYield.Providers.Kupo       as KupoApi
 import qualified GeniusYield.Providers.Maestro    as MaestroApi
 import           GeniusYield.Providers.Node       (nodeStakeAddressInfo)
 import qualified GeniusYield.Providers.Node       as Node
+import           GeniusYield.ReadJSON             (readJSON)
 import           GeniusYield.Types
 
 -- | How many seconds to keep slots cached, before refetching the data.
@@ -82,11 +84,7 @@ $( deriveFromJSON
  )
 
 coreProviderIO :: FilePath -> IO GYCoreProviderInfo
-coreProviderIO filePath = do
-  bs <- LBS.readFile filePath
-  case Aeson.eitherDecode' bs of
-    Left err  -> throwIO $ userError err
-    Right cfg -> pure cfg
+coreProviderIO = readJSON
 
 isNodeKupo :: GYCoreProviderInfo -> Bool
 isNodeKupo GYNodeKupo {} = True

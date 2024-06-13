@@ -120,6 +120,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                       else throwError $ GYDatumMismatch utxoOutDatum gyTxIn
                       where
                         checkDatumMatch _ GYTxInWitnessKey = True
+                        checkDatumMatch _ GYTxInWitnessSimpleScript{} = True
                         checkDatumMatch ud (GYTxInWitnessScript _ wd _) = case ud of
                           GYOutDatumNone       -> False
                           GYOutDatumHash h     -> h == hashDatum wd

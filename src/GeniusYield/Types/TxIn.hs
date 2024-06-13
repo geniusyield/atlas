@@ -9,15 +9,15 @@ Stability   : develop
 module GeniusYield.Types.TxIn (
     GYTxIn (..),
     GYInScript (..),
+    GYInSimpleScript (..),
     inScriptVersion,
     GYTxInWitness (..),
     txInToApi,
 ) where
 
-import           Data.GADT.Compare               (defaultEq)
-
 import qualified Cardano.Api                     as Api
-
+import qualified Cardano.Api.Shelley             as Api
+import           Data.GADT.Compare               (defaultEq)
 import           GeniusYield.Types.Datum
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.Redeemer
@@ -44,6 +44,8 @@ data GYTxInWitness v
     = GYTxInWitnessKey
     -- | Script witness with associated script, datum, and redeemer.
     | GYTxInWitnessScript !(GYInScript v) !GYDatum !GYRedeemer
+    -- | Simple script witness.
+    | GYTxInWitnessSimpleScript !(GYInSimpleScript v)
     deriving stock (Eq, Show)
 
 data GYInScript (u :: PlutusVersion) where
@@ -67,6 +69,17 @@ instance Eq (GYInScript v) where
     GYInScript v1 == GYInScript v2                           = defaultEq v1 v2
     _ == _ = False
 
+data GYInSimpleScript (u :: PlutusVersion) where
+    GYInSimpleScript :: !GYSimpleScript -> GYInSimpleScript u
+    GYInReferenceSimpleScript :: !GYTxOutRef -> !GYSimpleScript -> GYInSimpleScript 'PlutusV2
+
+deriving instance Show (GYInSimpleScript v)
+
+instance Eq (GYInSimpleScript v) where
+    GYInSimpleScript s1 == GYInSimpleScript s2 = s1 == s2
+    GYInReferenceSimpleScript ref1 s1 == GYInReferenceSimpleScript ref2 s2 = ref1 == ref2 && s1 == s2
+    _ == _ = False
+
 -- |
 --
 -- /Note:/ @TxIns@ type synonym is not exported: https://github.com/input-output-hk/cardano-node/issues/3732
@@ -82,6 +95,11 @@ txInToApi useInline (GYTxIn oref m) = (txOutRefToApi oref, Api.BuildTxWith $ f m
         (if useInline then Api.InlineScriptDatum else Api.ScriptDatumForTxIn $ datumToApi' d)
         (redeemerToApi r)
         (Api.ExecutionUnits 0 0)
+    f (GYTxInWitnessSimpleScript v) =
+        Api.ScriptWitness Api.ScriptWitnessForSpending $ Api.SimpleScriptWitness Api.SimpleScriptInBabbage $ h v
 
     g (GYInScript v)        = validatorToApiPlutusScriptWitness v
     g (GYInReference ref s) = referenceScriptToApiPlutusScriptWitness ref s
+
+    h (GYInSimpleScript v) = Api.SScript $ simpleScriptToApi v
+    h (GYInReferenceSimpleScript ref s) = Api.SReferenceScript (txOutRefToApi ref) $ Just $ hashSimpleScript' s

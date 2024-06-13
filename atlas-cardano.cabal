@@ -81,6 +81,7 @@ library
     GeniusYield.Providers.Maestro
     GeniusYield.Providers.Node
     GeniusYield.Providers.Sentry
+    GeniusYield.ReadJSON
     GeniusYield.Scripts.TestToken
     GeniusYield.Swagger.Utils
     GeniusYield.Test.Privnet.Asserts
@@ -128,6 +129,8 @@ library
     GeniusYield.Types.Rational
     GeniusYield.Types.Redeemer
     GeniusYield.Types.Script
+    GeniusYield.Types.Script.ScriptHash
+    GeniusYield.Types.Script.SimpleScript
     GeniusYield.Types.Slot
     GeniusYield.Types.SlotConfig
     GeniusYield.Types.StakeAddressInfo
@@ -220,6 +223,7 @@ library
     , cardano-ledger-binary
     , cardano-ledger-byron
     , cardano-ledger-core:{cardano-ledger-core, testlib}
+    , cardano-ledger-shelley
     , cardano-slotting
     , cardano-wallet-primitive
     , ouroboros-consensus
@@ -318,6 +322,7 @@ test-suite atlas-privnet-tests
   hs-source-dirs: tests-privnet
   main-is:        atlas-privnet-tests.hs
   other-modules:
+    GeniusYield.Test.Privnet.SimpleScripts
     GeniusYield.Test.Privnet.Stake
     GeniusYield.Test.Privnet.Stake.Key
     GeniusYield.Test.Privnet.Stake.Utils
@@ -328,5 +333,6 @@ test-suite atlas-privnet-tests
     , atlas-cardano:{atlas-cardano, framework-onchain-plutustx}
     , base
     , containers
+    , lens
     , tasty
     , tasty-hunit

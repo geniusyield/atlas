@@ -14,6 +14,7 @@ module GeniusYield.Types.Slot (
     unsafeAdvanceSlot,
     slotToInteger,
     slotFromInteger,
+    slotFromWord64,
     unsafeSlotFromInteger
 ) where
 
@@ -21,20 +22,23 @@ import           Data.Word           (Word64)
 import           GeniusYield.Imports
 
 import qualified Cardano.Api         as Api
-import qualified Data.Aeson.Types    as Aeson
 import qualified Data.Swagger        as Swagger
 import qualified Text.Printf         as Printf
+import           Web.HttpApiData     (FromHttpApiData, ToHttpApiData)
 
+-- $setup
+--
+-- >>> :set -XOverloadedStrings -XTypeApplications
+-- >>> import qualified Data.Aeson as Aeson
+
+-- >>> Aeson.fromJSON @GYSlot $ Aeson.Number 420000000000000000000000000000
+-- Error "parsing Word64 failed, value is either floating or will cause over or underflow 4.2e29"
 newtype GYSlot = GYSlot Word64
   deriving (Show, Read, Eq, Ord)
-  deriving newtype (Swagger.ToParamSchema, Swagger.ToSchema)
+  deriving newtype (Swagger.ToParamSchema, Swagger.ToSchema, ToJSON, FromJSON, ToHttpApiData, FromHttpApiData)
 
 instance Printf.PrintfArg GYSlot where
     formatArg (GYSlot n) = Printf.formatArg (show n)
-
-instance ToJSON GYSlot where
-    toEncoding (GYSlot n) = Aeson.toEncoding n
-    toJSON     (GYSlot n) = Aeson.toJSON n
 
 slotToApi :: GYSlot -> Api.SlotNo
 slotToApi = coerce
@@ -50,6 +54,9 @@ slotFromInteger s
     | s > toInteger (maxBound :: Word64) = Nothing
     | s < toInteger (minBound :: Word64) = Nothing
     | otherwise                          = Just . GYSlot $ fromInteger s
+
+slotFromWord64 :: Word64 -> GYSlot
+slotFromWord64 = GYSlot
 
 -- | Advance 'GYSlot' forward. If slot value overflows, return 'Nothing'.
 advanceSlot :: GYSlot -> Natural -> Maybe GYSlot

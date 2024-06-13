@@ -62,14 +62,24 @@ module GeniusYield.Transaction (
 import qualified Cardano.Api                           as Api
 import qualified Cardano.Api.Shelley                   as Api
 import qualified Cardano.Api.Shelley                   as Api.S
+import           Cardano.Crypto.DSIGN                  (sizeSigDSIGN,
+                                                        sizeVerKeyDSIGN)
 import qualified Cardano.Ledger.Alonzo.Scripts         as AlonzoScripts
 import qualified Cardano.Ledger.Alonzo.Tx              as AlonzoTx
-import           Cardano.Ledger.Core                   (EraTx (sizeTxF))
+import qualified Cardano.Ledger.Binary                 as CLB
+import qualified Cardano.Ledger.Binary.Crypto          as CLB
+import           Cardano.Ledger.Core                   (EraTx (sizeTxF),
+                                                        eraProtVerLow)
+import           Cardano.Ledger.Crypto                 (Crypto (..))
+import           Cardano.Ledger.Era                    (Era (..))
+import           Cardano.Ledger.Keys.WitVKey           (WitVKey (..))
+import qualified Cardano.Ledger.Shelley.API.Wallet     as Shelley
 import           Cardano.Slotting.Time                 (SystemStart)
 import           Control.Arrow                         ((&&&))
 import           Control.Lens                          (view)
 import           Control.Monad.Random
 import           Control.Monad.Trans.Except            (runExceptT, throwE)
+import qualified Data.ByteString.Lazy                  as LBS
 import           Data.Either.Combinators               (maybeToRight)
 import           Data.Foldable                         (Foldable (foldMap'),
                                                         for_)
@@ -581,14 +591,34 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh unbundledPP _ps utxos bo
             { AlonzoScripts.exUnitsSteps = steps
             , AlonzoScripts.exUnitsMem   = mem
             } = AlonzoTx.totExUnits ltx
-        txSize :: Natural = fromInteger $ view sizeTxF ltx
+        txSize :: Natural =
+          let
+              -- This low level code is taken verbatim from here: https://github.com/IntersectMBO/cardano-ledger/blob/6db84a7b77e19af58feb2f45dfc50aa70435967b/eras/shelley/impl/src/Cardano/Ledger/Shelley/API/Wallet.hs#L475-L494, as this is what is referred by @cardano-api@ under the hood.
+              -- This does not take into account the bootstrap (byron) witnesses.
+              version = eraProtVerLow @ShelleyBasedBabbageEra
+              sigSize = fromIntegral $ sizeSigDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedBabbageEra)))
+              dummySig =
+                fromRight
+                  (error "corrupt dummy signature")
+                  ( CLB.decodeFullDecoder
+                      version
+                      "dummy signature"
+                      CLB.decodeSignedDSIGN
+                      (CLB.serialize version $ LBS.replicate sigSize 0)
+                  )
+              vkeySize = fromIntegral $ sizeVerKeyDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedBabbageEra)))
+              dummyVKey w =
+                let padding = LBS.replicate paddingSize 0
+                    paddingSize = vkeySize - LBS.length sw
+                    sw = CLB.serialize version w
+                    keyBytes = CLB.serialize version $ padding <> sw
+                in fromRight (error "corrupt dummy vkey") (CLB.decodeFull version keyBytes)
+          in fromInteger $ view sizeTxF $ Shelley.addKeyWitnesses ltx (Set.fromList [WitVKey (dummyVKey x) dummySig | x <- [1 .. nkeys]])
     -- See: Cardano.Ledger.Alonzo.Rules.validateExUnitsTooBigUTxO
     unless (steps <= maxSteps && mem <= maxMemory) $
         Left $ BuildTxExUnitsTooBig (maxSteps, maxMemory) (steps, mem)
     -- See: Cardano.Ledger.Shelley.Rules.validateMaxTxSizeUTxO
     unless (txSize <= maxTxSize) $
-        {- Technically, this doesn't compare with the _final_ tx size, because of signers that will be
-        added later. But signing witnesses are only a few bytes, so it's unlikely to be an issue -}
         Left (BuildTxSizeTooBig maxTxSize txSize)
 
     collapsedBody <- first BuildTxCollapseExtraOutError $ collapseExtraOut extraOut txBodyContent txBody numSkeletonOuts
@@ -633,3 +663,5 @@ collapseExtraOut apiOut@(Api.TxOut _ outVal _ _) bodyContent@Api.TxBodyContent {
             Api.S.createAndValidateTransactionBody $ bodyContent { Api.txOuts = nOuts }
   where
     (skeletonOuts, changeOuts) = splitAt numSkeletonOuts txOuts
+
+type ShelleyBasedBabbageEra = Api.S.ShelleyLedgerEra Api.BabbageEra

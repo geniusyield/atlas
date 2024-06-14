@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {-|
 Module      : GeniusYield.Types.Logging
 Copyright   : (c) 2023 GYELD GMBH
@@ -8,7 +9,7 @@ Stability   : develop
 -}
 module GeniusYield.Types.Logging
     ( -- * Severity
-      GYLogSeverity (..)
+      GYLogSeverity (GYDebug, GYInfo, GYWarning, GYError)
       -- * Verbosity
     , GYLogVerbosity (..)
       -- * Namespace
@@ -65,14 +66,15 @@ import qualified Text.Printf                  as Printf
 -- >>> LBS8.putStrLn $ Aeson.encode GYError
 -- "Error"
 --
-data GYLogSeverity = GYDebug | GYInfo | GYWarning | GYError
-    deriving stock (Show, Read, Eq, Ord, Enum, Bounded)
+newtype GYLogSeverity = GYLogSeverity K.Severity
+    deriving stock (Show, Read)
+    deriving newtype (Eq, Ord, Enum, Bounded, Aeson.FromJSON, Aeson.ToJSON)
 
-instance Aeson.ToJSON GYLogSeverity where
-    toJSON GYDebug   = "Debug"
-    toJSON GYInfo    = "Info"
-    toJSON GYWarning = "Warning"
-    toJSON GYError   = "Error"
+pattern GYDebug, GYInfo, GYWarning, GYError :: GYLogSeverity
+pattern GYDebug = GYLogSeverity K.DebugS
+pattern GYInfo = GYLogSeverity K.InfoS
+pattern GYWarning = GYLogSeverity K.WarningS
+pattern GYError = GYLogSeverity K.ErrorS
 
 -- |
 --
@@ -91,19 +93,10 @@ instance Aeson.ToJSON GYLogSeverity where
 -- >>> Aeson.eitherDecode @GYLogSeverity "\"Fatal\""
 -- Left "Error in $: unknown GYLogSeverity: Fatal"
 --
-instance Aeson.FromJSON GYLogSeverity where
-    parseJSON = Aeson.withText "GYLogSeverity" $ \t ->
-        if | t == "Debug"   -> return GYDebug
-           | t == "Info"    -> return GYInfo
-           | t == "Warning" -> return GYWarning
-           | t == "Error"   -> return GYError
-           | otherwise      -> fail $ "unknown GYLogSeverity: " <> Text.unpack t
+
 
 logSeverityToKatip :: GYLogSeverity -> K.Severity
-logSeverityToKatip GYDebug   = K.DebugS
-logSeverityToKatip GYInfo    = K.InfoS
-logSeverityToKatip GYWarning = K.WarningS
-logSeverityToKatip GYError   = K.ErrorS
+logSeverityToKatip = coerce
 
 -------------------------------------------------------------------------------
 -- Verbosity

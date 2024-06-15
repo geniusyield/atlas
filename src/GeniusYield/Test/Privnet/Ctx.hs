@@ -104,7 +104,7 @@ data Ctx = Ctx
     , ctxUser9            :: !User
     , ctxGold             :: !GYAssetClass  -- ^ asset used in tests
     , ctxIron             :: !GYAssetClass  -- ^ asset used in tests
-    , ctxLog              :: !GYLog
+    , ctxLogConfiguration :: !GYLogConfiguration
     , ctxLookupDatum      :: !GYLookupDatum
     , ctxAwaitTxConfirmed :: !GYAwaitTx
     , ctxQueryUtxos       :: !GYQueryUTxO
@@ -199,7 +199,7 @@ ctxProviders ctx = GYProviders
     , gySlotActions      = nodeSlotActions (ctxInfo ctx)
     , gyGetParameters    = ctxGetParams ctx
     , gyQueryUTxO        = ctxQueryUtxos ctx
-    , gyLog'             = ctxLog ctx
+    , gyLogConfiguration' = ctxLogConfiguration ctx
     , gyGetStakeAddressInfo = nodeStakeAddressInfo (ctxInfo ctx)
     }
 

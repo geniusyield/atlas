@@ -76,7 +76,6 @@ library
     GeniusYield.Providers.CachedQueryUTxOs
     GeniusYield.Providers.Common
     GeniusYield.Providers.GCP
-    GeniusYield.Providers.Katip
     GeniusYield.Providers.Kupo
     GeniusYield.Providers.Maestro
     GeniusYield.Providers.Node
@@ -188,6 +187,7 @@ library
     , servant-client        ^>=0.19
     , servant-client-core   ^>=0.19
     , some                  ^>=1.0.5
+    , string-conv
     , swagger2              ^>=2.8.7
     , tasty                 ^>=1.4.3
     , tasty-hunit           ^>=0.10.0.3

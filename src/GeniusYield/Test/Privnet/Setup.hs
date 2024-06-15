@@ -140,7 +140,7 @@ makeSetup' privnetPath kupoUrl = do
 
     let localGetParams :: GYGetParameters
         localGetParams = nodeGetParameters era info
-
+    noLoggingCfg' <- noLoggingCfg
     -- context used for tests
     let user' = flip User Nothing
         ctx0 :: Ctx
@@ -158,7 +158,7 @@ makeSetup' privnetPath kupoUrl = do
             , ctxUser9            = uncurry user' (V.index userSkeyAddr (Proxy @7))
             , ctxGold             = GYLovelace -- temporarily
             , ctxIron             = GYLovelace -- temporarily
-            , ctxLog              = noLogging
+            , ctxLogConfiguration = noLoggingCfg'
             , ctxLookupDatum      = localLookupDatum
             , ctxAwaitTxConfirmed = localAwaitTxConfirmed
             , ctxQueryUtxos       = localQueryUtxo
@@ -196,8 +196,9 @@ makeSetup' privnetPath kupoUrl = do
           giveTokens ctx (snd $ userSkeyAddr V.! i)
       ) userBalances
 
+    simpleConsoleLoggingCfg' <- simpleConsoleLoggingCfg
     return $ Setup
-        (\putLog kont -> kont $ ctx { ctxLog = simpleConsoleLogging putLog })
+        (\putLog kont -> kont $ ctx { ctxLogConfiguration = simpleConsoleLoggingCfg' })
 
 -------------------------------------------------------------------------------
 -- Generating users

@@ -35,13 +35,13 @@ import qualified Cardano.Api                      as Api
 import           GeniusYield.Imports
 import qualified GeniusYield.Providers.Blockfrost as Blockfrost
 -- import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
-import qualified GeniusYield.Providers.Katip      as Katip
 import qualified GeniusYield.Providers.Kupo       as KupoApi
 import qualified GeniusYield.Providers.Maestro    as MaestroApi
 import           GeniusYield.Providers.Node       (nodeStakeAddressInfo)
 import qualified GeniusYield.Providers.Node       as Node
 import           GeniusYield.ReadJSON             (readJSON)
 import           GeniusYield.Types
+import qualified Katip
 
 -- | How many seconds to keep slots cached, before refetching the data.
 slotCachingTime :: NominalDiffTime
@@ -208,7 +208,12 @@ withCfgProviders
             , Blockfrost.blockfrostStakeAddressInfo proj
             )
 
-      bracket (Katip.mkKatipLog ns cfgLogging) logCleanUp $ \gyLog' -> do
+      bracket (mkLogEnv ns cfgLogging) (Katip.closeScribes . logEnvToKatip) $ \logEnv -> do
+        let gyLogConfiguration' = GYLogConfiguration
+                       { cfgLogNamespace = mempty
+                       , cfgLogContexts = mempty
+                       , cfgLogEnv = logEnv
+                       }
         (gyQueryUTxO, gySlotActions) <-
           {-if cfgUtxoCacheEnable
           then do
@@ -224,7 +229,7 @@ withCfgProviders
         case e of
             Right a                     -> pure a
             Left (err :: SomeException) -> do
-                logRun gyLog' mempty GYError $ printf "ERROR: %s" $ show err
+                logRun gyLogConfiguration' GYError ((printf "ERROR: %s" $ show err) :: String)
                 throwIO err
 
 logTiming :: GYProviders -> GYProviders
@@ -236,7 +241,7 @@ logTiming providers@GYProviders {..} = GYProviders
     , gyGetParameters       = gyGetParameters'
     , gyQueryUTxO           = gyQueryUTxO'
     , gyGetStakeAddressInfo = gyGetStakeAddressInfo'
-    , gyLog'                = gyLog'
+    , gyLogConfiguration'   = gyLogConfiguration'
     }
   where
     wrap :: String -> IO a -> IO a

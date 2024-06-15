@@ -1,4 +1,6 @@
 {-# LANGUAGE InstanceSigs #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+-- FIXME: Maybe I can get rid of above pragma related to orphans.
 {-|
 Module      : GeniusYield.TxBuilder.Class
 Copyright   : (c) 2023 GYELD GMBH
@@ -91,9 +93,11 @@ import qualified PlutusLedgerApi.V1           as Plutus (Address, DatumHash,
                                                          TxOutRef, Value)
 import qualified PlutusLedgerApi.V1.Value     as Plutus (AssetClass)
 
+import           Control.Monad.IO.Class       (MonadIO)
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+import qualified Katip                        as K
 
 -------------------------------------------------------------------------------
 -- Class
@@ -186,6 +190,11 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
 
     -- | Log a message with specified namespace and severity.
     logMsg :: HasCallStack => GYLogNamespace -> GYLogSeverity -> String -> m ()
+
+    -- | Obtain log configuration.
+    -- FIXME: Update minimal above.
+    -- FIXME: Lift it elsehwhere.
+    logConfiguration :: m GYLogConfiguration
 
 -- | Class of monads for querying monads as a user.
 class GYTxQueryMonad m => GYTxMonad m where
@@ -281,6 +290,28 @@ instance GYTxMonad m => GYTxMonad (ExceptT GYTxMonadException m) where
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
     randSeed = lift randSeed
+
+startLogging = undefined
+
+instance (MonadIO m, GYTxQueryMonad m) => K.Katip m where
+    getLogEnv = fmap (logEnvToKatip . cfgLogEnv) logConfiguration
+    localLogEnv f m = do
+        cfg <- logConfiguration
+        let cfg' = cfg { cfgLogEnv = logEnvFromKatip $ f (logEnvToKatip $ cfgLogEnv cfg) }
+        startLogging cfg' m
+
+instance (MonadIO m, GYTxQueryMonad m) => K.KatipContext m where
+    getKatipContext = fmap (logContextsToKatip . cfgLogContexts) logConfiguration
+    localKatipContext f m = do
+        cfg <- logConfiguration
+        let cfg' = cfg { cfgLogContexts = logContextsFromKatip $ f (logContextsToKatip $ cfgLogContexts cfg) }
+        startLogging cfg' m
+    getKatipNamespace = fmap (logNamespaceToKatip . cfgLogNamespace) logConfiguration
+    localKatipNamespace f m = do
+        cfg <- logConfiguration
+        let cfg' = cfg { cfgLogNamespace = logNamespaceFromKatip $ f (logNamespaceToKatip $ cfgLogNamespace cfg) }
+        startLogging cfg' m
+
 
 -- | A version of 'lookupDatum' that raises 'GYNoDatumForHash' if the datum is not found.
 lookupDatum' :: GYTxQueryMonad m => GYDatumHash -> m GYDatum

@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 {-|
 Module      : GeniusYield.Types.Logging
 Copyright   : (c) 2023 GYELD GMBH
@@ -9,33 +8,51 @@ Stability   : develop
 -}
 module GeniusYield.Types.Logging
     ( -- * Severity
-      GYLogSeverity (GYDebug, GYInfo, GYWarning, GYError)
+      GYLogSeverity (..)
+    , logSeverityToKatip
       -- * Verbosity
     , GYLogVerbosity (..)
+    , logVerbosityToKatip
       -- * Namespace
     , GYLogNamespace
+    , logNamespaceFromKatip
+    , logNamespaceToKatip
+      -- * Log contexts
+    , GYLogContexts
+    , logContextsFromKatip
+    , logContextsToKatip
+    , addContext
+      -- * Log environment
+    , GYLogEnv
+    , logEnvFromKatip
+    , logEnvToKatip
+      -- * Log configuration
+    , GYLogConfiguration (..)
+    , cfgAddNamespace
+    , cfgAddContext
+    , logRun
       -- * Scribe Configuration
     , GYLogScribeType (..)
     , GYLogScribeConfig (..)
     , LogSrc (..)
       -- * Utilities
-    , logSeverityToKatip
-    , logVerbosityToKatip
-    , logNamespaceToKatip
     , prettyNamespace
     , mkLogEnv
     ) where
 
+import           Control.Monad.IO.Class       (MonadIO)
 import           Data.Aeson                   (Key)
 import qualified Data.Aeson                   as Aeson
 import qualified Data.Aeson.Key               as Key
 import           Data.List                    (intercalate, isSuffixOf)
 import           Data.Maybe                   (fromJust)
+import           Data.String.Conv             (StringConv)
 import qualified Data.Text                    as Text
 import           GeniusYield.Imports
 import           GeniusYield.Providers.GCP    (gcpFormatter)
 import qualified GeniusYield.Providers.Sentry as Sentry
 import qualified Katip                        as K
+import qualified Katip.Core                   as KC
 import           Network.URI                  (URI (..), URIAuth (..),
                                                parseURIReference)
 import           System.IO                    (stderr, stdout)
@@ -66,15 +83,14 @@ import qualified Text.Printf                  as Printf
 -- >>> LBS8.putStrLn $ Aeson.encode GYError
 -- "Error"
 --
-newtype GYLogSeverity = GYLogSeverity K.Severity
-    deriving stock (Show, Read)
-    deriving newtype (Eq, Ord, Enum, Bounded, Aeson.FromJSON, Aeson.ToJSON)
+data GYLogSeverity = GYDebug | GYInfo | GYWarning | GYError
+    deriving stock (Show, Read, Eq, Ord, Enum, Bounded)
 
-pattern GYDebug, GYInfo, GYWarning, GYError :: GYLogSeverity
-pattern GYDebug = GYLogSeverity K.DebugS
-pattern GYInfo = GYLogSeverity K.InfoS
-pattern GYWarning = GYLogSeverity K.WarningS
-pattern GYError = GYLogSeverity K.ErrorS
+instance Aeson.ToJSON GYLogSeverity where
+    toJSON GYDebug   = "Debug"
+    toJSON GYInfo    = "Info"
+    toJSON GYWarning = "Warning"
+    toJSON GYError   = "Error"
 
 -- |
 --
@@ -93,10 +109,19 @@ pattern GYError = GYLogSeverity K.ErrorS
 -- >>> Aeson.eitherDecode @GYLogSeverity "\"Fatal\""
 -- Left "Error in $: unknown GYLogSeverity: Fatal"
 --
-
+instance Aeson.FromJSON GYLogSeverity where
+    parseJSON = Aeson.withText "GYLogSeverity" $ \t ->
+        if | t == "Debug"   -> return GYDebug
+           | t == "Info"    -> return GYInfo
+           | t == "Warning" -> return GYWarning
+           | t == "Error"   -> return GYError
+           | otherwise      -> fail $ "unknown GYLogSeverity: " <> Text.unpack t
 
 logSeverityToKatip :: GYLogSeverity -> K.Severity
-logSeverityToKatip = coerce
+logSeverityToKatip GYDebug   = K.DebugS
+logSeverityToKatip GYInfo    = K.InfoS
+logSeverityToKatip GYWarning = K.WarningS
+logSeverityToKatip GYError   = K.ErrorS
 
 -------------------------------------------------------------------------------
 -- Verbosity
@@ -150,8 +175,59 @@ instance Printf.PrintfArg GYLogNamespace where
 logNamespaceToKatip :: GYLogNamespace -> K.Namespace
 logNamespaceToKatip = coerce
 
+logNamespaceFromKatip :: K.Namespace -> GYLogNamespace
+logNamespaceFromKatip = coerce
+
 prettyNamespace :: GYLogNamespace -> String
 prettyNamespace ns = intercalate "." $ map Text.unpack $ K.unNamespace $ logNamespaceToKatip ns
+
+-------------------------------------------------------------------------------
+-- Log contexts
+-------------------------------------------------------------------------------
+
+newtype GYLogContexts = GYLogContexts K.LogContexts
+  deriving newtype (Semigroup, Monoid)
+
+logContextsFromKatip :: K.LogContexts -> GYLogContexts
+logContextsFromKatip = coerce
+
+logContextsToKatip :: GYLogContexts -> K.LogContexts
+logContextsToKatip = coerce
+
+addContext :: KC.LogItem i => i -> GYLogContexts -> GYLogContexts
+addContext i ctx = ctx <> logContextsFromKatip (K.liftPayload i)
+
+-------------------------------------------------------------------------------
+-- Log environment
+-------------------------------------------------------------------------------
+
+newtype GYLogEnv = GYLogEnv K.LogEnv
+
+logEnvFromKatip :: K.LogEnv -> GYLogEnv
+logEnvFromKatip = coerce
+
+logEnvToKatip :: GYLogEnv -> K.LogEnv
+logEnvToKatip = coerce
+
+-------------------------------------------------------------------------------
+-- Log configuration
+-------------------------------------------------------------------------------
+
+data GYLogConfiguration = GYLogConfiguration
+  { cfgLogNamespace :: !GYLogNamespace
+  , cfgLogContexts  :: !GYLogContexts
+  , cfgLogEnv       :: !GYLogEnv
+  }
+
+cfgAddNamespace :: GYLogNamespace -> GYLogConfiguration -> GYLogConfiguration
+cfgAddNamespace ns cfg = cfg { cfgLogNamespace = cfgLogNamespace cfg <> ns }
+
+cfgAddContext :: KC.LogItem i => i -> GYLogConfiguration -> GYLogConfiguration
+cfgAddContext i cfg = cfg { cfgLogContexts = addContext i (cfgLogContexts cfg) }
+
+-- FIXME: Remove the comment below.
+logRun :: (HasCallStack, MonadIO m, StringConv a Text) => GYLogConfiguration -> GYLogSeverity -> a -> m ()
+logRun (GYLogConfiguration {..}) sev msg = K.runKatipT (logEnvToKatip cfgLogEnv) $ K.logLoc (logContextsToKatip cfgLogContexts) (logNamespaceToKatip cfgLogNamespace) (logSeverityToKatip sev) (K.logStr msg) -- K.logItem (logContextsToKatip cfgLogContexts) (logNamespaceToKatip cfgLogNamespace) KC.getLoc (logSeverityToKatip sev) (K.logStr msg)
 
 -------------------------------------------------------------------------------
 -- Scribe Configuration
@@ -295,10 +371,10 @@ mkScribe GYLogScribeConfig {..} = case cfgLogType of
       x ->
         fail $ "Unsupported LogSrc: " <> show x
 
-mkLogEnv :: GYLogNamespace -> [GYLogScribeConfig] -> IO K.LogEnv
+mkLogEnv :: GYLogNamespace -> [GYLogScribeConfig] -> IO GYLogEnv
 mkLogEnv ns cfgs = do
     logEnv <- K.initLogEnv (logNamespaceToKatip $ "GeniusYield" <> ns) ""
-    foldM f logEnv cfgs
+    logEnvFromKatip <$> foldM f logEnv cfgs
   where
     f :: K.LogEnv -> GYLogScribeConfig -> IO K.LogEnv
     f logEnv cfg = do

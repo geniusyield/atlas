@@ -4,7 +4,6 @@ Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.Types.Providers
     ( -- * Lookup Datum
@@ -56,14 +55,13 @@ module GeniusYield.Types.Providers
     , gyQueryUtxoAtPaymentCredentialsDefault
     , gyQueryUtxosAtTxOutRefsDefault
       -- * Logging
-    , GYLog (..)
     , gyLog
     , gyLogDebug
     , gyLogInfo
     , gyLogWarning
     , gyLogError
-    , noLogging
-    , simpleConsoleLogging
+    , noLoggingCfg
+    , simpleConsoleLoggingCfg
       -- * Providers
     , GYProviders (..)
     ) where
@@ -73,6 +71,7 @@ import qualified Cardano.Api.Shelley                as Api.S
 import           Cardano.Slotting.Time              (SystemStart)
 import           Control.Concurrent                 (MVar, modifyMVar, newMVar,
                                                      threadDelay)
+import           Control.Exception                  (bracket)
 import           Control.Monad                      ((<$!>))
 import           Control.Monad.IO.Class             (MonadIO (..))
 import           Data.Default                       (Default, def)
@@ -93,6 +92,8 @@ import           GeniusYield.Types.Tx
 import           GeniusYield.Types.TxOutRef
 import           GeniusYield.Types.UTxO
 import           GeniusYield.Types.Value            (GYAssetClass)
+import qualified Katip
+import           System.IO                          (stdout)
 
 {- Note [Caching and concurrently accessible MVars]
 
@@ -133,7 +134,7 @@ data GYProviders = GYProviders
     , gyGetParameters       :: !GYGetParameters
     , gyQueryUTxO           :: !GYQueryUTxO
     , gyGetStakeAddressInfo :: !(GYStakeAddress -> IO (Maybe GYStakeAddressInfo))
-    , gyLog'                :: !GYLog
+    , gyLogConfiguration'   :: !GYLogConfiguration
     }
 
 gyGetSlotOfCurrentBlock :: GYProviders -> IO GYSlot
@@ -514,13 +515,11 @@ gyQueryUtxosAtTxOutRefsWithDatumsDefault utxosAtTxOutRefsFun lookupDatumFun refs
 -- Logging
 -------------------------------------------------------------------------------
 
-data GYLog = GYLog
-    { logRun     :: HasCallStack => GYLogNamespace -> GYLogSeverity -> String -> IO ()
-    , logCleanUp :: IO ()
-    }
-
 gyLog :: (HasCallStack, MonadIO m) => GYProviders -> GYLogNamespace -> GYLogSeverity -> String -> m ()
-gyLog providers ns s = liftIO . logRun (gyLog' providers) ns s
+gyLog providers ns s msg =
+  let cfg = gyLogConfiguration' providers
+      cfg' = cfgAddNamespace ns cfg
+  in liftIO $ logRun cfg' s msg
 
 gyLogDebug, gyLogInfo, gyLogWarning, gyLogError :: (HasCallStack, MonadIO m) => GYProviders -> GYLogNamespace -> String -> m ()
 gyLogDebug   p ns = gyLog p ns GYDebug
@@ -528,16 +527,21 @@ gyLogInfo    p ns = gyLog p ns GYInfo
 gyLogWarning p ns = gyLog p ns GYWarning
 gyLogError   p ns = gyLog p ns GYError
 
-noLogging :: GYLog
-noLogging = GYLog
-    { logRun     = \_ns _s _msg -> return ()
-    , logCleanUp = return ()
+noLoggingCfg :: IO GYLogConfiguration
+noLoggingCfg = do
+  le <- Katip.initLogEnv mempty ""
+  pure $ GYLogConfiguration
+    { cfgLogContexts = mempty
+    , cfgLogNamespace = mempty
+    , cfgLogEnv = logEnvFromKatip le
     }
 
-simpleConsoleLogging
-    :: (String -> IO ())   -- ^ putStrLn variant
-    -> GYLog
-simpleConsoleLogging f = GYLog
-    { logRun     = \ns _s msg -> f $ printf "*** [%s] %s" ns msg
-    , logCleanUp = return ()
+simpleConsoleLoggingCfg :: IO GYLogConfiguration
+simpleConsoleLoggingCfg = do
+  handleScribe <- Katip.mkHandleScribe Katip.ColorIfTerminal stdout (Katip.permitItem Katip.DebugS) Katip.V2
+  let makeLogEnv = Katip.registerScribe "stdout" handleScribe Katip.defaultScribeSettings =<< Katip.initLogEnv mempty ""
+  bracket makeLogEnv Katip.closeScribes $ \le -> pure $ GYLogConfiguration
+    { cfgLogContexts = mempty
+    , cfgLogNamespace = mempty
+    , cfgLogEnv = logEnvFromKatip le
     }

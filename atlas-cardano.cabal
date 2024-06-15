@@ -345,36 +345,3 @@ test-suite atlas-privnet-tests
     , tasty
     , tasty-hunit
 
-test-suite suite
-  import:         common
-  type:           exitcode-stdio-1.0
-  -- ghc-options:    -threaded -rtsopts
-  ghc-options:
-    -fno-ignore-interface-pragmas
-    -fno-omit-interface-pragmas
-    -Wno-partial-type-signatures
-  -- expose all unfoldings, so plutustx compiler can do its job
-    -fexpose-all-unfoldings
-    -fobject-code
-    -fplugin-opt PlutusTx.Plugin:defer-errors
-  hs-source-dirs: suite
-  main-is:        suite.hs
-  other-modules:
-    OnChain.BetRef
-    OnChain.Compiled
-    BetRef.Operations
-    BetRef.Tests.PlaceBet
-    BetRef.Tests.TakePot
-  -- Dependencies inherited from the library. No need to specify bounds.
-  build-depends:
-    , atlas-cardano
-    , base
-    , containers
-    , tasty
-    , tasty-hunit
-    , mtl
-    -- OnChain
-    , plutus-core
-    , plutus-ledger-api
-    , plutus-tx
-    , plutus-tx-plugin

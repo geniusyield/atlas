@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 {-|
-Module      : GeniusYield.TxBuilder.Run
+Module      : GeniusYield.TxBuilder.Clb
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co

@@ -40,7 +40,7 @@ import           Cardano.Slotting.Time                (RelativeTime (RelativeTim
                                                        mkSlotLength)
 import           Control.Exception                    (Exception)
 import           Data.Bifunctor                       (first)
-import           Data.SOP.Counting                    (NonEmpty (NonEmptyCons, NonEmptyOne))
+import           Data.SOP.NonEmpty                    (NonEmpty (NonEmptyCons, NonEmptyOne))
 import           GeniusYield.Types.Datum              (GYDatum, datumFromApi')
 import           GeniusYield.Types.Script             (mintingPolicyIdToText)
 import           GeniusYield.Types.Value              (GYAssetClass (..),
@@ -103,16 +103,16 @@ fromJson b = do
 
 == NOTE ==
 
-This must be updated with each hardfork.
+TODO: This must be updated with each hardfork.
 
 See 'Ouroboros.NonEmptyCons'/'Ouroboros.Summary'/'Ouroboros.CardanoEras' types to understand
 why one cannot trivially automate this.
 
 Well, unless one uses vectors, from dependent type land.
 -}
-parseEraHist :: (t -> Ouroboros.EraSummary) -> [t] -> Maybe (Api.EraHistory Api.CardanoMode)
+parseEraHist :: (t -> Ouroboros.EraSummary) -> [t] -> Maybe (Api.EraHistory)
 parseEraHist mkEra [byronEra, shelleyEra, allegraEra, maryEra, alonzoEra, babbageEra] = Just
-    . Api.EraHistory Api.CardanoMode
+    . Api.EraHistory
     . Ouroboros.mkInterpreter
     . Ouroboros.Summary
     . NonEmptyCons (mkEra byronEra)

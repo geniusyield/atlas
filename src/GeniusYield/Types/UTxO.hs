@@ -131,8 +131,10 @@ utxosToApi (GYUTxOs m) = Api.UTxO $ Map.foldlWithKey' f Map.empty m
         (maybe Api.S.ReferenceScriptNone someScriptToReferenceApi ms)
 
     outDatumToApi GYOutDatumNone     = Api.TxOutDatumNone
-    outDatumToApi (GYOutDatumHash h) = Api.TxOutDatumHash Api.ScriptDataInBabbageEra $ datumHashToApi h
-    outDatumToApi (GYOutDatumInline d) = Api.TxOutDatumInline Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra $ datumToApi' d
+    outDatumToApi (GYOutDatumHash h) =
+      Api.TxOutDatumHash Api.AlonzoEraOnwardsBabbage $ datumHashToApi h
+    outDatumToApi (GYOutDatumInline d) =
+      Api.TxOutDatumInline Api.BabbageEraOnwardsBabbage $ datumToApi' d
 
 utxoFromApi :: Api.TxIn -> Api.TxOut Api.CtxTx Api.BabbageEra -> GYUTxO
 utxoFromApi txIn (Api.TxOut a v d s) = GYUTxO

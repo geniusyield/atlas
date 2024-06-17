@@ -32,12 +32,12 @@ providersMashupTests configs =
            delayBySecond
            systemStart <- gyGetSystemStart provider
            delayBySecond
-           Api.EraHistory mode interpreter <- gyGetEraHistory provider  -- `mode` here doesn't appear to have `Eq` instance, comparing via it's `Show` instance should be fine.
+           Api.EraHistory interpreter <- gyGetEraHistory provider
            delayBySecond
            stakePools <- gyGetStakePools provider
            delayBySecond
            slotConfig' <- gyGetSlotConfig provider
-           pure (protocolParams, systemStart, (show mode, interpreter), stakePools, slotConfig')
+           pure (protocolParams, systemStart, interpreter, stakePools, slotConfig')
         assertBool "Parameters are not all equal" $ allEqual paramsList
     , testCase "Stake address info" $ do
         saInfos <- forM configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> do

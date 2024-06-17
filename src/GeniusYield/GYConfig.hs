@@ -142,7 +142,7 @@ coreConfigIO file = do
     Left err  -> throwIO $ userError err
     Right cfg -> pure cfg
 
-nodeConnectInfo :: FilePath -> GYNetworkId -> Api.LocalNodeConnectInfo Api.CardanoMode
+nodeConnectInfo :: FilePath -> GYNetworkId -> Api.LocalNodeConnectInfo
 nodeConnectInfo path netId = Node.networkIdToLocalNodeConnectInfo netId path
 
 withCfgProviders :: GYCoreConfig  -> GYLogNamespace -> (GYProviders -> IO a) -> IO a

@@ -9,14 +9,14 @@ repository cardano-haskell-packages
     c00aae8461a256275598500ea0e187588c35a5d5d7454fb57eac18d9edb86a56
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
+packages: .
+
 -- repeating the index-state for hackage to work around hackage.nix parsing limitation
-index-state: 2023-06-06T00:00:00Z
+index-state: 2024-03-19T15:29:53Z
 
 index-state:
-  , hackage.haskell.org 2023-06-06T00:00:00Z
-  , cardano-haskell-packages 2023-06-05T06:39:32Z
-
-packages: .
+  , hackage.haskell.org 2024-03-19T15:29:53Z
+  , cardano-haskell-packages 2024-03-15T17:07:52Z
 
 -- TODO: Default value should be @direct@ in upcoming 3.10 version of cabal, omit this line then.
 test-show-details: direct
@@ -34,82 +34,76 @@ source-repository-package
   tag: d70479ce3be06d6b7c52bf39d783f36d6771e36d
   --sha256: sha256-8se+xlIB1BDEuKGwjaldmW5G4LpCujD1ABgBaY0cY6Y=
 
--- Unfortunately, cardano-node 8.1.2 is constrained with plutus-ledger-api 1.5.0.0 and we would like at least 1.6.0.0.
--- This is done in accordance with changes in https://github.com/input-output-hk/cardano-ledger/pull/3430/files.
+source-repository-package
+  type: git
+  location: https://github.com/mlabs-haskell/clb
+  tag: 24d70ba823a92ece87780edc5224c9d78936f6c8
+  --sha256: sha256-TmSkZ0iILzIRrES2j726HKxVubwzN/Zh3vTp0tYLIMk=
+
 constraints:
-    plutus-ledger-api == 1.6.0.0
-  , plutus-core == 1.6.0.0
-
-allow-newer:
-  , cardano-ledger-alonzo:plutus-ledger-api
-  , cardano-ledger-alonzo:plutus-core
-  , cardano-ledger-alonzo-test:plutus-ledger-api
-  , cardano-ledger-alonzo-test:plutus-ledger-api-testlib
-  , cardano-ledger-babbage:plutus-ledger-api
-  , cardano-ledger-conway:plutus-ledger-api
-  , cardano-ledger-binary:plutus-ledger-api
-  , cardano-api:plutus-ledger-api
-  , cardano-api:plutus-ledger-api-testlib
-  , cardano-api:prettyprinter-configurable
-
-source-repository-package
-  type: git
-  location: https://github.com/geniusyield/plutus-simple-model
-  tag: 0cb63af903a835c73aec662092eb67d228bba9b0
-  --sha256: sha256-H56EyRFNdDvLDo9FVeGZyQZ92itQPG39TkMVyEC/xqM=
-  subdir:
-    cardano-simple
-    psm
-
--- This should be present for in hackage index state >= 18th of september, 23. Remove it when we update to it.
-source-repository-package
-  type: git
-  location: https://github.com/blockfrost/blockfrost-haskell
-  tag: 206e1a0f62e2a7cc08d05db8d62cef8dc2fbd98e
-  --sha256: sha256-R6BP3hwrOBmlRabA3prUuOGkYzETmQIM+K+Oh+fczEY=
-  subdir:
-    blockfrost-api
-    blockfrost-client-core
-    blockfrost-client
+  , cardano-api ^>= 8.38.0.0
 
 -- Everything below is essentially copied from cardano-wallet's cabal.project.
--------- Begin contents from @cardano-wallet@'s @cabal.project@ file. --------
 
 source-repository-package
   type: git
   location: https://github.com/input-output-hk/cardano-wallet
-  tag: v2023-07-18
-  --sha256: sha256-ijflgIw+1FpLoxM4Rksf4MJvNqnEPAv3gNWE8zMuefU=
+  tag: v2024-03-27
+  --sha256: sha256-rxMPopa3nxQaM0yOxUCq5oj3+XSL68jkuuFVhj/SY+w=
   subdir:
+    lib/address-derivation-discovery
     lib/balance-tx/
     lib/coin-selection/
+    lib/crypto-primitives/
     lib/delta-store/
     lib/delta-table
     lib/delta-types/
+    lib/iohk-monitoring-extra
     lib/launcher/
+    lib/network-layer/
     lib/numeric/
     lib/primitive/
+    lib/read
+    lib/secrets
+    lib/std-gen-seed/
     lib/test-utils/
     lib/text-class/
     lib/wai-middleware-logging/
-    lib/wallet/
     lib/wallet-benchmarks/
+    lib/wallet/
 
--- Using RDRAND instead of /dev/urandom as an entropy source for key
--- generation is dubious. Set the flag so we use /dev/urandom by default.
-package cryptonite
-  flags: -support_rdrand
+------ Begin contents from @cardano-wallet@'s @cabal.project@ file. --------
+
+--------------------------------------------------------------------------------
 
 source-repository-package
     type: git
-    location: https://github.com/input-output-hk/cardano-addresses
-    tag: 6b55f96d57a181f898eb2a50531d3ae4280c549c
-    --sha256: 0yygam995i3mawk6hfgxb6v918phvqzyipzhjflff0l6zfrldy7f
+    location: https://github.com/IntersectMBO/cardano-addresses
+    tag: 126964483d188c2362393d2a6eea8c65dfc43097
+    --sha256: 1w152imj28ap5dfdc8x9ly0cy7dn500v7k63vw11f70gvgg6x7my
     subdir: command-line
             core
 
+-- Normally cabal won't apply ghc-options which we specify to build packages
+-- to their "regular" dependencies.
+-- However, the dependencies declared using the `source-repository-package`
+-- pragma are an exception to this rule.
+-- This is why we need to manually control options that are applied to the
+-- `cardano-addresses` package by declaring them explicitly here.
+--
+-- Cardano Addresses CLI uses an outdated version of the `optparse-applicative`
+-- library. This causes a deprecation warning to be emitted when building.
+-- We don't want to promote this warning to an error level as it break the
+-- release build and cardano-addresses codebase is not under our control.
+package cardano-addresses-cli
+    ghc-options:
+        -Wwarn=deprecations
+
 package cardano-addresses
-  ghc-options: -Wno-incomplete-uni-patterns
+    ghc-options:
+        -Wwarn=incomplete-uni-patterns
+-- END Cardano Addresses Dependency
+--------------------------------------------------------------------------------
 
 source-repository-package
     type: git
@@ -119,13 +113,13 @@ source-repository-package
 
 source-repository-package
     type: git
-    location: https://github.com/input-output-hk/bech32.git
-    tag: e341e7f83d7b73f10baa87e946818b2c493cc5f5
-    --sha256: 1d891bpc1q1m1gqj02b4iv3kr4g9w7knlkq43hwbl9dn5k78aydc
-    subdir: bech32
+    location: https://github.com/cardano-foundation/cardano-wallet-client.git
+    tag: 353412ca621dc28af53e4a19795338b19bab1b7b
+    --sha256: 04q58c82wy6x9nkwqbvcxbv6s61fx08h5kf62sb511aqp08id4bb
+    subdir: generated
 
--- -------------------------------------------------------------------------
--- Constraints tweaking
+--------------------------------------------------------------------------------
+-- BEGIN Constraints tweaking section
 
 -- cardano-addresses unit tests bring in some version constraint conflicts.
 --
@@ -140,45 +134,29 @@ allow-newer:
   , ekg:*
   , ntp-client:*
   , libsystemd-journal:base
-  , size-based:template-haskell
+  , cardano-addresses-cli:mtl
+  , servant-openapi3:*
 
-constraints:
-    bimap >= 0.4.0
-  , openapi3 >= 3.2.0
-  , libsystemd-journal >= 1.4.4
-  , systemd >= 2.3.0
-  -- dependency of systemd-2.3.0
-  , network >= 3.1.1.1
-  -- choose versions that work with base >= 4.12
-  , hjsonpointer >= 1.5.0
-  , hjsonschema >= 1.10.0
-  , Cabal >= 3.4.0.0
-  , async-timer >= 0.2.0.0
-  , unliftio-core >= 0.2.0.1
-  , generic-arbitrary >= 0.2.2
-  , iohk-monitoring >= 0.1.11
+-- END Constraints tweaking section
+--------------------------------------------------------------------------------
 
-  -- lower versions of katip won't build with the Win32-2.12.0.1
-  -- which is shipped with the ghc-9.2.8
-  , katip >= 0.8.7.4
+--------------------------------------------------------------------------------
+-- Flags for dependencies without an S-R-P pragma should be kept in this section
+-- (conversely, flags for the S-R-P dependencies should be kept within the
+-- same section where an S-R-P pragma is located,
+-- for them to be managed together)
 
-  -- Cardano Node dependencies:
-  , cardano-api ^>=8.2
-  , cardano-slotting >= 0.1
-  , ouroboros-network ^>= 0.8.1.0
-
-  -- TH Name shadowing warnings need to be addressed when bumping to 2.13.3.5
-  , persistent == 2.13.3.3
-
-  -- Haddock is broken in this release. Waiting for the next release
-
--- ----------------------------------------------------------------
--- Flags for dependencies
+-- Using RDRAND instead of /dev/urandom as an entropy source for key
+-- generation is dubious. Set the flag so we use /dev/urandom by default.
+package cryptonite
+  flags: -support_rdrand
 
 package cardano-config
   flags: -systemd
+
 package cardano-node
   flags: -systemd
 
 -- -------------------------------------------------------------------------
+
 -------- End contents from @cardano-wallet@'s @cabal.project@ file. --------

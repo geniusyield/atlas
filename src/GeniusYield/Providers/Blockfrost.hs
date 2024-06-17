@@ -16,6 +16,7 @@ module GeniusYield.Providers.Blockfrost
 import qualified Blockfrost.Client                    as Blockfrost
 import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api.S
+import qualified Cardano.Ledger.BaseTypes             as Ledger
 import qualified Cardano.Slotting.Slot                as CSlot
 import qualified Cardano.Slotting.Time                as CTime
 import           Control.Concurrent                   (threadDelay)
@@ -357,16 +358,11 @@ blockfrostProtocolParams proj = do
         , protocolParamStakeAddressDeposit = Api.Lovelace $ lovelacesToInteger _protocolParamsKeyDeposit
         , protocolParamStakePoolDeposit    = Api.Lovelace $ lovelacesToInteger _protocolParamsPoolDeposit
         , protocolParamMinPoolCost         = Api.Lovelace $ lovelacesToInteger _protocolParamsMinPoolCost
-        , protocolParamPoolRetireMaxEpoch  = Api.EpochNo $ fromInteger _protocolParamsEMax
+        , protocolParamPoolRetireMaxEpoch  = Ledger.EpochInterval $ fromInteger _protocolParamsEMax
         , protocolParamStakePoolTargetNum  = fromInteger _protocolParamsNOpt
         , protocolParamPoolPledgeInfluence = _protocolParamsA0
         , protocolParamMonetaryExpansion   = _protocolParamsRho
         , protocolParamTreasuryCut         = _protocolParamsTau
-        , protocolParamUTxOCostPerWord     = Nothing  -- Deprecated in Babbage.
-        -- , protocolParamUTxOCostPerWord     = if majorProtVers < babbageProtocolVersion
-        --                                         -- This is only used for pre-babbage protocols.
-        --                                         then Just . Api.Lovelace $ lovelacesToInteger _protocolParamsCoinsPerUtxoWord
-        --                                         else Nothing
         , protocolParamPrices              = Just $ Api.S.ExecutionUnitPrices _protocolParamsPriceStep _protocolParamsPriceMem
         , protocolParamMaxTxExUnits        = Just $ Api.ExecutionUnits (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExSteps) (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExMem)
         , protocolParamMaxBlockExUnits     = Just $ Api.ExecutionUnits (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExSteps) (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExMem)
@@ -409,7 +405,7 @@ blockfrostSystemStart proj = do
   genesisParams <- Blockfrost.runBlockfrost proj Blockfrost.getLedgerGenesis >>= handleBlockfrostError "LedgerGenesis"
   pure . CTime.SystemStart . Time.posixSecondsToUTCTime $ Blockfrost._genesisSystemStart genesisParams
 
-blockfrostEraHistory :: Blockfrost.Project -> IO (Api.EraHistory Api.CardanoMode)
+blockfrostEraHistory :: Blockfrost.Project -> IO (Api.EraHistory)
 blockfrostEraHistory proj = do
   eraSumms <- Blockfrost.runBlockfrost proj Blockfrost.getNetworkEras >>= handleBlockfrostError "EraHistory"
   maybe (throwIO $ BlpvIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms

@@ -26,6 +26,7 @@ module GeniusYield.Providers.Maestro
 
 import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api.S
+import qualified Cardano.Ledger.BaseTypes             as Ledger
 import qualified Cardano.Slotting.Slot                as CSlot
 import qualified Cardano.Slotting.Time                as CTime
 import           Control.Concurrent                   (threadDelay)
@@ -448,7 +449,8 @@ maestroProtocolParams env = do
       , protocolParamStakeAddressDeposit = Api.Lovelace $ toInteger protocolParametersStakeKeyDeposit
       , protocolParamStakePoolDeposit    = Api.Lovelace $ toInteger protocolParametersPoolDeposit
       , protocolParamMinPoolCost         = Api.Lovelace $ toInteger protocolParametersMinPoolCost
-      , protocolParamPoolRetireMaxEpoch  = Api.EpochNo $ Maestro.unEpochNo protocolParametersPoolRetirementEpochBound
+      , protocolParamPoolRetireMaxEpoch  = Ledger.EpochInterval . fromIntegral
+                                              $ Maestro.unEpochNo protocolParametersPoolRetirementEpochBound
       , protocolParamStakePoolTargetNum  = protocolParametersDesiredNumberOfPools
       , protocolParamPoolPledgeInfluence = Maestro.unMaestroRational protocolParametersPoolInfluence
       , protocolParamMonetaryExpansion   = Maestro.unMaestroRational protocolParametersMonetaryExpansion
@@ -474,7 +476,6 @@ maestroProtocolParams env = do
                                                 )
                                               ]
       , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ toInteger protocolParametersCoinsPerUtxoByte
-      , protocolParamUTxOCostPerWord     = Nothing  -- Deprecated in Babbage.
       }
 
 -- | Returns a set of all Stake Pool's 'Api.S.PoolId'.
@@ -499,7 +500,7 @@ maestroSystemStart env = fmap (CTime.SystemStart . Time.localTimeToUTC Time.utc)
     <=< try $ Maestro.getTimestampedData <$> Maestro.getSystemStart env
 
 -- | Returns the 'Api.EraHistory' queried from Maestro.
-maestroEraHistory :: Maestro.MaestroEnv 'Maestro.V1 -> IO (Api.EraHistory Api.CardanoMode)
+maestroEraHistory :: Maestro.MaestroEnv 'Maestro.V1 -> IO Api.EraHistory
 maestroEraHistory env = do
   eraSumms <- handleMaestroError "EraHistory" =<< try (Maestro.getTimestampedData <$> Maestro.getEraHistory env)
   maybe (throwIO $ MspvIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms

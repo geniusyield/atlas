@@ -13,7 +13,6 @@ module GeniusYield.Test.RefInput
     ( refInputTests
     ) where
 
-import           Control.Monad.Reader
 import           Test.Tasty                                           (TestTree,
                                                                        testGroup)
 
@@ -22,22 +21,7 @@ import           GeniusYield.Test.GYTxBody                            (mockTxId)
 import           GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
 import           GeniusYield.Test.Utils
 import           GeniusYield.TxBuilder
-import           GeniusYield.TxBuilder.Clb
 import           GeniusYield.Types
-import Clb qualified (
-  Clb,
-  ClbState (mockInfo),
-  initClb,
-  checkErrors,
-  OnChainTx (getOnChainTx),
-  MockConfig,
-  ppLog,
-  runClb,
-  intToKeyPair,
-  defaultBabbage,
-  waitSlot,
- )
-import qualified Cardano.Ledger.Shelley.API as L
 
 gyGuessRefInputDatumValidator :: GYValidator 'PlutusV2
 gyGuessRefInputDatumValidator = validatorFromPlutus guessRefInputDatumValidator
@@ -102,7 +86,7 @@ tryRefInputConsume Wallets{..} = do
     sendSkeleton (mustHaveRefInput @'PlutusV2 desiredOutputRef <> mustHaveOutput  (mkGYTxOutNoDatum (walletAddress w1) lovelaceToSendValue))
       `catchError` (
         \case
-          GYApplicationException e -> do
+          GYApplicationException _e -> do
             -- liftClb $ logInfo $ printf "Successfully caught expected exception %s" (show e)
             pure mockTxId
           e -> fail $ printf "Unexpected exception %s" (show e)

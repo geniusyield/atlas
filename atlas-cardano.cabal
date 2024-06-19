@@ -293,7 +293,6 @@ test-suite atlas-tests
     , bytestring
     , cardano-api           ^>= 8.38.0.0
     , cardano-ledger-alonzo
-    , cardano-ledger-shelley
     , clb
     , containers
     , data-default
@@ -302,7 +301,6 @@ test-suite atlas-tests
     , http-api-data
     , maestro-sdk
     , MonadRandom
-    , mtl
     , ouroboros-consensus
     , plutus-ledger-api
     , plutus-tx

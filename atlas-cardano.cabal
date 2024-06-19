@@ -216,15 +216,13 @@ library
     , cardano-addresses
     , cardano-api
     , cardano-api:{internal}
-    , cardano-balance-tx:{cardano-balance-tx, internal}
-    , cardano-binary
+    , cardano-balance-tx:{internal}
     , cardano-coin-selection
     , cardano-crypto-class
     , cardano-ledger-api
     , cardano-ledger-core:{cardano-ledger-core, testlib}
     , cardano-ledger-byron
     , cardano-ledger-shelley
-    , cardano-ledger-mary
     , cardano-ledger-alonzo
     , cardano-ledger-babbage
     , cardano-ledger-binary

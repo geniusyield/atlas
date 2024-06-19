@@ -208,7 +208,7 @@ withCfgProviders
             )
 
       bracket (mkLogEnv ns cfgLogging) closeScribes $ \logEnv -> do
-        let gyLogConfiguration' = GYLogConfiguration
+        let gyLog' = GYLogConfiguration
                        { cfgLogNamespace = mempty
                        , cfgLogContexts = mempty
                        , cfgLogDirector = Left logEnv
@@ -228,7 +228,7 @@ withCfgProviders
         case e of
             Right a                     -> pure a
             Left (err :: SomeException) -> do
-                logRun gyLogConfiguration' GYError ((printf "ERROR: %s" $ show err) :: String)
+                logRun gyLog' GYError ((printf "ERROR: %s" $ show err) :: String)
                 throwIO err
 
 logTiming :: GYProviders -> GYProviders
@@ -240,7 +240,7 @@ logTiming providers@GYProviders {..} = GYProviders
     , gyGetParameters       = gyGetParameters'
     , gyQueryUTxO           = gyQueryUTxO'
     , gyGetStakeAddressInfo = gyGetStakeAddressInfo'
-    , gyLogConfiguration'   = gyLogConfiguration'
+    , gyLog'                = gyLog'
     }
   where
     wrap :: String -> IO a -> IO a

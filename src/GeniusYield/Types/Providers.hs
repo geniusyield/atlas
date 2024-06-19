@@ -132,7 +132,7 @@ data GYProviders = GYProviders
     , gyGetParameters       :: !GYGetParameters
     , gyQueryUTxO           :: !GYQueryUTxO
     , gyGetStakeAddressInfo :: !(GYStakeAddress -> IO (Maybe GYStakeAddressInfo))
-    , gyLogConfiguration'   :: !GYLogConfiguration
+    , gyLog'                :: !GYLogConfiguration
     }
 
 gyGetSlotOfCurrentBlock :: GYProviders -> IO GYSlot
@@ -515,7 +515,7 @@ gyQueryUtxosAtTxOutRefsWithDatumsDefault utxosAtTxOutRefsFun lookupDatumFun refs
 
 gyLog :: (HasCallStack, MonadIO m) => GYProviders -> GYLogNamespace -> GYLogSeverity -> String -> m ()
 gyLog providers ns s msg =
-  let cfg = gyLogConfiguration' providers
+  let cfg = gyLog' providers
       cfg' = cfgAddNamespace ns cfg
   in withFrozenCallStack $ liftIO $ logRun cfg' s msg
 

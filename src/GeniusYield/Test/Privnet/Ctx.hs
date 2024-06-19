@@ -199,7 +199,7 @@ ctxProviders ctx = GYProviders
     , gySlotActions      = nodeSlotActions (ctxInfo ctx)
     , gyGetParameters    = ctxGetParams ctx
     , gyQueryUTxO        = ctxQueryUtxos ctx
-    , gyLogConfiguration' = ctxLogConfiguration ctx
+    , gyLog'             = ctxLogConfiguration ctx
     , gyGetStakeAddressInfo = nodeStakeAddressInfo (ctxInfo ctx)
     }
 

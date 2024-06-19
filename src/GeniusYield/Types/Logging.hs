@@ -22,6 +22,8 @@ module GeniusYield.Types.Logging
     , logContextsFromKatip
     , logContextsToKatip
     , addContext
+    , sl
+    , logContextsToS
       -- * Log environment
     , GYLogEnv
     , logEnvFromKatip
@@ -29,6 +31,7 @@ module GeniusYield.Types.Logging
     , closeScribes
       -- * Log configuration
     , GYLogConfiguration (..)
+    , GYRawLog (..)
     , cfgAddNamespace
     , cfgAddContext
     , logRun
@@ -41,13 +44,14 @@ module GeniusYield.Types.Logging
     , mkLogEnv
     ) where
 
-import           Control.Monad.IO.Class       (MonadIO)
+import           Control.Monad.IO.Class       (MonadIO (liftIO))
 import           Data.Aeson                   (Key)
 import qualified Data.Aeson                   as Aeson
 import qualified Data.Aeson.Key               as Key
+import qualified Data.ByteString.Lazy.Char8   as LBS8
 import           Data.List                    (intercalate, isSuffixOf)
 import           Data.Maybe                   (fromJust)
-import           Data.String.Conv             (StringConv)
+import           Data.String.Conv             (StringConv, toS)
 import qualified Data.Text                    as Text
 import           GeniusYield.Imports
 import           GeniusYield.Providers.GCP    (gcpFormatter)
@@ -199,6 +203,22 @@ logContextsToKatip = coerce
 addContext :: KC.LogItem i => i -> GYLogContexts -> GYLogContexts
 addContext i ctx = ctx <> logContextsFromKatip (K.liftPayload i)
 
+-- | Construct a simple log payload.
+--
+-- >>> Aeson.encode $ logContextsToKatip $ addContext (sl "key" "value") mempty
+-- "{\"key\":\"value\"}"
+--
+sl :: forall a. ToJSON a => Text -> a -> K.SimpleLogPayload
+sl = K.sl
+
+-- | Get textual representation of log contexts.
+--
+-- >>> logContextsToS @Text $ addContext (sl "key" "value") mempty
+-- "{\"key\":\"value\"}"
+--
+logContextsToS :: StringConv LBS8.ByteString a => GYLogContexts -> a
+logContextsToS = logContextsToKatip >>> Aeson.encode >>> toS
+
 -------------------------------------------------------------------------------
 -- Log environment
 -------------------------------------------------------------------------------
@@ -219,10 +239,15 @@ closeScribes genv = genv & logEnvToKatip & K.closeScribes <&> logEnvFromKatip
 -- Log configuration
 -------------------------------------------------------------------------------
 
+data GYRawLog = GYRawLog
+  { rawLogRun     :: String -> IO ()
+  , rawLogCleanUp :: IO ()
+  }
+
 data GYLogConfiguration = GYLogConfiguration
   { cfgLogNamespace :: !GYLogNamespace
   , cfgLogContexts  :: !GYLogContexts
-  , cfgLogEnv       :: !GYLogEnv
+  , cfgLogDirector  :: !(Either GYLogEnv GYRawLog)
   }
 
 cfgAddNamespace :: GYLogNamespace -> GYLogConfiguration -> GYLogConfiguration
@@ -232,7 +257,9 @@ cfgAddContext :: KC.LogItem i => i -> GYLogConfiguration -> GYLogConfiguration
 cfgAddContext i cfg = cfg { cfgLogContexts = addContext i (cfgLogContexts cfg) }
 
 logRun :: (HasCallStack, MonadIO m, StringConv a Text) => GYLogConfiguration -> GYLogSeverity -> a -> m ()
-logRun (GYLogConfiguration {..}) sev msg = withFrozenCallStack $ K.runKatipT (logEnvToKatip cfgLogEnv) $ K.logLoc (logContextsToKatip cfgLogContexts) (logNamespaceToKatip cfgLogNamespace) (logSeverityToKatip sev) (K.logStr msg)
+logRun GYLogConfiguration {..} sev msg = case cfgLogDirector of
+  Left cfgLogEnv -> withFrozenCallStack $ K.runKatipT (logEnvToKatip cfgLogEnv) $ K.logLoc (logContextsToKatip cfgLogContexts) (logNamespaceToKatip cfgLogNamespace) (logSeverityToKatip sev) (K.logStr msg)
+  Right GYRawLog {..} -> liftIO $ rawLogRun (toS @Text @String $ "[Namespaces: " <> Text.intercalate ", " (K.unNamespace $ logNamespaceToKatip cfgLogNamespace) <> "]" <> "[Contexts: " <> logContextsToS cfgLogContexts <> "] " <> toS @_ @Text msg)
 
 -------------------------------------------------------------------------------
 -- Scribe Configuration

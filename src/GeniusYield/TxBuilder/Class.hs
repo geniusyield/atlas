@@ -1,5 +1,4 @@
 {-# LANGUAGE InstanceSigs #-}
--- FIXME: Maybe I can get rid of above pragma related to orphans.
 {-|
 Module      : GeniusYield.TxBuilder.Class
 Copyright   : (c) 2023 GYELD GMBH

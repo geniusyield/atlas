@@ -60,8 +60,8 @@ module GeniusYield.Types.Providers
     , gyLogInfo
     , gyLogWarning
     , gyLogError
-    , noLoggingCfg
-    , simpleConsoleLoggingCfg
+    , noLogging
+    , simpleConsoleLogging
       -- * Providers
     , GYProviders (..)
     ) where
@@ -92,8 +92,6 @@ import           GeniusYield.Types.TxOutRef
 import           GeniusYield.Types.UTxO
 import           GeniusYield.Types.Value            (GYAssetClass)
 import           GHC.Stack                          (withFrozenCallStack)
-import qualified Katip
-import           System.IO                          (stdout)
 
 {- Note [Caching and concurrently accessible MVars]
 
@@ -527,22 +525,18 @@ gyLogInfo    p ns = withFrozenCallStack $ gyLog p ns GYInfo
 gyLogWarning p ns = withFrozenCallStack $ gyLog p ns GYWarning
 gyLogError   p ns = withFrozenCallStack $ gyLog p ns GYError
 
-noLoggingCfg :: IO GYLogConfiguration
-noLoggingCfg = do
-  le <- Katip.initLogEnv mempty ""
-  pure $ GYLogConfiguration
+noLogging :: GYLogConfiguration
+noLogging =
+  GYLogConfiguration
     { cfgLogContexts = mempty
     , cfgLogNamespace = mempty
-    , cfgLogEnv = logEnvFromKatip le
+    , cfgLogDirector = Right $ GYRawLog { rawLogRun = \_ -> pure (), rawLogCleanUp = pure () }
     }
 
-simpleConsoleLoggingCfg :: IO GYLogConfiguration
-simpleConsoleLoggingCfg = do
-  handleScribe <- Katip.mkHandleScribe Katip.ColorIfTerminal stdout (Katip.permitItem Katip.DebugS) Katip.V2
-  let makeLogEnv = Katip.registerScribe "stdout" handleScribe Katip.defaultScribeSettings =<< Katip.initLogEnv mempty ""
-  le <- makeLogEnv
-  pure $ GYLogConfiguration
+simpleConsoleLogging :: (String -> IO ()) -> GYLogConfiguration
+simpleConsoleLogging f =
+  GYLogConfiguration
     { cfgLogContexts = mempty
     , cfgLogNamespace = mempty
-    , cfgLogEnv = logEnvFromKatip le
+    , cfgLogDirector = Right $ GYRawLog { rawLogRun = f, rawLogCleanUp = pure () }
     }

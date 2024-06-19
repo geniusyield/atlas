@@ -41,7 +41,6 @@ import           GeniusYield.Providers.Node       (nodeStakeAddressInfo)
 import qualified GeniusYield.Providers.Node       as Node
 import           GeniusYield.ReadJSON             (readJSON)
 import           GeniusYield.Types
-import qualified Katip
 
 -- | How many seconds to keep slots cached, before refetching the data.
 slotCachingTime :: NominalDiffTime
@@ -208,11 +207,11 @@ withCfgProviders
             , Blockfrost.blockfrostStakeAddressInfo proj
             )
 
-      bracket (mkLogEnv ns cfgLogging) (Katip.closeScribes . logEnvToKatip) $ \logEnv -> do
+      bracket (mkLogEnv ns cfgLogging) closeScribes $ \logEnv -> do
         let gyLogConfiguration' = GYLogConfiguration
                        { cfgLogNamespace = mempty
                        , cfgLogContexts = mempty
-                       , cfgLogEnv = logEnv
+                       , cfgLogDirector = Left logEnv
                        }
         (gyQueryUTxO, gySlotActions) <-
           {-if cfgUtxoCacheEnable

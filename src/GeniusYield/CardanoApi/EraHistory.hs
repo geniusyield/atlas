@@ -6,12 +6,16 @@ Maintainer  : support@geniusyield.co
 Stability   : develop
 
 -}
-module GeniusYield.CardanoApi.EraHistory (extractEraSummaries, showEraSummaries, getEraEndSlot) where
+module GeniusYield.CardanoApi.EraHistory (
+  extractEraSummaries,
+  showEraSummaries,
+  getEraEndSlot
+ ) where
 
 import qualified Unsafe.Coerce                        as UNSAFE
 
 import qualified Cardano.Api                          as Api
-import           Data.SOP.Counting                    (nonEmptyLast)
+import           Data.SOP.NonEmpty                    (nonEmptyLast)
 import qualified Ouroboros.Consensus.Cardano.Block    as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
 
@@ -21,18 +25,20 @@ This is safe as long as Ouroboros.Interpeter is defined as a newtype to Ouroboro
 
 TODO: Can we ensure at runtime, that Interpreter is still a newtype to Summary? #20 (https://github.com/geniusyield/atlas/issues/20)
 -}
-extractEraSummaries :: Api.EraHistory Api.CardanoMode -> Ouroboros.Summary (Ouroboros.CardanoEras Ouroboros.StandardCrypto)
-extractEraSummaries (Api.EraHistory _ interpreter) = UNSAFE.unsafeCoerce interpreter
+extractEraSummaries ::
+  Api.EraHistory ->
+  Ouroboros.Summary (Ouroboros.CardanoEras Ouroboros.StandardCrypto)
+extractEraSummaries (Api.EraHistory interpreter) = UNSAFE.unsafeCoerce interpreter
 
 {- | Extract and show the era summaries with all its details, useful for manually constructing 'Api.EraHistory'.
 
 See: "GeniusYield.Providers.Common.preprodEraHist"
 -}
-showEraSummaries :: Api.EraHistory Api.CardanoMode -> String
+showEraSummaries :: Api.EraHistory -> String
 showEraSummaries eraHist = show $ extractEraSummaries eraHist
 
 -- | Get the slot after which the current era ends.
-getEraEndSlot :: Api.EraHistory Api.CardanoMode -> Maybe Api.SlotNo
+getEraEndSlot :: Api.EraHistory -> Maybe Api.SlotNo
 getEraEndSlot (extractEraSummaries -> Ouroboros.Summary summaries) =
     case Ouroboros.eraEnd (nonEmptyLast summaries) of
         Ouroboros.EraUnbounded -> Nothing

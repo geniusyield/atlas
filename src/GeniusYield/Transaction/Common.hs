@@ -19,6 +19,8 @@ module GeniusYield.Transaction.Common (
 import qualified Cardano.Api         as Api
 import qualified Cardano.Api.Shelley as Api.S
 
+import qualified Cardano.Ledger.Alonzo.Core as Ledger
+
 import           GeniusYield.Imports
 import           GeniusYield.Types
 import qualified Text.Printf         as Printf
@@ -76,8 +78,9 @@ instance Eq BalancingError where
 -- Transaction Utilities
 -------------------------------------------------------------------------------
 
-minimumUTxO :: Api.S.BundledProtocolParameters Api.S.BabbageEra -> GYTxOut v -> Natural
-minimumUTxO pp txOut = fromInteger $ coerce $ Api.calculateMinimumUTxO Api.ShelleyBasedEraBabbage (txOutToApi txOut) pp
+minimumUTxO :: Ledger.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra) -> GYTxOut v -> Natural
+minimumUTxO pp txOut = fromInteger $ coerce $
+  Api.calculateMinimumUTxO Api.ShelleyBasedEraBabbage (txOutToApi txOut) pp
 
 adjustTxOut :: (GYTxOut v -> Natural) -> GYTxOut v -> GYTxOut v
 adjustTxOut minimumUTxOF = helper

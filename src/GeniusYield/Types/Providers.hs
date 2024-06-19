@@ -206,7 +206,7 @@ gyGetProtocolParameters = gyGetProtocolParameters' . gyGetParameters
 gyGetSystemStart :: GYProviders -> IO SystemStart
 gyGetSystemStart = gyGetSystemStart' . gyGetParameters
 
-gyGetEraHistory :: GYProviders -> IO (Api.EraHistory Api.CardanoMode)
+gyGetEraHistory :: GYProviders -> IO Api.EraHistory
 gyGetEraHistory = gyGetEraHistory' . gyGetParameters
 
 gyGetStakePools :: GYProviders -> IO (Set Api.S.PoolId)
@@ -349,7 +349,7 @@ makeSlotActions t getSlotOfCurrentBlock = do
 data GYGetParameters = GYGetParameters
     { gyGetProtocolParameters' :: !(IO Api.S.ProtocolParameters)
     , gyGetSystemStart'        :: !(IO SystemStart)
-    , gyGetEraHistory'         :: !(IO (Api.EraHistory Api.CardanoMode))
+    , gyGetEraHistory'         :: !(IO Api.EraHistory)
     , gyGetStakePools'         :: !(IO (Set Api.S.PoolId))
     , gyGetSlotConfig'         :: !(IO GYSlotConfig)
     }
@@ -367,7 +367,7 @@ makeGetParameters :: IO GYSlot
                 -- ^ Getting protocol parameters
                 -> IO SystemStart
                 -- ^ Getting system start
-                -> IO (Api.EraHistory Api.CardanoMode)
+                -> IO (Api.EraHistory)
                 -- ^ Getting era history
                 -> IO (Set Api.S.PoolId)
                 -- ^ Getting stake pools
@@ -402,7 +402,7 @@ makeGetParameters getSlotOfCurrentBlock getProtParams getSysStart getEraHist get
 
     If refreshing is not necessary, the data is simply returned from the storage.
     -}
-    mkMethod :: (Api.EraHistory Api.CardanoMode -> IO a) -> MVar (GYParameterStore a) -> IO a
+    mkMethod :: (Api.EraHistory -> IO a) -> MVar (GYParameterStore a) -> IO a
     mkMethod dataRefreshF dataRef = do
         -- See note: [Caching and concurrently accessible MVars].
         modifyMVar dataRef $ \(GYParameterStore eraEndSlot a) -> do

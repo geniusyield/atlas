@@ -125,6 +125,7 @@ module GeniusYield.Types.Script (
     someScriptToReferenceApi,
     someScriptFromReferenceApi,
     referenceScriptToApiPlutusScriptWitness,
+    apiHashToPlutus,
 
     -- ** File operations
     writeScript,
@@ -672,11 +673,13 @@ scriptVersion (GYScript v _ _) = v
 scriptToApi :: GYScript v -> Api.PlutusScript (PlutusVersionToApi v)
 scriptToApi (GYScript _ api _) = api
 
+-- FIXME: Should we use Conway here?
 someScriptToReferenceApi :: Some GYScript -> Api.S.ReferenceScript Api.S.BabbageEra
 someScriptToReferenceApi (Some (GYScript v apiScript _)) =
-    Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra $
-    Api.ScriptInAnyLang (Api.PlutusScriptLanguage v') $
-    Api.PlutusScript v' apiScript
+    Api.S.ReferenceScript
+      Api.S.BabbageEraOnwardsBabbage $
+      Api.ScriptInAnyLang (Api.PlutusScriptLanguage v') $
+        Api.PlutusScript v' apiScript
   where
     v' = singPlutusVersionToApi v
 
@@ -685,19 +688,41 @@ someScriptToReferenceApi (Some (GYScript v apiScript _)) =
 -- /Note/: Simple scripts are converted to 'Nothing'.
 someScriptFromReferenceApi :: Api.S.ReferenceScript era -> Maybe (Some GYScript)
 someScriptFromReferenceApi Api.S.ReferenceScriptNone = Nothing
-someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra (Api.ScriptInAnyLang Api.SimpleScriptLanguage _)) = Nothing
-someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra (Api.ScriptInAnyLang (Api.PlutusScriptLanguage Api.PlutusScriptV1) (Api.PlutusScript _ x))) = Just (Some y)
+someScriptFromReferenceApi
+  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsBabbage
+    (Api.ScriptInAnyLang Api.SimpleScriptLanguage _)) = Nothing
+someScriptFromReferenceApi
+  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsBabbage
+    (Api.ScriptInAnyLang
+      (Api.PlutusScriptLanguage Api.PlutusScriptV1)
+      (Api.PlutusScript _ x)
+    )
+  ) = Just (Some y)
   where
     y :: GYScript 'PlutusV1
     y = scriptFromApi x
 
-someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra (Api.ScriptInAnyLang (Api.PlutusScriptLanguage Api.PlutusScriptV2) (Api.PlutusScript _ x))) = Just (Some y)
+someScriptFromReferenceApi
+  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsBabbage
+    (Api.ScriptInAnyLang
+      (Api.PlutusScriptLanguage Api.PlutusScriptV2)
+      (Api.PlutusScript _ x)
+    )
+  ) = Just (Some y)
   where
     y :: GYScript 'PlutusV2
     y = scriptFromApi x
--- TODO: Following patterns should be fixed when Conway unleashes!
-someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInBabbageEra (Api.ScriptInAnyLang (Api.PlutusScriptLanguage Api.PlutusScriptV3) (Api.PlutusScript _ _))) = Nothing
-someScriptFromReferenceApi (Api.S.ReferenceScript Api.S.ReferenceTxInsScriptsInlineDatumsInConwayEra _) = Nothing
+
+-- FIXME: V3 is not possible in Babbage, shold we indicate it?
+someScriptFromReferenceApi
+  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsBabbage
+    (Api.ScriptInAnyLang
+      (Api.PlutusScriptLanguage Api.PlutusScriptV3)
+      (Api.PlutusScript _ _))) = Nothing
+
+-- TODO: Add definitions for Conway
+someScriptFromReferenceApi
+  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsConway _) = Nothing
 
 scriptFromApi :: forall v. SingPlutusVersionI v => Api.PlutusScript (PlutusVersionToApi v) -> GYScript v
 scriptFromApi script = GYScript v script apiHash

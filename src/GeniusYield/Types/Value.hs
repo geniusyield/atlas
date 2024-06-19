@@ -79,6 +79,7 @@ import           GeniusYield.Imports
 import           PlutusTx.Builtins.Class          (fromBuiltin, toBuiltin)
 
 import qualified Cardano.Api                      as Api
+-- import qualified Cardano.Api.Value                as Api
 import qualified Data.Aeson                       as Aeson
 import qualified Data.Aeson.Types                 as Aeson
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
@@ -97,7 +98,6 @@ import qualified Web.HttpApiData                  as Web
 
 import           Data.Either.Combinators          (mapLeft)
 import           Data.Hashable                    (Hashable (..))
-import qualified GeniusYield.Imports              as TE
 import qualified GeniusYield.Types.Ada            as Ada
 import           GeniusYield.Types.Script
 
@@ -198,11 +198,16 @@ valueFromApi v = valueFromList
     ]
 
 valueFromApiTxOutValue :: Api.TxOutValue era -> GYValue
-valueFromApiTxOutValue (Api.TxOutValue _ v)                  = valueFromApi v
-valueFromApiTxOutValue (Api.TxOutAdaOnly _ (Api.Lovelace x)) = valueFromLovelace x
+valueFromApiTxOutValue (Api.TxOutValueByron (Api.Lovelace x)) = valueFromLovelace x
+valueFromApiTxOutValue (Api.TxOutValueShelleyBased e v) =
+  valueFromApi $ Api.fromLedgerValue e v
 
+-- FIXME: should we use Conway?
 valueToApiTxOutValue :: GYValue -> Api.TxOutValue Api.BabbageEra
-valueToApiTxOutValue v = Api.TxOutValue Api.MultiAssetInBabbageEra (valueToApi v)
+valueToApiTxOutValue v =
+  Api.TxOutValueShelleyBased
+    Api.ShelleyBasedEraBabbage
+    (Api.toLedgerValue Api.MaryEraOnwardsBabbage $ valueToApi v)
 
 -- | Create 'GYValue' from a list of asset class and amount.
 -- Duplicates are merged.
@@ -275,7 +280,7 @@ instance Csv.FromField GYValue where
         Nothing -> fail $ "Error Parsing GYValue: " <> show value
 
 
-assetPairToKV :: Aeson.KeyValue kv => GYAssetClass -> Integer -> kv
+assetPairToKV :: Aeson.KeyValue e kv => GYAssetClass -> Integer -> kv
 assetPairToKV ac i = K.fromText (f ac) .= i
   where
     f GYLovelace      = "lovelace"

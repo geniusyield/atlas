@@ -30,11 +30,11 @@ timeToSlot systemStart eraHistory utc = first show res
     res = Ouroboros.interpretQuery eraHistory $ (\(slot,_,_) -> slot)
           <$> Ouroboros.wallclockToSlot (Ouroboros.toRelativeTime systemStart utc)
 
-checkTimeToSlot :: Api.EraHistory Api.CardanoMode -> Property
+checkTimeToSlot :: Api.EraHistory -> Property
 checkTimeToSlot eraHistory
   = forAll (Ouroboros.SystemStart <$> arbitrary) $ \systemStart ->
     forAll (arbitraryTimeInRange systemStart eraEnd) $ \utc -> either error id $ do
-      let Api.EraHistory _ interpreter = eraHistory
+      let Api.EraHistory interpreter = eraHistory
       expected <- timeToSlot systemStart interpreter utc
 
       slotCfg <- makeSlotConfig systemStart eraHistory
@@ -46,13 +46,13 @@ checkTimeToSlot eraHistory
     summaries = extractEraSummaries eraHistory
     (_, eraEnd) = Ouroboros.summaryBounds summaries
 
-checkSlotToTime :: Api.EraHistory Api.CardanoMode -> Property
+checkSlotToTime :: Api.EraHistory -> Property
 checkSlotToTime eraHistory
   = forAll (Ouroboros.SystemStart <$> arbitrary) $ \systemStart ->
     -- Also see: [Slot Config Design]
     forAll (arbitrarySlotBefore eraEnd) $ \slot -> either error id $ do
         let gslot                        = slotFromApi slot
-            Api.EraHistory _ interpreter = eraHistory
+            Api.EraHistory interpreter = eraHistory
         expectedRes <- slotToTime systemStart interpreter slot
 
         slotCfg <- makeSlotConfig systemStart eraHistory
@@ -66,15 +66,15 @@ slotConversionTests :: TestTree
 slotConversionTests = testGroup "SlotToFromTime"
   [ testGroup "preprod"
       [ testProperty "SlotToTime"
-          $ checkSlotToTime (Api.EraHistory Api.CardanoMode preprodEraHist)
+          $ checkSlotToTime (Api.EraHistory preprodEraHist)
       , testProperty "TimeToSlot"
-          $ checkTimeToSlot (Api.EraHistory Api.CardanoMode preprodEraHist)
+          $ checkTimeToSlot (Api.EraHistory preprodEraHist)
       ]
   , testGroup "preview"
       [ testProperty "SlotToTime"
-          $ checkSlotToTime (Api.EraHistory Api.CardanoMode previewEraHist)
+          $ checkSlotToTime (Api.EraHistory previewEraHist)
       , testProperty "TimeToSlot"
-          $ checkTimeToSlot (Api.EraHistory Api.CardanoMode previewEraHist)
+          $ checkTimeToSlot (Api.EraHistory previewEraHist)
       ]
   ]
 

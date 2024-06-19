@@ -116,7 +116,7 @@ makeSetup' privnetPath kupoUrl = do
       ) userSkeyAddr
 
     -- Further down we need local node connection
-    let info :: Api.LocalNodeConnectInfo Api.CardanoMode
+    let info :: Api.LocalNodeConnectInfo
         info = Api.LocalNodeConnectInfo
             { Api.localConsensusModeParams = Api.CardanoModeParams $ Api.EpochSlots 500
             , Api.localNodeNetworkId       = networkIdToApi GYPrivnet

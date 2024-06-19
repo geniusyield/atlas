@@ -43,7 +43,7 @@ data GYTxCertWitness v
 
 txCertToApi
     :: GYTxCert v
-    -> (Api.Certificate, Maybe (Api.StakeCredential, Api.Witness Api.WitCtxStake Api.BabbageEra))
+    -> (Api.Certificate Api.BabbageEra, Maybe (Api.StakeCredential, Api.Witness Api.WitCtxStake Api.BabbageEra))
 txCertToApi (GYTxCert cert wit) = (certificateToApi cert, wit <&> (\wit' -> (certificateToStakeCredential cert & stakeCredentialToApi, f wit')) )
   where
     f :: GYTxCertWitness v -> Api.Witness Api.WitCtxStake Api.BabbageEra

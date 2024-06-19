@@ -35,7 +35,7 @@ import           Data.Word                            (Word64)
 import qualified Cardano.Api                          as Api
 import qualified Cardano.Slotting.Slot                as CSlot
 import qualified Cardano.Slotting.Time                as CSlot
-import qualified Data.SOP.Counting                    as Ouroboros
+import qualified Data.SOP.NonEmpty                    as Ouroboros
 import qualified Ouroboros.Consensus.BlockchainTime   as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
 
@@ -105,7 +105,7 @@ data GYSlotConfig = GYSlotConfig
 
 This is the recommended, robust, way to create slot config.
 -}
-makeSlotConfig :: CSlot.SystemStart -> Api.EraHistory Api.CardanoMode -> Either String GYSlotConfig
+makeSlotConfig :: CSlot.SystemStart -> Api.EraHistory -> Either String GYSlotConfig
 makeSlotConfig sysStart eraHist = GYSlotConfig sysStart <$!> simplifiedEraSumms
   where
     simplifiedEraSumms :: Either String (NonEmpty GYEraSlotConfig)

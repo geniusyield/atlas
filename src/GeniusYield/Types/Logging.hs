@@ -200,6 +200,7 @@ logContextsFromKatip = coerce
 logContextsToKatip :: GYLogContexts -> K.LogContexts
 logContextsToKatip = coerce
 
+-- | Add a context to the log contexts. See `sl`.
 addContext :: KC.LogItem i => i -> GYLogContexts -> GYLogContexts
 addContext i ctx = ctx <> logContextsFromKatip (K.liftPayload i)
 

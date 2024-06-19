@@ -28,7 +28,7 @@ data GYCertificate =
   | GYStakeAddressPoolDelegationCertificate !GYStakeCredential !GYStakePoolId
   deriving stock (Eq, Show)
 
-certificateToApi :: GYCertificate -> (Api.Certificate Api.BabbageEra)
+certificateToApi :: GYCertificate -> Api.Certificate Api.BabbageEra
 certificateToApi = \case
   GYStakeAddressRegistrationCertificate sc -> Api.makeStakeAddressRegistrationCertificate
     . Api.StakeAddrRegistrationPreConway Api.ShelleyToBabbageEraBabbage $ f sc
@@ -40,7 +40,7 @@ certificateToApi = \case
     f = stakeCredentialToApi
     g = stakePoolIdToApi
 
-certificateFromApiMaybe :: (Api.Certificate Api.BabbageEra) -> Maybe GYCertificate
+certificateFromApiMaybe :: Api.Certificate Api.BabbageEra -> Maybe GYCertificate
 certificateFromApiMaybe (Api.ShelleyRelatedCertificate _ x) = case x of
   Ledger.RegTxCert (Api.fromShelleyStakeCredential -> sc) -> Just $ GYStakeAddressRegistrationCertificate (f sc)
   Ledger.UnRegTxCert (Api.fromShelleyStakeCredential -> sc) -> Just $ GYStakeAddressDeregistrationCertificate (f sc)

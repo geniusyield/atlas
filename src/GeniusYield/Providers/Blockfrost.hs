@@ -405,7 +405,7 @@ blockfrostSystemStart proj = do
   genesisParams <- Blockfrost.runBlockfrost proj Blockfrost.getLedgerGenesis >>= handleBlockfrostError "LedgerGenesis"
   pure . CTime.SystemStart . Time.posixSecondsToUTCTime $ Blockfrost._genesisSystemStart genesisParams
 
-blockfrostEraHistory :: Blockfrost.Project -> IO (Api.EraHistory)
+blockfrostEraHistory :: Blockfrost.Project -> IO Api.EraHistory
 blockfrostEraHistory proj = do
   eraSumms <- Blockfrost.runBlockfrost proj Blockfrost.getNetworkEras >>= handleBlockfrostError "EraHistory"
   maybe (throwIO $ BlpvIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms

@@ -367,7 +367,7 @@ makeGetParameters :: IO GYSlot
                 -- ^ Getting protocol parameters
                 -> IO SystemStart
                 -- ^ Getting system start
-                -> IO (Api.EraHistory)
+                -> IO Api.EraHistory
                 -- ^ Getting era history
                 -> IO (Set Api.S.PoolId)
                 -- ^ Getting stake pools

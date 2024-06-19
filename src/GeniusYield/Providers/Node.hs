@@ -122,7 +122,7 @@ systemStart :: Api.LocalNodeConnectInfo -> IO SystemStart
 systemStart info = queryCardanoMode info Api.QuerySystemStart
 
 eraHistory :: Api.LocalNodeConnectInfo -> IO Api.EraHistory
-eraHistory info = queryCardanoMode info $ Api.QueryEraHistory
+eraHistory info = queryCardanoMode info Api.QueryEraHistory
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions

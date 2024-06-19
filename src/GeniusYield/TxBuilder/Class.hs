@@ -87,6 +87,7 @@ import qualified Data.Text                    as Txt
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+import           GHC.Stack                    (withFrozenCallStack)
 import qualified PlutusLedgerApi.V1           as Plutus (Address, DatumHash,
                                                          FromData (..),
                                                          PubKeyHash, TokenName,
@@ -220,7 +221,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
-    logMsg ns s = lift . logMsg ns s
+    logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (RandT g m) where
     ownAddresses = lift ownAddresses
@@ -246,7 +247,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
-    logMsg ns s = lift . logMsg ns s
+    logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ReaderT g m) where
     ownAddresses = lift ownAddresses
@@ -272,7 +273,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
-    logMsg ns s = lift . logMsg ns s
+    logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ExceptT GYTxMonadException m) where
     ownAddresses = lift ownAddresses
@@ -697,11 +698,11 @@ isInvalidBefore s = emptyGYTxSkeleton {gytxInvalidBefore = Just s}
 isInvalidAfter :: GYSlot -> GYTxSkeleton v
 isInvalidAfter s = emptyGYTxSkeleton {gytxInvalidAfter = Just s}
 
-gyLogDebug', gyLogInfo', gyLogWarning', gyLogError' :: GYTxQueryMonad m => GYLogNamespace -> String -> m ()
-gyLogDebug'   ns = logMsg ns GYDebug
-gyLogInfo'    ns = logMsg ns GYInfo
-gyLogWarning' ns = logMsg ns GYWarning
-gyLogError'   ns = logMsg ns GYError
+gyLogDebug', gyLogInfo', gyLogWarning', gyLogError' :: (GYTxQueryMonad m, HasCallStack) => GYLogNamespace -> String -> m ()
+gyLogDebug'   ns = withFrozenCallStack $ logMsg ns GYDebug
+gyLogInfo'    ns = withFrozenCallStack $ logMsg ns GYInfo
+gyLogWarning' ns = withFrozenCallStack $ logMsg ns GYWarning
+gyLogError'   ns = withFrozenCallStack $ logMsg ns GYError
 
 -- | Given a skeleton, returns a list of reference to reference script UTxOs which are present as witness.
 skeletonToRefScriptsORefs :: GYTxSkeleton v -> [GYTxOutRef]

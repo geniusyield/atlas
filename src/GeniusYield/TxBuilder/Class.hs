@@ -81,22 +81,18 @@ import           Control.Monad.Except         (ExceptT, MonadError (..),
 import           Control.Monad.Random         (MonadRandom (..), RandT, lift)
 import           Control.Monad.Reader         (ReaderT)
 import           Data.List                    (nubBy)
-
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (listToMaybe)
 import qualified Data.Set                     as Set
 import qualified Data.Text                    as Txt
+import           GeniusYield.Imports
+import           GeniusYield.TxBuilder.Errors
+import           GeniusYield.Types
 import qualified PlutusLedgerApi.V1           as Plutus (Address, DatumHash,
                                                          FromData (..),
                                                          PubKeyHash, TokenName,
                                                          TxOutRef, Value)
 import qualified PlutusLedgerApi.V1.Value     as Plutus (AssetClass)
-
-import           Control.Monad.IO.Class       (MonadIO)
-import           GeniusYield.Imports
-import           GeniusYield.TxBuilder.Errors
-import           GeniusYield.Types
-import qualified Katip                        as K
 
 -------------------------------------------------------------------------------
 -- Class

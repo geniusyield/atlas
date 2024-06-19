@@ -71,7 +71,6 @@ import qualified Cardano.Api.Shelley                as Api.S
 import           Cardano.Slotting.Time              (SystemStart)
 import           Control.Concurrent                 (MVar, modifyMVar, newMVar,
                                                      threadDelay)
-import           Control.Exception                  (bracket)
 import           Control.Monad                      ((<$!>))
 import           Control.Monad.IO.Class             (MonadIO (..))
 import           Data.Default                       (Default, def)
@@ -94,7 +93,7 @@ import           GeniusYield.Types.UTxO
 import           GeniusYield.Types.Value            (GYAssetClass)
 import           GHC.Stack                          (withFrozenCallStack)
 import qualified Katip
-import           System.IO                          (stderr, stdout)
+import           System.IO                          (stdout)
 
 {- Note [Caching and concurrently accessible MVars]
 

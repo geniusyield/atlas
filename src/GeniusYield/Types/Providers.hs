@@ -92,8 +92,9 @@ import           GeniusYield.Types.Tx
 import           GeniusYield.Types.TxOutRef
 import           GeniusYield.Types.UTxO
 import           GeniusYield.Types.Value            (GYAssetClass)
+import           GHC.Stack                          (withFrozenCallStack)
 import qualified Katip
-import           System.IO                          (stdout)
+import           System.IO                          (stderr, stdout)
 
 {- Note [Caching and concurrently accessible MVars]
 
@@ -519,13 +520,13 @@ gyLog :: (HasCallStack, MonadIO m) => GYProviders -> GYLogNamespace -> GYLogSeve
 gyLog providers ns s msg =
   let cfg = gyLogConfiguration' providers
       cfg' = cfgAddNamespace ns cfg
-  in liftIO $ logRun cfg' s msg
+  in withFrozenCallStack $ liftIO $ logRun cfg' s msg
 
 gyLogDebug, gyLogInfo, gyLogWarning, gyLogError :: (HasCallStack, MonadIO m) => GYProviders -> GYLogNamespace -> String -> m ()
-gyLogDebug   p ns = gyLog p ns GYDebug
-gyLogInfo    p ns = gyLog p ns GYInfo
-gyLogWarning p ns = gyLog p ns GYWarning
-gyLogError   p ns = gyLog p ns GYError
+gyLogDebug   p ns = withFrozenCallStack $ gyLog p ns GYDebug
+gyLogInfo    p ns = withFrozenCallStack $ gyLog p ns GYInfo
+gyLogWarning p ns = withFrozenCallStack $ gyLog p ns GYWarning
+gyLogError   p ns = withFrozenCallStack $ gyLog p ns GYError
 
 noLoggingCfg :: IO GYLogConfiguration
 noLoggingCfg = do
@@ -540,7 +541,8 @@ simpleConsoleLoggingCfg :: IO GYLogConfiguration
 simpleConsoleLoggingCfg = do
   handleScribe <- Katip.mkHandleScribe Katip.ColorIfTerminal stdout (Katip.permitItem Katip.DebugS) Katip.V2
   let makeLogEnv = Katip.registerScribe "stdout" handleScribe Katip.defaultScribeSettings =<< Katip.initLogEnv mempty ""
-  bracket makeLogEnv Katip.closeScribes $ \le -> pure $ GYLogConfiguration
+  le <- makeLogEnv
+  pure $ GYLogConfiguration
     { cfgLogContexts = mempty
     , cfgLogNamespace = mempty
     , cfgLogEnv = logEnvFromKatip le

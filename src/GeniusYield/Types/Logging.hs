@@ -26,6 +26,7 @@ module GeniusYield.Types.Logging
     , GYLogEnv
     , logEnvFromKatip
     , logEnvToKatip
+    , closeScribes
       -- * Log configuration
     , GYLogConfiguration (..)
     , cfgAddNamespace
@@ -51,6 +52,7 @@ import qualified Data.Text                    as Text
 import           GeniusYield.Imports
 import           GeniusYield.Providers.GCP    (gcpFormatter)
 import qualified GeniusYield.Providers.Sentry as Sentry
+import           GHC.Stack                    (withFrozenCallStack)
 import qualified Katip                        as K
 import qualified Katip.Core                   as KC
 import           Network.URI                  (URI (..), URIAuth (..),
@@ -209,6 +211,10 @@ logEnvFromKatip = coerce
 logEnvToKatip :: GYLogEnv -> K.LogEnv
 logEnvToKatip = coerce
 
+-- | Calls @closeScribes@ from Katip.
+closeScribes :: GYLogEnv -> IO GYLogEnv
+closeScribes genv = genv & logEnvToKatip & K.closeScribes <&> logEnvFromKatip
+
 -------------------------------------------------------------------------------
 -- Log configuration
 -------------------------------------------------------------------------------
@@ -225,9 +231,8 @@ cfgAddNamespace ns cfg = cfg { cfgLogNamespace = cfgLogNamespace cfg <> ns }
 cfgAddContext :: KC.LogItem i => i -> GYLogConfiguration -> GYLogConfiguration
 cfgAddContext i cfg = cfg { cfgLogContexts = addContext i (cfgLogContexts cfg) }
 
--- FIXME: Remove the comment below.
 logRun :: (HasCallStack, MonadIO m, StringConv a Text) => GYLogConfiguration -> GYLogSeverity -> a -> m ()
-logRun (GYLogConfiguration {..}) sev msg = K.runKatipT (logEnvToKatip cfgLogEnv) $ K.logLoc (logContextsToKatip cfgLogContexts) (logNamespaceToKatip cfgLogNamespace) (logSeverityToKatip sev) (K.logStr msg) -- K.logItem (logContextsToKatip cfgLogContexts) (logNamespaceToKatip cfgLogNamespace) KC.getLoc (logSeverityToKatip sev) (K.logStr msg)
+logRun (GYLogConfiguration {..}) sev msg = withFrozenCallStack $ K.runKatipT (logEnvToKatip cfgLogEnv) $ K.logLoc (logContextsToKatip cfgLogContexts) (logNamespaceToKatip cfgLogNamespace) (logSeverityToKatip sev) (K.logStr msg)
 
 -------------------------------------------------------------------------------
 -- Scribe Configuration

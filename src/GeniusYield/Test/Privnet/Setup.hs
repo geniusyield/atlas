@@ -157,7 +157,7 @@ makeSetup' privnetPath kupoUrl = do
             , ctxUser9            = uncurry user' (V.index userSkeyAddr (Proxy @7))
             , ctxGold             = GYLovelace -- temporarily
             , ctxIron             = GYLovelace -- temporarily
-            , ctxLogConfiguration = noLogging
+            , ctxLog              = noLogging
             , ctxLookupDatum      = localLookupDatum
             , ctxAwaitTxConfirmed = localAwaitTxConfirmed
             , ctxQueryUtxos       = localQueryUtxo
@@ -196,7 +196,7 @@ makeSetup' privnetPath kupoUrl = do
       ) userBalances
 
     return $ Setup
-        (\putLog kont -> kont $ ctx { ctxLogConfiguration = simpleConsoleLogging putLog })
+        (\putLog kont -> kont $ ctx { ctxLog = simpleConsoleLogging putLog })
 
 -------------------------------------------------------------------------------
 -- Generating users

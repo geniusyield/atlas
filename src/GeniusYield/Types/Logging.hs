@@ -70,6 +70,7 @@ import qualified Text.Printf                  as Printf
 -- >>> import qualified Data.Aeson                 as Aeson
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 -- >>> import           Text.Printf                (printf)
+-- >>> import           Data.Text                  (Text)
 
 -------------------------------------------------------------------------------
 -- Severity

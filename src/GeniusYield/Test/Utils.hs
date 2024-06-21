@@ -20,6 +20,7 @@ module GeniusYield.Test.Utils
     , withBalance
     , withWalletBalancesCheck
     , withWalletBalancesCheckSimple
+    , withWalletBalancesCheckSimpleIgnoreMinDepFor
     , getBalance
     , getBalances
     , waitUntilSlot
@@ -44,6 +45,7 @@ import           Data.Semigroup                   (Sum (getSum))
 
 import qualified Data.Maybe.Strict                as StrictMaybe
 import qualified Data.Sequence.Strict             as StrictSeq
+import qualified Data.Set                         as Set
 import           Prettyprinter                    (PageWidth(AvailablePerLine), defaultLayoutOptions, layoutPageWidth,
                                                    layoutPretty)
 import           Prettyprinter.Render.String      (renderString)
@@ -253,7 +255,10 @@ Notes:
 * The 'GYValue' should be negative to check if the Wallet lost those funds.
 -}
 withWalletBalancesCheckSimple :: [(Wallet, GYValue)] -> GYTxMonadClb a -> GYTxMonadClb a
-withWalletBalancesCheckSimple wallValueDiffs m = do
+withWalletBalancesCheckSimple wallValueDiffs = withWalletBalancesCheckSimpleIgnoreMinDepFor wallValueDiffs mempty
+
+withWalletBalancesCheckSimpleIgnoreMinDepFor :: [(Wallet, GYValue)] -> Set WalletName -> GYTxMonadClb a -> GYTxMonadClb a
+withWalletBalancesCheckSimpleIgnoreMinDepFor wallValueDiffs ignoreMinDepFor m = do
   bs <- mapM (balance . fst) wallValueDiffs
   a <- m
   walletExtraLovelaceMap <- gets walletExtraLovelace
@@ -261,9 +266,10 @@ withWalletBalancesCheckSimple wallValueDiffs m = do
 
   forM_ (zip3 wallValueDiffs bs' bs) $
     \((w, v), b', b) ->
-      let newBalance = case Map.lookup (walletName w) walletExtraLovelaceMap of
+      let wn = walletName w
+          newBalance = case Map.lookup wn walletExtraLovelaceMap of
             Nothing -> b'
-            Just (extraLovelaceForFees, extraLovelaceForMinAda) -> b' <> valueFromLovelace (getSum $ extraLovelaceForFees <> extraLovelaceForMinAda)
+            Just (extraLovelaceForFees, extraLovelaceForMinAda) -> b' <> valueFromLovelace (getSum $ extraLovelaceForFees <> if Set.member wn ignoreMinDepFor then mempty else extraLovelaceForMinAda)
           diff = newBalance `valueMinus` b
         in unless (diff == v) $ fail $
             printf "Wallet: %s. Old balance: %s. New balance: %s. New balance after adding extra lovelaces %s. Expected balance difference of %s, but the actual difference was %s" (walletName w) b b' newBalance v diff

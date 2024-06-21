@@ -48,7 +48,7 @@ slotCachingTime = 5
 
 -- | Newtype with a custom show instance that prevents showing the contained data.
 newtype Confidential a = Confidential a
-  deriving newtype (Eq, Ord, FromJSON)
+  deriving newtype (Eq, Ord, FromJSON, ToJSON)
 
 instance Show (Confidential a) where
   showsPrec _ _ = showString "<Confidential>"

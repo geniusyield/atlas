@@ -257,6 +257,7 @@ Notes:
 withWalletBalancesCheckSimple :: [(Wallet, GYValue)] -> GYTxMonadClb a -> GYTxMonadClb a
 withWalletBalancesCheckSimple wallValueDiffs = withWalletBalancesCheckSimpleIgnoreMinDepFor wallValueDiffs mempty
 
+-- | Variant of `withWalletBalancesCheckSimple` that only accounts for transaction fees and not minimum ada deposits.
 withWalletBalancesCheckSimpleIgnoreMinDepFor :: [(Wallet, GYValue)] -> Set WalletName -> GYTxMonadClb a -> GYTxMonadClb a
 withWalletBalancesCheckSimpleIgnoreMinDepFor wallValueDiffs ignoreMinDepFor m = do
   bs <- mapM (balance . fst) wallValueDiffs

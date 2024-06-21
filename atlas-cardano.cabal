@@ -291,7 +291,7 @@ test-suite atlas-tests
     , atlas-cardano
     , base
     , bytestring
-    , cardano-api           ^>= 8.38.0.0
+    , cardano-api
     , cardano-ledger-alonzo
     , clb
     , containers

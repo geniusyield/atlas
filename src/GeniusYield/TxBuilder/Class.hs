@@ -723,9 +723,9 @@ skeletonToRefScriptsORefs GYTxSkeleton{ gytxIns } = go gytxIns []
 -- | Log the time a particular monad action took.
 wrapReqWithTimeLog :: (GYTxQueryMonad m, MonadIO m) => String -> m a -> m a
 wrapReqWithTimeLog label m = do
-    start <- liftIO $ getCurrentTime
+    start <- liftIO getCurrentTime
     a <- m
-    end <- liftIO $ getCurrentTime
+    end <- liftIO getCurrentTime
     let dur = end `diffUTCTime` start
     logMsg mempty GYDebug $ label <> " took " <> show dur
     pure a

@@ -9,9 +9,11 @@ Stability   : develop
 module GeniusYield.Test.Privnet.Ctx (
     -- * Context
     Ctx (..),
+    ctxNetworkId,
     -- * User
     User (..),
     CreateUserConfig (..),
+
     ctxUsers,
     userPkh,
     userPaymentPkh,
@@ -91,27 +93,32 @@ userStakePkh :: User -> Maybe GYStakeKeyHash
 userStakePkh = fmap (stakeKeyHash . stakeVerificationKey) . userStakeSKey
 
 data Ctx = Ctx
-    { ctxEra              :: !GYEra
-    , ctxInfo             :: !Api.LocalNodeConnectInfo
-    , ctxUserF            :: !User  -- ^ Funder. All other users begin with same status of funds.
-    , ctxUser2            :: !User
-    , ctxUser3            :: !User
-    , ctxUser4            :: !User
-    , ctxUser5            :: !User
-    , ctxUser6            :: !User
-    , ctxUser7            :: !User
-    , ctxUser8            :: !User
-    , ctxUser9            :: !User
-    , ctxGold             :: !GYAssetClass  -- ^ asset used in tests
-    , ctxIron             :: !GYAssetClass  -- ^ asset used in tests
-    , ctxLog              :: !GYLogConfiguration
-    , ctxLookupDatum      :: !GYLookupDatum
-    , ctxAwaitTxConfirmed :: !GYAwaitTx
-    , ctxQueryUtxos       :: !GYQueryUTxO
-    , ctxGetParams        :: !GYGetParameters
+    { ctxNetworkInfo       :: !GYNetworkInfo
+    , ctxInfo              :: !Api.LocalNodeConnectInfo
+    -- FIXME: There are now multiple genesis users (since cardano-testnet usage).
+    , ctxUserF             :: !User  -- ^ Funder. All other users begin with same status of funds.
+    , ctxUser2             :: !User
+    , ctxUser3             :: !User
+    , ctxUser4             :: !User
+    , ctxUser5             :: !User
+    , ctxUser6             :: !User
+    , ctxUser7             :: !User
+    , ctxUser8             :: !User
+    , ctxUser9             :: !User
+    , ctxGold              :: !GYAssetClass  -- ^ asset used in tests
+    , ctxIron              :: !GYAssetClass  -- ^ asset used in tests
+    , ctxLog               :: !GYLogConfiguration
+    , ctxLookupDatum       :: !GYLookupDatum
+    , ctxAwaitTxConfirmed  :: !GYAwaitTx
+    , ctxQueryUtxos        :: !GYQueryUTxO
+    , ctxGetParams         :: !GYGetParameters
     }
 
+ctxNetworkId :: Ctx -> GYNetworkId
+ctxNetworkId Ctx {ctxNetworkInfo} = GYPrivnet ctxNetworkInfo
+
 -- | List of context sibling users - all of which begin with same balance.
+-- FIXME: Some of these users are actually genesis users.
 ctxUsers :: Ctx -> [User]
 ctxUsers ctx = ($ ctx) <$> [ctxUser2, ctxUser3, ctxUser4, ctxUser5, ctxUser6, ctxUser7, ctxUser8, ctxUser9]
 
@@ -128,7 +135,7 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
       newStakeVKey = stakeVerificationKey <$> newStakeSKey
       newPaymentKeyHash = paymentKeyHash newPaymentVKey
       newStakeKeyHash = stakeKeyHash <$> newStakeVKey
-      newAddr = addressFromCredential GYPrivnet (GYPaymentCredentialByKey newPaymentKeyHash) (GYStakeCredentialByKey <$> newStakeKeyHash)
+      newAddr = addressFromCredential (ctxNetworkId ctx) (GYPaymentCredentialByKey newPaymentKeyHash) (GYStakeCredentialByKey <$> newStakeKeyHash)
       (adaInValue, otherValue) = valueSplitAda fundValue
 
   -- We want this new user to have at least 5 ada if we want to create collateral.
@@ -147,10 +154,10 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
 
 
 ctxRunF :: forall t v. Traversable t => Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
-ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr Nothing
+ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
 
 ctxRunFWithStrategy :: forall t v. Traversable t => GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
-ctxRunFWithStrategy strat ctx User {..} =  runGYTxMonadNodeF strat GYPrivnet (ctxProviders ctx) [userAddr] userAddr Nothing
+ctxRunFWithStrategy strat ctx User {..} =  runGYTxMonadNodeF strat (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
 
 -- | Variant of `ctxRunF` where caller can also give the UTxO to be used as collateral.
 ctxRunFWithCollateral :: forall t v. Traversable t
@@ -160,7 +167,7 @@ ctxRunFWithCollateral :: forall t v. Traversable t
                       -> Bool        -- ^ To check whether this given collateral UTxO has value of exact 5 ada? If it doesn't have exact 5 ada, it would be ignored.
                       -> GYTxMonadNode (t (GYTxSkeleton v))
                       -> IO (t GYTxBody)
-ctxRunFWithCollateral ctx User {..} coll toCheck5Ada =  runGYTxMonadNodeF GYRandomImproveMultiAsset GYPrivnet (ctxProviders ctx) [userAddr] userAddr $ Just (coll, toCheck5Ada)
+ctxRunFWithCollateral ctx User {..} coll toCheck5Ada =  runGYTxMonadNodeF GYRandomImproveMultiAsset (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr $ Just (coll, toCheck5Ada)
 
 ctxRunC :: forall a. Ctx -> User -> GYTxMonadNode a -> IO a
 ctxRunC = coerce (ctxRunF @(Const a))

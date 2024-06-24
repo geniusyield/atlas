@@ -8,6 +8,7 @@ Stability   : develop
 -}
 module GeniusYield.Types.NetworkId
     ( GYNetworkId (..)
+    , GYNetworkInfo (..)
     , networkIdToApi
     , networkIdToLedger
     , networkIdToEpochSlots
@@ -29,24 +30,19 @@ import           GeniusYield.Types.Era
 -- >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 
 data GYNetworkId
-    = GYMainnet         -- ^ cardano mainnet
-    | GYTestnetPreprod  -- ^ cardano preprod testnet
-    | GYTestnetPreview  -- ^ cardano preview testnet
-    | GYTestnetLegacy   -- ^ cardano legacy testnet
-    | GYPrivnet
-        { gyNetworkMagic :: Word32
-        , gyNetworkEpochSlots :: Word64
-        , gyNetworkEra :: GYEra
-        }
-      -- ^ local private network
+    = GYMainnet               -- ^ cardano mainnet
+    | GYTestnetPreprod        -- ^ cardano preprod testnet
+    | GYTestnetPreview        -- ^ cardano preview testnet
+    | GYTestnetLegacy         -- ^ cardano legacy testnet
+    | GYPrivnet !GYNetworkInfo -- ^ local private network
     deriving (Show, Read, Eq, Ord)
 
 networkIdToApi :: GYNetworkId -> Api.NetworkId
-networkIdToApi GYMainnet                 = Api.Mainnet
-networkIdToApi GYTestnetPreprod          = Api.Testnet $ Api.NetworkMagic 1
-networkIdToApi GYTestnetPreview          = Api.Testnet $ Api.NetworkMagic 2
-networkIdToApi GYTestnetLegacy           = Api.Testnet $ Api.NetworkMagic 1097911063
-networkIdToApi GYPrivnet{gyNetworkMagic} = Api.Testnet $ Api.NetworkMagic gyNetworkMagic
+networkIdToApi GYMainnet           = Api.Mainnet
+networkIdToApi GYTestnetPreprod    = Api.Testnet $ Api.NetworkMagic 1
+networkIdToApi GYTestnetPreview    = Api.Testnet $ Api.NetworkMagic 2
+networkIdToApi GYTestnetLegacy     = Api.Testnet $ Api.NetworkMagic 1097911063
+networkIdToApi (GYPrivnet netInfo) = Api.Testnet . Api.NetworkMagic $ gyNetworkMagic netInfo
 
 networkIdToLedger :: GYNetworkId -> Ledger.Network
 networkIdToLedger nid = case networkIdToApi nid of
@@ -54,19 +50,26 @@ networkIdToLedger nid = case networkIdToApi nid of
     Api.Testnet _magic -> Ledger.Testnet
 
 networkIdToEpochSlots :: GYNetworkId -> Api.EpochSlots
-networkIdToEpochSlots GYPrivnet{gyNetworkEpochSlots} = Api.EpochSlots gyNetworkEpochSlots
-networkIdToEpochSlots GYMainnet                      = Api.EpochSlots 432000
-networkIdToEpochSlots GYTestnetPreprod               = Api.EpochSlots 432000
-networkIdToEpochSlots GYTestnetPreview               = Api.EpochSlots 86400
-networkIdToEpochSlots GYTestnetLegacy                = Api.EpochSlots 432000
+networkIdToEpochSlots (GYPrivnet netInfo) = Api.EpochSlots $ gyNetworkEpochSlots netInfo
+networkIdToEpochSlots GYMainnet           = Api.EpochSlots 432000
+networkIdToEpochSlots GYTestnetPreprod    = Api.EpochSlots 432000
+networkIdToEpochSlots GYTestnetPreview    = Api.EpochSlots 86400
+networkIdToEpochSlots GYTestnetLegacy     = Api.EpochSlots 432000
 
 -- This needs to be updated whenever a hardfork happens.
 networkIdToEra :: GYNetworkId -> GYEra
-networkIdToEra GYPrivnet{gyNetworkEra} = gyNetworkEra
-networkIdToEra GYMainnet               = GYBabbage
-networkIdToEra GYTestnetPreprod        = GYBabbage
-networkIdToEra GYTestnetPreview        = GYBabbage
-networkIdToEra GYTestnetLegacy         = GYBabbage
+networkIdToEra (GYPrivnet netInfo) = gyNetworkEra netInfo
+networkIdToEra GYMainnet           = GYBabbage
+networkIdToEra GYTestnetPreprod    = GYBabbage
+networkIdToEra GYTestnetPreview    = GYBabbage
+networkIdToEra GYTestnetLegacy     = GYBabbage
+
+data GYNetworkInfo = GYNetworkInfo
+    { gyNetworkMagic      :: !Word32
+    , gyNetworkEpochSlots :: !Word64
+    , gyNetworkEra        :: !GYEra
+    }
+    deriving (Show, Read, Eq, Ord)
 
 -------------------------------------------------------------------------------
 -- aeson

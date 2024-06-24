@@ -176,7 +176,7 @@ getNetworkId :: GYTxMonadClb GYNetworkId
 getNetworkId = do
     magic <- liftClb $ gets (mockConfigNetworkId . mockConfig)
     -- TODO: Add epoch slots and network era to clb and retrieve from there.
-    pure $ GYPrivnet
+    pure . GYPrivnet $ GYNetworkInfo
         { gyNetworkMagic = Api.S.unNetworkMagic $ Api.S.toNetworkMagic magic
         , gyNetworkEpochSlots = 500
         , gyNetworkEra = GYBabbage

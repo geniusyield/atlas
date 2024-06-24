@@ -9,11 +9,21 @@ Stability   : develop
 **INTERNAL MODULE**
 -}
 
-module GeniusYield.Providers.Node.Query (nodeQueryUTxO) where
+module GeniusYield.Providers.Node.Query (
+    nodeQueryUTxO,
+    nodeUtxosAtAddress,
+    nodeUtxosAtAddresses,
+    nodeUtxoAtTxOutRef,
+    nodeUtxosAtTxOutRefs,
+    nodeUtxosAtPaymentCredential,
+    nodeUtxosAtPaymentCredentials
+) where
 
-import qualified Cardano.Api                                       as Api
-import qualified Cardano.Api.Shelley                               as Api.S
-import qualified Data.Set                                          as Set
+import qualified Data.Set                     as Set
+
+import qualified Cardano.Api                  as Api
+import qualified Cardano.Api.Shelley          as Api.S
+
 import           GeniusYield.CardanoApi.Query
 import           GeniusYield.Types
 

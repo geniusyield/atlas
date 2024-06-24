@@ -11,7 +11,7 @@ import           Test.Tasty.HUnit                     (testCaseSteps)
 aStakeValidatorHash :: GYStakeValidatorHash
 aStakeValidatorHash = stakeValidatorHash aStakeValidator
 
-stakeValidatorTests :: IO Setup -> TestTree
+stakeValidatorTests :: Setup -> TestTree
 stakeValidatorTests setup = testGroup "stake"
   [ testCaseSteps "exercising stake credential registration, delegation, rewards claiming & de-registration via stake validator" $ \info -> withSetup setup info $ \ctx -> do
     stakeIntegrationTest (Just aStakeValidatorHash) info ctx

@@ -57,7 +57,7 @@ refInputTrace toInline actual guess Wallets{..} = do
     Just Nothing -> fail "Couldn't find index for reference utxo in outputs"
     Just (Just refInputORef) ->
       void $ runWallet w1 $ withWalletBalancesCheckSimple [w1 := valueFromLovelace 0] $ do
-        -- liftClb $ logInfo $ printf "Reference input ORef %s" refInputORef
+        liftClb $ logInfoS $ printf "Reference input ORef %s" refInputORef
         addr <- scriptAddress gyGuessRefInputDatumValidator
         (tx, txId) <- sendSkeleton' (mustHaveOutput $ mkGYTxOut addr outValue (datumFromPlutusData ())) []
         let mOrefIndices = findLockedUtxosInBody addr tx
@@ -65,7 +65,7 @@ refInputTrace toInline actual guess Wallets{..} = do
         oref        <- case fmap (txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx) orefIndices of
           [oref']        -> return oref'
           _non_singleton -> fail "expected exactly one reference"
-        -- liftClb $ logInfo $ printf "Locked ORef %s" oref
+        liftClb $ logInfoS $ printf "Locked ORef %s" oref
         guessRefInputRun refInputORef oref myGuess
 
 tryRefInputConsume :: Wallets -> GYTxMonadClb ()
@@ -86,8 +86,8 @@ tryRefInputConsume Wallets{..} = do
     sendSkeleton (mustHaveRefInput @'PlutusV2 desiredOutputRef <> mustHaveOutput  (mkGYTxOutNoDatum (walletAddress w1) lovelaceToSendValue))
       `catchError` (
         \case
-          GYApplicationException _e -> do
-            -- liftClb $ logInfo $ printf "Successfully caught expected exception %s" (show e)
+          GYApplicationException e -> do
+            liftClb $ logInfoS $ printf "Successfully caught expected exception %s" (show e)
             pure mockTxId
           e -> fail $ printf "Unexpected exception %s" (show e)
         )

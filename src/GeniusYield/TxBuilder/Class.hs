@@ -73,10 +73,13 @@ module GeniusYield.TxBuilder.Class
     , gyLogWarning'
     , gyLogError'
     , skeletonToRefScriptsORefs
+    , wrapReqWithTimeLog
+    , wt
     ) where
 
 import           Control.Monad.Except         (ExceptT, MonadError (..),
                                                liftEither)
+import           Control.Monad.IO.Class       (MonadIO (..))
 import           Control.Monad.Random         (MonadRandom (..), RandT, lift)
 import           Control.Monad.Reader         (ReaderT)
 import           Data.List                    (nubBy)
@@ -84,6 +87,7 @@ import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (listToMaybe)
 import qualified Data.Set                     as Set
 import qualified Data.Text                    as Txt
+import           Data.Time                    (diffUTCTime, getCurrentTime)
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
@@ -715,3 +719,17 @@ skeletonToRefScriptsORefs GYTxSkeleton{ gytxIns } = go gytxIns []
           GYInReference oRef _ -> go rest (oRef : acc)
           _anyOtherMatch       -> go rest acc
       _anyOtherMatch -> go rest acc
+
+-- | Log the time a particular monad action took.
+wrapReqWithTimeLog :: (GYTxQueryMonad m, MonadIO m) => String -> m a -> m a
+wrapReqWithTimeLog label m = do
+    start <- liftIO $ getCurrentTime
+    a <- m
+    end <- liftIO $ getCurrentTime
+    let dur = end `diffUTCTime` start
+    logMsg mempty GYDebug $ label <> " took " <> show dur
+    pure a
+
+-- | Synonym of 'wrapReqWithTimeLog'.
+wt :: (GYTxQueryMonad m, MonadIO m) => String -> m a -> m a
+wt = wrapReqWithTimeLog

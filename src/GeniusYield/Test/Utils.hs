@@ -33,6 +33,7 @@ module GeniusYield.Test.Utils
     , feesFromLovelace
     , withMaxQCTests
     , pattern (:=)
+    , logInfoS
     ) where
 
 import           Control.Lens                     ((^.))
@@ -46,7 +47,9 @@ import           Data.Semigroup                   (Sum (getSum))
 import qualified Data.Maybe.Strict                as StrictMaybe
 import qualified Data.Sequence.Strict             as StrictSeq
 import qualified Data.Set                         as Set
-import           Prettyprinter                    (PageWidth(AvailablePerLine), defaultLayoutOptions, layoutPageWidth,
+import           Prettyprinter                    (PageWidth (AvailablePerLine),
+                                                   defaultLayoutOptions,
+                                                   layoutPageWidth,
                                                    layoutPretty)
 import           Prettyprinter.Render.String      (renderString)
 
@@ -54,13 +57,18 @@ import qualified Cardano.Api                      as Api
 import qualified Cardano.Api.Shelley              as Api.S
 import qualified Cardano.Ledger.Address           as L
 import qualified Cardano.Ledger.Api               as L
-import qualified Cardano.Ledger.Binary            as L
 import qualified Cardano.Ledger.Babbage.Tx        as L.B
 import qualified Cardano.Ledger.Babbage.TxOut     as L.B
-import qualified Cardano.Ledger.Shelley.API       as L.S
+import qualified Cardano.Ledger.Binary            as L
 import qualified Cardano.Ledger.Plutus.TxInfo     as L.Plutus
-import qualified Clb                              (Clb, ClbState (mockInfo), MockConfig, OnChainTx (getOnChainTx),
-                                                   checkErrors, defaultBabbage, initClb, intToKeyPair, ppLog, runClb,
+import qualified Cardano.Ledger.Shelley.API       as L.S
+import qualified Clb                              (Clb, ClbState (mockInfo),
+                                                   ClbT, LogEntry (..),
+                                                   LogLevel (..), MockConfig,
+                                                   OnChainTx (getOnChainTx),
+                                                   checkErrors, defaultBabbage,
+                                                   initClb, intToKeyPair,
+                                                   logInfo, ppLog, runClb,
                                                    waitSlot)
 import qualified PlutusLedgerApi.V1.Value         as Plutus
 import qualified PlutusLedgerApi.V2               as PlutusV2
@@ -68,9 +76,9 @@ import qualified PlutusLedgerApi.V2               as PlutusV2
 import qualified Test.Cardano.Ledger.Core.KeyPair as TL
 
 import qualified Test.Tasty                       as Tasty
+import           Test.Tasty.HUnit                 (assertFailure, testCaseInfo)
 import qualified Test.Tasty.QuickCheck            as Tasty
 import qualified Test.Tasty.Runners               as Tasty
-import           Test.Tasty.HUnit                 (assertFailure, testCaseInfo)
 
 import           GeniusYield.Imports
 import           GeniusYield.Test.Address
@@ -394,3 +402,7 @@ pureGen = mkStdGen 42
 -- Silently returns if the given slot is greater than the current slot.
 waitUntilSlot :: GYSlot -> GYTxMonadClb ()
 waitUntilSlot slot = liftClb $ Clb.waitSlot $ slotToApi slot
+
+-- | Variant of `logInfo` from @Clb@ that logs a string with @Info@ severity.
+logInfoS :: Monad m => String -> Clb.ClbT m ()
+logInfoS s = Clb.logInfo $ Clb.LogEntry Clb.Info s

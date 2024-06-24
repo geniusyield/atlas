@@ -11,7 +11,13 @@ module GeniusYield.Test.Privnet.Setup (
     Setup,
     withPrivnet,
     withSetup,
-    cardanoDefaultTestnetOptions
+    -- * "Cardano.Testnet" re-exports
+    cardanoDefaultTestnetOptions,
+    cardanoDefaultTestnetNodeOptions,
+    CardanoTestnetOptions (..),
+    TestnetNodeOptions (..),
+    NodeLoggingFormat (..),
+    NodeConfigurationYaml (..)
 ) where
 
 import           Control.Concurrent                   (ThreadId, threadDelay, killThread)
@@ -75,17 +81,22 @@ data PrivnetRuntime = PrivnetRuntime
 
 debug :: String -> IO ()
 -- FIXME: change me to debug setup code.
-debug = putStrLn
--- debug _ = return ()
+-- debug = putStrLn
+debug _ = return ()
 
 -- | Calls the `Setup` function with a logging function and the action you wish to use with the privnet.
 withSetup :: Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
 withSetup (Setup cokont) putLog kont = do
     cokont putLog kont
 
--- | Spawn a resource managed privnet and do things with it (closing it in the end).
--- Returns `Setup`, which is essentially a function that performs an action given a logging
--- function and the action itself (which receives the Privnet Ctx).
+{- | Spawn a resource managed privnet and do things with it (closing it in the end).
+
+Privnet can be configured using "Cardano.Testnet.CardanoTestnetOptions". Pass 'cardanoDefaultTestnetOptions'
+for default configuration.
+
+Returns continuation on `Setup`, which is essentially a function that performs an action
+given a logging -- function and the action itself (which receives the Privnet Ctx).
+-}
 withPrivnet :: CardanoTestnetOptions -> (Setup -> IO ()) -> IO ()
 withPrivnet testnetOpts setupUser = do
     -- Based on: https://github.com/IntersectMBO/cardano-node/blob/master/cardano-testnet/src/Testnet/Property/Run.hs

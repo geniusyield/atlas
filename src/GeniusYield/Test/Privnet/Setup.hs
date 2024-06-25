@@ -58,6 +58,18 @@ import           GeniusYield.Types
 -- Once these two arguments are given to this function, it will give `Ctx` to the continuation, where the logging part (the `ctxLog`) of `Ctx` would be obtained from first argument of this function.
 newtype Setup = Setup ((String -> IO ()) -> (Ctx -> IO ()) -> IO ())
 
+data PrivnetRuntime = PrivnetRuntime
+  { runtimeNodeSocket  :: !FilePath
+  , runtimeNetworkInfo :: !GYNetworkInfo
+  , runtimeWallets     :: ![PaymentKeyInfo]
+  , runtimeThreadId    :: !ThreadId
+  }
+
+-- | Calls the `Setup` function with a logging function and the action you wish to use with the privnet.
+withSetup :: Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
+withSetup (Setup cokont) putLog kont = do
+    cokont putLog kont
+
 {-
 TODO: WIP: Provide a variant of `withSetup` that can access `Ctx` to return a non-unit result.
 TODO: Can below implementation also accept @putLog@?
@@ -72,22 +84,10 @@ withSetup' ioSetup kont = do
     takeMVar mvar
 -}
 
-data PrivnetRuntime = PrivnetRuntime
-  { runtimeNodeSocket  :: !FilePath
-  , runtimeNetworkInfo :: !GYNetworkInfo
-  , runtimeWallets     :: ![PaymentKeyInfo]
-  , runtimeThreadId    :: !ThreadId
-  }
-
 debug :: String -> IO ()
 -- FIXME: change me to debug setup code.
 -- debug = putStrLn
 debug _ = return ()
-
--- | Calls the `Setup` function with a logging function and the action you wish to use with the privnet.
-withSetup :: Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
-withSetup (Setup cokont) putLog kont = do
-    cokont putLog kont
 
 {- | Spawn a resource managed privnet and do things with it (closing it in the end).
 
@@ -155,9 +155,8 @@ withPrivnet testnetOpts setupUser = do
 
     let runtimeNetworkId = GYPrivnet runtimeNetworkInfo
 
+    -- Kill the resource holding thread at the end of all this to stop the privnet.
     (`finally` killThread runtimeThreadId) $ do
-
-        -- throwIO @IOError @() $ userError "Forceful"
 
         -- Read pre-existing users.
         -- NOTE: As of writing, cardano-testnet creates three (3) users.

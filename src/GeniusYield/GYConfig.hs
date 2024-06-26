@@ -35,7 +35,6 @@ import qualified Cardano.Api                      as Api
 import           GeniusYield.Imports
 import qualified GeniusYield.Providers.Blockfrost as Blockfrost
 -- import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
-import qualified GeniusYield.Providers.Katip      as Katip
 import qualified GeniusYield.Providers.Kupo       as KupoApi
 import qualified GeniusYield.Providers.Maestro    as MaestroApi
 import           GeniusYield.Providers.Node       (nodeStakeAddressInfo)
@@ -49,7 +48,7 @@ slotCachingTime = 5
 
 -- | Newtype with a custom show instance that prevents showing the contained data.
 newtype Confidential a = Confidential a
-  deriving newtype (Eq, Ord, FromJSON)
+  deriving newtype (Eq, Ord, FromJSON, ToJSON)
 
 instance Show (Confidential a) where
   showsPrec _ _ = showString "<Confidential>"
@@ -208,7 +207,12 @@ withCfgProviders
             , Blockfrost.blockfrostStakeAddressInfo proj
             )
 
-      bracket (Katip.mkKatipLog ns cfgLogging) logCleanUp $ \gyLog' -> do
+      bracket (mkLogEnv ns cfgLogging) closeScribes $ \logEnv -> do
+        let gyLog' = GYLogConfiguration
+                       { cfgLogNamespace = mempty
+                       , cfgLogContexts = mempty
+                       , cfgLogDirector = Left logEnv
+                       }
         (gyQueryUTxO, gySlotActions) <-
           {-if cfgUtxoCacheEnable
           then do
@@ -224,7 +228,7 @@ withCfgProviders
         case e of
             Right a                     -> pure a
             Left (err :: SomeException) -> do
-                logRun gyLog' mempty GYError $ printf "ERROR: %s" $ show err
+                logRun gyLog' GYError ((printf "ERROR: %s" $ show err) :: String)
                 throwIO err
 
 logTiming :: GYProviders -> GYProviders

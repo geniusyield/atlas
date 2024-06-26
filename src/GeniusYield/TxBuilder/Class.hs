@@ -73,27 +73,30 @@ module GeniusYield.TxBuilder.Class
     , gyLogWarning'
     , gyLogError'
     , skeletonToRefScriptsORefs
+    , wrapReqWithTimeLog
+    , wt
     ) where
 
 import           Control.Monad.Except         (ExceptT, MonadError (..),
                                                liftEither)
+import           Control.Monad.IO.Class       (MonadIO (..))
 import           Control.Monad.Random         (MonadRandom (..), RandT, lift)
 import           Control.Monad.Reader         (ReaderT)
 import           Data.List                    (nubBy)
-
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (listToMaybe)
 import qualified Data.Set                     as Set
 import qualified Data.Text                    as Txt
+import           Data.Time                    (diffUTCTime, getCurrentTime)
+import           GeniusYield.Imports
+import           GeniusYield.TxBuilder.Errors
+import           GeniusYield.Types
+import           GHC.Stack                    (withFrozenCallStack)
 import qualified PlutusLedgerApi.V1           as Plutus (Address, DatumHash,
                                                          FromData (..),
                                                          PubKeyHash, TokenName,
                                                          TxOutRef, Value)
 import qualified PlutusLedgerApi.V1.Value     as Plutus (AssetClass)
-
-import           GeniusYield.Imports
-import           GeniusYield.TxBuilder.Errors
-import           GeniusYield.Types
 
 -------------------------------------------------------------------------------
 -- Class
@@ -222,7 +225,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
-    logMsg ns s = lift . logMsg ns s
+    logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (RandT g m) where
     ownAddresses = lift ownAddresses
@@ -248,7 +251,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
-    logMsg ns s = lift . logMsg ns s
+    logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ReaderT g m) where
     ownAddresses = lift ownAddresses
@@ -274,7 +277,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     stakeAddressInfo = lift . stakeAddressInfo
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
-    logMsg ns s = lift . logMsg ns s
+    logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
 instance GYTxMonad m => GYTxMonad (ExceptT GYTxMonadException m) where
     ownAddresses = lift ownAddresses
@@ -699,11 +702,11 @@ isInvalidBefore s = emptyGYTxSkeleton {gytxInvalidBefore = Just s}
 isInvalidAfter :: GYSlot -> GYTxSkeleton v
 isInvalidAfter s = emptyGYTxSkeleton {gytxInvalidAfter = Just s}
 
-gyLogDebug', gyLogInfo', gyLogWarning', gyLogError' :: GYTxQueryMonad m => GYLogNamespace -> String -> m ()
-gyLogDebug'   ns = logMsg ns GYDebug
-gyLogInfo'    ns = logMsg ns GYInfo
-gyLogWarning' ns = logMsg ns GYWarning
-gyLogError'   ns = logMsg ns GYError
+gyLogDebug', gyLogInfo', gyLogWarning', gyLogError' :: (GYTxQueryMonad m, HasCallStack) => GYLogNamespace -> String -> m ()
+gyLogDebug'   ns = withFrozenCallStack $ logMsg ns GYDebug
+gyLogInfo'    ns = withFrozenCallStack $ logMsg ns GYInfo
+gyLogWarning' ns = withFrozenCallStack $ logMsg ns GYWarning
+gyLogError'   ns = withFrozenCallStack $ logMsg ns GYError
 
 -- | Given a skeleton, returns a list of reference to reference script UTxOs which are present as witness.
 skeletonToRefScriptsORefs :: GYTxSkeleton v -> [GYTxOutRef]
@@ -716,3 +719,17 @@ skeletonToRefScriptsORefs GYTxSkeleton{ gytxIns } = go gytxIns []
           GYInReference oRef _ -> go rest (oRef : acc)
           _anyOtherMatch       -> go rest acc
       _anyOtherMatch -> go rest acc
+
+-- | Log the time a particular monad action took.
+wrapReqWithTimeLog :: (GYTxQueryMonad m, MonadIO m) => String -> m a -> m a
+wrapReqWithTimeLog label m = do
+    start <- liftIO getCurrentTime
+    a <- m
+    end <- liftIO getCurrentTime
+    let dur = end `diffUTCTime` start
+    logMsg mempty GYDebug $ label <> " took " <> show dur
+    pure a
+
+-- | Synonym of 'wrapReqWithTimeLog'.
+wt :: (GYTxQueryMonad m, MonadIO m) => String -> m a -> m a
+wt = wrapReqWithTimeLog

@@ -11,7 +11,6 @@ module GeniusYield.Test.Address (
 
 -- import Cardano.Simple.PlutusLedgerApi.V1.Scripts
 -- import Cardano.Simple.TxExtra (keyToStaking)
-import Data.Coerce
 import PlutusLedgerApi.V1.Address
 import PlutusLedgerApi.V2
 import Prelude

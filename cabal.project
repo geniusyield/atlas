@@ -37,8 +37,8 @@ source-repository-package
 source-repository-package
   type: git
   location: https://github.com/mlabs-haskell/clb
-  tag: 24d70ba823a92ece87780edc5224c9d78936f6c8
-  --sha256: sha256-TmSkZ0iILzIRrES2j726HKxVubwzN/Zh3vTp0tYLIMk=
+  tag: 18e781b5b53adc1aa1d8c057c1b606b536a80350
+  --sha256: sha256-PDmrXYTBHPcY0x+JnF21uupLMBwURLSiNMqNmwwapkc=
 
 constraints:
   , cardano-api ^>= 8.38.0.0

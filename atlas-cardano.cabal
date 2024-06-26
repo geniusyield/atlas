@@ -15,7 +15,7 @@ category:           Blockchain, Cardano, Framework
 homepage:           https://github.com/geniusyield/atlas#readme
 bug-reports:        https://github.com/geniusyield/atlas/issues
 extra-source-files: README.md
-tested-with:        GHC ==9.6.4
+tested-with:        GHC ==9.6.5
 
 source-repository head
   type:     git
@@ -76,7 +76,6 @@ library
     GeniusYield.Providers.CachedQueryUTxOs
     GeniusYield.Providers.Common
     GeniusYield.Providers.GCP
-    GeniusYield.Providers.Katip
     GeniusYield.Providers.Kupo
     GeniusYield.Providers.Maestro
     GeniusYield.Providers.Node
@@ -192,6 +191,7 @@ library
     , servant-client-core   ^>=0.20
     , some                  ^>=1.0.5
     , sop-extras            ^>=0.1.0.0
+    , string-conv           ^>=0.2.0
     , swagger2              ^>=2.8.7
     , tasty                 ^>=1.5
     , tasty-hunit           ^>=0.10.0.3
@@ -216,15 +216,13 @@ library
     , cardano-addresses
     , cardano-api
     , cardano-api:{internal}
-    , cardano-balance-tx:{cardano-balance-tx, internal}
-    , cardano-binary
+    , cardano-balance-tx:{internal}
     , cardano-coin-selection
     , cardano-crypto-class
     , cardano-ledger-api
     , cardano-ledger-core:{cardano-ledger-core, testlib}
     , cardano-ledger-byron
     , cardano-ledger-shelley
-    , cardano-ledger-mary
     , cardano-ledger-alonzo
     , cardano-ledger-babbage
     , cardano-ledger-binary
@@ -295,7 +293,6 @@ test-suite atlas-tests
     , bytestring
     , cardano-api           ^>= 8.38.0.0
     , cardano-ledger-alonzo
-    , cardano-ledger-shelley
     , clb
     , containers
     , data-default
@@ -304,7 +301,6 @@ test-suite atlas-tests
     , http-api-data
     , maestro-sdk
     , MonadRandom
-    , mtl
     , ouroboros-consensus
     , plutus-ledger-api
     , plutus-tx

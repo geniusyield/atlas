@@ -155,8 +155,8 @@ mustFail act = do
         st <- get
         preFails <- getFails
         pure (st, preFails)
-    void $ act
-    postFails <- liftClb $ getFails
+    void act
+    postFails <- liftClb getFails
     if noNewErrors preFails postFails
         then liftClb $ logError "Expected action to fail but it succeeds"
     else do

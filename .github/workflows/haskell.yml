@@ -103,7 +103,7 @@ jobs:
     - name: Setup haskell tooling
       uses: haskell/actions/setup@v2
       with:
-        ghc-version: '9.2.8'
+        ghc-version: '9.6.5'
         cabal-version: '3.10.1.0'
         enable-stack: true
         stack-version: '2.9'
@@ -138,6 +138,29 @@ jobs:
         make
         sudo make install
         sudo ldconfig
+    - name: Install BLST
+      run: |
+        : ${BLST_VERSION:='v0.3.11'}
+        git clone --depth 1 --branch ${BLST_VERSION} https://github.com/supranational/blst
+        cd blst
+        ./build.sh
+        cat > libblst.pc << EOF
+        prefix=/usr/local
+        exec_prefix=\${prefix}
+        libdir=\${exec_prefix}/lib
+        includedir=\${prefix}/include
+
+        Name: libblst
+        Description: Multilingual BLS12-381 signature library
+        URL: https://github.com/supranational/blst
+        Version: ${BLST_VERSION#v}
+        Cflags: -I\${includedir}
+        Libs: -L\${libdir} -lblst
+        EOF
+        sudo cp libblst.pc /usr/local/lib/pkgconfig/
+        sudo cp bindings/blst_aux.h bindings/blst.h bindings/blst.hpp  /usr/local/include/
+        sudo cp libblst.a /usr/local/lib
+        sudo chmod u=rw,go=r /usr/local/{lib/{libblst.a,pkgconfig/libblst.pc},include/{blst.{h,hpp},blst_aux.h}}
     - name: Update dependencies (cabal)
       run: cabal update
     - name: Build dependencies (cabal)
@@ -181,7 +204,7 @@ jobs:
     - name: Upload haddock documentation
       uses: actions/upload-pages-artifact@v1.0.8
       with:
-        path: ./dist-newstyle/build/x86_64-linux/ghc-9.2.8/${{env.ATLAS_VERSION}}/doc/html/atlas-cardano/
+        path: ./dist-newstyle/build/x86_64-linux/ghc-9.6.5/${{env.ATLAS_VERSION}}/doc/html/atlas-cardano/
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:

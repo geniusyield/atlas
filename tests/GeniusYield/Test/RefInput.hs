@@ -13,7 +13,6 @@ module GeniusYield.Test.RefInput
     ( refInputTests
     ) where
 
-import           Control.Monad.Reader
 import           Test.Tasty                                           (TestTree,
                                                                        testGroup)
 
@@ -22,22 +21,7 @@ import           GeniusYield.Test.GYTxBody                            (mockTxId)
 import           GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
 import           GeniusYield.Test.Utils
 import           GeniusYield.TxBuilder
-import           GeniusYield.TxBuilder.Clb
 import           GeniusYield.Types
-import Clb qualified (
-  Clb,
-  ClbState (mockInfo),
-  initClb,
-  checkErrors,
-  OnChainTx (getOnChainTx),
-  MockConfig,
-  ppLog,
-  runClb,
-  intToKeyPair,
-  defaultBabbage,
-  waitSlot,
- )
-import qualified Cardano.Ledger.Shelley.API as L
 
 gyGuessRefInputDatumValidator :: GYValidator 'PlutusV2
 gyGuessRefInputDatumValidator = validatorFromPlutus guessRefInputDatumValidator
@@ -73,7 +57,7 @@ refInputTrace toInline actual guess Wallets{..} = do
     Just Nothing -> fail "Couldn't find index for reference utxo in outputs"
     Just (Just refInputORef) ->
       void $ runWallet w1 $ withWalletBalancesCheckSimple [w1 := valueFromLovelace 0] $ do
-        -- liftClb $ logInfo $ printf "Reference input ORef %s" refInputORef
+        liftClb $ logInfoS $ printf "Reference input ORef %s" refInputORef
         addr <- scriptAddress gyGuessRefInputDatumValidator
         (tx, txId) <- sendSkeleton' (mustHaveOutput $ mkGYTxOut addr outValue (datumFromPlutusData ())) []
         let mOrefIndices = findLockedUtxosInBody addr tx
@@ -81,7 +65,7 @@ refInputTrace toInline actual guess Wallets{..} = do
         oref        <- case fmap (txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx) orefIndices of
           [oref']        -> return oref'
           _non_singleton -> fail "expected exactly one reference"
-        -- liftClb $ logInfo $ printf "Locked ORef %s" oref
+        liftClb $ logInfoS $ printf "Locked ORef %s" oref
         guessRefInputRun refInputORef oref myGuess
 
 tryRefInputConsume :: Wallets -> GYTxMonadClb ()
@@ -103,7 +87,7 @@ tryRefInputConsume Wallets{..} = do
       `catchError` (
         \case
           GYApplicationException e -> do
-            -- liftClb $ logInfo $ printf "Successfully caught expected exception %s" (show e)
+            liftClb $ logInfoS $ printf "Successfully caught expected exception %s" (show e)
             pure mockTxId
           e -> fail $ printf "Unexpected exception %s" (show e)
         )

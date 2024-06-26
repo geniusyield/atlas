@@ -4,7 +4,6 @@ Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.Types.Providers
     ( -- * Lookup Datum
@@ -56,7 +55,6 @@ module GeniusYield.Types.Providers
     , gyQueryUtxoAtPaymentCredentialsDefault
     , gyQueryUtxosAtTxOutRefsDefault
       -- * Logging
-    , GYLog (..)
     , gyLog
     , gyLogDebug
     , gyLogInfo
@@ -93,6 +91,7 @@ import           GeniusYield.Types.Tx
 import           GeniusYield.Types.TxOutRef
 import           GeniusYield.Types.UTxO
 import           GeniusYield.Types.Value            (GYAssetClass)
+import           GHC.Stack                          (withFrozenCallStack)
 
 {- Note [Caching and concurrently accessible MVars]
 
@@ -133,7 +132,7 @@ data GYProviders = GYProviders
     , gyGetParameters       :: !GYGetParameters
     , gyQueryUTxO           :: !GYQueryUTxO
     , gyGetStakeAddressInfo :: !(GYStakeAddress -> IO (Maybe GYStakeAddressInfo))
-    , gyLog'                :: !GYLog
+    , gyLog'                :: !GYLogConfiguration
     }
 
 gyGetSlotOfCurrentBlock :: GYProviders -> IO GYSlot
@@ -368,7 +367,7 @@ makeGetParameters :: IO GYSlot
                 -- ^ Getting protocol parameters
                 -> IO SystemStart
                 -- ^ Getting system start
-                -> IO (Api.EraHistory)
+                -> IO Api.EraHistory
                 -- ^ Getting era history
                 -> IO (Set Api.S.PoolId)
                 -- ^ Getting stake pools
@@ -514,30 +513,30 @@ gyQueryUtxosAtTxOutRefsWithDatumsDefault utxosAtTxOutRefsFun lookupDatumFun refs
 -- Logging
 -------------------------------------------------------------------------------
 
-data GYLog = GYLog
-    { logRun     :: HasCallStack => GYLogNamespace -> GYLogSeverity -> String -> IO ()
-    , logCleanUp :: IO ()
-    }
-
 gyLog :: (HasCallStack, MonadIO m) => GYProviders -> GYLogNamespace -> GYLogSeverity -> String -> m ()
-gyLog providers ns s = liftIO . logRun (gyLog' providers) ns s
+gyLog providers ns s msg =
+  let cfg = gyLog' providers
+      cfg' = cfgAddNamespace ns cfg
+  in withFrozenCallStack $ liftIO $ logRun cfg' s msg
 
 gyLogDebug, gyLogInfo, gyLogWarning, gyLogError :: (HasCallStack, MonadIO m) => GYProviders -> GYLogNamespace -> String -> m ()
-gyLogDebug   p ns = gyLog p ns GYDebug
-gyLogInfo    p ns = gyLog p ns GYInfo
-gyLogWarning p ns = gyLog p ns GYWarning
-gyLogError   p ns = gyLog p ns GYError
+gyLogDebug   p ns = withFrozenCallStack $ gyLog p ns GYDebug
+gyLogInfo    p ns = withFrozenCallStack $ gyLog p ns GYInfo
+gyLogWarning p ns = withFrozenCallStack $ gyLog p ns GYWarning
+gyLogError   p ns = withFrozenCallStack $ gyLog p ns GYError
 
-noLogging :: GYLog
-noLogging = GYLog
-    { logRun     = \_ns _s _msg -> return ()
-    , logCleanUp = return ()
+noLogging :: GYLogConfiguration
+noLogging =
+  GYLogConfiguration
+    { cfgLogContexts = mempty
+    , cfgLogNamespace = mempty
+    , cfgLogDirector = Right $ GYRawLog { rawLogRun = \_ -> pure (), rawLogCleanUp = pure () }
     }
 
-simpleConsoleLogging
-    :: (String -> IO ())   -- ^ putStrLn variant
-    -> GYLog
-simpleConsoleLogging f = GYLog
-    { logRun     = \ns _s msg -> f $ printf "*** [%s] %s" ns msg
-    , logCleanUp = return ()
+simpleConsoleLogging :: (String -> IO ()) -> GYLogConfiguration
+simpleConsoleLogging f =
+  GYLogConfiguration
+    { cfgLogContexts = mempty
+    , cfgLogNamespace = mempty
+    , cfgLogDirector = Right $ GYRawLog { rawLogRun = f, rawLogCleanUp = pure () }
     }

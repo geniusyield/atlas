@@ -21,11 +21,11 @@ data CachedQueryUTxO = CachedQueryUTxO
     , _cquRefCache         :: !(Cache.Cache GYTxOutRef (Maybe GYUTxO))
     , _cquPaymentCredCache :: !(Cache.Cache (GYPaymentCredential, Maybe GYAssetClass) GYUTxOs)
     , _cquInfo             :: !GYQueryUTxO
-    , _cquLog              :: !GYLog
+    , _cquLog              :: !GYLogConfiguration
     }
 
 -- | Return a cached 'GYQueryUTxO' and a cache clearing function.
-makeCachedQueryUTxO :: GYQueryUTxO -> GYLog -> IO (GYQueryUTxO, IO ())
+makeCachedQueryUTxO :: GYQueryUTxO -> GYLogConfiguration -> IO (GYQueryUTxO, IO ())
 makeCachedQueryUTxO query log' = do
     addrCache        <- Cache.newCache Nothing
     refCache         <- Cache.newCache Nothing
@@ -65,12 +65,12 @@ cachedUtxoAtTxOutRef (CachedQueryUTxO _ cache _ q _) ref = do
       return res
 
 cachedUtxosAtTxOutRefs :: CachedQueryUTxO -> [GYTxOutRef] -> IO GYUTxOs
-cachedUtxosAtTxOutRefs ctx@(CachedQueryUTxO _ cache _ q (GYLog log' _)) refs = do
+cachedUtxosAtTxOutRefs ctx@(CachedQueryUTxO _ cache _ q logCfg) refs = do
     step1 <- forM refs $ \ref -> (ref, ) <$> Cache.lookup' cache ref
 
     -- refs with no results in cache.
     let refs' = mapMaybe (\(ref, res) -> if isJust res then Nothing else Just ref) step1
-    log' mempty GYDebug $ "TxOutRefs not in cache:\n" ++ unlines (map show refs')
+    logRun logCfg GYDebug $ "TxOutRefs not in cache:\n" ++ unlines (map show refs')
 
     -- query node for things not in cache
     utxos <- gyQueryUtxosAtTxOutRefs' q refs'
@@ -91,29 +91,29 @@ storeCacheUTxO (CachedQueryUTxO _ cache _ _ _) utxos = forUTxOs_ utxos $ \utxo -
     in  Cache.insert cache ref (Just utxo)
 
 cachedUtxosAtAddress :: CachedQueryUTxO -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
-cachedUtxosAtAddress ctx@(CachedQueryUTxO cache _ _ q (GYLog log' _)) addr mAssetClass = do
+cachedUtxosAtAddress ctx@(CachedQueryUTxO cache _ _ q logCfg) addr mAssetClass = do
   m <- Cache.lookup' cache (addr, mAssetClass)
   case m of
     Nothing  -> do
-      log' mempty GYDebug $ "address not cached: " <> show addr
+      logRun logCfg GYDebug $ "address not cached: " <> show addr
       res <- gyQueryUtxosAtAddress' q addr mAssetClass
       Cache.insert cache (addr, mAssetClass) res
       storeCacheUTxO ctx res
       return  res
     Just res -> do
-      log' mempty GYDebug $ "address cached:"  <> show addr
+      logRun logCfg GYDebug $ "address cached:"  <> show addr
       return res
 
 cachedUtxosAtPaymentCred :: CachedQueryUTxO -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
-cachedUtxosAtPaymentCred ctx@(CachedQueryUTxO _ _ cache q (GYLog log' _)) cred mAssetClass = do
+cachedUtxosAtPaymentCred ctx@(CachedQueryUTxO _ _ cache q logCfg) cred mAssetClass = do
   m <- Cache.lookup' cache (cred, mAssetClass)
   case m of
     Nothing    -> do
-      log' mempty GYDebug $ "payment credential not cached: " <> show cred
+      logRun logCfg GYDebug $ "payment credential not cached: " <> show cred
       res <- gyQueryUtxosAtPaymentCredential' q cred mAssetClass
       Cache.insert cache (cred, mAssetClass) res
       storeCacheUTxO ctx res
       return  res
     Just res -> do
-      log' mempty GYDebug $ "payment credential cached:"  <> show cred
+      logRun logCfg GYDebug $ "payment credential cached:"  <> show cred
       return res

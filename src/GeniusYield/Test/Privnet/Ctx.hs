@@ -104,7 +104,7 @@ data Ctx = Ctx
     , ctxUser9            :: !User
     , ctxGold             :: !GYAssetClass  -- ^ asset used in tests
     , ctxIron             :: !GYAssetClass  -- ^ asset used in tests
-    , ctxLog              :: !GYLog
+    , ctxLog              :: !GYLogConfiguration
     , ctxLookupDatum      :: !GYLookupDatum
     , ctxAwaitTxConfirmed :: !GYAwaitTx
     , ctxQueryUtxos       :: !GYQueryUTxO

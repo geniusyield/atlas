@@ -36,6 +36,7 @@ import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.NodeQuery
 import           GeniusYield.Types
+import           GHC.Stack                       (withFrozenCallStack)
 
 -------------------------------------------------------------------------------
 -- GY implementation
@@ -128,7 +129,7 @@ instance GYTxQueryMonad GYTxMonadNode where
         gyGetSlotOfCurrentBlock (envProviders env)
 
     logMsg ns s msg = GYTxMonadNode $ \env ->
-        gyLog (envProviders env) ns s msg
+        withFrozenCallStack $ gyLog (envProviders env) ns s msg
 
 -- TODO Note: randSeed implementation should use some internal state #30
 --            state so randSeed returns different seeds if called multiple times.

@@ -140,7 +140,6 @@ makeSetup' privnetPath kupoUrl = do
 
     let localGetParams :: GYGetParameters
         localGetParams = nodeGetParameters era info
-
     -- context used for tests
     let user' = flip User Nothing
         ctx0 :: Ctx

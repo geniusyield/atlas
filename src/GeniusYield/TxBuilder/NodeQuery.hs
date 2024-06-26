@@ -17,6 +17,7 @@ import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+import           GHC.Stack                    (withFrozenCallStack)
 
 
 -------------------------------------------------------------------------------
@@ -129,7 +130,7 @@ instance GYTxQueryMonad GYTxQueryMonadNode where
         gyGetSlotOfCurrentBlock providers
 
     logMsg ns s msg = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
-        gyLog providers ns s msg
+        withFrozenCallStack $ gyLog providers ns s msg
 
 runGYTxQueryMonadNode
     :: GYNetworkId

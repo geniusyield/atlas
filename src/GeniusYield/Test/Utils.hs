@@ -1,4 +1,3 @@
-{-# LANGUAGE MultiWayIf      #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 {-|
@@ -21,6 +20,7 @@ module GeniusYield.Test.Utils
     , withBalance
     , withWalletBalancesCheck
     , withWalletBalancesCheckSimple
+    , withWalletBalancesCheckSimpleIgnoreMinDepFor
     , getBalance
     , getBalances
     , waitUntilSlot
@@ -33,6 +33,7 @@ module GeniusYield.Test.Utils
     , feesFromLovelace
     , withMaxQCTests
     , pattern (:=)
+    , logInfoS
     ) where
 
 import           Control.Lens                     ((^.))
@@ -45,7 +46,10 @@ import           Data.Semigroup                   (Sum (getSum))
 
 import qualified Data.Maybe.Strict                as StrictMaybe
 import qualified Data.Sequence.Strict             as StrictSeq
-import           Prettyprinter                    (PageWidth(AvailablePerLine), defaultLayoutOptions, layoutPageWidth,
+import qualified Data.Set                         as Set
+import           Prettyprinter                    (PageWidth (AvailablePerLine),
+                                                   defaultLayoutOptions,
+                                                   layoutPageWidth,
                                                    layoutPretty)
 import           Prettyprinter.Render.String      (renderString)
 
@@ -53,13 +57,18 @@ import qualified Cardano.Api                      as Api
 import qualified Cardano.Api.Shelley              as Api.S
 import qualified Cardano.Ledger.Address           as L
 import qualified Cardano.Ledger.Api               as L
-import qualified Cardano.Ledger.Binary            as L
 import qualified Cardano.Ledger.Babbage.Tx        as L.B
 import qualified Cardano.Ledger.Babbage.TxOut     as L.B
-import qualified Cardano.Ledger.Shelley.API       as L.S
+import qualified Cardano.Ledger.Binary            as L
 import qualified Cardano.Ledger.Plutus.TxInfo     as L.Plutus
-import qualified Clb                              (Clb, ClbState (mockInfo), MockConfig, OnChainTx (getOnChainTx),
-                                                   checkErrors, defaultBabbage, initClb, intToKeyPair, ppLog, runClb,
+import qualified Cardano.Ledger.Shelley.API       as L.S
+import qualified Clb                              (Clb, ClbState (mockInfo),
+                                                   ClbT, LogEntry (..),
+                                                   LogLevel (..), MockConfig,
+                                                   OnChainTx (getOnChainTx),
+                                                   checkErrors, defaultBabbage,
+                                                   initClb, intToKeyPair,
+                                                   logInfo, ppLog, runClb,
                                                    waitSlot)
 import qualified PlutusLedgerApi.V1.Value         as Plutus
 import qualified PlutusLedgerApi.V2               as PlutusV2
@@ -67,9 +76,9 @@ import qualified PlutusLedgerApi.V2               as PlutusV2
 import qualified Test.Cardano.Ledger.Core.KeyPair as TL
 
 import qualified Test.Tasty                       as Tasty
+import           Test.Tasty.HUnit                 (assertFailure, testCaseInfo)
 import qualified Test.Tasty.QuickCheck            as Tasty
 import qualified Test.Tasty.Runners               as Tasty
-import           Test.Tasty.HUnit                 (assertFailure, testCaseInfo)
 
 import           GeniusYield.Imports
 import           GeniusYield.Test.Address
@@ -254,7 +263,11 @@ Notes:
 * The 'GYValue' should be negative to check if the Wallet lost those funds.
 -}
 withWalletBalancesCheckSimple :: [(Wallet, GYValue)] -> GYTxMonadClb a -> GYTxMonadClb a
-withWalletBalancesCheckSimple wallValueDiffs m = do
+withWalletBalancesCheckSimple wallValueDiffs = withWalletBalancesCheckSimpleIgnoreMinDepFor wallValueDiffs mempty
+
+-- | Variant of `withWalletBalancesCheckSimple` that only accounts for transaction fees and not minimum ada deposits.
+withWalletBalancesCheckSimpleIgnoreMinDepFor :: [(Wallet, GYValue)] -> Set WalletName -> GYTxMonadClb a -> GYTxMonadClb a
+withWalletBalancesCheckSimpleIgnoreMinDepFor wallValueDiffs ignoreMinDepFor m = do
   bs <- mapM (balance . fst) wallValueDiffs
   a <- m
   walletExtraLovelaceMap <- gets walletExtraLovelace
@@ -262,9 +275,10 @@ withWalletBalancesCheckSimple wallValueDiffs m = do
 
   forM_ (zip3 wallValueDiffs bs' bs) $
     \((w, v), b', b) ->
-      let newBalance = case Map.lookup (walletName w) walletExtraLovelaceMap of
+      let wn = walletName w
+          newBalance = case Map.lookup wn walletExtraLovelaceMap of
             Nothing -> b'
-            Just (extraLovelaceForFees, extraLovelaceForMinAda) -> b' <> valueFromLovelace (getSum $ extraLovelaceForFees <> extraLovelaceForMinAda)
+            Just (extraLovelaceForFees, extraLovelaceForMinAda) -> b' <> valueFromLovelace (getSum $ extraLovelaceForFees <> if Set.member wn ignoreMinDepFor then mempty else extraLovelaceForMinAda)
           diff = newBalance `valueMinus` b
         in unless (diff == v) $ fail $
             printf "Wallet: %s. Old balance: %s. New balance: %s. New balance after adding extra lovelaces %s. Expected balance difference of %s, but the actual difference was %s" (walletName w) b b' newBalance v diff
@@ -388,3 +402,7 @@ pureGen = mkStdGen 42
 -- Silently returns if the given slot is greater than the current slot.
 waitUntilSlot :: GYSlot -> GYTxMonadClb ()
 waitUntilSlot slot = liftClb $ Clb.waitSlot $ slotToApi slot
+
+-- | Variant of `logInfo` from @Clb@ that logs a string with @Info@ severity.
+logInfoS :: Monad m => String -> Clb.ClbT m ()
+logInfoS s = Clb.logInfo $ Clb.LogEntry Clb.Info s

@@ -307,8 +307,6 @@ generateUser network = do
 
 giveAda :: Ctx -> GYAddress -> IO ()
 giveAda ctx addr = do
-    ownRefs <- gyQueryUtxosAtAddress' (ctxQueryUtxos ctx) (userAddr $ ctxUserF ctx) Nothing
-    print ownRefs
     txBody <- ctxRunI ctx (ctxUserF ctx) $ return $ mconcat $ replicate 5 $
         mustHaveOutput $ mkGYTxOutNoDatum addr (valueFromLovelace 1_000_000_000)
     void $ submitTx ctx (ctxUserF ctx) txBody

@@ -43,6 +43,13 @@ nodeAwaitTxConfirmed era info p@GYAwaitTxParameters{..} txId = go 0
     go attempt
       | attempt >= maxAttempts = throwIO $ GYAwaitTxException p
       | otherwise = do
+          {- NOTE: Checking for created utxos is not always correct.
+
+          Transactions that create stake deposit with a user who's remaining
+          utxos are only enough to cover the transaction cost, create no outputs.
+          However, this is an extreme edge case that is unlikely to ever exist in
+          privnet tests (where this module is meant to be used, exclusively).
+          -}
           utxos <- nodeUtxosFromTx era info txId
           -- FIXME: This doesn't actually wait for confirmations.
           unless (utxosSize utxos /= 0) $

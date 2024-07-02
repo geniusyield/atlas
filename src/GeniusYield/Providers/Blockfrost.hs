@@ -481,7 +481,7 @@ networkIdToBlockfrost GYTestnetPreprod = Blockfrost.Preprod
 networkIdToBlockfrost GYTestnetPreview = Blockfrost.Preview
 networkIdToBlockfrost GYTestnetLegacy  = Blockfrost.Testnet
 -- TODO: we need another mechanism to query private network data
-networkIdToBlockfrost GYPrivnet        = error "Private network is not supported by Blockfrost"
+networkIdToBlockfrost GYPrivnet{}      = error "Private network is not supported by Blockfrost"
 
 datumHashFromBlockfrost :: Blockfrost.DatumHash -> Either SomeDeserializeError GYDatumHash
 datumHashFromBlockfrost = first (DeserializeErrorHex . Text.pack) . datumHashFromHexE . Text.unpack . Blockfrost.unDatumHash

@@ -11,7 +11,7 @@ import           GeniusYield.Types
 import           Test.Tasty                     (TestTree, testGroup)
 import           Test.Tasty.HUnit               (testCaseSteps)
 
-simpleScriptsTests :: IO Setup -> TestTree
+simpleScriptsTests :: Setup -> TestTree
 simpleScriptsTests setup = testGroup "simple-scripts"
   [ testCaseSteps "exercising a multi-sig simple script without giving it as reference" $ \info -> withSetup setup info $ \ctx -> do
     exerciseASimpleScript ctx info False
@@ -26,7 +26,7 @@ exerciseASimpleScript ctx info toUseRefScript = do
       user3 = ctxUser4 ctx
       (pkh1, pkh2, pkh3) = (user1, user2, user3) & each %~ userPaymentPkh
       multiSigSimpleScript = RequireAllOf [RequireSignature pkh1, RequireSignature pkh2, RequireSignature pkh3]
-      multiSigSimpleScriptAddr = addressFromSimpleScript GYPrivnet multiSigSimpleScript
+      multiSigSimpleScriptAddr = addressFromSimpleScript (ctxNetworkId ctx) multiSigSimpleScript
       fundUser = ctxUserF ctx
   info "Sending funds to simple script"
   when toUseRefScript $ do

@@ -120,4 +120,4 @@ walletKeysToAddress WalletKeys{wkPaymentKey, wkStakeKey} netId =
       GYTestnetPreprod -> S.shelleyTestnet
       GYTestnetPreview -> S.shelleyTestnet
       GYTestnetLegacy  -> S.shelleyTestnet
-      GYPrivnet        -> S.shelleyTestnet
+      GYPrivnet{}      -> S.shelleyTestnet

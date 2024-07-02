@@ -10,8 +10,10 @@ module GeniusYield.Test.Privnet.Utils (
     die,
     urlPieceFromFile,
     urlPieceToFile,
+    urlPieceFromText,
 ) where
 
+import           Data.Text       (Text)
 import           System.Exit     (exitFailure)
 import           Text.Printf     (printf)
 import           Type.Reflection (Typeable, typeRep)
@@ -27,13 +29,16 @@ die msg = do
 urlPieceFromFile :: forall a. (Typeable a, Web.FromHttpApiData a) => FilePath -> IO a
 urlPieceFromFile p = do
     t <- T.IO.readFile p
-    case Web.parseUrlPiece t of
-        Right x ->
-            return x
+    urlPieceFromText @a t
 
-        Left msg -> do
-            printf "Failed to parse %s from %s: %s\n" (show (typeRep @a)) p msg
-            exitFailure
+urlPieceFromText :: forall a. (Typeable a, Web.FromHttpApiData a) => Text -> IO a
+urlPieceFromText t = case Web.parseUrlPiece t of
+    Right x ->
+        return x
+
+    Left msg -> do
+        printf "Failed to parse %s from %s: %s\n" (show (typeRep @a)) t msg
+        exitFailure
 
 urlPieceToFile :: forall a. Web.ToHttpApiData a => FilePath -> a -> IO ()
 urlPieceToFile p x = T.IO.writeFile p (Web.toUrlPiece x)

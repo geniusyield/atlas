@@ -8,40 +8,46 @@ Stability   : develop
 
 -}
 module GeniusYield.Test.Privnet.Setup (
-    makeSetup,
     Setup,
+    withPrivnet,
     withSetup,
-    -- withSetup',
+    -- * "Cardano.Testnet" re-exports
+    cardanoDefaultTestnetOptions,
+    cardanoDefaultTestnetNodeOptions,
+    CardanoTestnetOptions (..),
+    TestnetNodeOptions (..),
+    NodeLoggingFormat (..),
+    NodeConfigurationYaml (..)
 ) where
 
-{-
-import           Control.Concurrent             (newEmptyMVar, putMVar,
-                                                 takeMVar)
--}
-import           Control.Exception              (IOException)
-import           System.Environment             (lookupEnv)
-import           System.Exit                    (exitFailure)
-import           System.FilePath                ((</>))
+import           Control.Concurrent                   (ThreadId, threadDelay, killThread)
+import qualified Control.Concurrent.STM               as STM
+import           Control.Exception                    (finally)
+import           Control.Monad                        (forever)
+import           Control.Monad.IO.Class               (liftIO)
+import           Control.Monad.Trans.Resource         (resourceForkIO, MonadResource (liftResourceT))
+import qualified Data.Vector                          as V
 
-import qualified Cardano.Api                    as Api
+import qualified Hedgehog                             as H
+import qualified Hedgehog.Extras.Stock                as H'
 
-import qualified Data.Vector.Fixed              as V
+import qualified Cardano.Api                          as Api
+import           Cardano.Testnet
+import           Testnet.Runtime
+import           Testnet.Property.Utils
 
-import qualified GeniusYield.Api.TestTokens     as GY.TestTokens
+
+import qualified GeniusYield.Api.TestTokens           as GY.TestTokens
 import           GeniusYield.Imports
-import           GeniusYield.Providers.Kupo     (kupoAwaitTxConfirmed,
-                                                 kupoLookupDatum, kupoQueryUtxo,
-                                                 newKupoApiEnv)
+import           GeniusYield.Providers.LiteChainIndex
 import           GeniusYield.Providers.Node
+import           GeniusYield.Providers.Node.AwaitTx   (nodeAwaitTxConfirmed)
+import           GeniusYield.Providers.Node.Query     (nodeQueryUTxO)
 import           GeniusYield.Test.Privnet.Ctx
-import           GeniusYield.Test.Privnet.Paths
 import           GeniusYield.Test.Privnet.Utils
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
--- | Era in which privnet runs.
-era :: GYEra
-era = GYBabbage
 
 -------------------------------------------------------------------------------
 -- Setup
@@ -52,9 +58,16 @@ era = GYBabbage
 -- Once these two arguments are given to this function, it will give `Ctx` to the continuation, where the logging part (the `ctxLog`) of `Ctx` would be obtained from first argument of this function.
 newtype Setup = Setup ((String -> IO ()) -> (Ctx -> IO ()) -> IO ())
 
-withSetup :: IO Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
-withSetup ioSetup putLog kont = do
-    Setup cokont <- ioSetup
+data PrivnetRuntime = PrivnetRuntime
+  { runtimeNodeSocket  :: !FilePath
+  , runtimeNetworkInfo :: !GYNetworkInfo
+  , runtimeWallets     :: ![PaymentKeyInfo]
+  , runtimeThreadId    :: !ThreadId
+  }
+
+-- | Calls the `Setup` function with a logging function and the action you wish to use with the privnet.
+withSetup :: Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
+withSetup (Setup cokont) putLog kont = do
     cokont putLog kont
 
 {-
@@ -71,185 +84,222 @@ withSetup' ioSetup kont = do
     takeMVar mvar
 -}
 
-makeSetup :: IO Setup
-makeSetup = do
-    let gyPrivDirVar = "GENIUSYIELD_PRIVNET_DIR"
-        kupoUrlVar   = "KUPO_URL"
-    privnetPath' <- lookupEnv gyPrivDirVar
-    kupoUrl      <- lookupEnv kupoUrlVar
-    case privnetPath' of
-        Nothing -> communicateError gyPrivDirVar
-
-        Just privnetPath -> maybe (communicateError kupoUrlVar) (makeSetup' privnetPath) kupoUrl
-    where
-      communicateError e = return $ Setup $ \info _kont -> info $ e <> " is not set"
-
 debug :: String -> IO ()
 -- FIXME: change me to debug setup code.
 -- debug = putStrLn
 debug _ = return ()
 
-makeSetup' :: FilePath -> String -> IO Setup
-makeSetup' privnetPath kupoUrl = do
-    -- init paths
-    paths <- initPaths privnetPath
+{- | Spawn a resource managed privnet and do things with it (closing it in the end).
 
-    -- read user address
-    userFaddr <- addressFromBech32 <$> urlPieceFromFile (pathUserAddr $ pathUserF paths)
-    debug $ printf "userFaddr = %s\n" userFaddr
+Privnet can be configured using "Cardano.Testnet.CardanoTestnetOptions". Pass 'cardanoDefaultTestnetOptions'
+for default configuration.
 
-    userFskey <- readPaymentSigningKey $ pathUserSKey $ pathUserF paths
-    debug $ printf "userFskey = %s\n" (show userFskey)
-    debug $ printf "userFvkey = %s\n" (show $ paymentVerificationKey userFskey)
-    debug $ printf "userFpkh  = %s\n" (show $ paymentKeyHash $ paymentVerificationKey userFskey)
+Returns continuation on `Setup`, which is essentially a function that performs an action
+given a logging -- function and the action itself (which receives the Privnet Ctx).
+-}
+withPrivnet :: CardanoTestnetOptions -> (Setup -> IO ()) -> IO ()
+withPrivnet testnetOpts setupUser = do
+    -- Based on: https://github.com/IntersectMBO/cardano-node/blob/master/cardano-testnet/src/Testnet/Property/Run.hs
+    -- They are using hedgehog (property testing framework) to orchestrate a testnet running in the background
+    -- ....for some god forsaken reason
+    -- the result is very awkward.
+    tmvRuntime <- STM.newEmptyTMVarIO
 
-    -- Generate user 2 .. 9
-    userSkeyAddr <- forM (pathUsers paths) generateUser
-    let getUserIdx (i :: Int) = i + 2
-    V.imapM_ (
-      \i (userIskey, userIaddr) -> do
-        debug $ printf "user = %s\n" (show $ getUserIdx i)
-        debug $ printf "user addr = %s\n" userIaddr
-        debug $ printf "user skey = %s\n" (show userIskey)
-        debug $ printf "user vkey = %s\n" (show $ paymentVerificationKey userIskey)
-        debug $ printf "user pkh  = %s\n" (show $ paymentKeyHash $ paymentVerificationKey userIskey)
-      ) userSkeyAddr
+    void . H.check $ integrationWorkspace "testnet" $ \workspaceDir -> do
+        conf <- mkConf workspaceDir
 
-    -- Further down we need local node connection
-    let info :: Api.LocalNodeConnectInfo
-        info = Api.LocalNodeConnectInfo
-            { Api.localConsensusModeParams = Api.CardanoModeParams $ Api.EpochSlots 500
-            , Api.localNodeNetworkId       = networkIdToApi GYPrivnet
-            , Api.localNodeSocketPath      = Api.File $ pathNodeSocket paths
-            }
+        -- Fork a thread to keep alive indefinitely any resources allocated by testnet.
+        threadId <- H.evalM . liftResourceT . resourceForkIO  . forever . liftIO $ threadDelay 10000000
 
-    -- ask current slot, so we know local node connection works
-    slot <- nodeGetSlotOfCurrentBlock info
-    debug $ printf "slotOfCurrentBlock = %s\n" slot
+        TestnetRuntime
+            { wallets
+            , poolNodes
+            , testnetMagic
+            } <- cardanoTestnetDefault testnetOpts conf
 
-    kupoEnv <- newKupoApiEnv kupoUrl
+        era <- case cardanoNodeEra testnetOpts of
+            Api.AnyCardanoEra Api.AlonzoEra -> pure GYAlonzo
+            Api.AnyCardanoEra Api.BabbageEra -> pure GYBabbage
+            Api.AnyCardanoEra x -> liftIO . die $ printf "Unsupported era: %s" (show x)
+        liftIO . STM.atomically
+            $ STM.writeTMVar tmvRuntime PrivnetRuntime
+                -- TODO: Consider obtaining everything here from shelleyGenesis rather than testnetOpts.
+                -- See: https://www.doitwithlovelace.io/haddock/cardano-ledger-shelley/html/Cardano-Ledger-Shelley-Genesis.html
+                -- See: https://github.com/IntersectMBO/cardano-node/blob/43149909fc4942e93e14a2686826543a2d9432bf/cardano-testnet/src/Testnet/Types.hs#L155
+                { runtimeNodeSocket = H'.sprocketSystemName
+                        . nodeSprocket
+                        . poolRuntime
+                        $ head poolNodes
+                , runtimeNetworkInfo = GYNetworkInfo
+                    { gyNetworkEra        = era
+                        -- TODO: Conway support.
+                    , gyNetworkEpochSlots = fromIntegral $ cardanoEpochLength testnetOpts
+                    , gyNetworkMagic      = fromIntegral testnetMagic
+                    }
+                , runtimeWallets = wallets
+                , runtimeThreadId = threadId
+                }
 
-    let localLookupDatum :: GYLookupDatum
-        localLookupDatum = kupoLookupDatum kupoEnv
+        -- Forced failure (just like upstream).
+        -- For some god forsaken reason, not making this whole thing fail makes the node workspace directory disappear and the nodes not run.
+        -- Assumption: Hedgehog clears the workspace (since it's temp) in case of success.
+        -- No clue why the nodes don't run. Laziness?
+        H.failure
 
-    let localAwaitTxConfirmed :: GYAwaitTx
-        localAwaitTxConfirmed = kupoAwaitTxConfirmed kupoEnv
+    PrivnetRuntime
+        { runtimeNodeSocket
+        , runtimeNetworkInfo
+        , runtimeWallets
+        , runtimeThreadId
+        } <- STM.atomically $ STM.readTMVar tmvRuntime
 
-    let localQueryUtxo :: GYQueryUTxO
-        localQueryUtxo = kupoQueryUtxo kupoEnv
+    let runtimeNetworkId = GYPrivnet runtimeNetworkInfo
 
-    let localGetParams :: GYGetParameters
-        localGetParams = nodeGetParameters era info
-    -- context used for tests
-    let user' = flip User Nothing
-        ctx0 :: Ctx
-        ctx0 = Ctx
-            { ctxEra              = era
-            , ctxInfo             = info
-            , ctxUserF            = User userFskey Nothing userFaddr
-            , ctxUser2            = uncurry user' (V.index userSkeyAddr (Proxy @0))
-            , ctxUser3            = uncurry user' (V.index userSkeyAddr (Proxy @1))
-            , ctxUser4            = uncurry user' (V.index userSkeyAddr (Proxy @2))
-            , ctxUser5            = uncurry user' (V.index userSkeyAddr (Proxy @3))
-            , ctxUser6            = uncurry user' (V.index userSkeyAddr (Proxy @4))
-            , ctxUser7            = uncurry user' (V.index userSkeyAddr (Proxy @5))
-            , ctxUser8            = uncurry user' (V.index userSkeyAddr (Proxy @6))
-            , ctxUser9            = uncurry user' (V.index userSkeyAddr (Proxy @7))
-            , ctxGold             = GYLovelace -- temporarily
-            , ctxIron             = GYLovelace -- temporarily
-            , ctxLog              = noLogging
-            , ctxLookupDatum      = localLookupDatum
-            , ctxAwaitTxConfirmed = localAwaitTxConfirmed
-            , ctxQueryUtxos       = localQueryUtxo
-            , ctxGetParams        = localGetParams
-            }
+    -- Kill the resource holding thread at the end of all this to stop the privnet.
+    (`finally` killThread runtimeThreadId) $ do
 
-    userBalances <- V.imapM
-      (\i (_, userIaddr) -> do
-        userIbalance <- ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
-        when (isEmptyValue userIbalance) $ do
-            debug $ printf "User %s balance is empty, giving some ada\n" (show $ getUserIdx i)
-            giveAda ctx0 userIaddr
-            when (i == 0) (giveAda ctx0 userFaddr) -- we also give ada to itself to create some small utxos
-        ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
-      ) userSkeyAddr
+        -- Read pre-existing users.
+        -- NOTE: As of writing, cardano-testnet creates three (3) users.
+        genesisUsers <- fmap V.fromList . liftIO . forM (zip [0 :: Int ..] runtimeWallets)
+            $ \(idx, PaymentKeyInfo {paymentKeyInfoPair, paymentKeyInfoAddr}) -> do
+                debug $ printf "userF = %s\n" (show idx)
+                userAddr <- addressFromBech32 <$> urlPieceFromText paymentKeyInfoAddr
+                debug $ printf "userF addr = %s\n" userAddr
+                userPaymentSKey <- readPaymentSigningKey $ paymentSKey paymentKeyInfoPair
+                debug $ printf "userF skey = %s\n" userPaymentSKey
+                pure User {userPaymentSKey, userStakeSKey=Nothing, userAddr}
 
-    -- mint test tokens
-    goldAC <- mintTestTokens paths ctx0 "GOLD"
-    debug $ printf "gold = %s\n" goldAC
+        -- Generate upto 9 users.
+        let extraIndices = [length genesisUsers + 1..9]
+        extraUsers <- fmap V.fromList . forM extraIndices $ \idx -> do
+            User {userPaymentSKey, userAddr, userStakeSKey} <- generateUser runtimeNetworkId
+            debug $ printf "user = %s\n" (show idx)
+            debug $ printf "user addr = %s\n" userAddr
+            debug $ printf "user skey = %s\n" (show userPaymentSKey)
+            debug $ printf "user vkey = %s\n" (show $ paymentVerificationKey userPaymentSKey)
+            debug $ printf "user pkh  = %s\n" (show $ paymentKeyHash $ paymentVerificationKey userPaymentSKey)
+            pure User {userPaymentSKey, userAddr, userStakeSKey}
 
-    ironAC <- mintTestTokens paths ctx0 "IRON"
-    debug $ printf "iron = %s\n" ironAC
+        -- Further down we need local node connection
+        let info :: Api.LocalNodeConnectInfo
+            info = Api.LocalNodeConnectInfo
+                { Api.localConsensusModeParams = Api.CardanoModeParams . Api.EpochSlots $ gyNetworkEpochSlots runtimeNetworkInfo
+                , Api.localNodeNetworkId       = networkIdToApi runtimeNetworkId
+                , Api.localNodeSocketPath      = Api.File runtimeNodeSocket
+                }
 
-    let ctx :: Ctx
-        ctx = ctx0
-            { ctxGold = goldAC
-            , ctxIron = ironAC
-            }
+        -- ask current slot, so we know local node connection works
+        slot <- nodeGetSlotOfCurrentBlock info
+        debug $ printf "slotOfCurrentBlock = %s\n" slot
 
-    -- distribute tokens
-    V.imapM_
-      (\i userIbalance -> do
-        when (isEmptyValue $ snd $ valueSplitAda userIbalance) $ do
-          debug $ printf "User%s has no tokens, giving some\n" (show $ getUserIdx i)
-          giveTokens ctx (snd $ userSkeyAddr V.! i)
-      ) userBalances
+        withLCIClient info [] $ \lci -> do
+            let era = gyNetworkEra runtimeNetworkInfo
 
-    return $ Setup
-        (\putLog kont -> kont $ ctx { ctxLog = simpleConsoleLogging putLog })
+            let localLookupDatum :: GYLookupDatum
+                localLookupDatum = lciLookupDatum lci
+
+            let localAwaitTxConfirmed :: GYAwaitTx
+                localAwaitTxConfirmed = nodeAwaitTxConfirmed era info
+
+            let localQueryUtxo :: GYQueryUTxO
+                localQueryUtxo = nodeQueryUTxO era info
+
+            let localGetParams :: GYGetParameters
+                localGetParams = nodeGetParameters era info
+
+            -- context used for tests
+            --
+            let allUsers = genesisUsers <> extraUsers
+            let ctx0 :: Ctx
+                ctx0 = Ctx
+                    { ctxNetworkInfo      = runtimeNetworkInfo
+                    , ctxInfo             = info
+                    -- FIXME: Some of the users which are supposed to be non genesis are actually genesis.
+                    -- This is because we have multiple genesis users with cardano testnet.
+                    -- Need a better (more dynamic mechanism for users).
+                    , ctxUserF            = V.head allUsers
+                    , ctxUser2            = allUsers V.! 1
+                    , ctxUser3            = allUsers V.! 2
+                    , ctxUser4            = allUsers V.! 3
+                    , ctxUser5            = allUsers V.! 4
+                    , ctxUser6            = allUsers V.! 5
+                    , ctxUser7            = allUsers V.! 6
+                    , ctxUser8            = allUsers V.! 7
+                    , ctxUser9            = allUsers V.! 8
+                    , ctxGold             = GYLovelace -- temporarily
+                    , ctxIron             = GYLovelace -- temporarily
+                    , ctxLog              = noLogging
+                    , ctxLookupDatum      = localLookupDatum
+                    , ctxAwaitTxConfirmed = localAwaitTxConfirmed
+                    , ctxQueryUtxos       = localQueryUtxo
+                    , ctxGetParams        = localGetParams
+                    }
+
+            userBalances <- V.mapM
+                (\(i, User{userAddr=userIaddr}) -> do
+                    userIbalance <- ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
+                    when (isEmptyValue userIbalance) $ do
+                        debug $ printf "User %s balance is empty, giving some ada\n" (show i)
+                        giveAda ctx0 userIaddr
+                        when (i == 0) (giveAda ctx0 . userAddr $ ctxUserF ctx0) -- we also give ada to itself to create some small utxos
+                    ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
+                ) $ V.zip
+                    (V.fromList extraIndices)
+                    extraUsers
+
+            -- mint test tokens
+            goldAC <- mintTestTokens ctx0 "GOLD"
+            debug $ printf "gold = %s\n" goldAC
+
+            ironAC <- mintTestTokens ctx0 "IRON"
+            debug $ printf "iron = %s\n" ironAC
+
+            let ctx :: Ctx
+                ctx = ctx0
+                    { ctxGold = goldAC
+                    , ctxIron = ironAC
+                    }
+
+            -- distribute tokens
+            mapM_
+                (\(i, userIbalance, user) -> do
+                    when (isEmptyValue $ snd $ valueSplitAda userIbalance) $ do
+                        debug $ printf "User%s has no tokens, giving some\n" (show i)
+                        giveTokens ctx (userAddr user)
+                )
+                $ V.zip3
+                    (V.fromList extraIndices)
+                    userBalances
+                    extraUsers
+
+            let setup = Setup $ \putLog kont -> kont $ ctx { ctxLog = simpleConsoleLogging putLog }
+            setupUser setup
 
 -------------------------------------------------------------------------------
 -- Generating users
 -------------------------------------------------------------------------------
 
-generateUser :: UserPaths -> IO (GYPaymentSigningKey, GYAddress)
-generateUser UserPaths {..} =
-    existing `catchIOException` const new
+generateUser :: GYNetworkId -> IO User
+generateUser network = do
+    -- generate new key
+    skey <- Api.generateSigningKey Api.AsPaymentKey
+
+    -- construct address (no stake)
+    let vkey     = Api.getVerificationKey skey
+        vkeyHash = Api.verificationKeyHash vkey
+
+    let addr :: GYAddress
+        addr = addressFromApi' $ Api.AddressInEra
+            (Api.ShelleyAddressInEra Api.ShelleyBasedEraBabbage)
+            (Api.makeShelleyAddress
+                (networkIdToApi network)
+                (Api.PaymentCredentialByKey vkeyHash)
+                stake
+            )
+
+    pure User {userPaymentSKey=paymentSigningKeyFromApi skey, userAddr=addr, userStakeSKey=Nothing}
   where
-    existing = do
-        skey <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsPaymentKey) (Api.File pathUserSKey) >>=
-          \case
-          Right skey -> return $ paymentSigningKeyFromApi skey
-          Left err   -> throwIO $ userError $ show err
-
-        addr <- addressFromBech32 <$> urlPieceFromFile pathUserAddr
-        return (skey, addr)
-
-    new = do
-        -- generate new key
-        skey <- runAddressKeyGen pathUserSKey
-
-        -- construct address (no stake)
-        let vkey     = Api.getVerificationKey skey
-            vkeyHash = Api.verificationKeyHash vkey
-
-        let addr :: GYAddress
-            addr = addressFromApi' $ Api.AddressInEra
-                (Api.ShelleyAddressInEra Api.ShelleyBasedEraBabbage)
-                (Api.makeShelleyAddress network (Api.PaymentCredentialByKey vkeyHash) stake)
-
-        urlPieceToFile pathUserAddr (addressToBech32 addr)
-
-        return (paymentSigningKeyFromApi skey, addr)
-
-    network = networkIdToApi GYPrivnet
     stake   = Api.NoStakeAddress
-
-runAddressKeyGen
-    :: FilePath  -- ^ signing key path
-    -> IO (Api.SigningKey Api.PaymentKey)
-runAddressKeyGen skeyPath = do
-      skey <- Api.generateSigningKey Api.AsPaymentKey
-      res <- Api.writeFileTextEnvelope (Api.File skeyPath) (Just skeyDesc) skey
-      case res of
-          Right () -> return skey
-          Left err -> do
-              printf "Failed to write %s: %s\n" skeyPath (show err)
-              exitFailure
-
-  where
-    skeyDesc :: Api.TextEnvelopeDescr
-    skeyDesc = "Payment Signing Key"
 
 -------------------------------------------------------------------------------
 -- Balance
@@ -272,29 +322,13 @@ giveTokens ctx addr = do
 -- minting tokens
 -------------------------------------------------------------------------------
 
-mintTestTokens :: Paths -> Ctx -> String -> IO GYAssetClass
-mintTestTokens Paths {pathGeniusYield} ctx tn' = do
-    debug $ printf "Minting token %s\n" (show tn)
-    existing `catchIOException` const new
+mintTestTokens :: Ctx -> String -> IO GYAssetClass
+mintTestTokens ctx tn' = do
+    (ac, txBody) <- ctxRunF ctx (ctxUserF ctx) $
+        GY.TestTokens.mintTestTokens tn 10_000_000
+    void $ submitTx ctx (ctxUserF ctx) txBody
+
+    pure ac
   where
     tn :: GYTokenName
     tn = fromString tn'
-
-    path :: FilePath
-    path = pathGeniusYield </> tn'
-
-    existing :: IO GYAssetClass
-    existing = urlPieceFromFile path
-
-    new :: IO GYAssetClass
-    new = do
-        (ac, txBody) <- ctxRunF ctx (ctxUserF ctx) $
-            GY.TestTokens.mintTestTokens tn 10_000_000
-        void $ submitTx ctx (ctxUserF ctx) txBody
-
-        urlPieceToFile path ac
-
-        return ac
-
-catchIOException :: IO a -> (IOException -> IO a) -> IO a
-catchIOException = catch

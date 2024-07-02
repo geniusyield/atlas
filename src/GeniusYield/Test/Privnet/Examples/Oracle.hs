@@ -26,7 +26,7 @@ import           GeniusYield.Types
 readOracleValidatorV2 :: GYValidator 'PlutusV2
 readOracleValidatorV2 = validatorFromPlutus readOracleValidator
 
-tests :: IO Setup -> TestTree
+tests :: Setup -> TestTree
 tests setup = testGroup "oracle"
     [ testCaseSteps "without-ref" $ \info -> withSetup setup info $ \ctx -> do
         let goldAC = ctxGold ctx

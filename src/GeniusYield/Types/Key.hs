@@ -238,10 +238,15 @@ paymentSigningKeyFromLedgerKeyPair = coerce . TLedger.sKey
 --
 readPaymentSigningKey :: FilePath -> IO GYPaymentSigningKey
 readPaymentSigningKey fp = do
-    s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsPaymentKey) (Api.File fp)
+    s <- Api.readFileTextEnvelopeAnyOf acceptedTypes (Api.File fp)
     case s of
         Left err -> fail (show err) --- throws IOError
         Right x  -> return (GYPaymentSigningKey x)
+  where
+    acceptedTypes =
+        [ Api.FromSomeType (Api.AsSigningKey Api.AsGenesisUTxOKey) Api.castSigningKey
+        , Api.FromSomeType (Api.AsSigningKey Api.AsPaymentKey) id
+        ]
 
 -- | Reads extended payment signing key from file
 --

@@ -21,7 +21,7 @@ import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder.Class
 
-tests :: IO Setup -> TestTree
+tests :: Setup -> TestTree
 tests setup = testGroup "treat"
     [ testCaseSteps "plutusV1" $ \info -> withSetup setup info $ \ctx -> do
         let goldAC = ctxGold ctx

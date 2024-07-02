@@ -84,6 +84,7 @@ import           GeniusYield.Imports
 import           GeniusYield.Test.Address
 import           GeniusYield.Test.FakeCoin
 import           GeniusYield.TxBuilder
+import           GeniusYield.TxBuilder.Clb
 import           GeniusYield.Types
 
 -------------------------------------------------------------------------------

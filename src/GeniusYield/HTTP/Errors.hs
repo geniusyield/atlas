@@ -44,6 +44,11 @@ data GYApiError = GYApiError
     }
     deriving stock (Show, Eq)
 
+instance Exception GYApiError where
+
+instance IsGYApiError GYApiError where
+    toApiError = id
+
 -- | Create a typical BACKEND_ERROR internal serval error with given message.
 someBackendError :: Text -> GYApiError
 someBackendError msg = GYApiError

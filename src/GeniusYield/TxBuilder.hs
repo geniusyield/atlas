@@ -22,8 +22,8 @@ import qualified Data.Map.Strict                 as Map
 import           GeniusYield.TxBuilder.Class     as X
 import           GeniusYield.TxBuilder.Common    as X
 import           GeniusYield.TxBuilder.Errors    as X
-import           GeniusYield.TxBuilder.Node      as X
-import           GeniusYield.TxBuilder.NodeQuery as X
+import           GeniusYield.TxBuilder.IO        as X
+import           GeniusYield.TxBuilder.IO.Query  as X
 import           GeniusYield.TxBuilder.Random    as X
 import           GeniusYield.TxBuilder.Clb       as X
 

@@ -1,141 +1,141 @@
 {-|
-Module      : GeniusYield.TxBuilder.NodeQuery
+Module      : GeniusYield.TxBuilder.IO.Query
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
 
 -}
-module GeniusYield.TxBuilder.NodeQuery (
-    GYTxQueryMonadNode,
-    runGYTxQueryMonadNode,
+module GeniusYield.TxBuilder.IO.Query (
+    GYTxQueryMonadIO,
+    runGYTxQueryMonadIO,
 ) where
 
 import           Control.Monad.IO.Class       (MonadIO (..))
+import           GHC.Stack                    (withFrozenCallStack)
 
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
-import           GHC.Stack                    (withFrozenCallStack)
 
 
 -------------------------------------------------------------------------------
 -- GY implementation
 -------------------------------------------------------------------------------
 
--- | 'GYTxQueryMonad' interpretation run against real node.
-newtype GYTxQueryMonadNode a = GYTxQueryMonadNode { unGYTxQueryMonadNode :: GYTxNodeEnv -> IO a }
+-- | 'GYTxQueryMonad' interpretation run under IO.
+newtype GYTxQueryMonadIO a = GYTxQueryMonadIO { unGYTxQueryMonadIO :: GYTxQueryIOEnv -> IO a }
   deriving stock (Functor)
 
-instance Applicative GYTxQueryMonadNode where
-    pure x = GYTxQueryMonadNode $ \_ -> return x
+instance Applicative GYTxQueryMonadIO where
+    pure x = GYTxQueryMonadIO $ \_ -> return x
     (<*>) = ap
 
-instance Monad GYTxQueryMonadNode where
-    m >>= k = GYTxQueryMonadNode $ \env -> do
-        x <- unGYTxQueryMonadNode m env
-        unGYTxQueryMonadNode (k x) env
+instance Monad GYTxQueryMonadIO where
+    m >>= k = GYTxQueryMonadIO $ \env -> do
+        x <- unGYTxQueryMonadIO m env
+        unGYTxQueryMonadIO (k x) env
 
-instance MonadIO GYTxQueryMonadNode where
-    liftIO = GYTxQueryMonadNode . const
+instance MonadIO GYTxQueryMonadIO where
+    liftIO = GYTxQueryMonadIO . const
 
-data GYTxNodeEnv = GYTxNodeEnv !GYNetworkId !GYProviders
+data GYTxQueryIOEnv = GYTxQueryIOEnv !GYNetworkId !GYProviders
 
-instance MonadError GYTxMonadException GYTxQueryMonadNode where
+instance MonadError GYTxMonadException GYTxQueryMonadIO where
     throwError = liftIO . throwIO
 
-    catchError action handler = GYTxQueryMonadNode $ \env -> catch
-        (unGYTxQueryMonadNode action env)
-        (\err -> unGYTxQueryMonadNode (handler err) env)
+    catchError action handler = GYTxQueryMonadIO $ \env -> catch
+        (unGYTxQueryMonadIO action env)
+        (\err -> unGYTxQueryMonadIO (handler err) env)
 
-instance GYTxQueryMonad GYTxQueryMonadNode where
-    networkId = GYTxQueryMonadNode $ \(GYTxNodeEnv nid _ ) ->
+instance GYTxQueryMonad GYTxQueryMonadIO where
+    networkId = GYTxQueryMonadIO $ \(GYTxQueryIOEnv nid _ ) ->
         return nid
 
     lookupDatum h = do
       logMsg mempty GYInfo $ printf "Querying Datum: %s" (show h)
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyLookupDatum providers h
 
     utxosAtAddress addr mAssetClass = do
       logMsg mempty GYInfo $ printf "Querying utxo At Address: %s" addr
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxosAtAddress providers addr mAssetClass
 
     utxosAtAddressWithDatums addr mAssetClass = do
       logMsg mempty GYInfo $ printf "Querying utxos (with datums) at address: %s" addr
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxosAtAddressWithDatums providers addr mAssetClass
 
     utxosAtPaymentCredential cred mAssetClass = do
       logMsg mempty GYInfo $ printf "Querying UTxOs at payment credential: %s" cred
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxosAtPaymentCredential providers cred mAssetClass
 
     utxosAtAddresses addrs = do
       logMsg mempty GYInfo $ printf "Querying utxos At Addresses: \n %s" (show addrs)
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxosAtAddresses providers addrs
 
     utxosAtAddressesWithDatums addrs = do
       logMsg mempty GYInfo $ printf "Querying utxos (with datums) At Addresses: \n %s" (show addrs)
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxosAtAddressesWithDatums providers addrs
 
     utxosAtPaymentCredentialWithDatums cred mAssetClass = do
       logMsg mempty GYInfo $ printf "Querying utxos (with datums) at credential: \n %s" (show cred)
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxosAtPaymentCredWithDatums providers cred mAssetClass
 
     utxosAtPaymentCredentials pcs = do
       logMsg mempty GYInfo $ printf "Querying utxos at payment credentials: \n %s" (show pcs)
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxosAtPaymentCredentials providers pcs
 
     utxosAtPaymentCredentialsWithDatums pcs = do
       logMsg mempty GYInfo $ printf "Querying utxos (with datums) at payment credentials: \n %s" (show pcs)
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxosAtPaymentCredsWithDatums providers pcs
 
     utxoRefsAtAddress addr = do
       logMsg mempty GYInfo $ printf "Querying UtxoRefs At Address: %s"  addr
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxoRefsAtAddress providers addr
 
     utxoAtTxOutRef oref = do
       logMsg mempty GYInfo $ printf "Querying Utxos At TxOutRef: %s" oref
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxoAtTxOutRef providers oref
 
     utxosAtTxOutRefs oref = do
       logMsg mempty GYInfo $ printf "Querying Utxos At TxOutRefs: %s" (show oref)
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxosAtTxOutRefs providers oref
 
     utxosAtTxOutRefsWithDatums orefs = do
       logMsg mempty GYInfo $ printf "Querying utxos (with datums) At TxOutRefs: \n %s" (show orefs)
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyQueryUtxosAtTxOutRefsWithDatums providers orefs
 
     stakeAddressInfo saddr = do
       logMsg mempty GYInfo $ printf "Querying Stake Address Info: %s" saddr
-      GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+      GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyGetStakeAddressInfo providers saddr
 
-    slotConfig = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+    slotConfig = GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyGetSlotConfig providers
 
-    slotOfCurrentBlock = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+    slotOfCurrentBlock = GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         gyGetSlotOfCurrentBlock providers
 
-    logMsg ns s msg = GYTxQueryMonadNode $ \(GYTxNodeEnv _ providers) ->
+    logMsg ns s msg = GYTxQueryMonadIO $ \(GYTxQueryIOEnv _ providers) ->
         withFrozenCallStack $ gyLog providers ns s msg
 
-runGYTxQueryMonadNode
+runGYTxQueryMonadIO
     :: GYNetworkId
     -> GYProviders
-    -> GYTxQueryMonadNode a
+    -> GYTxQueryMonadIO a
     -> IO a
-runGYTxQueryMonadNode nid providers (GYTxQueryMonadNode action) = do
-    action $ GYTxNodeEnv nid providers
+runGYTxQueryMonadIO nid providers (GYTxQueryMonadIO action) = do
+    action $ GYTxQueryIOEnv nid providers

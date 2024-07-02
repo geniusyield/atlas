@@ -153,11 +153,11 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
   return $ User {userPaymentSKey = newPaymentSKey, userAddr = newAddr, userStakeSKey = newStakeSKey}
 
 
-ctxRunF :: forall t v. Traversable t => Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
-ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
+ctxRunF :: forall t v. Traversable t => Ctx -> User -> GYTxMonadIO (t (GYTxSkeleton v)) -> IO (t GYTxBody)
+ctxRunF ctx User {..} =  runGYTxMonadIOF GYRandomImproveMultiAsset (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
 
-ctxRunFWithStrategy :: forall t v. Traversable t => GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
-ctxRunFWithStrategy strat ctx User {..} =  runGYTxMonadNodeF strat (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
+ctxRunFWithStrategy :: forall t v. Traversable t => GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadIO (t (GYTxSkeleton v)) -> IO (t GYTxBody)
+ctxRunFWithStrategy strat ctx User {..} =  runGYTxMonadIOF strat (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
 
 -- | Variant of `ctxRunF` where caller can also give the UTxO to be used as collateral.
 ctxRunFWithCollateral :: forall t v. Traversable t
@@ -165,20 +165,20 @@ ctxRunFWithCollateral :: forall t v. Traversable t
                       -> User
                       -> GYTxOutRef  -- ^ Reference to UTxO to be used as collateral.
                       -> Bool        -- ^ To check whether this given collateral UTxO has value of exact 5 ada? If it doesn't have exact 5 ada, it would be ignored.
-                      -> GYTxMonadNode (t (GYTxSkeleton v))
+                      -> GYTxMonadIO (t (GYTxSkeleton v))
                       -> IO (t GYTxBody)
-ctxRunFWithCollateral ctx User {..} coll toCheck5Ada =  runGYTxMonadNodeF GYRandomImproveMultiAsset (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr $ Just (coll, toCheck5Ada)
+ctxRunFWithCollateral ctx User {..} coll toCheck5Ada =  runGYTxMonadIOF GYRandomImproveMultiAsset (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr $ Just (coll, toCheck5Ada)
 
-ctxRunC :: forall a. Ctx -> User -> GYTxMonadNode a -> IO a
+ctxRunC :: forall a. Ctx -> User -> GYTxMonadIO a -> IO a
 ctxRunC = coerce (ctxRunF @(Const a))
 
-ctxRunCWithStrategy :: forall a. GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadNode a -> IO a
+ctxRunCWithStrategy :: forall a. GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadIO a -> IO a
 ctxRunCWithStrategy = coerce (ctxRunFWithStrategy @(Const a))
 
-ctxRunI :: Ctx -> User -> GYTxMonadNode (GYTxSkeleton v) -> IO GYTxBody
+ctxRunI :: Ctx -> User -> GYTxMonadIO (GYTxSkeleton v) -> IO GYTxBody
 ctxRunI = coerce (ctxRunF @Identity)
 
-ctxRunIWithStrategy :: GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadNode (GYTxSkeleton v) -> IO GYTxBody
+ctxRunIWithStrategy :: GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadIO (GYTxSkeleton v) -> IO GYTxBody
 ctxRunIWithStrategy = coerce (ctxRunFWithStrategy @Identity)
 
 ctxSlotOfCurrentBlock :: Ctx -> IO GYSlot

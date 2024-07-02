@@ -105,8 +105,8 @@ library
     GeniusYield.TxBuilder.Clb
     GeniusYield.TxBuilder.Common
     GeniusYield.TxBuilder.Errors
-    GeniusYield.TxBuilder.Node
-    GeniusYield.TxBuilder.NodeQuery
+    GeniusYield.TxBuilder.IO
+    GeniusYield.TxBuilder.IO.Query
     GeniusYield.TxBuilder.Random
     GeniusYield.Types
     GeniusYield.Types.Ada

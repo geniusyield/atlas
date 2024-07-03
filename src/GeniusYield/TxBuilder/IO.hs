@@ -22,18 +22,18 @@ module GeniusYield.TxBuilder.IO (
 
 import qualified Cardano.Api                     as Api
 
+import           Control.Monad.Reader            (ReaderT(ReaderT), MonadReader, asks)
 import           Control.Monad.IO.Class          (MonadIO (..))
 import           Control.Monad.Trans.Maybe       (MaybeT (runMaybeT))
-import qualified Data.ByteString                 as BS
 import qualified Data.List.NonEmpty              as NE
 import qualified Data.Set                        as Set
-import           GHC.Stack                       (withFrozenCallStack)
 
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
+import           GeniusYield.TxBuilder.IO.Query
 import           GeniusYield.Types
 
 -------------------------------------------------------------------------------
@@ -41,22 +41,18 @@ import           GeniusYield.Types
 -------------------------------------------------------------------------------
 
 -- | 'GYTxMonad' interpretation run under IO.
-newtype GYTxMonadIO a = GYTxMonadIO { unGYTxMonadIO :: GYTxIOEnv -> IO a }
-  deriving stock (Functor)
-
 type role GYTxMonadIO representational
-
-instance Applicative GYTxMonadIO where
-    pure x = GYTxMonadIO $ \_ -> return x
-    (<*>) = ap
-
-instance Monad GYTxMonadIO where
-    m >>= k = GYTxMonadIO $ \env -> do
-        x <- unGYTxMonadIO m env
-        unGYTxMonadIO (k x) env
-
-instance MonadIO GYTxMonadIO where
-    liftIO = GYTxMonadIO . const
+newtype GYTxMonadIO a = GYTxMonadIO (GYTxIOEnv -> GYTxQueryMonadIO a)
+  deriving ( Functor
+           , Applicative
+           , Monad
+           , MonadReader GYTxIOEnv
+           , MonadIO
+           , MonadRandom
+           , MonadError GYTxMonadException
+           , GYTxQueryMonad
+           )
+  via ReaderT GYTxIOEnv GYTxQueryMonadIO
 
 data GYTxIOEnv = GYTxIOEnv
     { envNid           :: !GYNetworkId
@@ -67,71 +63,9 @@ data GYTxIOEnv = GYTxIOEnv
     , envUsedSomeUTxOs :: !(Set GYTxOutRef)
     }
 
-instance MonadError GYTxMonadException GYTxMonadIO where
-    throwError = liftIO . throwIO
-
-    catchError action handler = GYTxMonadIO $ \env -> catch
-        (unGYTxMonadIO action env)
-        (\err -> unGYTxMonadIO (handler err) env)
-
-instance GYTxQueryMonad GYTxMonadIO where
-    networkId = GYTxMonadIO $ \env ->
-        return $ envNid env
-
-    lookupDatum h = GYTxMonadIO $ \env ->
-        gyLookupDatum (envProviders env) h
-
-    utxosAtAddress addr mAssetClass = GYTxMonadIO $ \env ->
-        gyQueryUtxosAtAddress (envProviders env) addr mAssetClass
-
-    utxosAtAddresses addrs = GYTxMonadIO $ \env ->
-        gyQueryUtxosAtAddresses (envProviders env) addrs
-
-    utxosAtPaymentCredentials pcs = GYTxMonadIO $ \env ->
-        gyQueryUtxosAtPaymentCredentials (envProviders env) pcs
-
-    utxosAtAddressWithDatums addr mAssetClass = GYTxMonadIO $ \env ->
-        gyQueryUtxosAtAddressWithDatums (envProviders env) addr mAssetClass
-
-    utxosAtPaymentCredential cred mAssetClass = GYTxMonadIO $ \env ->
-        gyQueryUtxosAtPaymentCredential (envProviders env) cred mAssetClass
-
-    utxosAtAddressesWithDatums addrs = GYTxMonadIO $ \env ->
-        gyQueryUtxosAtAddressesWithDatums (envProviders env) addrs
-
-    utxosAtPaymentCredentialWithDatums cred mAssetClass = GYTxMonadIO $ \env ->
-        gyQueryUtxosAtPaymentCredWithDatums (envProviders env) cred mAssetClass
-
-    utxosAtPaymentCredentialsWithDatums pcs = GYTxMonadIO $ \env ->
-        gyQueryUtxosAtPaymentCredsWithDatums (envProviders env) pcs
-
-    utxoRefsAtAddress addr = GYTxMonadIO $ \env ->
-        gyQueryUtxoRefsAtAddress (envProviders env) addr
-
-    utxoAtTxOutRef oref = GYTxMonadIO $ \env ->
-        gyQueryUtxoAtTxOutRef (envProviders env) oref
-
-    utxosAtTxOutRefs oref = GYTxMonadIO $ \env ->
-        gyQueryUtxosAtTxOutRefs (envProviders env) oref
-
-    utxosAtTxOutRefsWithDatums refs = GYTxMonadIO $ \env ->
-        gyQueryUtxosAtTxOutRefsWithDatums (envProviders env) refs
-
-    stakeAddressInfo stakeAddr = GYTxMonadIO $ \env ->
-        gyGetStakeAddressInfo (envProviders env) stakeAddr
-
-    slotConfig = GYTxMonadIO $ \env ->
-        gyGetSlotConfig (envProviders env)
-
-    slotOfCurrentBlock = GYTxMonadIO $ \env ->
-        gyGetSlotOfCurrentBlock (envProviders env)
-
-    logMsg ns s msg = GYTxMonadIO $ \env ->
-        withFrozenCallStack $ gyLog (envProviders env) ns s msg
-
 instance GYTxMonad GYTxMonadIO where
 
-    ownAddresses = GYTxMonadIO $ return . envAddrs
+    ownAddresses = asks envAddrs
 
     availableUTxOs = do
         addrs         <- ownAddresses
@@ -140,8 +74,8 @@ instance GYTxMonad GYTxMonadIO where
         utxos         <- utxosAtAddresses addrs
         return $ utxosRemoveTxOutRefs (maybe usedSomeUTxOs ((`Set.insert` usedSomeUTxOs) . utxoRef) mCollateral) utxos
       where
-        getCollateral    = GYTxMonadIO $ return . envCollateral
-        getUsedSomeUTxOs = GYTxMonadIO $ return . envUsedSomeUTxOs
+        getCollateral    = asks envCollateral
+        getUsedSomeUTxOs = asks envUsedSomeUTxOs
 
     someUTxO lang = do
         addrs           <- ownAddresses
@@ -156,12 +90,6 @@ instance GYTxMonad GYTxMonadIO where
               Just u  -> return $ utxoRef u
               Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
 
-instance MonadRandom GYTxMonadIO where
-    getRandomR  = GYTxMonadIO . const . getRandomR
-    getRandom   = GYTxMonadIO $ const getRandom
-    getRandomRs = GYTxMonadIO . const . getRandomRs
-    getRandoms  = GYTxMonadIO $ const getRandoms
-
 runGYTxMonadIO
     :: GYNetworkId                  -- ^ Network ID.
     -> GYProviders                  -- ^ Provider.
@@ -170,7 +98,7 @@ runGYTxMonadIO
     -> Maybe (GYTxOutRef, Bool)     -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadIO (GYTxSkeleton v) -- ^ Skeleton.
     -> IO GYTxBody
-runGYTxMonadIO = coerce (runGYTxMonadIOF @Identity GYRandomImproveMultiAsset)
+runGYTxMonadIO = runGYTxMonadIOWithStrategy GYRandomImproveMultiAsset
 
 runGYTxMonadIOWithStrategy
     :: GYCoinSelectionStrategy      -- ^ Coin selection strategy.
@@ -191,7 +119,7 @@ runGYTxMonadIOParallel
     -> Maybe (GYTxOutRef, Bool)     -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadIO [GYTxSkeleton v] -- ^ Skeleton(s).
     -> IO (GYTxBuildResult Identity)
-runGYTxMonadIOParallel = coerce (runGYTxMonadIOParallelF @Identity GYRandomImproveMultiAsset)
+runGYTxMonadIOParallel = runGYTxMonadIOParallelWithStrategy GYRandomImproveMultiAsset
 
 runGYTxMonadIOParallelWithStrategy
     :: GYCoinSelectionStrategy      -- ^ Coin selection strategy.
@@ -342,7 +270,7 @@ runGYTxMonadIOCore ownUtxoUpdateF cstrat nid providers addrs change collateral a
 
     collateral' <- obtainCollateral
 
-    e <- unGYTxMonadIO (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral' loggedAction) GYTxIOEnv
+    e <- runGYTxMonadNode' (buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral' loggedAction) GYTxIOEnv
             { envNid           = nid
             , envProviders     = providers
             , envAddrs         = addrs
@@ -369,6 +297,9 @@ runGYTxMonadIOCore ownUtxoUpdateF cstrat nid providers addrs change collateral a
 
       logSkeletons :: [f (GYTxSkeleton v)] -> GYTxMonadIO ()
       logSkeletons = mapM_ (mapM_ (logMsg "runGYTxMonadIOCore" GYDebug . show))
+
+runGYTxMonadNode' :: GYTxMonadIO a -> GYTxIOEnv -> IO a
+runGYTxMonadNode' (GYTxMonadIO action) env = runGYTxQueryMonadIO (envNid env) (envProviders env) $ action env
 
 -- | Update own utxo set by removing any utxos used up in the given tx.
 updateOwnUtxosParallel :: GYTxBody -> GYUTxOs -> GYUTxOs

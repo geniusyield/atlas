@@ -16,7 +16,6 @@ module GeniusYield.TxBuilder.Class
     , GYTxSkeletonRefIns (..)
     , gyTxSkeletonRefInsToList
     , gyTxSkeletonRefInsSet
-    , RandT
     , lookupDatum'
     , utxoAtTxOutRef'
     , utxoAtTxOutRefWithDatum'
@@ -77,8 +76,12 @@ module GeniusYield.TxBuilder.Class
     , wt
     ) where
 
-import           Control.Monad.Except         (ExceptT, MonadError (..),
-                                               liftEither)
+import           Control.Monad.Except         (MonadError (..), liftEither)
+import qualified Control.Monad.State.Strict   as Strict
+import qualified Control.Monad.State.Lazy     as Lazy
+import qualified Control.Monad.Writer.CPS     as CPS
+import qualified Control.Monad.Writer.Strict  as Strict
+import qualified Control.Monad.Writer.Lazy    as Lazy
 import           Control.Monad.IO.Class       (MonadIO (..))
 import           Control.Monad.Random         (MonadRandom (..), RandT, lift)
 import           Control.Monad.Reader         (ReaderT)
@@ -204,6 +207,10 @@ class GYTxQueryMonad m => GYTxMonad m where
     -- /Note:/ may or may not return the same value
     someUTxO :: PlutusVersion -> m GYTxOutRef
 
+-------------------------------------------------------------------------------
+-- Instances for useful transformers.
+-------------------------------------------------------------------------------
+
 instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     networkId = lift networkId
     lookupDatum = lift . lookupDatum
@@ -249,12 +256,39 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance GYTxMonad m => GYTxMonad (ReaderT g m) where
+instance GYTxMonad m => GYTxMonad (ReaderT env m) where
     ownAddresses = lift ownAddresses
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
 
-instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
+-------------------------------------------------------------------------------
+-- Instances for less useful transformers, provided for completeness.
+-- Many of these transformers are fundamentally riddled with issues.
+--    See: https://github.com/haskell-effectful/effectful/blob/master/transformers.md
+-------------------------------------------------------------------------------
+
+
+{- Note [MonadError on GYTxQueryMonad and ExceptT]
+
+ExceptT instances are omitted since the MonadError requirement for GYTxQueryMonad
+enforces only one exception type: thereby making multiple error handler transformers
+useless.
+See: https://ro-che.info/articles/2014-06-11-problem-with-mtl
+
+Perhaps said superclass constraint should be rethought? Does it really
+achieve what it is meant to achieve? The purpose of that contraint is to signal
+that the query methods _should_ throw errors of type 'GYTxMonadException'.
+After all, some queries are bound to fail. But this expectation does not really
+restrict the type of exceptinos. In fact, an IO based monad could still
+be throwing exceptions of different types (and our implementation of 'GYTxMonadIO'
+likely does).
+
+Alternatively: Use a better effect system. E.g effectful but any ReaderT based effect
+system will suffice (do NOT use free(er) monad like ones). This will trivialize this
+entire problem.
+-}
+
+instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
     networkId = lift networkId
     lookupDatum = lift . lookupDatum
     utxoAtTxOutRef = lift . utxoAtTxOutRef
@@ -274,7 +308,107 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance GYTxMonad m => GYTxMonad (ExceptT GYTxMonadException m) where
+instance GYTxMonad m => GYTxMonad (Strict.StateT s m) where
+    ownAddresses = lift ownAddresses
+    availableUTxOs = lift availableUTxOs
+    someUTxO = lift . someUTxO
+
+instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
+    networkId = lift networkId
+    lookupDatum = lift . lookupDatum
+    utxoAtTxOutRef = lift . utxoAtTxOutRef
+    utxosAtTxOutRefs = lift . utxosAtTxOutRefs
+    utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
+    utxosAtAddress addr = lift . utxosAtAddress addr
+    utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
+    utxosAtAddresses = lift . utxosAtAddresses
+    utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
+    utxoRefsAtAddress = lift . utxoRefsAtAddress
+    utxosAtPaymentCredential pc = lift . utxosAtPaymentCredential pc
+    utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
+    utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
+    utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
+    stakeAddressInfo = lift . stakeAddressInfo
+    slotConfig = lift slotConfig
+    slotOfCurrentBlock = lift slotOfCurrentBlock
+    logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+
+instance GYTxMonad m => GYTxMonad (Lazy.StateT s m) where
+    ownAddresses = lift ownAddresses
+    availableUTxOs = lift availableUTxOs
+    someUTxO = lift . someUTxO
+
+instance (GYTxQueryMonad m, Monoid s) => GYTxQueryMonad (CPS.WriterT s m) where
+    networkId = lift networkId
+    lookupDatum = lift . lookupDatum
+    utxoAtTxOutRef = lift . utxoAtTxOutRef
+    utxosAtTxOutRefs = lift . utxosAtTxOutRefs
+    utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
+    utxosAtAddress addr = lift . utxosAtAddress addr
+    utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
+    utxosAtAddresses = lift . utxosAtAddresses
+    utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
+    utxoRefsAtAddress = lift . utxoRefsAtAddress
+    utxosAtPaymentCredential pc = lift . utxosAtPaymentCredential pc
+    utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
+    utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
+    utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
+    stakeAddressInfo = lift . stakeAddressInfo
+    slotConfig = lift slotConfig
+    slotOfCurrentBlock = lift slotOfCurrentBlock
+    logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+
+instance (GYTxMonad m, Monoid s) => GYTxMonad (CPS.WriterT s m) where
+    ownAddresses = lift ownAddresses
+    availableUTxOs = lift availableUTxOs
+    someUTxO = lift . someUTxO
+
+instance (GYTxQueryMonad m, Monoid s) => GYTxQueryMonad (Strict.WriterT s m) where
+    networkId = lift networkId
+    lookupDatum = lift . lookupDatum
+    utxoAtTxOutRef = lift . utxoAtTxOutRef
+    utxosAtTxOutRefs = lift . utxosAtTxOutRefs
+    utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
+    utxosAtAddress addr = lift . utxosAtAddress addr
+    utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
+    utxosAtAddresses = lift . utxosAtAddresses
+    utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
+    utxoRefsAtAddress = lift . utxoRefsAtAddress
+    utxosAtPaymentCredential pc = lift . utxosAtPaymentCredential pc
+    utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
+    utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
+    utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
+    stakeAddressInfo = lift . stakeAddressInfo
+    slotConfig = lift slotConfig
+    slotOfCurrentBlock = lift slotOfCurrentBlock
+    logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+
+instance (GYTxMonad m, Monoid s) => GYTxMonad (Strict.WriterT s m) where
+    ownAddresses = lift ownAddresses
+    availableUTxOs = lift availableUTxOs
+    someUTxO = lift . someUTxO
+
+instance (GYTxQueryMonad m, Monoid s) => GYTxQueryMonad (Lazy.WriterT s m) where
+    networkId = lift networkId
+    lookupDatum = lift . lookupDatum
+    utxoAtTxOutRef = lift . utxoAtTxOutRef
+    utxosAtTxOutRefs = lift . utxosAtTxOutRefs
+    utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
+    utxosAtAddress addr = lift . utxosAtAddress addr
+    utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
+    utxosAtAddresses = lift . utxosAtAddresses
+    utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
+    utxoRefsAtAddress = lift . utxoRefsAtAddress
+    utxosAtPaymentCredential pc = lift . utxosAtPaymentCredential pc
+    utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
+    utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
+    utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
+    stakeAddressInfo = lift . stakeAddressInfo
+    slotConfig = lift slotConfig
+    slotOfCurrentBlock = lift slotOfCurrentBlock
+    logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+
+instance (GYTxMonad m, Monoid s) => GYTxMonad (Lazy.WriterT s m) where
     ownAddresses = lift ownAddresses
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO

@@ -204,9 +204,6 @@ class GYTxQueryMonad m => GYTxMonad m where
     -- /Note:/ may or may not return the same value
     someUTxO :: PlutusVersion -> m GYTxOutRef
 
-    -- | A seed to inject non-determinism.
-    randSeed :: m Int
-
 instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     networkId = lift networkId
     lookupDatum = lift . lookupDatum
@@ -231,7 +228,6 @@ instance GYTxMonad m => GYTxMonad (RandT g m) where
     ownAddresses = lift ownAddresses
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
-    randSeed = lift randSeed
 
 instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     networkId = lift networkId
@@ -257,7 +253,6 @@ instance GYTxMonad m => GYTxMonad (ReaderT g m) where
     ownAddresses = lift ownAddresses
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
-    randSeed = lift randSeed
 
 instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
     networkId = lift networkId
@@ -283,7 +278,6 @@ instance GYTxMonad m => GYTxMonad (ExceptT GYTxMonadException m) where
     ownAddresses = lift ownAddresses
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
-    randSeed = lift randSeed
 
 -- | A version of 'lookupDatum' that raises 'GYNoDatumForHash' if the datum is not found.
 lookupDatum' :: GYTxQueryMonad m => GYDatumHash -> m GYDatum

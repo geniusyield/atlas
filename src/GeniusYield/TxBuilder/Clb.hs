@@ -312,8 +312,6 @@ instance GYTxMonad GYTxMonadClb where
               Just u  -> return $ utxoRef u
               Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
 
-    randSeed = return 42
-
 -- Send skeletons with multiple signatures from wallet
 sendSkeletonWithWallets :: GYTxSkeleton v -> [Wallet] -> GYTxMonadClb GYTxId
 sendSkeletonWithWallets skeleton ws = snd <$> sendSkeleton' skeleton ws

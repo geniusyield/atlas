@@ -107,7 +107,6 @@ library
     GeniusYield.TxBuilder.Errors
     GeniusYield.TxBuilder.IO
     GeniusYield.TxBuilder.IO.Query
-    GeniusYield.TxBuilder.Random
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address

@@ -24,7 +24,6 @@ import           GeniusYield.TxBuilder.Common    as X
 import           GeniusYield.TxBuilder.Errors    as X
 import           GeniusYield.TxBuilder.IO        as X
 import           GeniusYield.TxBuilder.IO.Query  as X
-import           GeniusYield.TxBuilder.Random    as X
 
 import           GeniusYield.Imports
 import           GeniusYield.Types

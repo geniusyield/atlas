@@ -105,7 +105,7 @@ data GYBuildTxEnv = GYBuildTxEnv
     , gyBTxEnvProtocolParams :: !(AlonzoCore.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra))
     , gyBTxEnvPools          :: !(Set Api.S.PoolId)
     , gyBTxEnvOwnUtxos       :: !GYUTxOs
-    -- ^ own utxos available for use as additional input
+    -- ^ own utxos available for use as _additional_ input
     , gyBTxEnvChangeAddr     :: !GYAddress
     , gyBTxEnvCollateral     :: !GYUTxO
     }

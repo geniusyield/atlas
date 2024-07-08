@@ -56,14 +56,14 @@ tests setup = testGroup "gift"
             txBodyPlace <- buildTxBody $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace
+            submitTxBody_ txBodyPlace [ctxUserF ctx]
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
         ctxRun ctx (ctxUser2 ctx) $ do
             grabGiftsTx' <- grabGifts  @'PlutusV1 giftValidatorV1 >>= traverse buildTxBody
-            mapM_ (submitPrivnetTx (ctxUser2 ctx)) grabGiftsTx'
+            mapM_ (`submitTxBody` [ctxUser2 ctx]) grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
         balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
@@ -90,14 +90,14 @@ tests setup = testGroup "gift"
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV2
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace
+            submitTxBody_ txBodyPlace [ctxUserF ctx]
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
         ctxRun ctx (ctxUser2 ctx) $ do
             grabGiftsTx' <- grabGifts @'PlutusV2 giftValidatorV2 >>= traverse buildTxBody
-            mapM_ (submitPrivnetTx (ctxUser2 ctx)) grabGiftsTx'
+            mapM_ (`submitTxBody` [ctxUser2 ctx]) grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
         balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
@@ -125,14 +125,14 @@ tests setup = testGroup "gift"
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
                 & gyTxOutDatumL .~ GYTxOutUseInlineDatum
 
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace
+            submitTxBody_ txBodyPlace [ctxUserF ctx]
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
         ctxRun ctx (ctxUser2 ctx) $ do
             grabGiftsTx' <- grabGifts  @'PlutusV2 giftValidatorV2 >>= traverse buildTxBody
-            mapM_ (submitPrivnetTx (ctxUser2 ctx)) grabGiftsTx'
+            mapM_ (`submitTxBody` [ctxUser2 ctx]) grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
         balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
@@ -163,7 +163,7 @@ tests setup = testGroup "gift"
         assertBool "Collateral input shouldn't be set for this transaction" (txBodyCollateral txBodyPlace == mempty)
         assertBool "Return collateral shouldn't be set for this transaction" (txBodyCollateralReturnOutput txBodyPlace == Api.TxReturnCollateralNone)
         assertBool "Total collateral shouldn't be set for this transaction" (txBodyTotalCollateralLovelace txBodyPlace == 0)
-        ctxRun ctx (ctxUserF ctx) $ submitPrivnetTx_ (ctxUserF ctx) txBodyPlace
+        ctxRun ctx (ctxUserF ctx) $ submitTxBody_ txBodyPlace [ctxUserF ctx]
         -- wait a tiny bit.
         threadDelay 1_000_000
 
@@ -191,7 +191,7 @@ tests setup = testGroup "gift"
         let colls = txBodyCollateral grabGiftsTxBody'
         colls' <- ctxRunQuery ctx $ utxosAtTxOutRefs (Set.toList colls)
         assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
-        ctxRun ctx newUser $ submitPrivnetTx_ newUser grabGiftsTxBody'
+        ctxRun ctx newUser $ submitTxBody_ grabGiftsTxBody' [newUser]
 
     , testCaseSteps "Checking if collateral is reserved in case we send an exact 5 ada only UTxO as collateral (simulating browser's case) + is collateral spendable if we want?" $ \info -> withSetup setup info $ \ctx -> do
         ----------- Create a new user and fund it
@@ -250,7 +250,7 @@ tests setup = testGroup "gift"
         -- Add another UTxO to be used as collateral.
         ctxRun ctx (ctxUserF ctx) $ do
             txBody <- buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 8_000_000)
-            submitPrivnetTx_ (ctxUserF ctx) txBody
+            submitTxBody_ txBody [ctxUserF ctx]
 
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunQuery ctx $ utxosAtAddress (userAddr newUser) Nothing
@@ -322,7 +322,7 @@ tests setup = testGroup "gift"
             addr <- scriptAddress giftValidatorV2
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace
+            submitTxBody_ txBodyPlace [ctxUserF ctx]
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -331,7 +331,7 @@ tests setup = testGroup "gift"
         -- Apparently we MUST NOT include the script if there is a utxo input with that script. Even if we consume that utxo.
         ctxRun ctx (ctxUser2 ctx) $ do
             grabGiftsTx' <- grabGiftsRef ref giftValidatorV2 >>= traverse buildTxBody
-            mapM_ (submitPrivnetTx (ctxUser2 ctx)) grabGiftsTx'
+            mapM_ (`submitTxBody` [ctxUser2 ctx]) grabGiftsTx'
 
         -- Check final balance
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
@@ -373,7 +373,7 @@ tests setup = testGroup "gift"
             addr <- scriptAddress giftValidatorV2
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace
+            submitTxBody_ txBodyPlace [ctxUserF ctx]
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -385,7 +385,7 @@ tests setup = testGroup "gift"
             -- we need to use 'PlutusV2 here.
             s1 <- grabGifts  @'PlutusV2 giftValidatorV2
             grabGiftsTx' <- traverse buildTxBody $ s1 <|> Just (mustHaveRefInput ref)
-            mapM_ (submitPrivnetTx (ctxUser2 ctx)) grabGiftsTx'
+            mapM_ (`submitTxBody` [ctxUser2 ctx]) grabGiftsTx'
 
         -- Check final balance
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
@@ -425,7 +425,7 @@ tests setup = testGroup "gift"
             addr <- scriptAddress giftValidatorV2
             txBodyPlaceV2 <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlaceV2
+            submitTxBody_ txBodyPlaceV2 [ctxUserF ctx]
 
         info "Put V2 gifts"
 
@@ -434,7 +434,7 @@ tests setup = testGroup "gift"
             addr <- scriptAddress giftValidatorV1
             txBodyPlaceV1 <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlaceV1
+            submitTxBody_ txBodyPlaceV1 [ctxUserF ctx]
 
         info "Put V1 gifts"
 
@@ -458,7 +458,7 @@ tests setup = testGroup "gift"
             addr <- scriptAddress giftValidatorV1
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace
+            submitTxBody_ txBodyPlace [ctxUserF ctx]
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -497,7 +497,7 @@ tests setup = testGroup "gift"
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV2
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace
+            submitTxBody_ txBodyPlace [ctxUserF ctx]
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -517,7 +517,7 @@ tests setup = testGroup "gift"
 
         ctxRun ctx (ctxUser2 ctx) $ do
             grabGiftsTx' <- grabGifts giftValidatorV2 >>= traverse addNewGiftV2 >>= traverse buildTxBody
-            mapM_ (submitPrivnetTx (ctxUser2 ctx)) grabGiftsTx'
+            mapM_ (`submitTxBody` [ctxUser2 ctx]) grabGiftsTx'
 
     , testCaseSteps "inlinedatum-v1v2" $ \info -> withSetup setup info $ \ctx -> do
         -- in this test we try to consume v1 and v2 script outputs in the same transaction.
@@ -529,14 +529,14 @@ tests setup = testGroup "gift"
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV1
             txBodyPlace1 <- buildTxBody . mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace1
+            submitTxBody_ txBodyPlace1 [ctxUserF ctx]
 
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress treatValidatorV2
             txBodyPlace2 <- buildTxBody . mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
                 & gyTxOutDatumL .~ GYTxOutUseInlineDatum
 
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace2
+            submitTxBody_ txBodyPlace2 [ctxUserF ctx]
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -545,7 +545,7 @@ tests setup = testGroup "gift"
           s1 <- grabGifts  @'PlutusV1 giftValidatorV1
           s2 <- grabGifts treatValidatorV2
           grabGiftsTx <- traverse buildTxBody $ s1 <|> s2
-          mapM_ (submitPrivnetTx (ctxUser2 ctx)) grabGiftsTx
+          mapM_ (`submitTxBody` [ctxUser2 ctx]) grabGiftsTx
 
     , testCaseSteps "inlinedatum-in-v1" $ \info -> withSetup setup info $ \_ctx -> do
         -- in this test we try to consume v1 script output which has inline datums
@@ -561,7 +561,7 @@ tests setup = testGroup "gift"
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
                 & gyTxOutDatumL .~ True
 
-            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace1
+            submitTxBody_ txBodyPlace [ctxUserF ctx]1
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -581,17 +581,17 @@ giftCleanup ctx = do
     -- grab existing v2 gifts
     ctxRun ctx (ctxUserF ctx) $ do
         skeletonM <- grabGifts  @'PlutusV2 giftValidatorV2 >>= traverse buildTxBody
-        mapM_ (submitPrivnetTx (ctxUserF ctx)) skeletonM
+        mapM_ (`submitTxBody` [ctxUserF ctx]) skeletonM
 
     -- grab existing v1 gifts
     ctxRun ctx (ctxUserF ctx) $ do
         skeletonM <- grabGifts  @'PlutusV1 giftValidatorV1 >>= traverse buildTxBody
-        mapM_ (submitPrivnetTx (ctxUserF ctx)) skeletonM
+        mapM_ (`submitTxBody` [ctxUserF ctx]) skeletonM
 
     -- grab existing treats
     ctxRun ctx (ctxUserF ctx) $ do
         skeletonM <- grabGifts  @'PlutusV2 treatValidatorV2 >>= traverse buildTxBody
-        mapM_ (submitPrivnetTx (ctxUserF ctx)) skeletonM
+        mapM_ (`submitTxBody` [ctxUserF ctx]) skeletonM
 
     threadDelay 1_000_000
 
@@ -670,5 +670,5 @@ resolveRefScript' user txBodyRefScript script = do
       Just ref -> return ref
       Nothing  -> throwAppError $ someBackendError "Shouldn't happen: no ref in body"
 
-  void $ submitPrivnetTx user txBodyRefScript
+  void $ submitTxBody txBodyRefScript [user]
   return ref

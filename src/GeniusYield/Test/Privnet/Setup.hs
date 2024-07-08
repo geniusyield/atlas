@@ -308,14 +308,14 @@ giveAda :: Ctx -> GYAddress -> IO ()
 giveAda ctx addr = ctxRun ctx (ctxUserF ctx) $ do
     txBody <- buildTxBody $ mconcat $ replicate 5 $
         mustHaveOutput $ mkGYTxOutNoDatum addr (valueFromLovelace 1_000_000_000)
-    submitPrivnetTx_ (ctxUserF ctx) txBody
+    submitTxBody_ txBody [ctxUserF ctx]
 
 giveTokens :: Ctx -> GYAddress -> IO ()
 giveTokens ctx addr = ctxRun ctx (ctxUserF ctx) $ do
     txBody <- buildTxBody $
         mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxGold ctx) 1_000_000)) <>
         mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxIron ctx) 1_000_000))
-    submitPrivnetTx_ (ctxUserF ctx) txBody
+    submitTxBody_ txBody [ctxUserF ctx]
 
 -------------------------------------------------------------------------------
 -- minting tokens
@@ -325,7 +325,7 @@ mintTestTokens :: Ctx -> String -> IO GYAssetClass
 mintTestTokens ctx tn' = do
     ctxRun ctx (ctxUserF ctx) $ do
         (ac, txBody) <- GY.TestTokens.mintTestTokens tn 10_000_000 >>= traverse buildTxBody
-        submitPrivnetTx_ (ctxUserF ctx) txBody
+        submitTxBody_ txBody [ctxUserF ctx]
         pure ac
   where
     tn :: GYTokenName

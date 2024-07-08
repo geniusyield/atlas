@@ -47,7 +47,7 @@ tests setup = testGroup "misc"
             txBodyMint <- buildTxBody $
                  mustHaveInput (GYTxIn utxoAsParam GYTxInWitnessKey)
               <> mustMint (GYMintReference refScript policyAsScript) unitRedeemer tn amt
-            submitPrivnetTx_ (ctxUser2 ctx) txBodyMint
+            submitTxBody_ txBodyMint [ctxUser2 ctx]
 
         -- wait a tiny bit.
         threadDelay 1_000_000

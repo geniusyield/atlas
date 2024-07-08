@@ -13,7 +13,6 @@ module GeniusYield.Test.Privnet.Ctx (
     -- * User
     User (..),
     CreateUserConfig (..),
-
     ctxUsers,
     userPkh,
     userPaymentPkh,
@@ -30,8 +29,6 @@ module GeniusYield.Test.Privnet.Ctx (
     ctxWaitUntilSlot,
     ctxProviders,
     ctxSlotConfig,
-    submitPrivnetTx,
-    submitPrivnetTx_,
     -- * Helpers
     newTempUserCtx,
     ctxQueryBalance,
@@ -43,7 +40,7 @@ module GeniusYield.Test.Privnet.Ctx (
 import qualified Cardano.Api                as Api
 import           Data.Default               (Default (..))
 import qualified Data.Map.Strict            as Map
-import qualified Data.Set                   as Set
+
 import qualified GeniusYield.Examples.Limbo as Limbo
 import           GeniusYield.HTTP.Errors    (someBackendError)
 import           GeniusYield.Imports
@@ -51,6 +48,7 @@ import           GeniusYield.Providers.Node
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 import           Test.Tasty.HUnit           (assertFailure)
+import           GeniusYield.Types.Key.Class (ToShelleyWitnessSigningKey (toShelleyWitnessSigningKey))
 
 data CreateUserConfig =
      CreateUserConfig
@@ -63,11 +61,16 @@ data CreateUserConfig =
 instance Default CreateUserConfig where
    def = CreateUserConfig { cucGenerateCollateral = False, cucGenerateStakeKey = False }
 
+-- | Note: When signing using 'ToShelleyWitnessSigningKey' instance, it only uses the payment signing key.
 data User = User
     { userPaymentSKey :: !GYPaymentSigningKey
     , userStakeSKey   :: !(Maybe GYStakeSigningKey)
     , userAddr        :: !GYAddress
     }
+
+-- | This only takes the payment signing key, not the stake key.
+instance ToShelleyWitnessSigningKey User where
+    toShelleyWitnessSigningKey = toShelleyWitnessSigningKey . userPaymentSKey
 
 {-# DEPRECATED userVKey "Use userPaymentVKey." #-}
 userVKey :: User -> GYPaymentVerificationKey
@@ -145,7 +148,7 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
         mustHaveOutput (mkGYTxOutNoDatum newAddr collateralValue)
       else
         mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
-    submitPrivnetTx_ fundUser txBody
+    submitTxBody_ txBody [fundUser]
     pure txBody
 
   return $ User {userPaymentSKey = newPaymentSKey, userAddr = newAddr, userStakeSKey = newStakeSKey}
@@ -195,23 +198,6 @@ ctxProviders ctx = GYProviders
     , gyGetStakeAddressInfo = nodeStakeAddressInfo (ctxInfo ctx)
     }
 
-reqKeys :: User -> GYTxBody -> [GYSomeSigningKey]
-reqKeys User{..} txBody =
-  let reqSigs = txBodyReqSignatories txBody
-  in case userStakeSKey of
-        Nothing -> [GYSomeSigningKey userPaymentSKey]
-        -- It might be the case that @cardano-api@ is clever enough to not add signature if it is not required but cursory look at their code suggests otherwise.
-        Just stakeKey -> if Set.member (toPubKeyHash . stakeKeyHash . stakeVerificationKey $ stakeKey) reqSigs
-          then [GYSomeSigningKey userPaymentSKey, GYSomeSigningKey stakeKey]
-          else [GYSomeSigningKey userPaymentSKey]
-
--- | Sign and submit a transaction.
-submitPrivnetTx :: User -> GYTxBody ->  GYTxMonadIO GYTxId
-submitPrivnetTx u txBody = submitTxBody txBody $ reqKeys u txBody
-
-submitPrivnetTx_ :: User -> GYTxBody -> GYTxMonadIO ()
-submitPrivnetTx_ t = void . submitPrivnetTx t
-
 -- | Function to find for the first locked output in the given `GYTxBody` at the given `GYAddress`.
 findOutput :: GYAddress -> GYTxBody -> IO GYTxOutRef
 findOutput addr txBody = do
@@ -233,7 +219,7 @@ addRefScriptCtx ctx user script = ctxRun ctx user $ do
       ref <- case Map.lookup (Some script) refs of
         Just ref -> return ref
         Nothing  -> throwAppError $ someBackendError "Shouldn't happen: no ref in body"
-      submitPrivnetTx_ user body
+      submitTxBody_ body [user]
       pure ref
 
 -- | Function to add for a reference input.
@@ -256,5 +242,5 @@ addRefInputCtx ctx user toInline addr ourDatum = ctxRun ctx user $ do
   case mRefInputUtxo of
     Nothing               -> throwAppError $ someBackendError "Shouldn't happen: Couldn't find desired UTxO in tx outputs"
     Just GYUTxO {utxoRef} -> do
-      submitPrivnetTx_ user txBody
+      submitTxBody_ txBody [user]
       pure utxoRef

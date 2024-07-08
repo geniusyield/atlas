@@ -106,7 +106,6 @@ library
     GeniusYield.TxBuilder.Common
     GeniusYield.TxBuilder.Errors
     GeniusYield.TxBuilder.IO
-    GeniusYield.TxBuilder.IO.Query
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
@@ -154,6 +153,7 @@ library
     GeniusYield.Providers.LiteChainIndex
     GeniusYield.Providers.Node.AwaitTx
     GeniusYield.Providers.Node.Query
+    GeniusYield.TxBuilder.IO.Query
     GeniusYield.Utils
   build-depends:
     , async                 ^>=2.2.5

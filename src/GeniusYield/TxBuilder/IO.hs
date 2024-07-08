@@ -8,7 +8,9 @@ Stability   : develop
 -}
 module GeniusYield.TxBuilder.IO (
     GYTxMonadIO,
+    GYTxQueryMonadIO,
     GYTxBuildResult(..),
+    runGYTxQueryMonadIO,
     runGYTxMonadIO,
     runGYTxMonadIOWithStrategy,
     runGYTxMonadIOC,
@@ -20,13 +22,14 @@ module GeniusYield.TxBuilder.IO (
     runGYTxMonadIOChainingF,
 ) where
 
-import qualified Cardano.Api                     as Api
 
 import           Control.Monad.Reader            (ReaderT(ReaderT), MonadReader, asks)
 import           Control.Monad.IO.Class          (MonadIO (..))
 import           Control.Monad.Trans.Maybe       (MaybeT (runMaybeT))
 import qualified Data.List.NonEmpty              as NE
 import qualified Data.Set                        as Set
+
+import qualified Cardano.Api as Api
 
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
@@ -47,7 +50,6 @@ newtype GYTxMonadIO a = GYTxMonadIO (GYTxIOEnv -> GYTxQueryMonadIO a)
            , Applicative
            , Monad
            , MonadReader GYTxIOEnv
-           , MonadIO
            , MonadRandom
            , MonadError GYTxMonadException
            , GYTxQueryMonad

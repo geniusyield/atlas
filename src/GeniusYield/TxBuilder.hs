@@ -23,7 +23,6 @@ import           GeniusYield.TxBuilder.Class     as X
 import           GeniusYield.TxBuilder.Common    as X
 import           GeniusYield.TxBuilder.Errors    as X
 import           GeniusYield.TxBuilder.IO        as X
-import           GeniusYield.TxBuilder.IO.Query  as X
 
 import           GeniusYield.Imports
 import           GeniusYield.Types

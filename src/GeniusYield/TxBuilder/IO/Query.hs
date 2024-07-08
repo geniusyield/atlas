@@ -5,10 +5,12 @@ License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
 
+**INTERNAL MODULE**
 -}
 module GeniusYield.TxBuilder.IO.Query (
     GYTxQueryMonadIO,
     runGYTxQueryMonadIO,
+    ioToQueryMonad
 ) where
 
 import           Control.Monad.Reader
@@ -31,106 +33,110 @@ newtype GYTxQueryMonadIO a = GYTxQueryMonadIO { runGYTxQueryMonadIO' :: GYTxQuer
            , Applicative
            , Monad
            , MonadReader GYTxQueryIOEnv
-           , MonadIO
            , MonadRandom
            )
   via ReaderT GYTxQueryIOEnv IO
 
 data GYTxQueryIOEnv = GYTxQueryIOEnv { envNid :: !GYNetworkId, envProviders :: !GYProviders}
 
+-- INTERNAL USAGE ONLY
+-- Do not expose a 'MonadIO' instance. It allows the user to do arbitrary IO within the tx monad.
+ioToQueryMonad :: IO a -> GYTxQueryMonadIO a
+ioToQueryMonad ioAct = GYTxQueryMonadIO $ const ioAct
+
 instance MonadError GYTxMonadException GYTxQueryMonadIO where
-    throwError = liftIO . throwIO
+    throwError = ioToQueryMonad . throwIO
 
     catchError action handler = do
-      env <- ask
-      liftIO $ catch
-        (runGYTxQueryMonadIO' action env)
-        (\err -> handler err `runGYTxQueryMonadIO'` env)
+        env <- ask
+        ioToQueryMonad $ catch
+            (runGYTxQueryMonadIO' action env)
+            (\err -> handler err `runGYTxQueryMonadIO'` env)
 
 instance GYTxQueryMonad GYTxQueryMonadIO where
     networkId = asks envNid
 
     lookupDatum h = do
-      logMsg mempty GYInfo $ printf "Querying Datum: %s" (show h)
-      providers <- asks envProviders
-      liftIO $ gyLookupDatum providers h
+        logMsg mempty GYInfo $ printf "Querying Datum: %s" (show h)
+        providers <- asks envProviders
+        ioToQueryMonad $ gyLookupDatum providers h
 
     utxosAtAddress addr mAssetClass = do
-      logMsg mempty GYInfo $ printf "Querying utxo At Address: %s" addr
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxosAtAddress providers addr mAssetClass
+        logMsg mempty GYInfo $ printf "Querying utxo At Address: %s" addr
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxosAtAddress providers addr mAssetClass
 
     utxosAtAddressWithDatums addr mAssetClass = do
-      logMsg mempty GYInfo $ printf "Querying utxos (with datums) at address: %s" addr
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxosAtAddressWithDatums providers addr mAssetClass
+        logMsg mempty GYInfo $ printf "Querying utxos (with datums) at address: %s" addr
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxosAtAddressWithDatums providers addr mAssetClass
 
     utxosAtPaymentCredential cred mAssetClass = do
-      logMsg mempty GYInfo $ printf "Querying UTxOs at payment credential: %s" cred
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxosAtPaymentCredential providers cred mAssetClass
+        logMsg mempty GYInfo $ printf "Querying UTxOs at payment credential: %s" cred
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxosAtPaymentCredential providers cred mAssetClass
 
     utxosAtAddresses addrs = do
-      logMsg mempty GYInfo $ printf "Querying utxos At Addresses: \n %s" (show addrs)
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxosAtAddresses providers addrs
+        logMsg mempty GYInfo $ printf "Querying utxos At Addresses: \n %s" (show addrs)
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxosAtAddresses providers addrs
 
     utxosAtAddressesWithDatums addrs = do
-      logMsg mempty GYInfo $ printf "Querying utxos (with datums) At Addresses: \n %s" (show addrs)
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxosAtAddressesWithDatums providers addrs
+        logMsg mempty GYInfo $ printf "Querying utxos (with datums) At Addresses: \n %s" (show addrs)
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxosAtAddressesWithDatums providers addrs
 
     utxosAtPaymentCredentialWithDatums cred mAssetClass = do
-      logMsg mempty GYInfo $ printf "Querying utxos (with datums) at credential: \n %s" (show cred)
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxosAtPaymentCredWithDatums providers cred mAssetClass
+        logMsg mempty GYInfo $ printf "Querying utxos (with datums) at credential: \n %s" (show cred)
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxosAtPaymentCredWithDatums providers cred mAssetClass
 
     utxosAtPaymentCredentials pcs = do
-      logMsg mempty GYInfo $ printf "Querying utxos at payment credentials: \n %s" (show pcs)
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxosAtPaymentCredentials providers pcs
+        logMsg mempty GYInfo $ printf "Querying utxos at payment credentials: \n %s" (show pcs)
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxosAtPaymentCredentials providers pcs
 
     utxosAtPaymentCredentialsWithDatums pcs = do
-      logMsg mempty GYInfo $ printf "Querying utxos (with datums) at payment credentials: \n %s" (show pcs)
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxosAtPaymentCredsWithDatums providers pcs
+        logMsg mempty GYInfo $ printf "Querying utxos (with datums) at payment credentials: \n %s" (show pcs)
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxosAtPaymentCredsWithDatums providers pcs
 
     utxoRefsAtAddress addr = do
-      logMsg mempty GYInfo $ printf "Querying UtxoRefs At Address: %s"  addr
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxoRefsAtAddress providers addr
+        logMsg mempty GYInfo $ printf "Querying UtxoRefs At Address: %s"  addr
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxoRefsAtAddress providers addr
 
     utxoAtTxOutRef oref = do
-      logMsg mempty GYInfo $ printf "Querying Utxos At TxOutRef: %s" oref
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxoAtTxOutRef providers oref
+        logMsg mempty GYInfo $ printf "Querying Utxos At TxOutRef: %s" oref
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxoAtTxOutRef providers oref
 
     utxosAtTxOutRefs oref = do
-      logMsg mempty GYInfo $ printf "Querying Utxos At TxOutRefs: %s" (show oref)
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxosAtTxOutRefs providers oref
+        logMsg mempty GYInfo $ printf "Querying Utxos At TxOutRefs: %s" (show oref)
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxosAtTxOutRefs providers oref
 
     utxosAtTxOutRefsWithDatums orefs = do
-      logMsg mempty GYInfo $ printf "Querying utxos (with datums) At TxOutRefs: \n %s" (show orefs)
-      providers <- asks envProviders
-      liftIO $ gyQueryUtxosAtTxOutRefsWithDatums providers orefs
+        logMsg mempty GYInfo $ printf "Querying utxos (with datums) At TxOutRefs: \n %s" (show orefs)
+        providers <- asks envProviders
+        ioToQueryMonad $ gyQueryUtxosAtTxOutRefsWithDatums providers orefs
 
     stakeAddressInfo saddr = do
-      logMsg mempty GYInfo $ printf "Querying Stake Address Info: %s" saddr
-      providers <- asks envProviders
-      liftIO $ gyGetStakeAddressInfo providers saddr
+        logMsg mempty GYInfo $ printf "Querying Stake Address Info: %s" saddr
+        providers <- asks envProviders
+        ioToQueryMonad $ gyGetStakeAddressInfo providers saddr
 
     slotConfig = do
-      providers <- asks envProviders
-      liftIO $ gyGetSlotConfig providers
+        providers <- asks envProviders
+        ioToQueryMonad $ gyGetSlotConfig providers
 
     slotOfCurrentBlock = do
-      providers <- asks envProviders
-      liftIO $ gyGetSlotOfCurrentBlock providers
+        providers <- asks envProviders
+        ioToQueryMonad $ gyGetSlotOfCurrentBlock providers
 
     logMsg ns s msg = do
-      providers <- asks envProviders
-      liftIO $ withFrozenCallStack $ gyLog providers ns s msg
+        providers <- asks envProviders
+        ioToQueryMonad $ withFrozenCallStack $ gyLog providers ns s msg
 
 runGYTxQueryMonadIO
     :: GYNetworkId

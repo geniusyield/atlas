@@ -21,6 +21,7 @@ import           Control.Monad.Random                          (MonadRandom)
 import           Control.Monad.Trans.Except                    (ExceptT (ExceptT),
                                                                 except)
 import qualified Data.ByteString                               as BS
+import           Data.Default                                  (Default (def))
 import qualified Data.Map                                      as Map
 import qualified Data.Set                                      as S
 import qualified Data.Text                                     as Text
@@ -101,6 +102,9 @@ data GYCoinSelectionStrategy
     | GYRandomImproveMultiAsset
     | GYLegacy
     deriving stock (Eq, Show, Enum, Bounded)
+
+instance Default GYCoinSelectionStrategy where
+    def = GYRandomImproveMultiAsset
 
 {- | Select additional inputs from the set of own utxos given, such that when combined with given existing inputs,
 they cover for all the given outputs, as well as extraLovelace.

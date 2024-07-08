@@ -236,12 +236,12 @@ withPrivnet testnetOpts setupUser = do
 
             userBalances <- V.mapM
                 (\(i, User{userAddr=userIaddr}) -> do
-                    userIbalance <- ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
+                    userIbalance <- ctxRunQuery ctx0 $ queryBalance userIaddr
                     when (isEmptyValue userIbalance) $ do
                         debug $ printf "User %s balance is empty, giving some ada\n" (show i)
                         giveAda ctx0 userIaddr
                         when (i == 0) (giveAda ctx0 . userAddr $ ctxUserF ctx0) -- we also give ada to itself to create some small utxos
-                    ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
+                    ctxRunQuery ctx0 $ queryBalance userIaddr
                 ) $ V.zip
                     (V.fromList extraIndices)
                     extraUsers
@@ -305,17 +305,17 @@ generateUser network = do
 -------------------------------------------------------------------------------
 
 giveAda :: Ctx -> GYAddress -> IO ()
-giveAda ctx addr = do
-    txBody <- ctxRunI ctx (ctxUserF ctx) $ return $ mconcat $ replicate 5 $
+giveAda ctx addr = ctxRun ctx (ctxUserF ctx) $ do
+    txBody <- buildTxBody $ mconcat $ replicate 5 $
         mustHaveOutput $ mkGYTxOutNoDatum addr (valueFromLovelace 1_000_000_000)
-    void $ submitTx ctx (ctxUserF ctx) txBody
+    submitPrivnetTx_ (ctxUserF ctx) txBody
 
 giveTokens :: Ctx -> GYAddress -> IO ()
-giveTokens ctx addr = do
-    txBody <- ctxRunI ctx (ctxUserF ctx) $ return $
+giveTokens ctx addr = ctxRun ctx (ctxUserF ctx) $ do
+    txBody <- buildTxBody $
         mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxGold ctx) 1_000_000)) <>
         mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxIron ctx) 1_000_000))
-    void $ submitTx ctx (ctxUserF ctx) txBody
+    submitPrivnetTx_ (ctxUserF ctx) txBody
 
 -------------------------------------------------------------------------------
 -- minting tokens
@@ -323,11 +323,10 @@ giveTokens ctx addr = do
 
 mintTestTokens :: Ctx -> String -> IO GYAssetClass
 mintTestTokens ctx tn' = do
-    (ac, txBody) <- ctxRunF ctx (ctxUserF ctx) $
-        GY.TestTokens.mintTestTokens tn 10_000_000
-    void $ submitTx ctx (ctxUserF ctx) txBody
-
-    pure ac
+    ctxRun ctx (ctxUserF ctx) $ do
+        (ac, txBody) <- GY.TestTokens.mintTestTokens tn 10_000_000 >>= traverse buildTxBody
+        submitPrivnetTx_ (ctxUserF ctx) txBody
+        pure ac
   where
     tn :: GYTokenName
     tn = fromString tn'

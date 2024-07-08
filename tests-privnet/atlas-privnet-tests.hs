@@ -21,6 +21,7 @@ import qualified GeniusYield.Test.Privnet.Examples
 import           GeniusYield.Test.Privnet.Setup
 import qualified GeniusYield.Test.Privnet.Stake
 import qualified GeniusYield.Test.Privnet.SimpleScripts
+import           GeniusYield.TxBuilder
 
 main :: IO ()
 main = do
@@ -45,18 +46,16 @@ main = do
               info $ show sc
 
           , testCaseSteps "GetParameters" $ \info -> withSetup setup info $ \ctx -> do
-              let providers = ctxProviders ctx
+              ss <- ctxRunQuery ctx systemStart
+              info $ printf "System start: %s" (show ss)
 
-              systemStart <- gyGetSystemStart providers
-              info $ printf "System start: %s" (show systemStart)
+              sp <- ctxRunQuery ctx stakePools
+              info $ printf "Stake pools: %s" (show sp)
 
-              stakePools <- gyGetStakePools providers
-              info $ printf "Stake pools: %s" (show stakePools)
+              eh <- ctxRunQuery ctx eraHistory
+              info $ showEraSummaries eh
 
-              eraHistory <- gyGetEraHistory providers
-              info $ showEraSummaries eraHistory
-
-              pp <- gyGetProtocolParameters providers
+              pp <- ctxRunQuery ctx protocolParams
               info $ printf "Protocol parameters: %s" (show pp)
 
           , GeniusYield.Test.Privnet.Examples.tests setup

@@ -19,50 +19,51 @@ import           GeniusYield.Examples.Treat
 import           GeniusYield.Test.Privnet.Asserts
 import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Setup
-import           GeniusYield.TxBuilder.Class
+import           GeniusYield.TxBuilder
 
 tests :: Setup -> TestTree
 tests setup = testGroup "treat"
     [ testCaseSteps "plutusV1" $ \info -> withSetup setup info $ \ctx -> do
         let goldAC = ctxGold ctx
 
-        txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
+        ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress treatValidatorV1
-            return $ mconcat
+            txBodyPlace <- buildTxBody $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-        void $ submitTx ctx (ctxUserF ctx) txBodyPlace
+            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace
 
         threadDelay 1_000_000
 
         -- this fails as we tell that script is 'PlutusV1,
         -- but it uses V2 features.
-        assertThrown isTxBodyErrorAutoBalance $ ctxRunF ctx (ctxUser2 ctx) $ grabTreats  @'PlutusV1 treatValidatorV1
+        assertThrown isTxBodyErrorAutoBalance $ ctxRun ctx (ctxUser2 ctx) $ grabTreats  @'PlutusV1 treatValidatorV1 >>= traverse buildTxBody
 
     -- this is the same tests as for Gift 'PlutusV2.
     , testCaseSteps "plutusV2" $ \info -> withSetup setup info $ \ctx -> do
         let ironAC = ctxIron ctx
 
         -- grab existing treats to cleanup
-        grabTreatsTx <- ctxRunF ctx (ctxUserF ctx) $ grabTreats  @'PlutusV2 treatValidatorV2
-        mapM_ (submitTx ctx (ctxUserF ctx)) grabTreatsTx
+        ctxRun ctx (ctxUserF ctx) $ do
+            grabTreatsTx <- grabTreats  @'PlutusV2 treatValidatorV2 >>= traverse buildTxBody
+            mapM_ (submitPrivnetTx (ctxUserF ctx)) grabTreatsTx
 
         threadDelay 1_000_000
 
         balance1 <- ctxQueryBalance ctx (ctxUserF ctx)
         balance2 <- ctxQueryBalance ctx (ctxUser2 ctx)
 
-        txBodyPlace <- ctxRunI ctx (ctxUserF ctx) $ do
+        ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress treatValidatorV2
-            return $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-
-        void $ submitTx ctx (ctxUserF ctx) txBodyPlace
+            txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
+            submitPrivnetTx_ (ctxUserF ctx) txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-        grabTreatsTx' <- ctxRunF ctx (ctxUser2 ctx) $ grabTreats  @'PlutusV2 treatValidatorV2
-        mapM_ (submitTx ctx (ctxUser2 ctx)) grabTreatsTx'
+        ctxRun ctx (ctxUser2 ctx) $ do
+            grabTreatsTx' <- grabTreats  @'PlutusV2 treatValidatorV2 >>= traverse buildTxBody
+            mapM_ (submitPrivnetTx (ctxUser2 ctx)) grabTreatsTx'
 
         -- wait a tiny bit.
         threadDelay 1_000_000

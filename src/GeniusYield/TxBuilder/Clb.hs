@@ -174,8 +174,13 @@ mustFail act = do
 
 getNetworkId :: GYTxMonadClb GYNetworkId
 getNetworkId = do
-    res <- liftClb $ gets (networkIdFromApi . mockConfigNetworkId . mockConfig)
-    maybe (fail "Unsupported network") pure res
+    magic <- liftClb $ gets (mockConfigNetworkId . mockConfig)
+    -- TODO: Add epoch slots and network era to clb and retrieve from there.
+    pure . GYPrivnet $ GYNetworkInfo
+        { gyNetworkMagic = Api.S.unNetworkMagic $ Api.S.toNetworkMagic magic
+        , gyNetworkEpochSlots = 500
+        , gyNetworkEra = GYBabbage
+        }
 
 instance MonadFail GYTxMonadClb where
     fail = GYTxMonadClb . throwError . Left

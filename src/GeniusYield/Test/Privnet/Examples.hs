@@ -16,7 +16,7 @@ import qualified GeniusYield.Test.Privnet.Examples.Treat
 import qualified GeniusYield.Test.Privnet.Examples.Misc
 import           GeniusYield.Test.Privnet.Setup
 
-tests :: IO Setup -> TestTree
+tests :: Setup -> TestTree
 tests setup = testGroup "examples"
     [ GeniusYield.Test.Privnet.Examples.Gift.tests setup
     , GeniusYield.Test.Privnet.Examples.Treat.tests setup

@@ -10,8 +10,7 @@ module Main (main) where
 
 import           GeniusYield.Imports
 
-import           Test.Tasty                        (defaultMain, testGroup,
-                                                    withResource)
+import           Test.Tasty                        (defaultMain, testGroup)
 import           Test.Tasty.HUnit                  (testCaseSteps)
 
 import           GeniusYield.CardanoApi.EraHistory
@@ -25,9 +24,8 @@ import qualified GeniusYield.Test.Privnet.SimpleScripts
 
 main :: IO ()
 main = do
-    defaultMain $
-      withResource makeSetup (const mempty) $ \setup ->
-      testGroup "atlas-privnet-tests"
+    withPrivnet cardanoDefaultTestnetOptions $ \setup ->
+        defaultMain $ testGroup "atlas-privnet-tests"
           [ testCaseSteps "Balances" $ \info -> withSetup setup info $ \ctx -> do
               forM_ (zip [(1 :: Integer) ..] (ctxUserF ctx : ctxUsers ctx))
                 (\(i, ctxUser) -> do

@@ -40,7 +40,7 @@ import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common     (collateralValue,
                                                    maximumRequiredCollateralValue)
 
-tests :: IO Setup -> TestTree
+tests :: Setup -> TestTree
 tests setup = testGroup "gift"
     [ testCaseSteps "plutusV1" $ \info -> withSetup setup info $ \ctx -> do
         giftCleanup ctx

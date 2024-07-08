@@ -13,9 +13,6 @@ module GeniusYield.Providers.Node
     , nodeGetParameters
     -- * Low-level
     , nodeGetSlotOfCurrentBlock
-    , nodeUtxosAtAddress
-    , nodeUtxoAtTxOutRef
-    , nodeUtxosAtTxOutRefs
     , nodeStakeAddressInfo
     -- * Auxiliary
     , networkIdToLocalNodeConnectInfo
@@ -63,23 +60,6 @@ nodeSlotActions info = GYSlotActions
     }
   where
     getSlotOfCurrentBlock = nodeGetSlotOfCurrentBlock info
-
--------------------------------------------------------------------------------
--- UTxO query
--------------------------------------------------------------------------------
-
-nodeUtxosAtAddress :: GYEra -> Api.LocalNodeConnectInfo -> GYAddress -> IO GYUTxOs
-nodeUtxosAtAddress era info addr = queryUTxO era info $ Api.QueryUTxOByAddress $ Set.singleton $ addressToApi addr
-
-nodeUtxoAtTxOutRef :: GYEra -> Api.LocalNodeConnectInfo -> GYTxOutRef -> IO (Maybe GYUTxO)
-nodeUtxoAtTxOutRef era info ins = do
-    utxos <- queryUTxO era info $ Api.QueryUTxOByTxIn $ Set.singleton $ txOutRefToApi ins
-    case utxosToList utxos of
-        [x] | utxoRef x == ins -> return (Just x)
-        _                      -> return Nothing -- we return Nothing also in "should never happen" cases.
-
-nodeUtxosAtTxOutRefs :: GYEra -> Api.LocalNodeConnectInfo -> [GYTxOutRef] -> IO GYUTxOs
-nodeUtxosAtTxOutRefs era info ins = queryUTxO era info $ Api.QueryUTxOByTxIn $ Set.fromList $ txOutRefToApi <$> ins
 
 -------------------------------------------------------------------------------
 -- Parameters

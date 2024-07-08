@@ -11,12 +11,14 @@ repository cardano-haskell-packages
 
 packages: .
 
+tests: true
+
 -- repeating the index-state for hackage to work around hackage.nix parsing limitation
-index-state: 2024-03-19T15:29:53Z
+index-state: 2024-06-15T17:35:54Z
 
 index-state:
-  , hackage.haskell.org 2024-03-19T15:29:53Z
-  , cardano-haskell-packages 2024-03-15T17:07:52Z
+  , hackage.haskell.org 2024-06-15T17:35:54Z
+  , cardano-haskell-packages 2024-06-13T23:12:13Z
 
 -- TODO: Default value should be @direct@ in upcoming 3.10 version of cabal, omit this line then.
 test-show-details: direct
@@ -40,8 +42,17 @@ source-repository-package
   tag: 18e781b5b53adc1aa1d8c057c1b606b536a80350
   --sha256: sha256-PDmrXYTBHPcY0x+JnF21uupLMBwURLSiNMqNmwwapkc=
 
-constraints:
-  , cardano-api ^>= 8.38.0.0
+-- Obtaining cardano-node stuff for 8.9.*. These aren't published on CHaP yet.
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/cardano-node
+  tag: 8.9.2
+  --sha256: sha256-PxMlVzTLMuVeu04QcGOxjaSMnpWJG78J0Rul3423too=
+  subdir:
+    cardano-node
+    cardano-testnet
+    cardano-git-rev
+    trace-dispatcher
 
 -- Everything below is essentially copied from cardano-wallet's cabal.project.
 

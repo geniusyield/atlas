@@ -24,7 +24,7 @@ import           GeniusYield.Test.Privnet.Examples.Gift (resolveRefScript)
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder.Class
 
-tests :: IO Setup -> TestTree
+tests :: Setup -> TestTree
 tests setup = testGroup "misc"
     [ testCaseSteps "Reference script for minting policy" $ \info -> withSetup setup info $ \ctx -> do
 

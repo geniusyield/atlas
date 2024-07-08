@@ -42,9 +42,9 @@ data GYTxBuildResult f
     -- | All given 'GYTxSkeleton's were successfully built.
     = GYTxBuildSuccess !(NonEmpty (f GYTxBody))
     -- | Some of the given 'GYTxSkeleton's were successfully built, but the rest failed due to _insufficient funds_.
-    | GYTxBuildPartialSuccess !BalancingError !(NonEmpty (f GYTxBody))
+    | GYTxBuildPartialSuccess !GYBalancingError !(NonEmpty (f GYTxBody))
     -- | None of the given 'GYTxSkeleton's could be built due to _insufficient funds_.
-    | GYTxBuildFailure !BalancingError
+    | GYTxBuildFailure !GYBalancingError
     -- | Input did not contain any 'GYTxSkeleton's.
     | GYTxBuildNoInputs
 
@@ -72,7 +72,7 @@ buildTxCore
     -> GYAddress
     -> Maybe GYUTxO  -- ^ Is `Nothing` if there was no 5 ada collateral returned by browser wallet.
     -> m [f (GYTxSkeleton v)]
-    -> m (Either BuildTxException (GYTxBuildResult f))
+    -> m (Either GYBuildTxError (GYTxBuildResult f))
 buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral action = do
     fbodies <- action
     ownUtxos <- utxosAtAddresses addrs
@@ -87,7 +87,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
             , gyBTxEnvCollateral     = collateralUtxo
             }
 
-        helper :: GYUTxOs -> GYTxSkeleton v -> m (Either BuildTxException GYTxBody)
+        helper :: GYUTxOs -> GYTxSkeleton v -> m (Either GYBuildTxError GYTxBody)
         helper ownUtxos' GYTxSkeleton {..} = do
             let gytxMint' :: Maybe (GYValue, [(GYMintScript v, GYRedeemer)])
                 gytxMint'
@@ -146,7 +146,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                       (utxosToList ownUtxos')
 
             case mCollateralUtxo of
-              Nothing -> return (Left BuildTxNoSuitableCollateral)
+              Nothing -> return (Left GYBuildTxNoSuitableCollateral)
               Just collateralUtxo ->
                 -- Build the transaction.
                 buildUnsignedTxBody
@@ -163,14 +163,14 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                     gytxSigs
                     gytxMetadata
 
-        go :: GYUTxOs -> GYTxBuildResult f -> [f (GYTxSkeleton v)] -> m (Either BuildTxException  (GYTxBuildResult f))
+        go :: GYUTxOs -> GYTxBuildResult f -> [f (GYTxSkeleton v)] -> m (Either GYBuildTxError  (GYTxBuildResult f))
         go _         acc []             = pure $ Right $ reverseResult acc
         go ownUtxos' acc (fbody : rest) = do
             res <- sequence <$> traverse (helper ownUtxos') fbody
             case res of
                 {- Not enough funds for this transaction
                 We assume it's not worth continuing with the next transactions (which is often the case) -}
-                Left (BuildTxBalancingError be) -> pure $ Right $ reverseResult $ updateBuildRes (Left be) acc
+                Left (GYBuildTxBalancingError be) -> pure $ Right $ reverseResult $ updateBuildRes (Left be) acc
                 -- Any other exception is fatal. TODO: To think more on whether collateral error can be handled here.
                 Left err                      -> pure $ Left err
                 Right fres                    -> do

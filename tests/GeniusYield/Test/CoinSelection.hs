@@ -371,7 +371,7 @@ rideTheWave =
 Returns a pair where the first element is a list of additional inputs chosen, and the second element
 is a list of change outputs generated.
 -}
-runCoinSelectionTest :: GYCoinSelectionStrategy -> CoinSelectionTestParams -> Either BalancingError ([GYValue], [GYValue])
+runCoinSelectionTest :: GYCoinSelectionStrategy -> CoinSelectionTestParams -> Either GYBalancingError ([GYValue], [GYValue])
 runCoinSelectionTest cstrat cstParams = do
     (additionalInps, changeOuts) <- (`evalRand` pureStdGen)
         . runExceptT $ selectInputs (coinSelectionTestParamsToEnv cstParams) cstrat
@@ -473,7 +473,7 @@ testCaseQuickCheckBody strat prop = forAllShrinkShow genParamsLovelace shrinkPar
         pre $ outputsHaveLovelace cstEnv
         seed <- run $ generate arbitrary
         case (`evalRand` mkStdGen seed) . runExceptT $ selectInputs cstEnv strat of
-            Left (BalancingErrorChangeShortFall _) -> discard
+            Left (GYBalancingErrorChangeShortFall _) -> discard
             Left err -> fail $ show err
             Right (addInputs, changeOuts) -> monitor (counterexample (getReason addInputs changeOuts)) >>
                                             M.assert (prop cstEnv addInputs changeOuts)

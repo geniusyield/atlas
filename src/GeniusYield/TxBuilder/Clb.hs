@@ -69,8 +69,8 @@ import qualified PlutusLedgerApi.V2                        as Plutus
 
 import           GeniusYield.Imports
 import           GeniusYield.Transaction                   (GYCoinSelectionStrategy (GYRandomImproveMultiAsset),
-                                                            BuildTxException (BuildTxBalancingError),
-                                                            BalancingError(BalancingErrorInsufficientFunds))
+                                                            GYBuildTxError (GYBuildTxBalancingError),
+                                                            GYBalancingError(GYBalancingErrorInsufficientFunds))
 import           GeniusYield.Transaction.Common            (adjustTxOut,
                                                             minimumUTxO)
 import           GeniusYield.Test.Address
@@ -394,13 +394,13 @@ skeletonToTxBody skeleton = do
     pp <- protocolParameters
     ps <- stakePools
 
-    addr        <- ownAddress
+    addr <- ownAddress
     e <- buildTxCore ss eh pp ps GYRandomImproveMultiAsset (const id) [addr] addr Nothing (return [Identity skeleton])
     case e of
-        Left err  -> throwAppError err
+        Left err  -> throwError $ GYBuildTxException err
         Right res -> case res of
             GYTxBuildSuccess (Identity body :| _) -> return body
-            GYTxBuildFailure (BalancingErrorInsufficientFunds v) -> throwAppError . BuildTxBalancingError $ BalancingErrorInsufficientFunds v
+            GYTxBuildFailure (GYBalancingErrorInsufficientFunds v) -> throwError . GYBuildTxException . GYBuildTxBalancingError $ GYBalancingErrorInsufficientFunds v
             GYTxBuildFailure _                    -> error "impossible case"
             GYTxBuildPartialSuccess _ _           -> error "impossible case"
             GYTxBuildNoInputs                     -> error "impossible case"

@@ -49,12 +49,12 @@ module GeniusYield.Transaction (
     -- * Top level build interface
     GYBuildTxEnv (..),
     buildUnsignedTxBody,
-    BuildTxException (..),
+    GYBuildTxError (..),
     GYCoinSelectionStrategy (..),
     -- * Balancing only
     balanceTxStep,
     finalizeGYBalancedTx,
-    BalancingError (..),
+    GYBalancingError (..),
     -- * Utility type
     GYTxInDetailed (..),
 ) where
@@ -90,7 +90,6 @@ import           Data.Maybe                            (fromJust)
 import           Data.Ratio                            ((%))
 import           Data.Semigroup                        (Sum (..))
 import qualified Data.Set                              as Set
-import           GeniusYield.HTTP.Errors               (IsGYApiError)
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Transaction.CoinSelection
@@ -112,29 +111,6 @@ data GYBuildTxEnv = GYBuildTxEnv
 
 utxoFromTxInDetailed :: GYTxInDetailed v -> GYUTxO
 utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref _witns) addr val d ms) = GYUTxO ref addr val d ms
-
-data BuildTxException
-    = BuildTxBalancingError !BalancingError
-    | BuildTxBodyErrorAutoBalance !(Api.TxBodyErrorAutoBalance Api.S.BabbageEra)
-    | BuildTxPPConversionError !Api.ProtocolParametersConversionError
-    | BuildTxMissingMaxExUnitsParam
-    -- ^ Missing max ex units in protocol params
-    | BuildTxExUnitsTooBig  -- ^ Execution units required is higher than the maximum as specified by protocol params.
-        (Natural, Natural)  -- ^ Tuple of maximum execution steps & memory as given by protocol parameters.
-        (Natural, Natural)  -- ^ Tuple of execution steps & memory as taken by built transaction.
-
-    | BuildTxSizeTooBig  -- ^ Transaction size is higher than the maximum as specified by protocol params.
-        !Natural  -- ^ Maximum size as specified by protocol parameters.
-        !Natural  -- ^ Size our built transaction took.
-    | BuildTxCollateralShortFall  -- ^ Shortfall (in collateral inputs) for collateral requirement.
-        !Natural  -- ^ Transaction collateral requirement.
-        !Natural  -- ^ Lovelaces in given collateral UTxO.
-    | BuildTxNoSuitableCollateral
-    -- ^ Couldn't find a UTxO to use as collateral.
-    | BuildTxCborSimplificationError !CborSimplificationError
-    | BuildTxCollapseExtraOutError !Api.TxBodyError
-  deriving stock    Show
-  deriving anyclass (Exception, IsGYApiError)
 
 -------------------------------------------------------------------------------
 -- Top level wrappers around core balancing logic
@@ -171,13 +147,13 @@ buildUnsignedTxBody :: forall m v.
         -> Maybe GYSlot
         -> Set GYPubKeyHash
         -> Maybe GYTxMetadata
-        -> m (Either BuildTxException GYTxBody)
+        -> m (Either GYBuildTxError GYTxBody)
 buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata = buildTxLoop cstrat extraLovelaceStart
   where
-    step :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
-    step stepStrat = fmap (first BuildTxBalancingError) . balanceTxStep env mmint wdrls certs insOld outsOld stepStrat
+    step :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
+    step stepStrat = fmap (first GYBuildTxBalancingError) . balanceTxStep env mmint wdrls certs insOld outsOld stepStrat
 
-    buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException GYTxBody)
+    buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError GYTxBody)
     buildTxLoop stepStrat n
         -- Stop trying with RandomImprove if extra lovelace has hit the pre-determined ceiling.
         | stepStrat /= GYLargestFirstMultiAsset && n >= randImproveExtraLovelaceCeil = buildTxLoop GYLargestFirstMultiAsset n
@@ -186,24 +162,24 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub sig
             case res of
                 {- These errors generally indicate the input selection process selected less ada
                 than necessary. Try again with double the extra lovelace amount -}
-                Left (BuildTxBodyErrorAutoBalance Api.TxBodyErrorAdaBalanceNegative{}) -> buildTxLoop stepStrat (n * 2)
-                Left (BuildTxBodyErrorAutoBalance Api.TxBodyErrorAdaBalanceTooSmall{}) -> buildTxLoop stepStrat (n * 2)
+                Left (GYBuildTxBodyErrorAutoBalance Api.TxBodyErrorAdaBalanceNegative{}) -> buildTxLoop stepStrat (n * 2)
+                Left (GYBuildTxBodyErrorAutoBalance Api.TxBodyErrorAdaBalanceTooSmall{}) -> buildTxLoop stepStrat (n * 2)
                 -- @RandomImprove@ may result into many change outputs, where their minimum ada requirements might be unsatisfiable with available ada.
-                Left (BuildTxBalancingError err@(BalancingErrorChangeShortFall _))         -> retryIfRandomImprove
+                Left (GYBuildTxBalancingError err@(GYBalancingErrorChangeShortFall _))         -> retryIfRandomImprove
                                                                                             stepStrat
                                                                                             n
-                                                                                            (BuildTxBalancingError err)
+                                                                                            (GYBuildTxBalancingError err)
                 {- RandomImprove may end up selecting too many inputs to fit in the transaction.
                 In this case, try with LargestFirst and dial back the extraLovelace param.
                 -}
-                Left (BuildTxExUnitsTooBig maxUnits currentUnits)                      -> retryIfRandomImprove
+                Left (GYBuildTxExUnitsTooBig maxUnits currentUnits)                      -> retryIfRandomImprove
                                                                                             stepStrat
                                                                                             n
-                                                                                            (BuildTxExUnitsTooBig maxUnits currentUnits)
-                Left (BuildTxSizeTooBig maxPossibleSize currentSize)                   -> retryIfRandomImprove
+                                                                                            (GYBuildTxExUnitsTooBig maxUnits currentUnits)
+                Left (GYBuildTxSizeTooBig maxPossibleSize currentSize)                   -> retryIfRandomImprove
                                                                                             stepStrat
                                                                                             n
-                                                                                            (BuildTxSizeTooBig maxPossibleSize currentSize)
+                                                                                            (GYBuildTxSizeTooBig maxPossibleSize currentSize)
                 Right x                                                                -> pure $ Right x
                 {- The most common error here would be:
                 - InsufficientFunds
@@ -214,7 +190,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub sig
                 -}
                 other                                                                  -> pure other
 
-    f :: GYCoinSelectionStrategy -> Natural -> m (Either BuildTxException GYTxBody)
+    f :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError GYTxBody)
     f stepStrat pessimisticFee = do
         stepRes <- step stepStrat pessimisticFee
         pure $ stepRes >>= \(ins, collaterals, outs) ->
@@ -258,7 +234,7 @@ balanceTxStep :: (HasCallStack, MonadRandom m)
     -> [GYTxOut v]                                      -- ^ transaction outputs
     -> GYCoinSelectionStrategy                          -- ^ Coin selection strategy to use
     -> Natural                                          -- ^ extra lovelace to look for on top of output value
-    -> m (Either BalancingError ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
+    -> m (Either GYBalancingError ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
 balanceTxStep
     GYBuildTxEnv
         { gyBTxEnvProtocolParams = pp
@@ -294,7 +270,7 @@ balanceTxStep
       in \extraLovelace -> runExceptT $ do
             for_ adjustedOuts $ \txOut ->
                 unless (valueNonNegative $ gyTxOutValue txOut)
-                    . throwE $ BalancingErrorNonPositiveTxOut txOut
+                    . throwE $ GYBalancingErrorNonPositiveTxOut txOut
             (addIns, changeOuts) <- selectInputs
                 GYCoinSelectionEnv
                     { existingInputs  = ins
@@ -328,7 +304,7 @@ balanceTxStep
 retColSup :: Api.BabbageEraOnwards Api.BabbageEra
 retColSup = Api.BabbageEraOnwardsBabbage
 
-finalizeGYBalancedTx :: GYBuildTxEnv -> GYBalancedTx v -> Int -> Either BuildTxException GYTxBody
+finalizeGYBalancedTx :: GYBuildTxEnv -> GYBalancedTx v -> Int -> Either GYBuildTxError GYTxBody
 finalizeGYBalancedTx
     GYBuildTxEnv
         { gyBTxEnvSystemStart    = ss
@@ -533,23 +509,23 @@ makeTransactionBodyAutoBalanceWrapper :: GYUTxOs
                                       -> Map.Map Api.StakeCredential Api.Lovelace
                                       -> Word
                                       -> Int
-                                      -> Either BuildTxException GYTxBody
+                                      -> Either GYBuildTxError GYTxBody
 makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body changeAddr stakeDelegDeposits nkeys numSkeletonOuts = do
     let poolids = Set.empty -- TODO: This denotes the set of registered stake pools, that are being unregistered in this transaction.
 
     Api.ExecutionUnits
         { executionSteps  = maxSteps
         , executionMemory = maxMemory
-        } <- maybeToRight BuildTxMissingMaxExUnitsParam $ Api.S.protocolParamMaxTxExUnits apiPP
+        } <- maybeToRight GYBuildTxMissingMaxExUnitsParam $ Api.S.protocolParamMaxTxExUnits apiPP
     let maxTxSize = Api.S.protocolParamMaxTxSize apiPP
         changeAddrApi :: Api.S.AddressInEra Api.S.BabbageEra = addressToApi' changeAddr
         drepDelegDeposits = mempty -- TODO:
 
-    ledgerPP <- first BuildTxPPConversionError $ Api.S.convertToLedgerProtocolParameters Api.ShelleyBasedEraBabbage apiPP
+    ledgerPP <- first GYBuildTxPPConversionError $ Api.S.convertToLedgerProtocolParameters Api.ShelleyBasedEraBabbage apiPP
 
     -- First we obtain the calculated fees to correct for our collaterals.
     bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ _ (Api.Lovelace feeOld)) <-
-      first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
+      first GYBuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
         Api.ShelleyBasedEraBabbage
         ss
         (Api.toLedgerEpochInfo eh)
@@ -580,12 +556,12 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body cha
             , Api.TxReturnCollateral retColSup $ txOutToApi $ GYTxOut changeAddr (collateralTotalValue `valueMinus` valueFromLovelace balanceNeeded) Nothing Nothing
 
             )
-          else Left $ BuildTxCollateralShortFall (fromInteger balanceNeeded) (fromInteger collateralTotalLovelace)
+          else Left $ GYBuildTxCollateralShortFall (fromInteger balanceNeeded) (fromInteger collateralTotalLovelace)
 
           -- In this case `makeTransactionBodyAutoBalance` doesn't return
           -- an error but instead returns `(Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)`
 
-        first BuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
+        first GYBuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
           Api.ShelleyBasedEraBabbage
           ss
           (Api.toLedgerEpochInfo eh)
@@ -629,14 +605,14 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body cha
           in fromInteger $ view sizeTxF $ Shelley.addKeyWitnesses ltx (Set.fromList [WitVKey (dummyVKey x) dummySig | x <- [1 .. nkeys]])
     -- See: Cardano.Ledger.Alonzo.Rules.validateExUnitsTooBigUTxO
     unless (steps <= maxSteps && mem <= maxMemory) $
-        Left $ BuildTxExUnitsTooBig (maxSteps, maxMemory) (steps, mem)
+        Left $ GYBuildTxExUnitsTooBig (maxSteps, maxMemory) (steps, mem)
     -- See: Cardano.Ledger.Shelley.Rules.validateMaxTxSizeUTxO
     unless (txSize <= maxTxSize) $
-        Left (BuildTxSizeTooBig maxTxSize txSize)
+        Left (GYBuildTxSizeTooBig maxTxSize txSize)
 
-    collapsedBody <- first BuildTxCollapseExtraOutError $ collapseExtraOut extraOut txBodyContent txBody numSkeletonOuts
+    collapsedBody <- first GYBuildTxCollapseExtraOutError $ collapseExtraOut extraOut txBodyContent txBody numSkeletonOuts
 
-    first BuildTxCborSimplificationError $ simplifyGYTxBodyCbor $ txBodyFromApi collapsedBody
+    first GYBuildTxCborSimplificationError $ simplifyGYTxBodyCbor $ txBodyFromApi collapsedBody
 
 
 {- | Collapses the extra out generated in the last step of tx building into

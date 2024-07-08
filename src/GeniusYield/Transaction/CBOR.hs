@@ -27,8 +27,10 @@ import qualified Data.ByteString.Lazy   as LBS
 import qualified Data.Text              as T
 import qualified Data.Text.Encoding     as TE
 import qualified Data.Text.Lazy         as LT (toStrict)
+
 import           GeniusYield.Imports
-import           GeniusYield.Types
+import           GeniusYield.Types.Tx
+import           GeniusYield.Types.TxBody (GYTxBody, unsignedTx, getTxBody)
 
 -- TODO: Make a log before performing this simplification?
 

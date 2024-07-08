@@ -7,7 +7,8 @@ Stability   : develop
 
 -}
 
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase      #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module GeniusYield.Test.Privnet.Examples.Gift (tests, resolveRefScript, resolveRefScript') where
 
@@ -39,6 +40,10 @@ import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common     (collateralValue,
                                                    maximumRequiredCollateralValue)
+import           GeniusYield.TxBuilder.Errors     (GYTxMonadException (GYBuildTxException))
+
+pattern InsufficientFundsException :: GYTxMonadException
+pattern InsufficientFundsException <- GYBuildTxException (GYBuildTxBalancingError (GYBalancingErrorInsufficientFunds _))
 
 tests :: Setup -> TestTree
 tests setup = testGroup "gift"
@@ -201,9 +206,9 @@ tests setup = testGroup "gift"
         fiveAdaUtxo <- case find (\u -> utxoValue u == collateralValue) (utxosToList newUserUtxos) of
                          Nothing           -> fail "Couldn't find a 5-ada-only UTxO"
                          Just fiveAdaUtxo' -> return fiveAdaUtxo'
-        assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) False $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        assertThrown (\case InsufficientFundsException -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) False $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
         -- Should be reserved if we also perform 5 ada check as it satisfies it.
-        assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) True $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        assertThrown (\case InsufficientFundsException -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef fiveAdaUtxo) True $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
         -- Would have thrown error if unable to build body.
         void $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
@@ -216,7 +221,7 @@ tests setup = testGroup "gift"
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
         forUTxOs_ newUserUtxos (info . show)
-        assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
+        assertThrown (\case (GYBuildTxException GYBuildTxNoSuitableCollateral) -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
     , testCaseSteps "Checking for 'BuildTxNoSuitableCollateral' error when UTxO is greater than or equal to maximum possible total collateral but resulting return collateral doesn't satisfy minimum ada requirement" $ \info -> withSetup setup info $ \ctx -> do
         pp <- gyGetProtocolParameters (ctxProviders ctx)
@@ -227,7 +232,7 @@ tests setup = testGroup "gift"
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunC ctx newUser $ utxosAtAddress (userAddr newUser) Nothing
         forUTxOs_ newUserUtxos (info . show)
-        assertThrown (\case BuildTxNoSuitableCollateral -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
+        assertThrown (\case (GYBuildTxException GYBuildTxNoSuitableCollateral) -> True; _anyOther -> False) $ ctxRunI ctx newUser $ return $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
     , testCaseSteps "No 'BuildTxNoSuitableCollateral' error is thrown when collateral input is sufficient" $ \info -> withSetup setup info $ \ctx -> do
         pp <- gyGetProtocolParameters (ctxProviders ctx)
@@ -253,7 +258,7 @@ tests setup = testGroup "gift"
                           Nothing -> fail "Couldn't find a 8-ada-only UTxO"
                           Just u  -> return u
         let newUserValue = foldlUTxOs' (\a u -> a <> utxoValue u) mempty newUserUtxos
-        assertThrown (\case BuildTxBalancingError (BalancingErrorInsufficientFunds _) -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef eightAdaUtxo) False $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        assertThrown (\case InsufficientFundsException -> True; _anyOther -> False) $ ctxRunFWithCollateral ctx newUser (utxoRef eightAdaUtxo) False $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
         -- eight ada utxo won't satisfy 5 ada check and thus would be ignored
         void $ ctxRunFWithCollateral ctx newUser (utxoRef eightAdaUtxo) True $ return $ Identity $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 

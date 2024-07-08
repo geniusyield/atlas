@@ -181,8 +181,8 @@ runGYTxMonadIOF cstrat nid providers addrs change collateral m = do
     x <- runGYTxMonadIOCore (const id) cstrat nid providers addrs change collateral $ (:[]) <$> m
     case x of
       GYTxBuildSuccess ne          -> pure $ NE.head ne
-      GYTxBuildPartialSuccess be _ -> throwIO $ BuildTxBalancingError be
-      GYTxBuildFailure be          -> throwIO $ BuildTxBalancingError be
+      GYTxBuildPartialSuccess be _ -> throwIO . GYBuildTxException $ GYBuildTxBalancingError be
+      GYTxBuildFailure be          -> throwIO . GYBuildTxException $ GYBuildTxBalancingError be
       -- We know there is precisely one input.
       GYTxBuildNoInputs            -> error "runGYTxMonadIOF: absurd"
 
@@ -271,7 +271,7 @@ runGYTxMonadIOCore ownUtxoUpdateF cstrat nid providers addrs change collateral a
     --             Right bpp' -> pure bpp'
 
     pp <- case Api.toLedgerPParams Api.ShelleyBasedEraBabbage apiPp of
-                Left e   -> throwIO $ BuildTxPPConversionError e
+                Left e   -> throwIO . GYBuildTxException $ GYBuildTxPPConversionError e
                 Right pp -> pure pp
 
     collateral' <- obtainCollateral
@@ -285,7 +285,7 @@ runGYTxMonadIOCore ownUtxoUpdateF cstrat nid providers addrs change collateral a
             , envUsedSomeUTxOs = mempty
             }
     case e of
-        Left err  -> throwIO err
+        Left err  -> throwIO $ GYBuildTxException err
         Right res -> return res
 
     where

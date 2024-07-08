@@ -31,6 +31,7 @@ import           Control.Monad.Except
 import           Control.Monad.Random
 import           Control.Monad.Reader
 import           Control.Monad.State
+import           Data.Default                              (Default(def))
 import           Data.Foldable                             (foldMap')
 import           Data.List                                 (singleton)
 import           Data.List.NonEmpty                        (NonEmpty (..))
@@ -68,8 +69,7 @@ import qualified Ouroboros.Consensus.HardFork.History      as Ouroboros
 import qualified PlutusLedgerApi.V2                        as Plutus
 
 import           GeniusYield.Imports
-import           GeniusYield.Transaction                   (GYCoinSelectionStrategy (GYRandomImproveMultiAsset),
-                                                            GYBuildTxError (GYBuildTxBalancingError),
+import           GeniusYield.Transaction                   (GYBuildTxError (GYBuildTxBalancingError),
                                                             GYBalancingError(GYBalancingErrorInsufficientFunds))
 import           GeniusYield.Transaction.Common            (adjustTxOut,
                                                             minimumUTxO)
@@ -227,7 +227,7 @@ instance GYTxQueryMonad GYTxMonadClb where
         utxos <- wither f refs
         pure
             . utxosFromList
-            $ filter (\GYUTxO{utxoValue} -> maybe True (>0) $ valueAssetClass utxoValue <$> mAssetClass)
+            $ filter (\GYUTxO{utxoValue} -> maybe True ((> 0) . valueAssetClass utxoValue) mAssetClass)
             utxos
       where
         f :: Plutus.TxOutRef -> GYTxMonadClb (Maybe GYUTxO)
@@ -289,7 +289,7 @@ instance GYTxQueryMonad GYTxMonadClb where
             GYWarning -> LogEntry Warning doc
             GYError   -> LogEntry Error doc
 
-instance GYTxMonad GYTxMonadClb where
+instance GYTxUserQueryMonad GYTxMonadClb where
 
     ownAddresses = singleton <$> do
         nid <- networkId
@@ -395,7 +395,7 @@ skeletonToTxBody skeleton = do
     ps <- stakePools
 
     addr <- ownAddress
-    e <- buildTxCore ss eh pp ps GYRandomImproveMultiAsset (const id) [addr] addr Nothing (return [Identity skeleton])
+    e <- buildTxCore ss eh pp ps def (const id) [addr] addr Nothing [Identity skeleton]
     case e of
         Left err  -> throwError $ GYBuildTxException err
         Right res -> case res of
@@ -412,79 +412,79 @@ slotConfig' = liftClb $ do
         zero = posixSecondsToUTCTime $ timeToPOSIX $ timeFromPlutus $ scSlotZeroTime sc
     return (zero, len)
 
-systemStart :: GYTxMonadClb Api.SystemStart
-systemStart = gyscSystemStart <$> slotConfig
-
 protocolParameters :: GYTxMonadClb (AlonzoCore.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra))
 protocolParameters = do
     pparams <- liftClb $ gets $ mockConfigProtocol . mockConfig
     pure $ coerce pparams
 
+instance GYTxSpecialQueryMonad GYTxMonadClb where
+    systemStart = gyscSystemStart <$> slotConfig
 
-stakePools :: GYTxMonadClb (Set Api.S.PoolId)
-stakePools = pure Set.empty
--- stakePools = do
---     pids <- liftClb $ gets $ Map.keys . stake'pools . mockStake
---     foldM f Set.empty pids
---   where
---     f :: Set Api.S.PoolId -> Api.S.PoolId -> GYTxMonadClb (Set Api.S.PoolId)
---     f s pid = either
---         (\e -> throwError $ GYConversionException $ GYLedgerToCardanoError $ DeserialiseRawBytesError ("stakePools, error: " <> fromString (show e)))
---         (\pid' -> return $ Set.insert pid' s)
---         $ Api.deserialiseFromRawBytes (Api.AsHash Api.AsStakePoolKey) bs
---       where
---         Plutus.BuiltinByteString bs = Plutus.getPubKeyHash $ unPoolId pid
+    protocolParams = Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage <$> protocolParameters
 
-eraHistory :: GYTxMonadClb Api.EraHistory
-eraHistory = do
-    (_, len) <- slotConfig'
-    return $ Api.EraHistory $ eh len
-  where
-    eh :: NominalDiffTime -> Ouroboros.Interpreter (Ouroboros.CardanoEras Ouroboros.StandardCrypto)
-    eh = Ouroboros.mkInterpreter . Ouroboros.Summary
-                . NonEmptyCons byronEra
-                . NonEmptyCons shelleyEra
-                . NonEmptyCons allegraEra
-                . NonEmptyCons maryEra
-                . NonEmptyCons alonzoEra
-                . NonEmptyOne . babbageEra
 
-    byronEra =
-        Ouroboros.EraSummary
-            { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-            , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-            , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864}
-            }
-    shelleyEra =
-        Ouroboros.EraSummary
-            { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-            , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-            , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
-            }
-    allegraEra =
-        Ouroboros.EraSummary
-            { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-            , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-            , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
-            }
-    maryEra =
-        Ouroboros.EraSummary
-            { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-            , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-            , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
-            }
-    alonzoEra =
-        Ouroboros.EraSummary
-            { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-            , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-            , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
-            }
-    babbageEra len =
-        Ouroboros.EraSummary
-            { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-            , eraEnd = Ouroboros.EraUnbounded
-            , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920}
-            }
+    stakePools = pure Set.empty
+    -- stakePools = do
+    --     pids <- liftClb $ gets $ Map.keys . stake'pools . mockStake
+    --     foldM f Set.empty pids
+    --   where
+    --     f :: Set Api.S.PoolId -> Api.S.PoolId -> GYTxMonadClb (Set Api.S.PoolId)
+    --     f s pid = either
+    --         (\e -> throwError $ GYConversionException $ GYLedgerToCardanoError $ DeserialiseRawBytesError ("stakePools, error: " <> fromString (show e)))
+    --         (\pid' -> return $ Set.insert pid' s)
+    --         $ Api.deserialiseFromRawBytes (Api.AsHash Api.AsStakePoolKey) bs
+    --       where
+    --         Plutus.BuiltinByteString bs = Plutus.getPubKeyHash $ unPoolId pid
+
+    eraHistory = do
+        (_, len) <- slotConfig'
+        return $ Api.EraHistory $ eh len
+      where
+        eh :: NominalDiffTime -> Ouroboros.Interpreter (Ouroboros.CardanoEras Ouroboros.StandardCrypto)
+        eh = Ouroboros.mkInterpreter . Ouroboros.Summary
+                    . NonEmptyCons byronEra
+                    . NonEmptyCons shelleyEra
+                    . NonEmptyCons allegraEra
+                    . NonEmptyCons maryEra
+                    . NonEmptyCons alonzoEra
+                    . NonEmptyOne . babbageEra
+
+        byronEra =
+            Ouroboros.EraSummary
+                { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+                , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864}
+                }
+        shelleyEra =
+            Ouroboros.EraSummary
+                { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+                , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                }
+        allegraEra =
+            Ouroboros.EraSummary
+                { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+                , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                }
+        maryEra =
+            Ouroboros.EraSummary
+                { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+                , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                }
+        alonzoEra =
+            Ouroboros.EraSummary
+                { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+                , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                }
+        babbageEra len =
+            Ouroboros.EraSummary
+                { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+                , eraEnd = Ouroboros.EraUnbounded
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                }
 
 dumpUtxoState :: GYTxMonadClb ()
 dumpUtxoState = liftClb Clb.dumpUtxoState

@@ -53,6 +53,7 @@ newtype GYTxMonadIO a = GYTxMonadIO (GYTxIOEnv -> GYTxQueryMonadIO a)
            , MonadRandom
            , MonadError GYTxMonadException
            , GYTxQueryMonad
+           , GYTxSpecialQueryMonad
            )
   via ReaderT GYTxIOEnv GYTxQueryMonadIO
 
@@ -60,16 +61,21 @@ data GYTxIOEnv = GYTxIOEnv
     { envNid           :: !GYNetworkId
     , envProviders     :: !GYProviders
     , envAddrs         :: ![GYAddress]
-    , _envChangeAddr   :: !GYAddress
+    , envChangeAddr    :: !GYAddress
     , envCollateral    :: !(Maybe GYUTxO)
     , envUsedSomeUTxOs :: !(Set GYTxOutRef)
     }
 
-instance GYTxMonad GYTxMonadIO where
+-- INTERNAL USAGE ONLY
+-- Do not expose a 'MonadIO' instance. It allows the user to do arbitrary IO within the tx monad.
+ioToTxMonad :: IO a -> GYTxMonadIO a
+ioToTxMonad ioAct = GYTxMonadIO . const $ ioToQueryMonad ioAct
+
+instance GYTxUserQueryMonad GYTxMonadIO where
 
     ownAddresses = asks envAddrs
 
-    ownChangeAddress = asks _envChangeAddr
+    ownChangeAddress = asks envChangeAddr
 
     ownCollateral = asks envCollateral
 
@@ -95,6 +101,15 @@ instance GYTxMonad GYTxMonadIO where
             case find utxoTranslatableToV1 $ utxosToList utxosToConsider of
               Just u  -> return $ utxoRef u
               Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
+
+instance GYTxMonad GYTxMonadIO where
+    submitTx tx = do
+        txSubmitter <- asks (gySubmitTx . envProviders)
+        ioToTxMonad $ txSubmitter tx
+
+    awaitTxConfirmed' params txId = do
+        txAwaiter <- asks (gyAwaitTxConfirmed . envProviders)
+        ioToTxMonad $ txAwaiter params txId
 
 runGYTxMonadIO
     :: GYNetworkId                  -- ^ Network ID.
@@ -280,7 +295,7 @@ runGYTxMonadIOCore ownUtxoUpdateF cstrat nid providers addrs change collateral a
             { envNid           = nid
             , envProviders     = providers
             , envAddrs         = addrs
-            ,_envChangeAddr    = change
+            , envChangeAddr    = change
             , envCollateral    = collateral'
             , envUsedSomeUTxOs = mempty
             }

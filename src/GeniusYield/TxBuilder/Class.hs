@@ -12,8 +12,20 @@ module GeniusYield.TxBuilder.Class
     , MonadRandom (..)
     , GYTxMonad (..)
     , GYTxQueryMonad (..)
+    , GYTxSpecialQueryMonad (..)
+    , GYTxUserQueryMonad (..)
     , GYTxSkeleton (..)
     , GYTxSkeletonRefIns (..)
+    , submitTx_
+    , submitTxConfirmed
+    , submitTxConfirmed_
+    , submitTxConfirmed'
+    , submitTxConfirmed'_
+    , submitTxBody
+    , submitTxBody_
+    , submitTxBodyConfirmed
+    , submitTxBodyConfirmed_
+    , awaitTxConfirmed
     , gyTxSkeletonRefInsToList
     , gyTxSkeletonRefInsSet
     , lookupDatum'
@@ -76,6 +88,8 @@ module GeniusYield.TxBuilder.Class
     , wt
     ) where
 
+import qualified Cardano.Api                  as Api
+import qualified Cardano.Api.Shelley          as Api.S
 import           Control.Monad.Except         (MonadError (..), liftEither)
 import qualified Control.Monad.State.Strict   as Strict
 import qualified Control.Monad.State.Lazy     as Lazy
@@ -85,6 +99,7 @@ import qualified Control.Monad.Writer.Lazy    as Lazy
 import           Control.Monad.IO.Class       (MonadIO (..))
 import           Control.Monad.Random         (MonadRandom (..), RandT, lift)
 import           Control.Monad.Reader         (ReaderT)
+import           Data.Default                 (def)
 import           Data.List                    (nubBy)
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe                   (listToMaybe)
@@ -94,6 +109,7 @@ import           Data.Time                    (diffUTCTime, getCurrentTime)
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+import           GeniusYield.Types.Key.Class  (ToShelleyWitnessSigningKey)
 import           GHC.Stack                    (withFrozenCallStack)
 import qualified PlutusLedgerApi.V1           as Plutus (Address, DatumHash,
                                                          FromData (..),
@@ -193,8 +209,27 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     -- | Log a message with specified namespace and severity.
     logMsg :: HasCallStack => GYLogNamespace -> GYLogSeverity -> String -> m ()
 
+-- | Class of monads for querying special chain data.
+{- Note [Necessity of 'GYTxSpecialQueryMonad' and transaction building as a class method]
+
+The only purpose of 'GYTxSpecialQueryMonad' is to provide necessary information for building
+transactions. Since the inclusion of 'submitTx' under 'GYTxMonad', it is necessary to be able to
+build transactions within 'GYTxMonad'. Our current tx building interface requires these pieces
+of information. So this is a superclass to 'GYTxMonad'.
+
+However, transaction building _could_ be included as a class method of 'GYTxMonad'. But it is difficult
+to decide where to draw the line regarding the interface. Our transaction building mechanisms are aware of
+coin selection strategy, parallel transactions, chaining transactions etc. Should all this really be included
+under the class method in question?
+-}
+class GYTxQueryMonad m => GYTxSpecialQueryMonad m where
+    systemStart :: m Api.SystemStart
+    eraHistory :: m Api.EraHistory
+    protocolParams :: m Api.S.ProtocolParameters
+    stakePools :: m (Set Api.S.PoolId)
+
 -- | Class of monads for querying as a user.
-class GYTxQueryMonad m => GYTxMonad m where
+class GYTxQueryMonad m => GYTxUserQueryMonad m where
     -- | Get your own address(es).
     ownAddresses :: m [GYAddress]
 
@@ -211,6 +246,72 @@ class GYTxQueryMonad m => GYTxMonad m where
     --
     -- /Law:/ Must return the different values.
     someUTxO :: PlutusVersion -> m GYTxOutRef
+
+-- | Class of monads for interacting with the blockchain using transactions.
+class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m) => GYTxMonad m where
+    -- | Submit a fully built transaction to the chain.
+    --   Use 'buildTxBody' to build a transaction body, and 'signGYTxBody' to
+    --   sign it before submitting.
+    --
+    -- /Note:/ Changes made to the chain by the submitted transaction may not be reflected immediately,
+    -- see 'awaitTxConfirmed'.
+    --
+    -- /Law:/ 'someUTxO' calls made after a call to 'submitTx' may return previously returned UTxOs
+    -- if they were not affected by the submitted transaction.
+    submitTx :: GYTx -> m GYTxId
+
+    -- | Wait for a _recently_ submitted transaction to be confirmed.
+    --
+    -- /Note:/ If used on a transaction submitted long ago, the behavior is undefined.
+    --
+    -- /Law:/ Queries made after a call to 'awaitTxConfirmed'' should reflect changes made to the chain
+    -- by the identified transaction.
+    awaitTxConfirmed' :: GYAwaitTxParameters -> GYTxId -> m ()
+
+-- | > submitTx_ = void . submitTx
+submitTx_ :: GYTxMonad m => GYTx -> m ()
+submitTx_ = void . submitTx
+
+-- | > submitTxConfirmed_ = void . submitTxConfirmed
+submitTxConfirmed_ :: GYTxMonad m => GYTx -> m ()
+submitTxConfirmed_ = void . submitTxConfirmed
+
+-- | 'submitTxConfirmed'' with default tx waiting parameters.
+submitTxConfirmed :: GYTxMonad m => GYTx -> m GYTxId
+submitTxConfirmed = submitTxConfirmed' def
+
+-- | > submitTxConfirmed'_ p = void . submitTxConfirmed' p
+submitTxConfirmed'_ :: GYTxMonad m => GYAwaitTxParameters -> GYTx -> m ()
+submitTxConfirmed'_ awaitParams = void . submitTxConfirmed' awaitParams
+
+-- | Equivalent to a call to 'submitTx' and then a call to 'awaitTxConfirmed'' with submitted tx id.
+submitTxConfirmed' :: GYTxMonad m => GYAwaitTxParameters -> GYTx -> m GYTxId
+submitTxConfirmed' awaitParams tx = do
+    txId <- submitTx tx
+    awaitTxConfirmed' awaitParams txId
+    pure txId
+
+-- | Wait for a _recently_ submitted transaction to be confirmed, with default waiting parameters.
+awaitTxConfirmed :: GYTxMonad m => GYTxId -> m ()
+awaitTxConfirmed = awaitTxConfirmed' def
+
+-- | > submitTxBody_ t = void . submitTxBody t
+submitTxBody_ :: (GYTxMonad f, ToShelleyWitnessSigningKey a) => GYTxBody -> [a] -> f ()
+submitTxBody_ txBody = void . submitTxBody txBody
+
+-- | Signs a 'GYTxBody' with the given keys and submits the transaction.
+-- Equivalent to a call to 'signGYTxBody', followed by a call to 'submitTx'
+submitTxBody :: (GYTxMonad m, ToShelleyWitnessSigningKey a) => GYTxBody -> [a] -> m GYTxId
+submitTxBody txBody = submitTx . signGYTxBody txBody
+
+-- | > submitTxBodyConfirmed_ t = void . submitTxBodyConfirmed t
+submitTxBodyConfirmed_ :: (GYTxMonad m, ToShelleyWitnessSigningKey a) => GYTxBody -> [a] -> m ()
+submitTxBodyConfirmed_ txBody = void . submitTxBodyConfirmed txBody
+
+-- | Signs a 'GYTxBody' with the given keys, submits the transaction, and waits for its confirmation.
+-- Equivalent to a call to 'signGYTxBody', followed by a call to 'submitTxConfirmed'.
+submitTxBodyConfirmed :: (GYTxMonad m, ToShelleyWitnessSigningKey a) => GYTxBody -> [a] ->  m GYTxId
+submitTxBodyConfirmed txBody = submitTxConfirmed . signGYTxBody txBody
 
 -------------------------------------------------------------------------------
 -- Instances for useful transformers.
@@ -236,12 +337,22 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance GYTxMonad m => GYTxMonad (RandT g m) where
+instance GYTxUserQueryMonad m => GYTxUserQueryMonad (RandT g m) where
     ownAddresses = lift ownAddresses
     ownChangeAddress = lift ownChangeAddress
     ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
+
+instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (RandT g m) where
+    systemStart = lift systemStart
+    eraHistory = lift eraHistory
+    protocolParams = lift protocolParams
+    stakePools = lift stakePools
+
+instance GYTxMonad m => GYTxMonad (RandT g m) where
+    submitTx = lift . submitTx
+    awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
 instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     networkId = lift networkId
@@ -263,12 +374,22 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance GYTxMonad m => GYTxMonad (ReaderT env m) where
+instance GYTxUserQueryMonad m => GYTxUserQueryMonad (ReaderT env m) where
     ownAddresses = lift ownAddresses
     ownChangeAddress = lift ownChangeAddress
     ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
+
+instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (ReaderT env m) where
+    systemStart = lift systemStart
+    eraHistory = lift eraHistory
+    protocolParams = lift protocolParams
+    stakePools = lift stakePools
+
+instance GYTxMonad m => GYTxMonad (ReaderT env m) where
+    submitTx = lift . submitTx
+    awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
 -------------------------------------------------------------------------------
 -- Instances for less useful transformers, provided for completeness.
@@ -317,12 +438,22 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance GYTxMonad m => GYTxMonad (Strict.StateT s m) where
+instance GYTxUserQueryMonad m => GYTxUserQueryMonad (Strict.StateT s m) where
     ownAddresses = lift ownAddresses
     ownChangeAddress = lift ownChangeAddress
     ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
+
+instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (Strict.StateT s m) where
+    systemStart = lift systemStart
+    eraHistory = lift eraHistory
+    protocolParams = lift protocolParams
+    stakePools = lift stakePools
+
+instance GYTxMonad m => GYTxMonad (Strict.StateT s m) where
+    submitTx = lift . submitTx
+    awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
 instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
     networkId = lift networkId
@@ -344,12 +475,22 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance GYTxMonad m => GYTxMonad (Lazy.StateT s m) where
+instance GYTxUserQueryMonad m => GYTxUserQueryMonad (Lazy.StateT s m) where
     ownAddresses = lift ownAddresses
     ownChangeAddress = lift ownChangeAddress
     ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
+
+instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (Lazy.StateT s m) where
+    systemStart = lift systemStart
+    eraHistory = lift eraHistory
+    protocolParams = lift protocolParams
+    stakePools = lift stakePools
+
+instance GYTxMonad m => GYTxMonad (Lazy.StateT s m) where
+    submitTx = lift . submitTx
+    awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
 instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (CPS.WriterT w m) where
     networkId = lift networkId
@@ -371,12 +512,22 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (CPS.WriterT w m) where
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance (GYTxMonad m, Monoid w) => GYTxMonad (CPS.WriterT w m) where
+instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (CPS.WriterT w m) where
     ownAddresses = lift ownAddresses
     ownChangeAddress = lift ownChangeAddress
     ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
+
+instance (GYTxSpecialQueryMonad m, Monoid w) => GYTxSpecialQueryMonad (CPS.WriterT w m) where
+    systemStart = lift systemStart
+    eraHistory = lift eraHistory
+    protocolParams = lift protocolParams
+    stakePools = lift stakePools
+
+instance (GYTxMonad m, Monoid w) => GYTxMonad (CPS.WriterT w m) where
+    submitTx = lift . submitTx
+    awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
 instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Strict.WriterT w m) where
     networkId = lift networkId
@@ -398,12 +549,22 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Strict.WriterT w m) whe
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance (GYTxMonad m, Monoid w) => GYTxMonad (Strict.WriterT w m) where
+instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (Strict.WriterT w m) where
     ownAddresses = lift ownAddresses
     ownChangeAddress = lift ownChangeAddress
     ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
+
+instance (GYTxSpecialQueryMonad m, Monoid w) => GYTxSpecialQueryMonad (Strict.WriterT w m) where
+    systemStart = lift systemStart
+    eraHistory = lift eraHistory
+    protocolParams = lift protocolParams
+    stakePools = lift stakePools
+
+instance (GYTxMonad m, Monoid w) => GYTxMonad (Strict.WriterT w m) where
+    submitTx = lift . submitTx
+    awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
 instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Lazy.WriterT w m) where
     networkId = lift networkId
@@ -425,12 +586,22 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Lazy.WriterT w m) where
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance (GYTxMonad m, Monoid w) => GYTxMonad (Lazy.WriterT w m) where
+instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (Lazy.WriterT w m) where
     ownAddresses = lift ownAddresses
     ownChangeAddress = lift ownChangeAddress
     ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
+
+instance (GYTxSpecialQueryMonad m, Monoid w) => GYTxSpecialQueryMonad (Lazy.WriterT w m) where
+    systemStart = lift systemStart
+    eraHistory = lift eraHistory
+    protocolParams = lift protocolParams
+    stakePools = lift stakePools
+
+instance (GYTxMonad m, Monoid w) => GYTxMonad (Lazy.WriterT w m) where
+    submitTx = lift . submitTx
+    awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
 -- | A version of 'lookupDatum' that raises 'GYNoDatumForHash' if the datum is not found.
 lookupDatum' :: GYTxQueryMonad m => GYDatumHash -> m GYDatum

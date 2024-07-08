@@ -138,6 +138,12 @@ instance GYTxQueryMonad GYTxQueryMonadIO where
         providers <- asks envProviders
         ioToQueryMonad $ withFrozenCallStack $ gyLog providers ns s msg
 
+instance GYTxSpecialQueryMonad GYTxQueryMonadIO where
+    systemStart    = asks envProviders >>= ioToQueryMonad . gyGetSystemStart
+    eraHistory     = asks envProviders >>= ioToQueryMonad . gyGetEraHistory
+    protocolParams = asks envProviders >>= ioToQueryMonad . gyGetProtocolParameters
+    stakePools     = asks envProviders >>= ioToQueryMonad . gyGetStakePools
+
 runGYTxQueryMonadIO
     :: GYNetworkId
     -> GYProviders

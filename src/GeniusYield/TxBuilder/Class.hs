@@ -193,18 +193,23 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     -- | Log a message with specified namespace and severity.
     logMsg :: HasCallStack => GYLogNamespace -> GYLogSeverity -> String -> m ()
 
--- | Class of monads for querying monads as a user.
+-- | Class of monads for querying as a user.
 class GYTxQueryMonad m => GYTxMonad m where
-
     -- | Get your own address(es).
     ownAddresses :: m [GYAddress]
 
-    -- | Get available UTxOs that can be operated upon.
+    -- | Get own change address.
+    ownChangeAddress :: m GYAddress
+
+    -- | Get own collateral utxo.
+    ownCollateral :: m (Maybe GYUTxO)
+
+    -- | Get available own UTxOs that can be operated upon.
     availableUTxOs :: m GYUTxOs
 
     -- | Return some unspend transaction output translatable to the given language corresponding to the script in question.
     --
-    -- /Note:/ may or may not return the same value
+    -- /Law:/ Must return the different values.
     someUTxO :: PlutusVersion -> m GYTxOutRef
 
 -------------------------------------------------------------------------------
@@ -233,6 +238,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
 
 instance GYTxMonad m => GYTxMonad (RandT g m) where
     ownAddresses = lift ownAddresses
+    ownChangeAddress = lift ownChangeAddress
+    ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
 
@@ -258,6 +265,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
 
 instance GYTxMonad m => GYTxMonad (ReaderT env m) where
     ownAddresses = lift ownAddresses
+    ownChangeAddress = lift ownChangeAddress
+    ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
 
@@ -310,6 +319,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
 
 instance GYTxMonad m => GYTxMonad (Strict.StateT s m) where
     ownAddresses = lift ownAddresses
+    ownChangeAddress = lift ownChangeAddress
+    ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
 
@@ -335,10 +346,12 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
 
 instance GYTxMonad m => GYTxMonad (Lazy.StateT s m) where
     ownAddresses = lift ownAddresses
+    ownChangeAddress = lift ownChangeAddress
+    ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
 
-instance (GYTxQueryMonad m, Monoid s) => GYTxQueryMonad (CPS.WriterT s m) where
+instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (CPS.WriterT w m) where
     networkId = lift networkId
     lookupDatum = lift . lookupDatum
     utxoAtTxOutRef = lift . utxoAtTxOutRef
@@ -358,12 +371,14 @@ instance (GYTxQueryMonad m, Monoid s) => GYTxQueryMonad (CPS.WriterT s m) where
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance (GYTxMonad m, Monoid s) => GYTxMonad (CPS.WriterT s m) where
+instance (GYTxMonad m, Monoid w) => GYTxMonad (CPS.WriterT w m) where
     ownAddresses = lift ownAddresses
+    ownChangeAddress = lift ownChangeAddress
+    ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
 
-instance (GYTxQueryMonad m, Monoid s) => GYTxQueryMonad (Strict.WriterT s m) where
+instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Strict.WriterT w m) where
     networkId = lift networkId
     lookupDatum = lift . lookupDatum
     utxoAtTxOutRef = lift . utxoAtTxOutRef
@@ -383,12 +398,14 @@ instance (GYTxQueryMonad m, Monoid s) => GYTxQueryMonad (Strict.WriterT s m) whe
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance (GYTxMonad m, Monoid s) => GYTxMonad (Strict.WriterT s m) where
+instance (GYTxMonad m, Monoid w) => GYTxMonad (Strict.WriterT w m) where
     ownAddresses = lift ownAddresses
+    ownChangeAddress = lift ownChangeAddress
+    ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
 
-instance (GYTxQueryMonad m, Monoid s) => GYTxQueryMonad (Lazy.WriterT s m) where
+instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Lazy.WriterT w m) where
     networkId = lift networkId
     lookupDatum = lift . lookupDatum
     utxoAtTxOutRef = lift . utxoAtTxOutRef
@@ -408,8 +425,10 @@ instance (GYTxQueryMonad m, Monoid s) => GYTxQueryMonad (Lazy.WriterT s m) where
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
 
-instance (GYTxMonad m, Monoid s) => GYTxMonad (Lazy.WriterT s m) where
+instance (GYTxMonad m, Monoid w) => GYTxMonad (Lazy.WriterT w m) where
     ownAddresses = lift ownAddresses
+    ownChangeAddress = lift ownChangeAddress
+    ownCollateral = lift ownCollateral
     availableUTxOs = lift availableUTxOs
     someUTxO = lift . someUTxO
 

@@ -69,6 +69,10 @@ instance GYTxMonad GYTxMonadIO where
 
     ownAddresses = asks envAddrs
 
+    ownChangeAddress = asks _envChangeAddr
+
+    ownCollateral = asks envCollateral
+
     availableUTxOs = do
         addrs         <- ownAddresses
         mCollateral   <- getCollateral

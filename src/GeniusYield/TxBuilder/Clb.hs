@@ -295,6 +295,10 @@ instance GYTxMonad GYTxMonadClb where
         nid <- networkId
         asks $ addressFromPaymentKeyHash nid . paymentKeyHash . paymentVerificationKey . walletPaymentSigningKey . runEnvWallet
 
+    ownChangeAddress = head <$> ownAddresses
+
+    ownCollateral = pure Nothing
+
     availableUTxOs = do
         addrs <- ownAddresses
         utxosAtAddresses addrs

@@ -57,72 +57,72 @@ instance GYTxQueryMonad GYTxQueryMonadIO where
     networkId = asks envNid
 
     lookupDatum h = do
-        logMsg mempty GYInfo $ printf "Querying Datum: %s" (show h)
+        logMsg mempty GYDebug $ printf "Querying Datum: %s" (show h)
         providers <- asks envProviders
         ioToQueryMonad $ gyLookupDatum providers h
 
     utxosAtAddress addr mAssetClass = do
-        logMsg mempty GYInfo $ printf "Querying utxo At Address: %s" addr
+        logMsg mempty GYDebug $ printf "Querying utxo At Address: %s" addr
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxosAtAddress providers addr mAssetClass
 
     utxosAtAddressWithDatums addr mAssetClass = do
-        logMsg mempty GYInfo $ printf "Querying utxos (with datums) at address: %s" addr
+        logMsg mempty GYDebug $ printf "Querying utxos (with datums) at address: %s" addr
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxosAtAddressWithDatums providers addr mAssetClass
 
     utxosAtPaymentCredential cred mAssetClass = do
-        logMsg mempty GYInfo $ printf "Querying UTxOs at payment credential: %s" cred
+        logMsg mempty GYDebug $ printf "Querying UTxOs at payment credential: %s" cred
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxosAtPaymentCredential providers cred mAssetClass
 
     utxosAtAddresses addrs = do
-        logMsg mempty GYInfo $ printf "Querying utxos At Addresses: \n %s" (show addrs)
+        logMsg mempty GYDebug $ printf "Querying utxos At Addresses: \n %s" (show addrs)
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxosAtAddresses providers addrs
 
     utxosAtAddressesWithDatums addrs = do
-        logMsg mempty GYInfo $ printf "Querying utxos (with datums) At Addresses: \n %s" (show addrs)
+        logMsg mempty GYDebug $ printf "Querying utxos (with datums) At Addresses: \n %s" (show addrs)
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxosAtAddressesWithDatums providers addrs
 
     utxosAtPaymentCredentialWithDatums cred mAssetClass = do
-        logMsg mempty GYInfo $ printf "Querying utxos (with datums) at credential: \n %s" (show cred)
+        logMsg mempty GYDebug $ printf "Querying utxos (with datums) at credential: \n %s" (show cred)
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxosAtPaymentCredWithDatums providers cred mAssetClass
 
     utxosAtPaymentCredentials pcs = do
-        logMsg mempty GYInfo $ printf "Querying utxos at payment credentials: \n %s" (show pcs)
+        logMsg mempty GYDebug $ printf "Querying utxos at payment credentials: \n %s" (show pcs)
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxosAtPaymentCredentials providers pcs
 
     utxosAtPaymentCredentialsWithDatums pcs = do
-        logMsg mempty GYInfo $ printf "Querying utxos (with datums) at payment credentials: \n %s" (show pcs)
+        logMsg mempty GYDebug $ printf "Querying utxos (with datums) at payment credentials: \n %s" (show pcs)
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxosAtPaymentCredsWithDatums providers pcs
 
     utxoRefsAtAddress addr = do
-        logMsg mempty GYInfo $ printf "Querying UtxoRefs At Address: %s"  addr
+        logMsg mempty GYDebug $ printf "Querying UtxoRefs At Address: %s"  addr
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxoRefsAtAddress providers addr
 
     utxoAtTxOutRef oref = do
-        logMsg mempty GYInfo $ printf "Querying Utxos At TxOutRef: %s" oref
+        logMsg mempty GYDebug $ printf "Querying Utxos At TxOutRef: %s" oref
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxoAtTxOutRef providers oref
 
     utxosAtTxOutRefs oref = do
-        logMsg mempty GYInfo $ printf "Querying Utxos At TxOutRefs: %s" (show oref)
+        logMsg mempty GYDebug $ printf "Querying Utxos At TxOutRefs: %s" (show oref)
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxosAtTxOutRefs providers oref
 
     utxosAtTxOutRefsWithDatums orefs = do
-        logMsg mempty GYInfo $ printf "Querying utxos (with datums) At TxOutRefs: \n %s" (show orefs)
+        logMsg mempty GYDebug $ printf "Querying utxos (with datums) At TxOutRefs: \n %s" (show orefs)
         providers <- asks envProviders
         ioToQueryMonad $ gyQueryUtxosAtTxOutRefsWithDatums providers orefs
 
     stakeAddressInfo saddr = do
-        logMsg mempty GYInfo $ printf "Querying Stake Address Info: %s" saddr
+        logMsg mempty GYDebug $ printf "Querying Stake Address Info: %s" saddr
         providers <- asks envProviders
         ioToQueryMonad $ gyGetStakeAddressInfo providers saddr
 

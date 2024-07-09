@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-|
 Module      : GeniusYield.Test.Privnet.Setup
 Copyright   : (c) 2023 GYELD GMBH

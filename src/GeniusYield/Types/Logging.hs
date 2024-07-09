@@ -32,6 +32,9 @@ module GeniusYield.Types.Logging
       -- * Log configuration
     , GYLogConfiguration (..)
     , GYRawLog (..)
+    , RawLogger (..)
+    , unitRawLogger
+    , simpleRawLogger
     , cfgAddNamespace
     , cfgAddContext
     , logRun
@@ -241,8 +244,18 @@ closeScribes genv = genv & logEnvToKatip & K.closeScribes <&> logEnvFromKatip
 -- Log configuration
 -------------------------------------------------------------------------------
 
+newtype RawLogger = RawLogger { unRawLogger :: GYLogContexts -> GYLogNamespace -> GYLogSeverity -> Text -> IO () }
+
+-- | A logger that does ignores the logs.
+unitRawLogger :: RawLogger
+unitRawLogger = RawLogger $ \_ _ _ _ -> pure ()
+
+-- | A logger that ignores context and namespace and filters messages based on severity.
+simpleRawLogger :: GYLogSeverity -> (Text -> IO ()) -> RawLogger
+simpleRawLogger targetSev putLog = RawLogger $ \_ _ sev -> when (targetSev <= sev) . putLog
+
 data GYRawLog = GYRawLog
-  { rawLogRun     :: String -> IO ()
+  { rawLogRun     :: RawLogger
   , rawLogCleanUp :: IO ()
   }
 
@@ -261,7 +274,7 @@ cfgAddContext i cfg = cfg { cfgLogContexts = addContext i (cfgLogContexts cfg) }
 logRun :: (HasCallStack, MonadIO m, StringConv a Text) => GYLogConfiguration -> GYLogSeverity -> a -> m ()
 logRun GYLogConfiguration {..} sev msg = case cfgLogDirector of
   Left cfgLogEnv -> withFrozenCallStack $ K.runKatipT (logEnvToKatip cfgLogEnv) $ K.logLoc (logContextsToKatip cfgLogContexts) (logNamespaceToKatip cfgLogNamespace) (logSeverityToKatip sev) (K.logStr msg)
-  Right GYRawLog {..} -> liftIO $ rawLogRun (toS @Text @String $ "[Namespaces: " <> Text.intercalate ", " (K.unNamespace $ logNamespaceToKatip cfgLogNamespace) <> "]" <> "[Contexts: " <> logContextsToS cfgLogContexts <> "] " <> toS @_ @Text msg)
+  Right GYRawLog {..} -> liftIO $ unRawLogger rawLogRun cfgLogContexts cfgLogNamespace sev $ toS msg
 
 -------------------------------------------------------------------------------
 -- Scribe Configuration

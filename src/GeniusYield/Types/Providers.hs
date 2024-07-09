@@ -61,7 +61,7 @@ module GeniusYield.Types.Providers
     , gyLogWarning
     , gyLogError
     , noLogging
-    , simpleConsoleLogging
+    , simpleLogging
       -- * Providers
     , GYProviders (..)
     ) where
@@ -530,13 +530,14 @@ noLogging =
   GYLogConfiguration
     { cfgLogContexts = mempty
     , cfgLogNamespace = mempty
-    , cfgLogDirector = Right $ GYRawLog { rawLogRun = \_ -> pure (), rawLogCleanUp = pure () }
+    , cfgLogDirector = Right $ GYRawLog { rawLogRun = unitRawLogger, rawLogCleanUp = pure () }
     }
 
-simpleConsoleLogging :: (String -> IO ()) -> GYLogConfiguration
-simpleConsoleLogging f =
+-- | Logging messages using the given severity filter with given IO action.
+simpleLogging :: GYLogSeverity -> (Text -> IO ()) -> GYLogConfiguration
+simpleLogging targetSev f =
   GYLogConfiguration
     { cfgLogContexts = mempty
     , cfgLogNamespace = mempty
-    , cfgLogDirector = Right $ GYRawLog { rawLogRun = f, rawLogCleanUp = pure () }
+    , cfgLogDirector = Right $ GYRawLog { rawLogRun = simpleRawLogger targetSev f, rawLogCleanUp = pure () }
     }

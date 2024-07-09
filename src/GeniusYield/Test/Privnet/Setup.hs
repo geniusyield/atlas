@@ -25,6 +25,7 @@ import           Control.Exception                    (finally)
 import           Control.Monad                        (forever)
 import           Control.Monad.IO.Class               (liftIO)
 import           Control.Monad.Trans.Resource         (resourceForkIO, MonadResource (liftResourceT))
+import qualified Data.Text                            as Txt
 import qualified Data.Vector                          as V
 
 import qualified Hedgehog                             as H
@@ -52,10 +53,12 @@ import           GeniusYield.Types
 -- Setup
 -------------------------------------------------------------------------------
 
--- | This setup represents a two argument function where first argument is for logging & second represents for continuation, in need of `Ctx`.
+-- | This setup represents a three argument function where first two arguments are for logging & second is for the continuation, in need of `Ctx`.
 --
--- Once these two arguments are given to this function, it will give `Ctx` to the continuation, where the logging part (the `ctxLog`) of `Ctx` would be obtained from first argument of this function.
-newtype Setup = Setup ((String -> IO ()) -> (Ctx -> IO ()) -> IO ())
+-- Once these arguments are given to this function, it will give `Ctx` to the continuation, where the logging part (the `ctxLog`) of `Ctx` would be obtained from the first two arguments of this function.
+--
+-- The first argument is the log severity filter. Only logs of this severity or higher will be passed on to the second argument, which is a logging action.
+newtype Setup = Setup (GYLogSeverity -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ())
 
 data PrivnetRuntime = PrivnetRuntime
   { runtimeNodeSocket  :: !FilePath
@@ -64,10 +67,14 @@ data PrivnetRuntime = PrivnetRuntime
   , runtimeThreadId    :: !ThreadId
   }
 
--- | Calls the `Setup` function with a logging function and the action you wish to use with the privnet.
+-- | Calls the `Setup` function with a logging function that receives info severity logs, and the action you wish to use with the privnet.
 withSetup :: Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
-withSetup (Setup cokont) putLog kont = do
-    cokont putLog kont
+withSetup setup = withSetup' setup GYInfo
+
+-- | Calls the `Setup` function with target logging severity, a logging function and the action you wish to use with the privnet.
+withSetup' :: Setup -> GYLogSeverity -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
+withSetup' (Setup cokont) targetSev putLog kont = do
+    cokont targetSev putLog kont
 
 {-
 TODO: WIP: Provide a variant of `withSetup` that can access `Ctx` to return a non-unit result.
@@ -271,7 +278,7 @@ withPrivnet testnetOpts setupUser = do
                     userBalances
                     extraUsers
 
-            let setup = Setup $ \putLog kont -> kont $ ctx { ctxLog = simpleConsoleLogging putLog }
+            let setup = Setup $ \targetSev putLog kont -> kont $ ctx { ctxLog = simpleLogging targetSev (putLog . Txt.unpack) }
             setupUser setup
 
 -------------------------------------------------------------------------------

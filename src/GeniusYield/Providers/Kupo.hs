@@ -13,7 +13,7 @@ module GeniusYield.Providers.Kupo (
   kupoLookupDatum,
   kupoLookupScript,
   kupoQueryUtxo,
-  kupoAwaitTxConfirmed
+  kupoAwaitTxConfirmed,
 ) where
 
 import qualified Cardano.Api                  as Api
@@ -44,6 +44,7 @@ import           GeniusYield.Types            (GYAddress, GYAddressBech32,
                                                gyQueryUtxoAtPaymentCredentialsDefault,
                                                gyQueryUtxoRefsAtAddressDefault,
                                                gyQueryUtxosAtTxOutRefsDefault,
+                                               parseValueKM,
                                                paymentCredentialToHexText,
                                                scriptFromCBOR, txIdToApi,
                                                txOutRefFromApiTxIdIx,
@@ -60,6 +61,7 @@ import           Servant.Client               (ClientEnv, ClientError, ClientM,
                                                client, runClientM)
 
 -- $setup
+-- >>> :set -XOverloadedStrings -XTypeApplications
 -- >>> import qualified Data.Aeson as Aeson
 
 -- | Kupo api env.
@@ -156,7 +158,24 @@ data KupoValue = KupoValue
   , assets :: !GYValue
   }
   deriving stock (Show, Eq, Ord, Generic)
-  deriving anyclass (FromJSON)
+
+-- >>> Aeson.decode @KupoValue "{\"coins\":1762790,\"assets\":{\"604eed076ac858d58278d943f3ae79f9a0ea958712cd50dda49c0a8b\":1}}"
+-- Just (KupoValue {coins = 1762790, assets = valueFromList [(GYToken "604eed076ac858d58278d943f3ae79f9a0ea958712cd50dda49c0a8b" "",1)]})
+--
+-- >>> Aeson.decode @KupoValue "{\"coins\":1762790,\"assets\":{\"604eed076ac858d58278d943f3ae79f9a0ea958712cd50dda49c0a8b.\":1}}"
+-- Just (KupoValue {coins = 1762790, assets = valueFromList [(GYToken "604eed076ac858d58278d943f3ae79f9a0ea958712cd50dda49c0a8b" "",1)]})
+--
+-- >>> Aeson.decode @KupoValue "{\"coins\":1762790,\"assets\":{\"604eed076ac858d58278d943f3ae79f9a0ea958712cd50dda49c0a8b.474f4c44\":1}}"
+-- Just (KupoValue {coins = 1762790, assets = valueFromList [(GYToken "604eed076ac858d58278d943f3ae79f9a0ea958712cd50dda49c0a8b" "GOLD",1)]})
+--
+-- >>> Aeson.decode @KupoValue "{\"coins\":1762790,\"assets\":{\"604eed076ac858d58278d943f3ae79f9a0ea958712cd50dda49c0a8b474f4c44\":1}}"
+-- Just (KupoValue {coins = 1762790, assets = valueFromList [(GYToken "604eed076ac858d58278d943f3ae79f9a0ea958712cd50dda49c0a8b" "GOLD",1)]})
+instance FromJSON KupoValue where
+  parseJSON = withObject "KupoValue" $ \v -> do
+    coins <- v .: "coins"
+    assets' <- v .: "assets"
+    assets <- parseValueKM True assets'
+    return KupoValue { coins = coins, assets = assets }
 
 data KupoDatumType = Hash | Inline
   deriving stock (Show, Eq, Ord, Generic)

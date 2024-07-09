@@ -19,7 +19,8 @@ import qualified Cardano.Api              as Api
 import qualified Cardano.Ledger.BaseTypes as Ledger
 import qualified Data.Aeson.Types         as Aeson
 import qualified Data.Text                as T
-import           Data.Word               (Word32, Word64)
+import           Data.Word                (Word32, Word64)
+import           Deriving.Aeson
 
 import           GeniusYield.Types.Era
 
@@ -69,7 +70,9 @@ data GYNetworkInfo = GYNetworkInfo
     , gyNetworkEpochSlots :: !Word64
     , gyNetworkEra        :: !GYEra
     }
-    deriving (Show, Read, Eq, Ord)
+    deriving (Show, Read, Eq, Ord, Generic)
+    deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "gy", CamelToSnake]] GYNetworkInfo
+
 
 -------------------------------------------------------------------------------
 -- aeson
@@ -77,12 +80,11 @@ data GYNetworkInfo = GYNetworkInfo
 
 -- |
 --
--- >>> mapM_ LBS8.putStrLn $ Aeson.encode <$> [GYMainnet, GYTestnetPreprod, GYTestnetPreview, GYTestnetLegacy, GYPrivnet]
+-- >>> mapM_ LBS8.putStrLn $ Aeson.encode <$> [GYMainnet, GYTestnetPreprod, GYTestnetPreview, GYTestnetLegacy]
 -- "mainnet"
 -- "testnet-preprod"
 -- "testnet-preview"
 -- "testnet"
--- "privnet"
 --
 instance Aeson.ToJSON GYNetworkId where
     toJSON GYMainnet        = Aeson.toJSON ("mainnet" :: T.Text)
@@ -99,8 +101,8 @@ instance Aeson.ToJSON GYNetworkId where
 
 -- |
 --
--- >>> Aeson.eitherDecode @GYNetworkId <$> ["\"mainnet\"", "\"testnet-preprod\"", "\"preprod\"", "\"testnet-preview\"", "\"preview\"", "\"testnet\"", "\"privnet\"", "\"no-such-net\""]
--- [Right GYMainnet,Right GYTestnetPreprod,Right GYTestnetPreprod,Right GYTestnetPreview,Right GYTestnetPreview,Right GYTestnetLegacy,Right GYPrivnet,Left "Error in $: Expected mainnet, testnet-preprod, preprod, testnet-preview, preview, testnet or privnet"]
+-- >>> Aeson.eitherDecode @GYNetworkId <$> ["\"mainnet\"", "\"testnet-preprod\"", "\"preprod\"", "\"testnet-preview\"", "\"preview\"", "\"testnet\"", "\"no-such-net\""]
+-- [Right GYMainnet,Right GYTestnetPreprod,Right GYTestnetPreprod,Right GYTestnetPreview,Right GYTestnetPreview,Right GYTestnetLegacy,Left "Error in $: Expected mainnet, testnet-preprod, preprod, testnet-preview, preview or testnet"]
 --
 instance Aeson.FromJSON GYNetworkId where
     parseJSON "mainnet"         = pure GYMainnet

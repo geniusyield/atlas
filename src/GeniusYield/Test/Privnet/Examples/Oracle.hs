@@ -37,7 +37,7 @@ tests setup = testGroup "oracle"
             txBodyPlaceOracle <- buildTxBody $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-            submitTxBody_ txBodyPlaceOracle [ctxUserF ctx]
+            submitTxBodyConfirmed_ txBodyPlaceOracle [ctxUserF ctx]
 
         -- fails: no reference input with datum
         assertThrown isTxBodyErrorAutoBalance $ ctxRun ctx (ctxUserF ctx) $ do
@@ -68,7 +68,7 @@ tests setup = testGroup "oracle"
                 [ mustHaveOutput $ mkGYTxOut giftValidatorV2Addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                     & gyTxOutDatumL .~ GYTxOutUseInlineDatum
                 ]
-            submitTxBody_ txBodyPlaceDatum [ctxUserF ctx]
+            submitTxBodyConfirmed_ txBodyPlaceDatum [ctxUserF ctx]
             pure txBodyPlaceDatum
 
         -- get datum ref.
@@ -80,7 +80,7 @@ tests setup = testGroup "oracle"
             txBodyPlaceOracle <- buildTxBody $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-            submitTxBody_ txBodyPlaceOracle [ctxUserF ctx]
+            submitTxBodyConfirmed_ txBodyPlaceOracle [ctxUserF ctx]
 
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress readOracleValidatorV2
@@ -99,5 +99,5 @@ tests setup = testGroup "oracle"
                 [ mustHaveRefInput datumRef
                 ]
 
-            submitTxBody_ txBodyConsume [ctxUserF ctx]
+            submitTxBodyConfirmed_ txBodyConsume [ctxUserF ctx]
     ]

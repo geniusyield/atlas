@@ -148,7 +148,7 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
         mustHaveOutput (mkGYTxOutNoDatum newAddr collateralValue)
       else
         mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
-    submitTxBody_ txBody [fundUser]
+    submitTxBodyConfirmed_ txBody [fundUser]
     pure txBody
 
   return $ User {userPaymentSKey = newPaymentSKey, userAddr = newAddr, userStakeSKey = newStakeSKey}
@@ -219,7 +219,7 @@ addRefScriptCtx ctx user script = ctxRun ctx user $ do
       ref <- case Map.lookup (Some script) refs of
         Just ref -> return ref
         Nothing  -> throwAppError $ someBackendError "Shouldn't happen: no ref in body"
-      submitTxBody_ body [user]
+      submitTxBodyConfirmed_ body [user]
       pure ref
 
 -- | Function to add for a reference input.
@@ -242,5 +242,5 @@ addRefInputCtx ctx user toInline addr ourDatum = ctxRun ctx user $ do
   case mRefInputUtxo of
     Nothing               -> throwAppError $ someBackendError "Shouldn't happen: Couldn't find desired UTxO in tx outputs"
     Just GYUTxO {utxoRef} -> do
-      submitTxBody_ txBody [user]
+      submitTxBodyConfirmed_ txBody [user]
       pure utxoRef

@@ -40,7 +40,7 @@ createMangledUser ctx stakeCred = do
       fundUser = ctxUserF ctx
   ctxRun ctx fundUser $ do
     txBody <- buildTxBody $ mustHaveOutput (mkGYTxOutNoDatum newAddr $ valueFromLovelace 1_000_000_000)
-    submitTxBody_ txBody [fundUser]
+    submitTxBodyConfirmed_ txBody [fundUser]
   pure $ User {userPaymentSKey = newPaymentSKey, userAddr = newAddr, userStakeSKey = Nothing}
 
 userStakeCredential :: User -> GYStakeCredential
@@ -73,7 +73,7 @@ registerStakeCredentialSteps strat user mstakeValHash info ctx = do
     txBodyReg <- ctxRun ctx user $ do
       buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressRegistrationCertificate (resolveStakeCredential user mstakeValHash))
     info $ "-- Registration tx body --\n" <> show txBodyReg <> "\n-- x --\n"
-    ctxRun ctx user $ submitTxBody_ txBodyReg [user]
+    ctxRun ctx user $ submitTxBodyConfirmed_ txBodyReg [user]
 
 delegateStakeCredentialSteps :: GYCoinSelectionStrategy -> User -> Maybe GYStakeValidatorHash -> GYStakePoolId -> (String -> IO ()) -> Ctx -> IO ()
 delegateStakeCredentialSteps strat user mstakeValHash spId info ctx = do

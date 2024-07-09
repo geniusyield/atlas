@@ -31,7 +31,7 @@ tests setup = testGroup "treat"
             txBodyPlace <- buildTxBody $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-            submitTxBody_ txBodyPlace [ctxUserF ctx]
+            submitTxBodyConfirmed_ txBodyPlace [ctxUserF ctx]
 
         threadDelay 1_000_000
 
@@ -46,7 +46,7 @@ tests setup = testGroup "treat"
         -- grab existing treats to cleanup
         ctxRun ctx (ctxUserF ctx) $ do
             grabTreatsTx <- grabTreats  @'PlutusV2 treatValidatorV2 >>= traverse buildTxBody
-            mapM_ (`submitTxBody` [ctxUserF ctx]) grabTreatsTx
+            mapM_ (`submitTxBodyConfirmed` [ctxUserF ctx]) grabTreatsTx
 
         threadDelay 1_000_000
 
@@ -56,14 +56,14 @@ tests setup = testGroup "treat"
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress treatValidatorV2
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-            submitTxBody_ txBodyPlace [ctxUserF ctx]
+            submitTxBodyConfirmed_ txBodyPlace [ctxUserF ctx]
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
         ctxRun ctx (ctxUser2 ctx) $ do
             grabTreatsTx' <- grabTreats  @'PlutusV2 treatValidatorV2 >>= traverse buildTxBody
-            mapM_ (`submitTxBody` [ctxUser2 ctx]) grabTreatsTx'
+            mapM_ (`submitTxBodyConfirmed` [ctxUser2 ctx]) grabTreatsTx'
 
         -- wait a tiny bit.
         threadDelay 1_000_000

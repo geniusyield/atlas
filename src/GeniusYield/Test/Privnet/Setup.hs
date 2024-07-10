@@ -10,6 +10,7 @@ module GeniusYield.Test.Privnet.Setup (
     Setup,
     withPrivnet,
     withSetup,
+    withSetupOld,
     -- * "Cardano.Testnet" re-exports
     cardanoDefaultTestnetOptions,
     cardanoDefaultTestnetNodeOptions,
@@ -67,13 +68,17 @@ data PrivnetRuntime = PrivnetRuntime
   , runtimeThreadId    :: !ThreadId
   }
 
+{-# DEPRECATED withSetupOld "Use withSetup." #-}
+withSetupOld :: Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
+withSetupOld = flip withSetup
+
 -- | Calls the `Setup` function with a logging function that receives info severity logs, and the action you wish to use with the privnet.
-withSetup :: Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
-withSetup setup = withSetup' setup GYInfo
+withSetup :: (String -> IO ()) -> Setup -> (Ctx -> IO ()) -> IO ()
+withSetup = withSetup' GYInfo
 
 -- | Calls the `Setup` function with target logging severity, a logging function and the action you wish to use with the privnet.
-withSetup' :: Setup -> GYLogSeverity -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
-withSetup' (Setup cokont) targetSev putLog kont = do
+withSetup' :: GYLogSeverity -> (String -> IO ()) -> Setup -> (Ctx -> IO ()) -> IO ()
+withSetup' targetSev putLog (Setup cokont) kont = do
     cokont targetSev putLog kont
 
 {-

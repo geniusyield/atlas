@@ -13,9 +13,9 @@ import           Test.Tasty.HUnit               (testCaseSteps)
 
 simpleScriptsTests :: Setup -> TestTree
 simpleScriptsTests setup = testGroup "simple-scripts"
-  [ testCaseSteps "exercising a multi-sig simple script without giving it as reference" $ \info -> withSetup setup info $ \ctx -> do
+  [ testCaseSteps "exercising a multi-sig simple script without giving it as reference" $ \info -> withSetup info setup $ \ctx -> do
     exerciseASimpleScript ctx info False
-  , testCaseSteps "exercising a multi-sig simple script when given as a reference" $ \info -> withSetup setup info $ \ctx -> do
+  , testCaseSteps "exercising a multi-sig simple script when given as a reference" $ \info -> withSetup info setup $ \ctx -> do
     exerciseASimpleScript ctx info True
   ]
 

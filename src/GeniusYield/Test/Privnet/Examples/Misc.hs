@@ -26,7 +26,7 @@ import           GeniusYield.TxBuilder
 
 tests :: Setup -> TestTree
 tests setup = testGroup "misc"
-    [ testCaseSteps "Reference script for minting policy" $ \info -> withSetup setup info $ \ctx -> do
+    [ testCaseSteps "Reference script for minting policy" $ \info -> withSetup info setup $ \ctx -> do
 
         utxoAsParam <- ctxRun ctx (ctxUser2 ctx) $ someUTxO PlutusV1
         let amt    = 1

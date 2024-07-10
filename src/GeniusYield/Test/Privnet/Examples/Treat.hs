@@ -23,7 +23,7 @@ import           GeniusYield.TxBuilder
 
 tests :: Setup -> TestTree
 tests setup = testGroup "treat"
-    [ testCaseSteps "plutusV1" $ \info -> withSetup setup info $ \ctx -> do
+    [ testCaseSteps "plutusV1" $ \info -> withSetup info setup $ \ctx -> do
         let goldAC = ctxGold ctx
 
         ctxRun ctx (ctxUserF ctx) $ do
@@ -40,7 +40,7 @@ tests setup = testGroup "treat"
         assertThrown isTxBodyErrorAutoBalance $ ctxRun ctx (ctxUser2 ctx) $ grabTreats  @'PlutusV1 treatValidatorV1 >>= traverse buildTxBody
 
     -- this is the same tests as for Gift 'PlutusV2.
-    , testCaseSteps "plutusV2" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "plutusV2" $ \info -> withSetup info setup $ \ctx -> do
         let ironAC = ctxIron ctx
 
         -- grab existing treats to cleanup

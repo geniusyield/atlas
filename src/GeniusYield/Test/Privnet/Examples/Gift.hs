@@ -44,7 +44,7 @@ pattern InsufficientFundsException <- GYBuildTxException (GYBuildTxBalancingErro
 
 tests :: Setup -> TestTree
 tests setup = testGroup "gift"
-    [ testCaseSteps "plutusV1" $ \info -> withSetup setup info $ \ctx -> do
+    [ testCaseSteps "plutusV1" $ \info -> withSetup info setup $ \ctx -> do
         giftCleanup ctx
         let goldAC = ctxGold ctx
 
@@ -79,7 +79,7 @@ tests setup = testGroup "gift"
             (valueSingleton goldAC 10)
             (snd (valueSplitAda diff2))
 
-    , testCaseSteps "plutusV2" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "plutusV2" $ \info -> withSetup info setup $ \ctx -> do
         giftCleanup ctx
 
         let ironAC = ctxIron ctx
@@ -113,7 +113,7 @@ tests setup = testGroup "gift"
             (valueSingleton ironAC 10)
             (snd (valueSplitAda diff2))
 
-    , testCaseSteps "plutusV2-inlinedatum" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "plutusV2-inlinedatum" $ \info -> withSetup info setup $ \ctx -> do
         giftCleanup ctx
         let ironAC = ctxIron ctx
 
@@ -148,7 +148,7 @@ tests setup = testGroup "gift"
             (valueSingleton ironAC 10)
             (snd (valueSplitAda diff2))
 
-    , testCaseSteps "Checking Vasil feature of Collateral Return and Total Collateral - Multi-asset collateral" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "Checking Vasil feature of Collateral Return and Total Collateral - Multi-asset collateral" $ \info -> withSetup info setup $ \ctx -> do
         giftCleanup ctx
 
         ----------- Create a new user and fund it
@@ -193,7 +193,7 @@ tests setup = testGroup "gift"
         assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
         ctxRun ctx newUser $ submitTxBodyConfirmed_ grabGiftsTxBody' [newUser]
 
-    , testCaseSteps "Checking if collateral is reserved in case we send an exact 5 ada only UTxO as collateral (simulating browser's case) + is collateral spendable if we want?" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "Checking if collateral is reserved in case we send an exact 5 ada only UTxO as collateral (simulating browser's case) + is collateral spendable if we want?" $ \info -> withSetup info setup $ \ctx -> do
         ----------- Create a new user and fund it
         let ironAC = ctxIron ctx
             newUserValue = valueFromLovelace 200_000_000 <> valueSingleton ironAC 25
@@ -211,7 +211,7 @@ tests setup = testGroup "gift"
         -- Would have thrown error if unable to build body.
         void $ ctxRun ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
-    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when no UTxO is greater than or equal to maximum possible total collateral" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when no UTxO is greater than or equal to maximum possible total collateral" $ \info -> withSetup info setup $ \ctx -> do
         ----------- Create a new user and fund it
         pp <- gyGetProtocolParameters (ctxProviders ctx)
         let newUserValue = maximumRequiredCollateralValue pp `valueMinus` valueFromLovelace 1
@@ -222,7 +222,7 @@ tests setup = testGroup "gift"
         forUTxOs_ newUserUtxos (info . show)
         assertThrown (\case (GYBuildTxException GYBuildTxNoSuitableCollateral) -> True; _anyOther -> False) $ ctxRun ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
-    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when UTxO is greater than or equal to maximum possible total collateral but resulting return collateral doesn't satisfy minimum ada requirement" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when UTxO is greater than or equal to maximum possible total collateral but resulting return collateral doesn't satisfy minimum ada requirement" $ \info -> withSetup info setup $ \ctx -> do
         pp <- gyGetProtocolParameters (ctxProviders ctx)
         ----------- Create a new user and fund it
         let newUserValue = maximumRequiredCollateralValue pp <> valueFromLovelace 0_500_000
@@ -233,7 +233,7 @@ tests setup = testGroup "gift"
         forUTxOs_ newUserUtxos (info . show)
         assertThrown (\case (GYBuildTxException GYBuildTxNoSuitableCollateral) -> True; _anyOther -> False) $ ctxRun ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
-    , testCaseSteps "No 'GYBuildTxNoSuitableCollateral' error is thrown when collateral input is sufficient" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "No 'GYBuildTxNoSuitableCollateral' error is thrown when collateral input is sufficient" $ \info -> withSetup info setup $ \ctx -> do
         pp <- gyGetProtocolParameters (ctxProviders ctx)
         ----------- Create a new user and fund it
         let newUserValue = maximumRequiredCollateralValue pp <> valueFromLovelace 1_500_000
@@ -244,7 +244,7 @@ tests setup = testGroup "gift"
         forUTxOs_ newUserUtxos (info . show)
         void $ ctxRun ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
-    , testCaseSteps "Checking if collateral is reserved in case we want it even if it's value is not 5 ada" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "Checking if collateral is reserved in case we want it even if it's value is not 5 ada" $ \info -> withSetup info setup $ \ctx -> do
         ----------- Create a new user and fund it
         newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 40_000_000) def
         -- Add another UTxO to be used as collateral.
@@ -263,7 +263,7 @@ tests setup = testGroup "gift"
         -- eight ada utxo won't satisfy 5 ada check and thus would be ignored
         void $ ctxRunWithCollateral ctx newUser (utxoRef eightAdaUtxo) True $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
-    , testCaseSteps "Testing signature from stake key" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "Testing signature from stake key" $ \info -> withSetup info setup $ \ctx -> do
         ----------- Create a new user and fund it
         let newUserValue = valueFromLovelace 200_000_000 <> valueSingleton (ctxIron ctx) 25
             submitWithoutStakeKey User {..} txBody = do
@@ -281,7 +281,7 @@ tests setup = testGroup "gift"
            $ \(_ :: SubmitTxException) -> pure ()
         -- Signing should go smoothly.
 
-    , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup info setup $ \ctx -> do
         giftCleanup ctx
 
         ref <- ctxRun ctx (ctxUserF ctx) $ do
@@ -299,7 +299,7 @@ tests setup = testGroup "gift"
           Just utxo -> maybe (assertFailure "No Reference Script exists in the added UTxO.") (\s -> if s == Some (validatorToScript giftValidatorV2) then info "Script matched, able to read reference script from UTxO." else assertFailure "Mismatch.") (utxoRefScript utxo)
           Nothing -> assertFailure "Couldn't find the UTxO containing added Reference Script."
 
-    , testCaseSteps "refscript" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "refscript" $ \info -> withSetup info setup $ \ctx -> do
         giftCleanup ctx
         let ironAC = ctxIron ctx
 
@@ -348,7 +348,7 @@ tests setup = testGroup "gift"
             (valueSingleton ironAC 10)
             (snd (valueSplitAda diff2))
 
-    , testCaseSteps "refinputs" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "refinputs" $ \info -> withSetup info setup $ \ctx -> do
         -- this is a bad test, but for proper one we'll need a script
         -- actually using reference input provided.
         giftCleanup ctx
@@ -402,7 +402,7 @@ tests setup = testGroup "gift"
             (valueSingleton ironAC 10)
             (snd (valueSplitAda diff2))
 
-    , testCaseSteps "refscript_mixup" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "refscript_mixup" $ \info -> withSetup info setup $ \ctx -> do
         -- in this test we consume 'PlutusV1 UTxO and 'PlutusV2 UTxO
         -- that should be fine, but we are using reference scripts for consuming 'PlutusV2
         -- and that is not supported.
@@ -446,7 +446,7 @@ tests setup = testGroup "gift"
             return (liftA2 (<>) sV2 sV1)
         -}
 
-    , testCaseSteps "inline datums V1+V2" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "inline datums V1+V2" $ \info -> withSetup info setup $ \ctx -> do
         -- in this test we consume UTxO with Plutus V1 script
         -- and in the same transaction create an output where we force inline datum usage
         --
@@ -483,7 +483,7 @@ tests setup = testGroup "gift"
         -- wait a tiny bit.
         threadDelay 1_000_000
 
-    , testCaseSteps "inline datums V2" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "inline datums V2" $ \info -> withSetup info setup $ \ctx -> do
         -- in this test, there are only V2 scripts
         -- so everything seems to work.
         --
@@ -519,7 +519,7 @@ tests setup = testGroup "gift"
             grabGiftsTx' <- grabGifts giftValidatorV2 >>= traverse addNewGiftV2 >>= traverse buildTxBody
             mapM_ (`submitTxBodyConfirmed` [ctxUser2 ctx]) grabGiftsTx'
 
-    , testCaseSteps "inlinedatum-v1v2" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "inlinedatum-v1v2" $ \info -> withSetup info setup $ \ctx -> do
         -- in this test we try to consume v1 and v2 script outputs in the same transaction.
         -- The v2 outputs have inline datums
         --
@@ -547,7 +547,7 @@ tests setup = testGroup "gift"
           grabGiftsTx <- traverse buildTxBody $ s1 <|> s2
           mapM_ (`submitTxBodyConfirmed` [ctxUser2 ctx]) grabGiftsTx
 
-    , testCaseSteps "inlinedatum-in-v1" $ \info -> withSetup setup info $ \_ctx -> do
+    , testCaseSteps "inlinedatum-in-v1" $ \info -> withSetup info setup $ \_ctx -> do
         -- in this test we try to consume v1 script output which has inline datums
         -- this doesn't work, and break things.
         return ()

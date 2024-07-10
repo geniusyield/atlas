@@ -28,7 +28,7 @@ readOracleValidatorV2 = validatorFromPlutus readOracleValidator
 
 tests :: Setup -> TestTree
 tests setup = testGroup "oracle"
-    [ testCaseSteps "without-ref" $ \info -> withSetup setup info $ \ctx -> do
+    [ testCaseSteps "without-ref" $ \info -> withSetup info setup $ \ctx -> do
         let goldAC = ctxGold ctx
 
         -- create output with read oracle script
@@ -55,7 +55,7 @@ tests setup = testGroup "oracle"
                 | (ref, (_, _, d)) <- Map.toList datums
                 ]
 
-    , testCaseSteps "with-ref" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "with-ref" $ \info -> withSetup info setup $ \ctx -> do
         let goldAC = ctxGold ctx
 
         -- address

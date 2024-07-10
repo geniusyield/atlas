@@ -27,7 +27,7 @@ main :: IO ()
 main = do
     withPrivnet cardanoDefaultTestnetOptions $ \setup ->
         defaultMain $ testGroup "atlas-privnet-tests"
-          [ testCaseSteps "Balances" $ \info -> withSetup setup info $ \ctx -> do
+          [ testCaseSteps "Balances" $ \info -> withSetup info setup $ \ctx -> do
               forM_ (zip [(1 :: Integer) ..] (ctxUserF ctx : ctxUsers ctx))
                 (\(i, ctxUser) -> do
                   userIutxos <- gyQueryUtxosAtAddress (ctxProviders ctx) (userAddr ctxUser) Nothing
@@ -38,14 +38,14 @@ main = do
                       ]
 
                 )
-          , testCaseSteps "SlotConfig" $ \info -> withSetup setup info $ \ctx -> do
+          , testCaseSteps "SlotConfig" $ \info -> withSetup info setup $ \ctx -> do
               slot <- ctxSlotOfCurrentBlock ctx
               info $ printf "Slot %s" slot
 
               sc <- ctxSlotConfig ctx
               info $ show sc
 
-          , testCaseSteps "GetParameters" $ \info -> withSetup setup info $ \ctx -> do
+          , testCaseSteps "GetParameters" $ \info -> withSetup info setup $ \ctx -> do
               ss <- ctxRunQuery ctx systemStart
               info $ printf "System start: %s" (show ss)
 

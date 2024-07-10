@@ -186,8 +186,10 @@ jobs:
       run: |
         curl -sL https://github.com/input-output-hk/cardano-node/releases/download/8.1.2/cardano-node-8.1.2-linux.tar.gz > ./cardano-node.tar.gz
         tar xf ./cardano-node.tar.gz -C $HOME/.local/bin
+    - name: Symlink cardano-node binaries
+      run: cabal install --package-env=$(pwd) cardano-cli cardano-node
     - name: Run privnet tests
-      run: bash scripts/run-privnet-tests.sh
+      run: cabal run atlas-privnet-tests -- -j1 --hide-successes
     - name: Run checks (cabal)
       run: cabal check
     - name: Create source distribution file (cabal)

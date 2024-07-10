@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-|
 Module      : GeniusYield.Test.Privnet.Setup
 Copyright   : (c) 2023 GYELD GMBH
@@ -105,7 +104,7 @@ withPrivnet testnetOpts setupUser = do
     -- the result is very awkward.
     tmvRuntime <- STM.newEmptyTMVarIO
 
-    void . H.check $ integrationWorkspace "testnet" $ \workspaceDir -> do
+    void . H.check $ integrationWorkspace "tn" $ \workspaceDir -> do
         conf <- mkConf workspaceDir
 
         -- Fork a thread to keep alive indefinitely any resources allocated by testnet.

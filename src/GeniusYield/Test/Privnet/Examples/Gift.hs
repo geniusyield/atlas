@@ -56,14 +56,14 @@ tests setup = testGroup "gift"
             txBodyPlace <- buildTxBody $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-            submitTxBodyConfirmed_ txBodyPlace [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
         ctxRun ctx (ctxUser2 ctx) $ do
             grabGiftsTx' <- grabGifts  @'PlutusV1 giftValidatorV1 >>= traverse buildTxBody
-            mapM_ (`submitTxBodyConfirmed` [ctxUser2 ctx]) grabGiftsTx'
+            mapM_ signAndSubmitConfirmed grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
         balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
@@ -90,14 +90,14 @@ tests setup = testGroup "gift"
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV2
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-            submitTxBodyConfirmed_ txBodyPlace [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
         ctxRun ctx (ctxUser2 ctx) $ do
             grabGiftsTx' <- grabGifts @'PlutusV2 giftValidatorV2 >>= traverse buildTxBody
-            mapM_ (`submitTxBodyConfirmed` [ctxUser2 ctx]) grabGiftsTx'
+            mapM_ signAndSubmitConfirmed grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
         balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
@@ -125,14 +125,14 @@ tests setup = testGroup "gift"
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
                 & gyTxOutDatumL .~ GYTxOutUseInlineDatum
 
-            submitTxBodyConfirmed_ txBodyPlace [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
 
         ctxRun ctx (ctxUser2 ctx) $ do
             grabGiftsTx' <- grabGifts  @'PlutusV2 giftValidatorV2 >>= traverse buildTxBody
-            mapM_ (`submitTxBodyConfirmed` [ctxUser2 ctx]) grabGiftsTx'
+            mapM_ signAndSubmitConfirmed grabGiftsTx'
 
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
         balance2' <- ctxQueryBalance ctx (ctxUser2 ctx)
@@ -157,13 +157,13 @@ tests setup = testGroup "gift"
         newUser <- newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 200_000_000 <> valueSingleton ironAC 25) def
         info $ printf "Newly created user's address %s" (show $ userAddr newUser)
         ----------- (ctxUserF ctx) submits some gifts
-        txBodyPlace <- ctxRun ctx (ctxUserF ctx) $ do
+        txBodyPlace <- ctxRunBuilder ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV2
             buildTxBody $ mustHaveOutput  (mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ()))
         assertBool "Collateral input shouldn't be set for this transaction" (txBodyCollateral txBodyPlace == mempty)
         assertBool "Return collateral shouldn't be set for this transaction" (txBodyCollateralReturnOutput txBodyPlace == Api.TxReturnCollateralNone)
         assertBool "Total collateral shouldn't be set for this transaction" (txBodyTotalCollateralLovelace txBodyPlace == 0)
-        ctxRun ctx (ctxUserF ctx) $ submitTxBodyConfirmed_ txBodyPlace [ctxUserF ctx]
+        ctxRun ctx (ctxUserF ctx) $ signAndSubmitConfirmed_ txBodyPlace
         -- wait a tiny bit.
         threadDelay 1_000_000
 
@@ -172,7 +172,7 @@ tests setup = testGroup "gift"
         forUTxOs_ newUserUtxos (info . show)
 
         ---------- New user tries to grab it, since interacting with script, needs to give collateral
-        grabGiftsTxBody <- ctxRun ctx newUser $ grabGifts  @'PlutusV2 giftValidatorV2 >>= traverse buildTxBody
+        grabGiftsTxBody <- ctxRunBuilder ctx newUser $ grabGifts  @'PlutusV2 giftValidatorV2 >>= traverse buildTxBody
         grabGiftsTxBody' <- case grabGiftsTxBody of
           Nothing   -> assertFailure "Unable to build tx"
           Just body -> return body
@@ -191,7 +191,7 @@ tests setup = testGroup "gift"
         let colls = txBodyCollateral grabGiftsTxBody'
         colls' <- ctxRunQuery ctx $ utxosAtTxOutRefs (Set.toList colls)
         assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
-        ctxRun ctx newUser $ submitTxBodyConfirmed_ grabGiftsTxBody' [newUser]
+        ctxRun ctx newUser $ signAndSubmitConfirmed_ grabGiftsTxBody'
 
     , testCaseSteps "Checking if collateral is reserved in case we send an exact 5 ada only UTxO as collateral (simulating browser's case) + is collateral spendable if we want?" $ \info -> withSetup info setup $ \ctx -> do
         ----------- Create a new user and fund it
@@ -205,11 +205,11 @@ tests setup = testGroup "gift"
         fiveAdaUtxo <- case find (\u -> utxoValue u == collateralValue) (utxosToList newUserUtxos) of
                          Nothing           -> fail "Couldn't find a 5-ada-only UTxO"
                          Just fiveAdaUtxo' -> return fiveAdaUtxo'
-        assertThrown (\case InsufficientFundsException -> True; _anyOther -> False) $ ctxRunWithCollateral ctx newUser (utxoRef fiveAdaUtxo) False $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        assertThrown (\case InsufficientFundsException -> True; _anyOther -> False) $ ctxRunBuilderWithCollateral ctx newUser (utxoRef fiveAdaUtxo) False $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
         -- Should be reserved if we also perform 5 ada check as it satisfies it.
-        assertThrown (\case InsufficientFundsException -> True; _anyOther -> False) $ ctxRunWithCollateral ctx newUser (utxoRef fiveAdaUtxo) True $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        assertThrown (\case InsufficientFundsException -> True; _anyOther -> False) $ ctxRunBuilderWithCollateral ctx newUser (utxoRef fiveAdaUtxo) True $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
         -- Would have thrown error if unable to build body.
-        void $ ctxRun ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        void $ ctxRunBuilder ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
     , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when no UTxO is greater than or equal to maximum possible total collateral" $ \info -> withSetup info setup $ \ctx -> do
         ----------- Create a new user and fund it
@@ -242,7 +242,7 @@ tests setup = testGroup "gift"
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunQuery ctx $ utxosAtAddress (userAddr newUser) Nothing
         forUTxOs_ newUserUtxos (info . show)
-        void $ ctxRun ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
+        void $ ctxRunBuilder ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
     , testCaseSteps "Checking if collateral is reserved in case we want it even if it's value is not 5 ada" $ \info -> withSetup info setup $ \ctx -> do
         ----------- Create a new user and fund it
@@ -250,7 +250,7 @@ tests setup = testGroup "gift"
         -- Add another UTxO to be used as collateral.
         ctxRun ctx (ctxUserF ctx) $ do
             txBody <- buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 8_000_000)
-            submitTxBodyConfirmed_ txBody [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBody
 
         info $ printf "UTxOs at this new user"
         newUserUtxos <- ctxRunQuery ctx $ utxosAtAddress (userAddr newUser) Nothing
@@ -259,9 +259,9 @@ tests setup = testGroup "gift"
                           Nothing -> fail "Couldn't find a 8-ada-only UTxO"
                           Just u  -> return u
         let newUserValue = foldlUTxOs' (\a u -> a <> utxoValue u) mempty newUserUtxos
-        assertThrown (\case InsufficientFundsException -> True; _anyOther -> False) $ ctxRunWithCollateral ctx newUser (utxoRef eightAdaUtxo) False $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        assertThrown (\case InsufficientFundsException -> True; _anyOther -> False) $ ctxRunBuilderWithCollateral ctx newUser (utxoRef eightAdaUtxo) False $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
         -- eight ada utxo won't satisfy 5 ada check and thus would be ignored
-        void $ ctxRunWithCollateral ctx newUser (utxoRef eightAdaUtxo) True $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
+        void $ ctxRunBuilderWithCollateral ctx newUser (utxoRef eightAdaUtxo) True $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
     , testCaseSteps "Testing signature from stake key" $ \info -> withSetup info setup $ \ctx -> do
         ----------- Create a new user and fund it
@@ -286,7 +286,7 @@ tests setup = testGroup "gift"
 
         ref <- ctxRun ctx (ctxUserF ctx) $ do
             txBodyRefScript <- addRefScript' (validatorToScript giftValidatorV2) >>= buildTxBody
-            resolveRefScript' (ctxUserF ctx) txBodyRefScript (Some (validatorToScript giftValidatorV2))
+            resolveRefScript' txBodyRefScript (Some (validatorToScript giftValidatorV2))
 
         info $ "Reference at " ++ show ref
 
@@ -313,7 +313,7 @@ tests setup = testGroup "gift"
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
         ref <- ctxRun ctx (ctxUserF ctx) $ do
             txBodyRefScript <- addRefScript (validatorToScript giftValidatorV2) >>= traverse buildTxBody
-            resolveRefScript (ctxUserF ctx) txBodyRefScript (Some (validatorToScript giftValidatorV2))
+            resolveRefScript txBodyRefScript (Some (validatorToScript giftValidatorV2))
 
         info $ "Reference at " ++ show ref
 
@@ -322,7 +322,7 @@ tests setup = testGroup "gift"
             addr <- scriptAddress giftValidatorV2
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-            submitTxBodyConfirmed_ txBodyPlace [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -331,7 +331,7 @@ tests setup = testGroup "gift"
         -- Apparently we MUST NOT include the script if there is a utxo input with that script. Even if we consume that utxo.
         ctxRun ctx (ctxUser2 ctx) $ do
             grabGiftsTx' <- grabGiftsRef ref giftValidatorV2 >>= traverse buildTxBody
-            mapM_ (`submitTxBodyConfirmed` [ctxUser2 ctx]) grabGiftsTx'
+            mapM_ signAndSubmitConfirmed grabGiftsTx'
 
         -- Check final balance
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
@@ -364,7 +364,7 @@ tests setup = testGroup "gift"
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
         ref <- ctxRun ctx (ctxUserF ctx) $ do
             txBodyRefScript <- addRefScript (validatorToScript giftValidatorV2) >>= traverse buildTxBody
-            resolveRefScript (ctxUserF ctx) txBodyRefScript (Some (validatorToScript giftValidatorV2))
+            resolveRefScript txBodyRefScript (Some (validatorToScript giftValidatorV2))
 
         info $ "Reference at " ++ show ref
 
@@ -373,7 +373,7 @@ tests setup = testGroup "gift"
             addr <- scriptAddress giftValidatorV2
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-            submitTxBodyConfirmed_ txBodyPlace [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -385,7 +385,7 @@ tests setup = testGroup "gift"
             -- we need to use 'PlutusV2 here.
             s1 <- grabGifts  @'PlutusV2 giftValidatorV2
             grabGiftsTx' <- traverse buildTxBody $ s1 <|> Just (mustHaveRefInput ref)
-            mapM_ (`submitTxBodyConfirmed` [ctxUser2 ctx]) grabGiftsTx'
+            mapM_ signAndSubmitConfirmed grabGiftsTx'
 
         -- Check final balance
         balance1' <- ctxQueryBalance ctx (ctxUserF ctx)
@@ -416,7 +416,7 @@ tests setup = testGroup "gift"
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
         ref <- ctxRun ctx (ctxUserF ctx) $ do
             txBodyRefScript <- addRefScript (validatorToScript giftValidatorV2) >>= traverse buildTxBody
-            resolveRefScript (ctxUserF ctx) txBodyRefScript (Some (validatorToScript giftValidatorV2))
+            resolveRefScript txBodyRefScript (Some (validatorToScript giftValidatorV2))
 
         info $ "Reference at " ++ show ref
 
@@ -425,7 +425,7 @@ tests setup = testGroup "gift"
             addr <- scriptAddress giftValidatorV2
             txBodyPlaceV2 <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-            submitTxBodyConfirmed_ txBodyPlaceV2 [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBodyPlaceV2
 
         info "Put V2 gifts"
 
@@ -434,7 +434,7 @@ tests setup = testGroup "gift"
             addr <- scriptAddress giftValidatorV1
             txBodyPlaceV1 <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-            submitTxBodyConfirmed_ txBodyPlaceV1 [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBodyPlaceV1
 
         info "Put V1 gifts"
 
@@ -458,7 +458,7 @@ tests setup = testGroup "gift"
             addr <- scriptAddress giftValidatorV1
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
 
-            submitTxBodyConfirmed_ txBodyPlace [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -497,7 +497,7 @@ tests setup = testGroup "gift"
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV2
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-            submitTxBodyConfirmed_ txBodyPlace [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBodyPlace
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -517,7 +517,7 @@ tests setup = testGroup "gift"
 
         ctxRun ctx (ctxUser2 ctx) $ do
             grabGiftsTx' <- grabGifts giftValidatorV2 >>= traverse addNewGiftV2 >>= traverse buildTxBody
-            mapM_ (`submitTxBodyConfirmed` [ctxUser2 ctx]) grabGiftsTx'
+            mapM_ signAndSubmitConfirmed grabGiftsTx'
 
     , testCaseSteps "inlinedatum-v1v2" $ \info -> withSetup info setup $ \ctx -> do
         -- in this test we try to consume v1 and v2 script outputs in the same transaction.
@@ -529,14 +529,14 @@ tests setup = testGroup "gift"
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV1
             txBodyPlace1 <- buildTxBody . mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-            submitTxBodyConfirmed_ txBodyPlace1 [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBodyPlace1
 
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress treatValidatorV2
             txBodyPlace2 <- buildTxBody . mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
                 & gyTxOutDatumL .~ GYTxOutUseInlineDatum
 
-            submitTxBodyConfirmed_ txBodyPlace2 [ctxUserF ctx]
+            signAndSubmitConfirmed_ txBodyPlace2
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -545,7 +545,7 @@ tests setup = testGroup "gift"
           s1 <- grabGifts  @'PlutusV1 giftValidatorV1
           s2 <- grabGifts treatValidatorV2
           grabGiftsTx <- traverse buildTxBody $ s1 <|> s2
-          mapM_ (`submitTxBodyConfirmed` [ctxUser2 ctx]) grabGiftsTx
+          mapM_ signAndSubmitConfirmed grabGiftsTx
 
     , testCaseSteps "inlinedatum-in-v1" $ \info -> withSetup info setup $ \_ctx -> do
         -- in this test we try to consume v1 script output which has inline datums
@@ -561,7 +561,7 @@ tests setup = testGroup "gift"
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
                 & gyTxOutDatumL .~ True
 
-            submitTxBodyConfirmed_ txBodyPlace [ctxUserF ctx]1
+            signAndSubmitConfirmed_ txBodyPlace1
 
         -- wait a tiny bit.
         threadDelay 1_000_000
@@ -581,22 +581,22 @@ giftCleanup ctx = do
     -- grab existing v2 gifts
     ctxRun ctx (ctxUserF ctx) $ do
         skeletonM <- grabGifts  @'PlutusV2 giftValidatorV2 >>= traverse buildTxBody
-        mapM_ (`submitTxBodyConfirmed` [ctxUserF ctx]) skeletonM
+        mapM_ signAndSubmitConfirmed skeletonM
 
     -- grab existing v1 gifts
     ctxRun ctx (ctxUserF ctx) $ do
         skeletonM <- grabGifts  @'PlutusV1 giftValidatorV1 >>= traverse buildTxBody
-        mapM_ (`submitTxBodyConfirmed` [ctxUserF ctx]) skeletonM
+        mapM_ signAndSubmitConfirmed skeletonM
 
     -- grab existing treats
     ctxRun ctx (ctxUserF ctx) $ do
         skeletonM <- grabGifts  @'PlutusV2 treatValidatorV2 >>= traverse buildTxBody
-        mapM_ (`submitTxBodyConfirmed` [ctxUserF ctx]) skeletonM
+        mapM_ signAndSubmitConfirmed skeletonM
 
     threadDelay 1_000_000
 
 grabGifts
-    :: forall u v m. (GYTxMonad m, VersionIsGreaterOrEqual v u)
+    :: forall u v m. (GYTxQueryMonad m, VersionIsGreaterOrEqual v u)
     => GYValidator v
     -> m (Maybe (GYTxSkeleton u))
 grabGifts validator = do
@@ -619,7 +619,7 @@ grabGifts validator = do
 
 -- | Grab gifts using a referenced validator.
 grabGiftsRef
-    :: GYTxMonad m
+    :: GYTxQueryMonad m
     => GYTxOutRef
     -> GYValidator 'PlutusV2
     -> m (Maybe (GYTxSkeleton 'PlutusV2))
@@ -657,18 +657,18 @@ checkCollateral inputValue returnValue totalCollateralLovelace txFee collPer =
   && inputValue == returnValue <> valueFromLovelace totalCollateralLovelace
   where (balanceLovelace, balanceOther) = valueSplitAda $ inputValue `valueMinus` returnValue
 
-resolveRefScript :: User -> Either GYTxOutRef GYTxBody -> Some GYScript -> GYTxMonadIO GYTxOutRef
-resolveRefScript user txBodyRefScript script =
+resolveRefScript :: Either GYTxOutRef GYTxBody -> Some GYScript -> GYTxMonadIO GYTxOutRef
+resolveRefScript txBodyRefScript script =
   case txBodyRefScript of
     Left ref   -> pure ref
-    Right body -> resolveRefScript' user body script
+    Right body -> resolveRefScript' body script
 
-resolveRefScript' :: User -> GYTxBody -> Some GYScript -> GYTxMonadIO GYTxOutRef
-resolveRefScript' user txBodyRefScript script = do
+resolveRefScript' :: GYTxBody -> Some GYScript -> GYTxMonadIO GYTxOutRef
+resolveRefScript' txBodyRefScript script = do
   let refs = findRefScriptsInBody txBodyRefScript
   ref <- case Map.lookup script refs of
       Just ref -> return ref
       Nothing  -> throwAppError $ someBackendError "Shouldn't happen: no ref in body"
 
-  void $ submitTxBodyConfirmed txBodyRefScript [user]
+  void $ signAndSubmitConfirmed_ txBodyRefScript
   return ref

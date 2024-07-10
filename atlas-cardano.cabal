@@ -154,6 +154,7 @@ library
     GeniusYield.Providers.Node.AwaitTx
     GeniusYield.Providers.Node.Query
     GeniusYield.TxBuilder.IO.Query
+    GeniusYield.TxBuilder.IO.Builder
     GeniusYield.Utils
   build-depends:
     , async                 ^>=2.2.5

@@ -121,7 +121,7 @@ providersMashupTests configs =
           let totalSenderFunds = foldMapUTxOs utxoValue senderUTxOs
               valueToSend     = totalSenderFunds `valueMinus` valueFromLovelace 5_000_000
               -- This way, UTxO distribution in test wallet should remain same.
-          txBody <- runGYTxMonadIO nid provider [senderAddress] senderAddress Nothing $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum @'PlutusV2 senderAddress valueToSend
+          txBody <- runGYTxBuilderMonadIO nid provider [senderAddress] senderAddress Nothing $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum @'PlutusV2 senderAddress valueToSend
           delayBySecond
           let signedTxBody = signGYTxBody txBody [skey]
           printf "Signed tx: %s\n" (txToHex signedTxBody)

@@ -33,7 +33,7 @@ exerciseASimpleScript ctx info toUseRefScript = do
     info "Also attaching script to fund UTxO"
   txIdFund <- ctxRun ctx fundUser $ do
     txBodyFund <- buildTxBody $ mustHaveOutput (GYTxOut {gyTxOutValue = valueFromLovelace 100_000_000, gyTxOutRefS = if toUseRefScript then Just (GYSimpleScript multiSigSimpleScript) else Nothing, gyTxOutDatum = Nothing, gyTxOutAddress = multiSigSimpleScriptAddr})
-    submitTxBodyConfirmed txBodyFund [fundUser]
+    signAndSubmitConfirmed txBodyFund
   info $ "Successfully funded the simple script, with tx id: " <> show txIdFund
   info "Now consuming from the simple script"
   let toConsume = txOutRefFromTuple (txIdFund, 0)

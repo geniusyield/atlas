@@ -37,7 +37,7 @@ tests setup = testGroup "misc"
 
         refScript <- ctxRun ctx (ctxUserF ctx) $ do
             txBodyRefScript <- addRefScript policyAsScript >>= traverse buildTxBody
-            resolveRefScript (ctxUserF ctx) txBodyRefScript (Some policyAsScript)
+            resolveRefScript txBodyRefScript (Some policyAsScript)
         -- wait a tiny bit.
         threadDelay 1_000_000
 
@@ -47,7 +47,7 @@ tests setup = testGroup "misc"
             txBodyMint <- buildTxBody $
                  mustHaveInput (GYTxIn utxoAsParam GYTxInWitnessKey)
               <> mustMint (GYMintReference refScript policyAsScript) unitRedeemer tn amt
-            submitTxBodyConfirmed_ txBodyMint [ctxUser2 ctx]
+            signAndSubmitConfirmed_ txBodyMint
 
         -- wait a tiny bit.
         threadDelay 1_000_000

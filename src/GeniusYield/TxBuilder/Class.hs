@@ -25,6 +25,8 @@ module GeniusYield.TxBuilder.Class
     , submitTxBody_
     , submitTxBodyConfirmed
     , submitTxBodyConfirmed_
+    , signAndSubmitConfirmed
+    , signAndSubmitConfirmed_
     , awaitTxConfirmed
     , gyTxSkeletonRefInsToList
     , gyTxSkeletonRefInsSet
@@ -249,6 +251,21 @@ class GYTxQueryMonad m => GYTxUserQueryMonad m where
 
 -- | Class of monads for interacting with the blockchain using transactions.
 class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m) => GYTxMonad m where
+    -- | Sign a transaction body with the user payment key to produce a transaction with witnesses.
+    --
+    -- /Note:/ The key is not meant to be exposed to the monad, so it is only held
+    -- within the closure that signs a given transaction.
+    -- It is recommended to use 'signGYTxBody' and similar to implement this method.
+    signTxBody :: GYTxBody -> m GYTx
+
+    -- | Sign a transaction body with the user payment key AND user stake key to produce
+    -- a transaction with witnesses.
+    -- If the user wallet does not have a stake key, this function should be equivalent to
+    -- 'signTxBody'.
+    --
+    -- See note on 'signTxBody'
+    signTxBodyWithStake :: GYTxBody -> m GYTx
+
     -- | Submit a fully built transaction to the chain.
     --   Use 'buildTxBody' to build a transaction body, and 'signGYTxBody' to
     --   sign it before submitting.
@@ -313,6 +330,12 @@ submitTxBodyConfirmed_ txBody = void . submitTxBodyConfirmed txBody
 submitTxBodyConfirmed :: (GYTxMonad m, ToShelleyWitnessSigningKey a) => GYTxBody -> [a] ->  m GYTxId
 submitTxBodyConfirmed txBody = submitTxConfirmed . signGYTxBody txBody
 
+signAndSubmitConfirmed_ :: GYTxMonad m => GYTxBody -> m ()
+signAndSubmitConfirmed_ = void . signAndSubmitConfirmed
+
+signAndSubmitConfirmed :: GYTxMonad m => GYTxBody -> m GYTxId
+signAndSubmitConfirmed txBody = signTxBody txBody >>= submitTxConfirmed
+
 -------------------------------------------------------------------------------
 -- Instances for useful transformers.
 -------------------------------------------------------------------------------
@@ -351,6 +374,8 @@ instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (RandT g m) where
     stakePools = lift stakePools
 
 instance GYTxMonad m => GYTxMonad (RandT g m) where
+    signTxBody = lift . signTxBody
+    signTxBodyWithStake = lift . signTxBodyWithStake
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
@@ -388,6 +413,8 @@ instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (ReaderT env m) where
     stakePools = lift stakePools
 
 instance GYTxMonad m => GYTxMonad (ReaderT env m) where
+    signTxBody = lift . signTxBody
+    signTxBodyWithStake = lift . signTxBodyWithStake
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
@@ -452,6 +479,8 @@ instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (Strict.StateT s m) wh
     stakePools = lift stakePools
 
 instance GYTxMonad m => GYTxMonad (Strict.StateT s m) where
+    signTxBody = lift . signTxBody
+    signTxBodyWithStake = lift . signTxBodyWithStake
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
@@ -489,6 +518,8 @@ instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (Lazy.StateT s m) wher
     stakePools = lift stakePools
 
 instance GYTxMonad m => GYTxMonad (Lazy.StateT s m) where
+    signTxBody = lift . signTxBody
+    signTxBodyWithStake = lift . signTxBodyWithStake
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
@@ -526,6 +557,8 @@ instance (GYTxSpecialQueryMonad m, Monoid w) => GYTxSpecialQueryMonad (CPS.Write
     stakePools = lift stakePools
 
 instance (GYTxMonad m, Monoid w) => GYTxMonad (CPS.WriterT w m) where
+    signTxBody = lift . signTxBody
+    signTxBodyWithStake = lift . signTxBodyWithStake
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
@@ -563,6 +596,8 @@ instance (GYTxSpecialQueryMonad m, Monoid w) => GYTxSpecialQueryMonad (Strict.Wr
     stakePools = lift stakePools
 
 instance (GYTxMonad m, Monoid w) => GYTxMonad (Strict.WriterT w m) where
+    signTxBody = lift . signTxBody
+    signTxBodyWithStake = lift . signTxBodyWithStake
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
@@ -600,6 +635,8 @@ instance (GYTxSpecialQueryMonad m, Monoid w) => GYTxSpecialQueryMonad (Lazy.Writ
     stakePools = lift stakePools
 
 instance (GYTxMonad m, Monoid w) => GYTxMonad (Lazy.WriterT w m) where
+    signTxBody = lift . signTxBody
+    signTxBodyWithStake = lift . signTxBodyWithStake
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 

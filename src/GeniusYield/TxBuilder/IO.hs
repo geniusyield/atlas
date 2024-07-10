@@ -9,21 +9,23 @@ Stability   : develop
 module GeniusYield.TxBuilder.IO (
     GYTxMonadIO,
     GYTxQueryMonadIO,
+    GYTxBuilderMonadIO,
+    runGYTxBuilderMonadIO,
     runGYTxQueryMonadIO,
     runGYTxMonadIO,
+    queryAsBuilderMonad,
+    liftQueryMonad,
+    liftBuilderMonad
 ) where
 
 
 import           Control.Monad.Reader            (ReaderT(ReaderT), MonadReader, asks)
-import           Control.Monad.IO.Class          (MonadIO (..))
-import           Control.Monad.Trans.Maybe       (MaybeT (runMaybeT))
-import qualified Data.Set                        as Set
+import           Data.Maybe                      (maybeToList)
 
-import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Class
-import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.IO.Query
+import           GeniusYield.TxBuilder.IO.Builder
 import           GeniusYield.Types
 
 -------------------------------------------------------------------------------
@@ -32,7 +34,7 @@ import           GeniusYield.Types
 
 -- | 'GYTxMonad' interpretation run under IO.
 type role GYTxMonadIO representational
-newtype GYTxMonadIO a = GYTxMonadIO (GYTxIOEnv -> GYTxQueryMonadIO a)
+newtype GYTxMonadIO a = GYTxMonadIO (GYTxIOEnv -> GYTxBuilderMonadIO a)
   deriving ( Functor
            , Applicative
            , Monad
@@ -41,55 +43,40 @@ newtype GYTxMonadIO a = GYTxMonadIO (GYTxIOEnv -> GYTxQueryMonadIO a)
            , MonadError GYTxMonadException
            , GYTxQueryMonad
            , GYTxSpecialQueryMonad
+           , GYTxUserQueryMonad
            )
-  via ReaderT GYTxIOEnv GYTxQueryMonadIO
+  via ReaderT GYTxIOEnv GYTxBuilderMonadIO
 
 data GYTxIOEnv = GYTxIOEnv
     { envNid           :: !GYNetworkId
     , envProviders     :: !GYProviders
-    , envAddrs         :: ![GYAddress]
-    , envChangeAddr    :: !GYAddress
-    , envCollateral    :: !(Maybe GYUTxO)
-    , envUsedSomeUTxOs :: !(Set GYTxOutRef)
+    , envPaymentSKey   :: !GYPaymentSigningKey
+    , envStakeSKey     :: !(Maybe GYStakeSigningKey)
     }
 
 -- INTERNAL USAGE ONLY
 -- Do not expose a 'MonadIO' instance. It allows the user to do arbitrary IO within the tx monad.
 ioToTxMonad :: IO a -> GYTxMonadIO a
-ioToTxMonad ioAct = GYTxMonadIO . const $ ioToQueryMonad ioAct
+ioToTxMonad ioAct = GYTxMonadIO . const $ ioToTxBuilderMonad ioAct
 
-instance GYTxUserQueryMonad GYTxMonadIO where
+-- | Lift a 'GYTxBuilderMonadIO' into 'GYTxMonadIO'.
+liftBuilderMonad :: GYTxBuilderMonadIO a -> GYTxMonadIO a
+liftBuilderMonad = GYTxMonadIO . pure
 
-    ownAddresses = asks envAddrs
-
-    ownChangeAddress = asks envChangeAddr
-
-    ownCollateral = asks envCollateral
-
-    availableUTxOs = do
-        addrs         <- ownAddresses
-        mCollateral   <- getCollateral
-        usedSomeUTxOs <- getUsedSomeUTxOs
-        utxos         <- utxosAtAddresses addrs
-        return $ utxosRemoveTxOutRefs (maybe usedSomeUTxOs ((`Set.insert` usedSomeUTxOs) . utxoRef) mCollateral) utxos
-      where
-        getCollateral    = asks envCollateral
-        getUsedSomeUTxOs = asks envUsedSomeUTxOs
-
-    someUTxO lang = do
-        addrs           <- ownAddresses
-        utxosToConsider <- availableUTxOs
-        case lang of
-          PlutusV2 ->
-            case someTxOutRef utxosToConsider  of
-                Just (oref, _) -> return oref
-                Nothing        -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs
-          PlutusV1 ->
-            case find utxoTranslatableToV1 $ utxosToList utxosToConsider of
-              Just u  -> return $ utxoRef u
-              Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
+-- | Lift a 'GYTxQueryMonadIO' into 'GYTxMonadIO'.
+liftQueryMonad :: GYTxQueryMonadIO a -> GYTxMonadIO a
+liftQueryMonad = GYTxMonadIO . pure . queryAsBuilderMonad
 
 instance GYTxMonad GYTxMonadIO where
+    signTxBody txBody = do
+      sKey <- asks envPaymentSKey
+      pure $ signGYTxBody txBody [sKey]
+
+    signTxBodyWithStake txBody = do
+      paymentSKey <- asks envPaymentSKey
+      stakeSKey <- asks envStakeSKey
+      pure . signGYTxBody txBody $ GYSomeSigningKey paymentSKey : (GYSomeSigningKey <$> maybeToList stakeSKey)
+
     submitTx tx = do
         txSubmitter <- asks (gySubmitTx . envProviders)
         ioToTxMonad $ txSubmitter tx
@@ -101,30 +88,17 @@ instance GYTxMonad GYTxMonadIO where
 runGYTxMonadIO
     :: GYNetworkId                      -- ^ Network ID.
     -> GYProviders                      -- ^ Provider.
+    -> GYPaymentSigningKey              -- ^ Payment signing key of the wallet
+    -> Maybe GYStakeSigningKey          -- ^ Stake signing key of the wallet (optional)
     -> [GYAddress]                      -- ^ Addresses belonging to wallet.
     -> GYAddress                        -- ^ Change address.
     -> Maybe (GYTxOutRef, Bool)         -- ^ If `Nothing` is provided, framework would pick up a suitable UTxO as collateral and in such case is also free to spend it. If something is given with boolean being `False` then framework will use the given `GYTxOutRef` as collateral and would reserve it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO is exactly 5 ada.
     -> GYTxMonadIO a
     -> IO a
-runGYTxMonadIO nid providers addrs change collateral action = do
-    collateral' <- obtainCollateral
-
-    runGYTxMonadNode' action GYTxIOEnv
-            { envNid           = nid
-            , envProviders     = providers
-            , envAddrs         = addrs
-            , envChangeAddr    = change
-            , envCollateral    = collateral'
-            , envUsedSomeUTxOs = mempty
+runGYTxMonadIO envNid envProviders envPaymentSKey envStakeSKey envAddrs envChangeAddr collateral (GYTxMonadIO action) = do
+    runGYTxBuilderMonadIO envNid envProviders envAddrs envChangeAddr collateral $ action GYTxIOEnv
+            { envNid
+            , envProviders
+            , envPaymentSKey
+            , envStakeSKey
             }
-    where
-      obtainCollateral :: IO (Maybe GYUTxO)
-      obtainCollateral = runMaybeT $ do
-        (collateralRef, toCheck) <- hoistMaybe collateral
-        collateralUtxo <- liftIO $ gyQueryUtxoAtTxOutRef providers collateralRef
-            >>= maybe (throwIO . GYQueryUTxOException $ GYNoUtxoAtRef collateralRef) pure
-        if not toCheck || (utxoValue collateralUtxo == collateralValue) then return collateralUtxo
-        else hoistMaybe Nothing
-
-runGYTxMonadNode' :: GYTxMonadIO a -> GYTxIOEnv -> IO a
-runGYTxMonadNode' (GYTxMonadIO action) env = runGYTxQueryMonadIO (envNid env) (envProviders env) $ action env

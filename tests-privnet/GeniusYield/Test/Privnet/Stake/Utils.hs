@@ -40,7 +40,7 @@ createMangledUser ctx stakeCred = do
       fundUser = ctxUserF ctx
   ctxRun ctx fundUser $ do
     txBody <- buildTxBody $ mustHaveOutput (mkGYTxOutNoDatum newAddr $ valueFromLovelace 1_000_000_000)
-    submitTxBodyConfirmed_ txBody [fundUser]
+    signAndSubmitConfirmed_ txBody
   pure $ User {userPaymentSKey = newPaymentSKey, userAddr = newAddr, userStakeSKey = Nothing}
 
 userStakeCredential :: User -> GYStakeCredential
@@ -73,21 +73,21 @@ registerStakeCredentialSteps strat user mstakeValHash info ctx = do
     txBodyReg <- ctxRun ctx user $ do
       buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressRegistrationCertificate (resolveStakeCredential user mstakeValHash))
     info $ "-- Registration tx body --\n" <> show txBodyReg <> "\n-- x --\n"
-    ctxRun ctx user $ submitTxBodyConfirmed_ txBodyReg [user]
+    ctxRun ctx user $ signAndSubmitConfirmed_ txBodyReg
 
 delegateStakeCredentialSteps :: GYCoinSelectionStrategy -> User -> Maybe GYStakeValidatorHash -> GYStakePoolId -> (String -> IO ()) -> Ctx -> IO ()
 delegateStakeCredentialSteps strat user mstakeValHash spId info ctx = do
-  txBodyDel <- ctxRun ctx user $ do
+  txBodyDel <- ctxRunBuilder ctx user $ do
     buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressPoolDelegationCertificate (resolveStakeCredential user mstakeValHash) spId (resolveCertWitness (isJust mstakeValHash)))
   info $ "-- Delegation tx body --\n" <> show txBodyDel <> "\n-- x --\n"
-  void . ctxRun ctx user . submitTxBodyConfirmed txBodyDel $ resolveSigningRequirement user mstakeValHash
+  ctxRun ctx user . submitTxBodyConfirmed_ txBodyDel $ resolveSigningRequirement user mstakeValHash
 
 deregisterStakeCredentialSteps :: GYCoinSelectionStrategy -> User -> Maybe GYStakeValidatorHash -> (String -> IO ()) -> Ctx -> IO ()
 deregisterStakeCredentialSteps strat user mstakeValHash info ctx = do
   txBodyDereg <- ctxRun ctx user $ do
     buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressDeregistrationCertificate (resolveStakeCredential user mstakeValHash) (resolveCertWitness (isJust mstakeValHash)))
   info $ "-- Deregistration tx body --\n" <> show txBodyDereg <> "\n-- x --\n"
-  void . ctxRun ctx user . submitTxBodyConfirmed txBodyDereg $ resolveSigningRequirement user mstakeValHash
+  ctxRun ctx user . submitTxBodyConfirmed_ txBodyDereg $ resolveSigningRequirement user mstakeValHash
 
 withdrawRewardsSteps :: GYCoinSelectionStrategy -> User -> Maybe GYStakeValidatorHash -> Natural -> (String -> IO ()) -> Ctx -> IO ()
 withdrawRewardsSteps strat user mstakeValHash rewards info ctx = do
@@ -96,7 +96,7 @@ withdrawRewardsSteps strat user mstakeValHash rewards info ctx = do
       Just _  -> mustHaveOutput (mkGYTxOutNoDatum someAddr mempty)
       Nothing -> mempty
   info $ "-- Withdrawal tx body --\n" <> show txBodyWithdraw <> "\n-- x --\n"
-  void . ctxRun ctx user . submitTxBodyConfirmed txBodyWithdraw $ resolveSigningRequirement user mstakeValHash
+  ctxRun ctx user . submitTxBodyConfirmed_ txBodyWithdraw $ resolveSigningRequirement user mstakeValHash
 
 stakeIntegrationTest :: Maybe GYStakeValidatorHash -> (String -> IO ()) -> Ctx -> IO ()
 stakeIntegrationTest mstakeValHash info ctx = do

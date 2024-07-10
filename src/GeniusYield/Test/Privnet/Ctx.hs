@@ -23,7 +23,8 @@ module GeniusYield.Test.Privnet.Ctx (
     -- * Operations
     ctxRun,
     ctxRunQuery,
-    ctxRunWithCollateral,
+    ctxRunBuilder,
+    ctxRunBuilderWithCollateral,
     ctxSlotOfCurrentBlock,
     ctxWaitNextBlock,
     ctxWaitUntilSlot,
@@ -148,26 +149,34 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
         mustHaveOutput (mkGYTxOutNoDatum newAddr collateralValue)
       else
         mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
-    submitTxBodyConfirmed_ txBody [fundUser]
+    signAndSubmitConfirmed_ txBody
     pure txBody
 
   return $ User {userPaymentSKey = newPaymentSKey, userAddr = newAddr, userStakeSKey = newStakeSKey}
 
 
 ctxRun :: Ctx -> User -> GYTxMonadIO a -> IO a
-ctxRun ctx User {..} = runGYTxMonadIO (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
+ctxRun ctx User {..} = runGYTxMonadIO (ctxNetworkId ctx) (ctxProviders ctx) userPaymentSKey userStakeSKey [userAddr] userAddr Nothing
 
 ctxRunQuery :: Ctx -> GYTxQueryMonadIO a -> IO a
 ctxRunQuery ctx = runGYTxQueryMonadIO (ctxNetworkId ctx) (ctxProviders ctx)
 
+ctxRunBuilder :: Ctx -> User -> GYTxBuilderMonadIO a -> IO a
+ctxRunBuilder ctx User {..} = runGYTxBuilderMonadIO (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
+
 -- | Variant of `ctxRun` where caller can also give the UTxO to be used as collateral.
-ctxRunWithCollateral :: Ctx
+ctxRunBuilderWithCollateral :: Ctx
                      -> User
                      -> GYTxOutRef  -- ^ Reference to UTxO to be used as collateral.
                      -> Bool        -- ^ To check whether this given collateral UTxO has value of exact 5 ada? If it doesn't have exact 5 ada, it would be ignored.
-                     -> GYTxMonadIO a
+                     -> GYTxBuilderMonadIO a
                      -> IO a
-ctxRunWithCollateral ctx User {..} coll toCheck5Ada = runGYTxMonadIO (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr $ Just (coll, toCheck5Ada)
+ctxRunBuilderWithCollateral ctx User {..} coll toCheck5Ada = runGYTxBuilderMonadIO
+    (ctxNetworkId ctx)
+    (ctxProviders ctx)
+    [userAddr]
+    userAddr
+    (Just (coll, toCheck5Ada))
 
 ctxSlotOfCurrentBlock :: Ctx -> IO GYSlot
 ctxSlotOfCurrentBlock (ctxProviders -> providers) =
@@ -219,7 +228,7 @@ addRefScriptCtx ctx user script = ctxRun ctx user $ do
       ref <- case Map.lookup (Some script) refs of
         Just ref -> return ref
         Nothing  -> throwAppError $ someBackendError "Shouldn't happen: no ref in body"
-      submitTxBodyConfirmed_ body [user]
+      signAndSubmitConfirmed_ body
       pure ref
 
 -- | Function to add for a reference input.
@@ -242,5 +251,5 @@ addRefInputCtx ctx user toInline addr ourDatum = ctxRun ctx user $ do
   case mRefInputUtxo of
     Nothing               -> throwAppError $ someBackendError "Shouldn't happen: Couldn't find desired UTxO in tx outputs"
     Just GYUTxO {utxoRef} -> do
-      submitTxBodyConfirmed_ txBody [user]
+      signAndSubmitConfirmed_ txBody
       pure utxoRef

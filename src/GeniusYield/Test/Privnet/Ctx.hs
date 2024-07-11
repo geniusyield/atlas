@@ -142,7 +142,7 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
   -- Our balancer would add minimum ada required for other utxo in case of equality
   when (cucGenerateCollateral && adaInValue < collateralLovelace) $ fail "Given value for new user has less than 5 ada"
 
-  void . ctxRun ctx fundUser $ do
+  ctxRun ctx fundUser $ do
     txBody <- buildTxBody $
       if cucGenerateCollateral then
         mustHaveOutput (mkGYTxOutNoDatum newAddr (otherValue <> (valueFromLovelace adaInValue `valueMinus` collateralValue))) <>
@@ -150,7 +150,6 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
       else
         mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
     signAndSubmitConfirmed_ txBody
-    pure txBody
 
   return $ User {userPaymentSKey = newPaymentSKey, userAddr = newAddr, userStakeSKey = newStakeSKey}
 

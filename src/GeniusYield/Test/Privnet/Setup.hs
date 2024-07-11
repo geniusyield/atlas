@@ -10,6 +10,7 @@ module GeniusYield.Test.Privnet.Setup (
     Setup,
     withPrivnet,
     withSetup,
+    withSetup',
     withSetupOld,
     -- * "Cardano.Testnet" re-exports
     cardanoDefaultTestnetOptions,

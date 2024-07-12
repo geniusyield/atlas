@@ -84,7 +84,7 @@ library
     GeniusYield.ReadJSON
     GeniusYield.Scripts.TestToken
     GeniusYield.Swagger.Utils
-    GeniusYield.Test.Address
+    GeniusYield.Test.Clb
     GeniusYield.Test.FakeCoin
     GeniusYield.Test.Privnet.Asserts
     GeniusYield.Test.Privnet.Ctx
@@ -103,7 +103,6 @@ library
     GeniusYield.Transaction.Common
     GeniusYield.TxBuilder
     GeniusYield.TxBuilder.Class
-    GeniusYield.TxBuilder.Clb
     GeniusYield.TxBuilder.Common
     GeniusYield.TxBuilder.Errors
     GeniusYield.TxBuilder.IO

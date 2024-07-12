@@ -21,7 +21,7 @@ import           GeniusYield.Test.GYTxBody                            (mockTxId)
 import           GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
 import           GeniusYield.Test.Utils
 import           GeniusYield.TxBuilder
-import           GeniusYield.TxBuilder.Clb
+import           GeniusYield.Test.Clb
 import           GeniusYield.Types
 
 gyGuessRefInputDatumValidator :: GYValidator 'PlutusV2

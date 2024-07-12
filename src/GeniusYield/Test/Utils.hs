@@ -80,10 +80,9 @@ import qualified Test.Tasty.QuickCheck            as Tasty
 import qualified Test.Tasty.Runners               as Tasty
 
 import           GeniusYield.Imports
-import           GeniusYield.Test.Address
 import           GeniusYield.Test.FakeCoin
 import           GeniusYield.TxBuilder
-import           GeniusYield.TxBuilder.Clb
+import           GeniusYield.Test.Clb
 import           GeniusYield.Types
 
 -------------------------------------------------------------------------------
@@ -221,19 +220,16 @@ walletPubKeyHash = fromJust . addressToPubKeyHash . walletAddress
 {- | Gets the balance from anything that `HasAddress`. The usual case will be a
      testing wallet.
 -}
-balance :: HasAddress a => a -> GYTxMonadClb GYValue
+balance :: Wallet -> GYTxMonadClb GYValue
 balance a = do
-    nid <- networkId
-    case addressFromPlutus nid $ toAddress a of
-        Left err   -> fail $ show err
-        Right addr -> do
-            utxos <- utxosAtAddress addr Nothing
-            return $ foldMapUTxOs utxoValue utxos
+    let addr = walletAddress a
+    utxos <- utxosAtAddress addr Nothing
+    return $ foldMapUTxOs utxoValue utxos
 
 {- | Computes a `GYTxMonadClb` action and returns the result and how this action
      changed the balance of some "Address".
 -}
-withBalance :: HasAddress a => String -> a -> GYTxMonadClb b -> GYTxMonadClb (b, GYValue)
+withBalance :: String -> Wallet -> GYTxMonadClb b -> GYTxMonadClb (b, GYValue)
 withBalance n a m = do
     old <- balance a
     b   <- m

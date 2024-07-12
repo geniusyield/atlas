@@ -1,14 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
 
 {-|
-Module      : GeniusYield.TxBuilder.Clb
+Module      : GeniusYield.Test.Clb
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
 
 -}
-module GeniusYield.TxBuilder.Clb
+module GeniusYield.Test.Clb
     ( Wallet (..)
     , WalletName
     , GYTxRunState (..)
@@ -73,7 +73,6 @@ import           GeniusYield.Transaction                   (GYBuildTxError (GYBu
                                                             GYBalancingError(GYBalancingErrorInsufficientFunds))
 import           GeniusYield.Transaction.Common            (adjustTxOut,
                                                             minimumUTxO)
-import           GeniusYield.Test.Address
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
@@ -96,9 +95,6 @@ data Wallet = Wallet
 walletAddress :: Wallet -> GYAddress
 walletAddress Wallet{..} = addressFromPaymentKeyHash walletNetworkId $ paymentKeyHash $
                            paymentVerificationKey walletPaymentSigningKey
-
-instance HasAddress Wallet where
-    toAddress = addressToPlutus . walletAddress
 
 newtype GYTxRunEnv = GYTxRunEnv { runEnvWallet :: Wallet }
 

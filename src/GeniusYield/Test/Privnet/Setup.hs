@@ -177,20 +177,20 @@ withPrivnet testnetOpts setupUser = do
                 debug $ printf "userF = %s\n" (show idx)
                 userAddr <- addressFromBech32 <$> urlPieceFromText paymentKeyInfoAddr
                 debug $ printf "userF addr = %s\n" userAddr
-                userPaymentSKey <- readPaymentSigningKey $ paymentSKey paymentKeyInfoPair
-                debug $ printf "userF skey = %s\n" userPaymentSKey
-                pure User {userPaymentSKey, userStakeSKey=Nothing, userAddr}
+                userPaymentSKey' <- readPaymentSigningKey $ paymentSKey paymentKeyInfoPair
+                debug $ printf "userF skey = %s\n" userPaymentSKey'
+                pure User' {userPaymentSKey', userStakeSKey'=Nothing, userAddr}
 
         -- Generate upto 9 users.
         let extraIndices = [length genesisUsers + 1..9]
         extraUsers <- fmap V.fromList . forM extraIndices $ \idx -> do
-            User {userPaymentSKey, userAddr, userStakeSKey} <- generateUser runtimeNetworkId
+            User' {userPaymentSKey', userAddr, userStakeSKey'} <- generateUser runtimeNetworkId
             debug $ printf "user = %s\n" (show idx)
             debug $ printf "user addr = %s\n" userAddr
-            debug $ printf "user skey = %s\n" (show userPaymentSKey)
-            debug $ printf "user vkey = %s\n" (show $ paymentVerificationKey userPaymentSKey)
-            debug $ printf "user pkh  = %s\n" (show $ paymentKeyHash $ paymentVerificationKey userPaymentSKey)
-            pure User {userPaymentSKey, userAddr, userStakeSKey}
+            debug $ printf "user skey = %s\n" (show userPaymentSKey')
+            debug $ printf "user vkey = %s\n" (show $ paymentVerificationKey userPaymentSKey')
+            debug $ printf "user pkh  = %s\n" (show $ paymentKeyHash $ paymentVerificationKey userPaymentSKey')
+            pure User' {userPaymentSKey', userAddr, userStakeSKey'}
 
         -- Further down we need local node connection
         let info :: Api.LocalNodeConnectInfo
@@ -248,10 +248,10 @@ withPrivnet testnetOpts setupUser = do
                     }
 
             userBalances <- V.mapM
-                (\(i, User{userAddr=userIaddr}) -> do
+                (\(i, User'{userAddr=userIaddr}) -> do
                     userIbalance <- ctxRunQuery ctx0 $ queryBalance userIaddr
                     when (isEmptyValue userIbalance) $ do
-                        debug $ printf "User %s balance is empty, giving some ada\n" (show i)
+                        debug $ printf "User' %s balance is empty, giving some ada\n" (show i)
                         giveAda ctx0 userIaddr
                         when (i == 0) (giveAda ctx0 . userAddr $ ctxUserF ctx0) -- we also give ada to itself to create some small utxos
                     ctxRunQuery ctx0 $ queryBalance userIaddr
@@ -276,7 +276,7 @@ withPrivnet testnetOpts setupUser = do
             mapM_
                 (\(i, userIbalance, user) -> do
                     when (isEmptyValue $ snd $ valueSplitAda userIbalance) $ do
-                        debug $ printf "User%s has no tokens, giving some\n" (show i)
+                        debug $ printf "User'%s has no tokens, giving some\n" (show i)
                         giveTokens ctx (userAddr user)
                 )
                 $ V.zip3
@@ -309,7 +309,7 @@ generateUser network = do
                 stake
             )
 
-    pure User {userPaymentSKey=paymentSigningKeyFromApi skey, userAddr=addr, userStakeSKey=Nothing}
+    pure User' {userPaymentSKey'=paymentSigningKeyFromApi skey, userAddr=addr, userStakeSKey'=Nothing}
   where
     stake   = Api.NoStakeAddress
 

@@ -41,7 +41,7 @@ createMangledUser ctx stakeCred = do
   ctxRun ctx fundUser $ do
     txBody <- buildTxBody $ mustHaveOutput (mkGYTxOutNoDatum newAddr $ valueFromLovelace 1_000_000_000)
     signAndSubmitConfirmed_ txBody
-  pure $ User {userPaymentSKey = newPaymentSKey, userAddr = newAddr, userStakeSKey = Nothing}
+  pure $ User' {userPaymentSKey' = newPaymentSKey, userAddr = newAddr, userStakeSKey' = Nothing}
 
 userStakeCredential :: User -> GYStakeCredential
 userStakeCredential user = userStakePkh user & fromJust & GYStakeCredentialByKey
@@ -53,7 +53,7 @@ resolveStakeAddress :: GYNetworkId -> User -> Maybe GYStakeValidatorHash -> GYSt
 resolveStakeAddress privnetNetworkId user = stakeAddressFromCredential privnetNetworkId . resolveStakeCredential user
 
 resolveSigningRequirement :: User -> Maybe GYStakeValidatorHash -> [GYSomeSigningKey]
-resolveSigningRequirement User {..} mstakeValHash = GYSomeSigningKey userPaymentSKey : ([userStakeSKey & fromJust & GYSomeSigningKey | isNothing mstakeValHash])
+resolveSigningRequirement User' {..} mstakeValHash = GYSomeSigningKey userPaymentSKey' : ([userStakeSKey' & fromJust & GYSomeSigningKey | isNothing mstakeValHash])
 
 resolveCertWitness :: Bool -> GYTxCertWitness 'PlutusV2
 resolveCertWitness isScript = if not isScript then GYTxCertWitnessKey else GYTxCertWitnessScript (GYStakeValScript aStakeValidator) unitRedeemer

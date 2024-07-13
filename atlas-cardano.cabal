@@ -34,7 +34,7 @@ common common
     OverloadedStrings
     RecordWildCards
     RoleAnnotations
-    TypeFamilies
+    TypeFamilyDependencies
     UndecidableInstances
     ViewPatterns
 
@@ -106,6 +106,7 @@ library
     GeniusYield.TxBuilder.Common
     GeniusYield.TxBuilder.Errors
     GeniusYield.TxBuilder.IO
+    GeniusYield.TxBuilder.User
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address

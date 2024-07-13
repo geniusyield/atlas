@@ -49,7 +49,6 @@ import           GeniusYield.Providers.Node
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 import           Test.Tasty.HUnit           (assertFailure)
-import           GeniusYield.Types.Key.Class (ToShelleyWitnessSigningKey (toShelleyWitnessSigningKey))
 
 data CreateUserConfig =
      CreateUserConfig
@@ -62,35 +61,6 @@ data CreateUserConfig =
 instance Default CreateUserConfig where
    def = CreateUserConfig { cucGenerateCollateral = False, cucGenerateStakeKey = False }
 
--- | Note: When signing using 'ToShelleyWitnessSigningKey' instance, it only uses the payment signing key.
-data User = User
-    { userPaymentSKey :: !GYPaymentSigningKey
-    , userStakeSKey   :: !(Maybe GYStakeSigningKey)
-    , userAddr        :: !GYAddress
-    }
-
--- | This only takes the payment signing key, not the stake key.
-instance ToShelleyWitnessSigningKey User where
-    toShelleyWitnessSigningKey = toShelleyWitnessSigningKey . userPaymentSKey
-
-{-# DEPRECATED userVKey "Use userPaymentVKey." #-}
-userVKey :: User -> GYPaymentVerificationKey
-userVKey = paymentVerificationKey . userPaymentSKey
-
-userPaymentVKey :: User -> GYPaymentVerificationKey
-userPaymentVKey = userVKey
-
-userStakeVKey :: User -> Maybe GYStakeVerificationKey
-userStakeVKey = fmap stakeVerificationKey . userStakeSKey
-
-userPkh :: User -> GYPubKeyHash
-userPkh = toPubKeyHash . paymentKeyHash . paymentVerificationKey . userPaymentSKey
-
-userPaymentPkh :: User -> GYPaymentKeyHash
-userPaymentPkh = paymentKeyHash . paymentVerificationKey . userPaymentSKey
-
-userStakePkh :: User -> Maybe GYStakeKeyHash
-userStakePkh = fmap (stakeKeyHash . stakeVerificationKey) . userStakeSKey
 
 data Ctx = Ctx
     { ctxNetworkInfo       :: !GYNetworkInfo
@@ -151,17 +121,17 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
         mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
     signAndSubmitConfirmed_ txBody
 
-  return $ User {userPaymentSKey = newPaymentSKey, userAddr = newAddr, userStakeSKey = newStakeSKey}
+  pure $ User' {userPaymentSKey' = newPaymentSKey, userAddr = newAddr, userStakeSKey' = newStakeSKey}
 
 
 ctxRun :: Ctx -> User -> GYTxMonadIO a -> IO a
-ctxRun ctx User {..} = runGYTxMonadIO (ctxNetworkId ctx) (ctxProviders ctx) userPaymentSKey userStakeSKey [userAddr] userAddr Nothing
+ctxRun ctx User' {..} = runGYTxMonadIO (ctxNetworkId ctx) (ctxProviders ctx) userPaymentSKey' userStakeSKey' [userAddr] userAddr Nothing
 
 ctxRunQuery :: Ctx -> GYTxQueryMonadIO a -> IO a
 ctxRunQuery ctx = runGYTxQueryMonadIO (ctxNetworkId ctx) (ctxProviders ctx)
 
 ctxRunBuilder :: Ctx -> User -> GYTxBuilderMonadIO a -> IO a
-ctxRunBuilder ctx User {..} = runGYTxBuilderMonadIO (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
+ctxRunBuilder ctx User' {..} = runGYTxBuilderMonadIO (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
 
 -- | Variant of `ctxRun` where caller can also give the UTxO to be used as collateral.
 ctxRunBuilderWithCollateral :: Ctx
@@ -170,7 +140,7 @@ ctxRunBuilderWithCollateral :: Ctx
                      -> Bool        -- ^ To check whether this given collateral UTxO has value of exact 5 ada? If it doesn't have exact 5 ada, it would be ignored.
                      -> GYTxBuilderMonadIO a
                      -> IO a
-ctxRunBuilderWithCollateral ctx User {..} coll toCheck5Ada = runGYTxBuilderMonadIO
+ctxRunBuilderWithCollateral ctx User' {..} coll toCheck5Ada = runGYTxBuilderMonadIO
     (ctxNetworkId ctx)
     (ctxProviders ctx)
     [userAddr]

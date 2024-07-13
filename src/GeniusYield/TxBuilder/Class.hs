@@ -10,12 +10,14 @@ Stability   : develop
 module GeniusYield.TxBuilder.Class
     ( MonadError (..)
     , MonadRandom (..)
+    , GYTxGameMonad (..)
     , GYTxMonad (..)
     , GYTxQueryMonad (..)
     , GYTxSpecialQueryMonad (..)
     , GYTxUserQueryMonad (..)
     , GYTxSkeleton (..)
     , GYTxSkeletonRefIns (..)
+    , waitNSlots
     , submitTx_
     , submitTxConfirmed
     , submitTxConfirmed_
@@ -108,8 +110,10 @@ import           Data.Maybe                   (listToMaybe)
 import qualified Data.Set                     as Set
 import qualified Data.Text                    as Txt
 import           Data.Time                    (diffUTCTime, getCurrentTime)
+import           Data.Word                    (Word64)
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
+import           GeniusYield.TxBuilder.User
 import           GeniusYield.Types
 import           GeniusYield.Types.Key.Class  (ToShelleyWitnessSigningKey)
 import           GHC.Stack                    (withFrozenCallStack)
@@ -285,6 +289,46 @@ class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m) => GYTxMonad m where
     -- by the identified transaction.
     awaitTxConfirmed' :: GYAwaitTxParameters -> GYTxId -> m ()
 
+-- | Class of monads that can simulate a "game" between different users interacting with transactions.
+class (GYTxMonad (TxMonadOf m), GYTxSpecialQueryMonad m) => GYTxGameMonad m where
+    -- | Type of the supported 'GYTxMonad' instance that can participate within the "game".
+    type TxMonadOf m = (r :: Type -> Type) | r -> m
+    -- | Lift the supported 'GYTxMonad' instance into the game, as a participating user wallet.
+    asUser :: User -> TxMonadOf m a -> m a
+    -- | Wait until the chain tip is at given slot number.
+    waitUntilSlot :: GYSlot -> m GYSlot
+    -- | Wait until the chain tip is at the next block.
+    waitForNextBlock :: m GYSlot
+
+{- Note [Higher order effects, TxMonadOf, and GYTxGameMonad]
+
+'GYTxGameMonad' is designed to give the implementor two choices: either make it a different data type
+from its associated 'GYTxMonad' instance (such is the case for 'GYTxGameMonadIO' and 'GYTxMonadIO'), or
+make the same data type a 'GYTxMonad' and 'GYTxGameMonad'.
+
+The former would not be possible if 'GYTxGameMonad' was subsumed into 'GYTxMonad', or if the 'TxMonadOf' type family
+was not present. Thus, both the seperation and the type family are the result of a conscious design decision.
+
+It's important to allow the former case since it avoids making 'asUser' a higher order effect, unconditionally. Higher
+order effects can be problematic. If, in the future, we are to use a proper effect system - we'd like to avoid having to
+deal with higher order effects wherever feasible.
+
+As to why the type family is injective, the goal is to have a unique 'GYTxMonad' instance for each 'GYTxGameMonad'. This
+makes type checking easier regardless of the implementation choice above. Thus, one can have a block of 'GYTxGameMonad' code
+with a bunch of 'asUser' calls sprinkled in with blocks of 'GYTxMonad' code, and no extraneous type signatures would be necessary.
+Just one type inference (or signature) on the top most call that runs the 'GYTxGameMonad' code block, and all the 'asUser' code blocks
+will be automatically inferred.
+-}
+
+-- | Wait until the chain tip has progressed by N slots.
+waitNSlots :: GYTxGameMonad m => Word64 -> m GYSlot
+waitNSlots (slotFromWord64 -> n) = do
+    -- FIXME: Does this need to be an absolute slot getter instead?
+    currentSlot <- slotOfCurrentBlock
+    waitUntilSlot . slotFromApi $ currentSlot `addSlots` n
+  where
+    addSlots = (+) `on` slotToApi
+
 -- | > submitTx_ = void . submitTx
 submitTx_ :: GYTxMonad m => GYTx -> m ()
 submitTx_ = void . submitTx
@@ -339,6 +383,25 @@ signAndSubmitConfirmed txBody = signTxBody txBody >>= submitTxConfirmed
 -------------------------------------------------------------------------------
 -- Instances for useful transformers.
 -------------------------------------------------------------------------------
+
+{- Note [GYTxGameMonad instances for transformers]
+
+No 'GYTxGameMonad' instances are provided for any transformer. This is intentional.
+The design of 'GYTxGameMonad' has some intricate decisions. See note
+"Higher order effects, TxMonadOf, and GYTxGameMonad" above.
+
+Since 'TxMonadOf' is an injective type family, it is impossible to make transformer
+instances in the likes of 'TxMonadOf (ReaderT env m) = TxMonadOf m'. Each 'GYTxGameMonad'
+instance is expected to have its own unique 'GYTxMonad' instance. So
+'GYTxGameMonad m => ReaderT env m' and 'GYTxGameMonad m => m' can't both use the same 'GYTxMonad'
+instance.
+
+The solution to this is to simply have a wrapper data type that brings generativity to the table.
+Such as 'data ReaderTTxMonad m a = ReaderTTxMonad ((TxMonadOf m) a)' or similar.
+
+Since these wrapper data types are usage specific, and 'GYTxGameMonad' instances are meant to be some
+"overarching base" type, we do not provide these instances and users may define them if necessary.
+-}
 
 instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     networkId = lift networkId

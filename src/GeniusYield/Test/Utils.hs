@@ -23,7 +23,6 @@ module GeniusYield.Test.Utils
     , withWalletBalancesCheckSimpleIgnoreMinDepFor
     , getBalance
     , getBalances
-    , waitUntilSlot
     , findLockedUtxosInBody
     , utxosInBody
     , addRefScript
@@ -398,11 +397,6 @@ pureGen = mkStdGen 42
 {- -----------------------------------------------------------------------------
   CLB
 ----------------------------------------------------------------------------- -}
-
--- | Waits until a certain 'GYSlot'.
--- Silently returns if the given slot is greater than the current slot.
-waitUntilSlot :: GYSlot -> GYTxMonadClb ()
-waitUntilSlot slot = liftClb $ Clb.waitSlot $ slotToApi slot
 
 -- | Variant of `logInfo` from @Clb@ that logs a string with @Info@ severity.
 logInfoS :: Monad m => String -> Clb.ClbT m ()

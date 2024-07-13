@@ -104,11 +104,11 @@ runGYTxBuilderMonadIO envNid envProviders envAddrs envChangeAddr collateral (GYT
     collateral' <- obtainCollateral
 
     runGYTxQueryMonadIO envNid envProviders $ action GYTxBuilderIOEnv
-            { envAddrs
-            , envChangeAddr
-            , envCollateral    = collateral'
-            , envUsedSomeUTxOs = mempty
-            }
+        { envAddrs
+        , envChangeAddr
+        , envCollateral    = collateral'
+        , envUsedSomeUTxOs = mempty
+        }
     where
       obtainCollateral :: IO (Maybe GYUTxO)
       obtainCollateral = runMaybeT $ do

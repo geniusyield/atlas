@@ -7,7 +7,12 @@ Stability   : develop
 
 -}
 module GeniusYield.TxBuilder.Common
-    ( GYTxBuildResult (..)
+    ( GYTxSkeleton (..)
+    , GYTxSkeletonRefIns (..)
+    , emptyGYTxSkeleton
+    , gyTxSkeletonRefInsToList
+    , gyTxSkeletonRefInsSet
+    , GYTxBuildResult (..)
     , buildTxCore
     , collateralLovelace
     , collateralValue
@@ -19,6 +24,9 @@ import qualified Cardano.Api                    as Api
 import qualified Cardano.Api.Shelley            as Api.S
 import qualified Cardano.Ledger.Alonzo.Core     as Ledger
 import           Control.Applicative            ((<|>))
+import           Control.Monad.Except           (MonadError (throwError))
+import           Control.Monad.Random           (MonadRandom)
+import           Data.List                      (nubBy)
 import           Data.List.NonEmpty             (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty             as NE
 import qualified Data.Map.Strict                as Map
@@ -28,9 +36,105 @@ import qualified Data.Set                       as Set
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
 import           GeniusYield.Transaction.Common (minimumUTxO)
-import           GeniusYield.TxBuilder.Class
+import           GeniusYield.TxBuilder.Query.Class
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+
+-------------------------------------------------------------------------------
+-- Transaction skeleton
+-------------------------------------------------------------------------------
+
+-- | Transaction skeleton
+--
+-- /Note:/ let's add fields as we need them.
+--
+-- The parameter @v@ indicates the minimum version of scripts allowed
+-- as inputs.
+--
+data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
+    { gytxIns           :: ![GYTxIn v]
+    , gytxOuts          :: ![GYTxOut v]
+    , gytxRefIns        :: !(GYTxSkeletonRefIns v)
+    , gytxMint          :: !(Map (GYMintScript v) (Map GYTokenName Integer, GYRedeemer))
+    , gytxWdrls         :: ![GYTxWdrl v]
+    , gytxSigs          :: !(Set GYPubKeyHash)
+    , gytxCerts         :: ![GYTxCert v]
+    , gytxInvalidBefore :: !(Maybe GYSlot)
+    , gytxInvalidAfter  :: !(Maybe GYSlot)
+    , gytxMetadata      :: !(Maybe GYTxMetadata)
+    } deriving Show
+
+data GYTxSkeletonRefIns :: PlutusVersion -> Type where
+    GYTxSkeletonRefIns :: VersionIsGreaterOrEqual v 'PlutusV2 => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
+    GYTxSkeletonNoRefIns :: GYTxSkeletonRefIns v
+
+deriving instance Show (GYTxSkeletonRefIns v)
+deriving instance Eq (GYTxSkeletonRefIns v)
+
+gyTxSkeletonRefInsToList :: GYTxSkeletonRefIns v -> [GYTxOutRef]
+gyTxSkeletonRefInsToList = Set.toList . gyTxSkeletonRefInsSet
+
+gyTxSkeletonRefInsSet :: GYTxSkeletonRefIns v -> Set GYTxOutRef
+gyTxSkeletonRefInsSet (GYTxSkeletonRefIns xs) = xs
+gyTxSkeletonRefInsSet GYTxSkeletonNoRefIns    = Set.empty
+
+instance Semigroup (GYTxSkeletonRefIns v) where
+    GYTxSkeletonRefIns a <> GYTxSkeletonRefIns b = GYTxSkeletonRefIns (Set.union a b)
+    GYTxSkeletonRefIns a <> GYTxSkeletonNoRefIns = GYTxSkeletonRefIns a
+    GYTxSkeletonNoRefIns <> GYTxSkeletonRefIns b = GYTxSkeletonRefIns b
+    GYTxSkeletonNoRefIns <> GYTxSkeletonNoRefIns = GYTxSkeletonNoRefIns
+
+emptyGYTxSkeleton :: GYTxSkeleton v
+emptyGYTxSkeleton = GYTxSkeleton
+    { gytxIns           = []
+    , gytxOuts          = []
+    , gytxRefIns        = GYTxSkeletonNoRefIns
+    , gytxMint          = Map.empty
+    , gytxWdrls         = []
+    , gytxSigs          = Set.empty
+    , gytxCerts         = []
+    , gytxInvalidBefore = Nothing
+    , gytxInvalidAfter  = Nothing
+    , gytxMetadata      = Nothing
+    }
+
+instance Semigroup (GYTxSkeleton v) where
+    x <> y = GYTxSkeleton
+        { gytxIns           = combineIns (gytxIns x) (gytxIns y)
+        , gytxOuts          = gytxOuts x ++ gytxOuts y
+        , gytxRefIns        = gytxRefIns x <> gytxRefIns y
+        , gytxMint          = combineMint (gytxMint x) (gytxMint y)
+        , gytxWdrls         = combineWdrls (gytxWdrls x) (gytxWdrls y)
+        , gytxSigs          = Set.union (gytxSigs x) (gytxSigs y)
+        , gytxCerts         = gytxCerts x <> gytxCerts y
+        , gytxInvalidBefore = combineInvalidBefore (gytxInvalidBefore x) (gytxInvalidBefore y)
+        , gytxInvalidAfter  = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
+        , gytxMetadata      = gytxMetadata x <> gytxMetadata y
+        }
+      where
+        -- we keep only one input per utxo to spend
+        combineIns u v = nubBy ((==) `on` gyTxInTxOutRef) (u ++ v)
+        -- we cannot combine redeemers, so we just pick first.
+        combineMint = Map.unionWith (\(amt, r) (amt', _r) -> (Map.unionWith (+) amt amt', r))
+        -- we keep only one withdrawal per stake address
+        combineWdrls u v = nubBy ((==) `on` gyTxWdrlStakeAddress) (u ++ v)
+
+        combineInvalidBefore :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
+        combineInvalidBefore m        Nothing  = m
+        combineInvalidBefore Nothing  n        = n
+        combineInvalidBefore (Just s) (Just t) = Just (max s t)
+
+        combineInvalidAfter :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
+        combineInvalidAfter m        Nothing  = m
+        combineInvalidAfter Nothing  n        = n
+        combineInvalidAfter (Just s) (Just t) = Just (min s t)
+
+instance Monoid (GYTxSkeleton v) where
+    mempty = emptyGYTxSkeleton
+
+-------------------------------------------------------------------------------
+-- Transaction building
+-------------------------------------------------------------------------------
 
 {- | Result of building 'GYTxBody's with the option of recovery from error.
 

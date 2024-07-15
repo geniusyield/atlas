@@ -11,11 +11,15 @@ module GeniusYield.TxBuilder.Class
     , MonadRandom (..)
     , GYTxGameMonad (..)
     , GYTxMonad (..)
+    , signTxBodyImpl
+    , signTxBodyWithStakeImpl
+    , GYTxBuilderMonad (..)
     , GYTxQueryMonad (..)
     , GYTxSpecialQueryMonad (..)
     , GYTxUserQueryMonad (..)
     , GYTxSkeleton (..)
     , GYTxSkeletonRefIns (..)
+    , buildTxBody
     , waitNSlots
     , submitTx_
     , submitTxConfirmed
@@ -91,6 +95,7 @@ module GeniusYield.TxBuilder.Class
     , wt
     ) where
 
+import qualified Cardano.Api                  as Api
 import           Control.Monad.Except         (MonadError (..), liftEither)
 import qualified Control.Monad.State.Strict   as Strict
 import qualified Control.Monad.State.Lazy     as Lazy
@@ -100,14 +105,17 @@ import qualified Control.Monad.Writer.Lazy    as Lazy
 import           Control.Monad.IO.Class       (MonadIO (..))
 import           Control.Monad.Random         (MonadRandom (..), RandT, lift)
 import           Control.Monad.Reader         (ReaderT)
-import           Data.Default                 (def)
-import           Data.List                    (nubBy)
+import           Data.Default                 (def, Default)
+import qualified Data.List.NonEmpty           as NE
 import qualified Data.Map.Strict              as Map
+import           Data.Maybe                   (maybeToList)
 import qualified Data.Set                     as Set
 import qualified Data.Text                    as Txt
 import           Data.Time                    (diffUTCTime, getCurrentTime)
 import           Data.Word                    (Word64)
 import           GeniusYield.Imports
+import           GeniusYield.Transaction
+import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.Query.Class
 import           GeniusYield.TxBuilder.User
@@ -120,9 +128,24 @@ import qualified PlutusLedgerApi.V1           as Plutus (Address, DatumHash,
                                                          TxOutRef, Value)
 import qualified PlutusLedgerApi.V1.Value     as Plutus (AssetClass)
 
+-- | Class of monads for building transactions. This can be default derived if the requirements are met.
+-- Specifically, set 'TxBuilderStrategy' to 'GYCoinSelectionStrategy' if you wish to use the default in-house
+-- transaction building implementation.
+class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, Default (TxBuilderStrategy m)) => GYTxBuilderMonad m where
+    type TxBuilderStrategy m :: Type
+    type TxBuilderStrategy m = GYCoinSelectionStrategy
+    buildTxBodyWithStrategy :: forall v. TxBuilderStrategy m -> GYTxSkeleton v -> m GYTxBody
+    default buildTxBodyWithStrategy :: forall v. (MonadRandom m, TxBuilderStrategy m ~ GYCoinSelectionStrategy)
+                                    => TxBuilderStrategy m
+                                    -> GYTxSkeleton v
+                                    -> m GYTxBody
+    buildTxBodyWithStrategy = buildTxBodyWithStrategy'
+
+buildTxBody :: GYTxBuilderMonad m => GYTxSkeleton v -> m GYTxBody
+buildTxBody = buildTxBodyWithStrategy def
 
 -- | Class of monads for interacting with the blockchain using transactions.
-class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m) => GYTxMonad m where
+class GYTxBuilderMonad m => GYTxMonad m where
     -- | Sign a transaction body with the user payment key to produce a transaction with witnesses.
     --
     -- /Note:/ The key is not meant to be exposed to the monad, so it is only held
@@ -156,6 +179,12 @@ class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m) => GYTxMonad m where
     -- /Law:/ Queries made after a call to 'awaitTxConfirmed'' should reflect changes made to the chain
     -- by the identified transaction.
     awaitTxConfirmed' :: GYAwaitTxParameters -> GYTxId -> m ()
+
+signTxBodyImpl :: GYTxMonad m => m GYPaymentSigningKey -> GYTxBody -> m GYTx
+signTxBodyImpl kM txBody = signGYTxBody txBody . (:[]) <$> kM
+
+signTxBodyWithStakeImpl :: GYTxMonad m => m (GYPaymentSigningKey, Maybe GYStakeSigningKey) -> GYTxBody -> m GYTx
+signTxBodyWithStakeImpl kM txBody = (\(pKey, sKey) -> signGYTxBody txBody $ GYSomeSigningKey pKey : maybeToList (GYSomeSigningKey <$> sKey)) <$> kM
 
 -- | Class of monads that can simulate a "game" between different users interacting with transactions.
 class (GYTxMonad (TxMonadOf m), GYTxSpecialQueryMonad m) => GYTxGameMonad m where
@@ -271,6 +300,9 @@ Since these wrapper data types are usage specific, and 'GYTxGameMonad' instances
 "overarching base" type, we do not provide these instances and users may define them if necessary.
 -}
 
+instance GYTxBuilderMonad m => GYTxBuilderMonad (RandT g m) where
+    type TxBuilderStrategy (RandT g m) = TxBuilderStrategy m
+    buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
 
 instance GYTxMonad m => GYTxMonad (RandT g m) where
     signTxBody = lift . signTxBody
@@ -278,6 +310,9 @@ instance GYTxMonad m => GYTxMonad (RandT g m) where
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
+instance GYTxBuilderMonad m => GYTxBuilderMonad (ReaderT env m) where
+    type TxBuilderStrategy (ReaderT env m) = TxBuilderStrategy m
+    buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
 
 instance GYTxMonad m => GYTxMonad (ReaderT env m) where
     signTxBody = lift . signTxBody
@@ -291,6 +326,9 @@ instance GYTxMonad m => GYTxMonad (ReaderT env m) where
 --    See: https://github.com/haskell-effectful/effectful/blob/master/transformers.md
 -------------------------------------------------------------------------------
 
+instance GYTxBuilderMonad m => GYTxBuilderMonad (Strict.StateT s m) where
+    type TxBuilderStrategy (Strict.StateT s m) = TxBuilderStrategy m
+    buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
 
 instance GYTxMonad m => GYTxMonad (Strict.StateT s m) where
     signTxBody = lift . signTxBody
@@ -298,6 +336,9 @@ instance GYTxMonad m => GYTxMonad (Strict.StateT s m) where
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
+instance GYTxBuilderMonad m => GYTxBuilderMonad (Lazy.StateT s m) where
+    type TxBuilderStrategy (Lazy.StateT s m) = TxBuilderStrategy m
+    buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
 
 instance GYTxMonad m => GYTxMonad (Lazy.StateT s m) where
     signTxBody = lift . signTxBody
@@ -305,6 +346,9 @@ instance GYTxMonad m => GYTxMonad (Lazy.StateT s m) where
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
+instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (CPS.WriterT w m) where
+    type TxBuilderStrategy (CPS.WriterT w m) = TxBuilderStrategy m
+    buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
 
 instance (GYTxMonad m, Monoid w) => GYTxMonad (CPS.WriterT w m) where
     signTxBody = lift . signTxBody
@@ -312,6 +356,9 @@ instance (GYTxMonad m, Monoid w) => GYTxMonad (CPS.WriterT w m) where
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
+instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (Strict.WriterT w m) where
+    type TxBuilderStrategy (Strict.WriterT w m) = TxBuilderStrategy m
+    buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
 
 instance (GYTxMonad m, Monoid w) => GYTxMonad (Strict.WriterT w m) where
     signTxBody = lift . signTxBody
@@ -319,6 +366,9 @@ instance (GYTxMonad m, Monoid w) => GYTxMonad (Strict.WriterT w m) where
     submitTx = lift . submitTx
     awaitTxConfirmed' p = lift . awaitTxConfirmed' p
 
+instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (Lazy.WriterT w m) where
+    type TxBuilderStrategy (Lazy.WriterT w m) = TxBuilderStrategy m
+    buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
 
 instance (GYTxMonad m, Monoid w) => GYTxMonad (Lazy.WriterT w m) where
     signTxBody = lift . signTxBody
@@ -381,98 +431,6 @@ enclosingSlotFromTime' :: GYTxQueryMonad m => GYTime -> m GYSlot
 enclosingSlotFromTime' x = do
     sysStart <- gyscSystemStart <$> slotConfig
     enclosingSlotFromTime x >>= maybe (throwError $ GYTimeUnderflowException sysStart x) pure
-
--------------------------------------------------------------------------------
--- Transaction skeleton
--------------------------------------------------------------------------------
-
--- | Transaction skeleton
---
--- /Note:/ let's add fields as we need them.
---
--- The parameter @v@ indicates the minimum version of scripts allowed
--- as inputs.
---
-data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
-    { gytxIns           :: ![GYTxIn v]
-    , gytxOuts          :: ![GYTxOut v]
-    , gytxRefIns        :: !(GYTxSkeletonRefIns v)
-    , gytxMint          :: !(Map (GYMintScript v) (Map GYTokenName Integer, GYRedeemer))
-    , gytxWdrls         :: ![GYTxWdrl v]
-    , gytxSigs          :: !(Set GYPubKeyHash)
-    , gytxCerts         :: ![GYTxCert v]
-    , gytxInvalidBefore :: !(Maybe GYSlot)
-    , gytxInvalidAfter  :: !(Maybe GYSlot)
-    , gytxMetadata      :: !(Maybe GYTxMetadata)
-    } deriving Show
-
-data GYTxSkeletonRefIns :: PlutusVersion -> Type where
-    GYTxSkeletonRefIns :: VersionIsGreaterOrEqual v 'PlutusV2 => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
-    GYTxSkeletonNoRefIns :: GYTxSkeletonRefIns v
-
-deriving instance Show (GYTxSkeletonRefIns v)
-deriving instance Eq (GYTxSkeletonRefIns v)
-
-gyTxSkeletonRefInsToList :: GYTxSkeletonRefIns v -> [GYTxOutRef]
-gyTxSkeletonRefInsToList = Set.toList . gyTxSkeletonRefInsSet
-
-gyTxSkeletonRefInsSet :: GYTxSkeletonRefIns v -> Set GYTxOutRef
-gyTxSkeletonRefInsSet (GYTxSkeletonRefIns xs) = xs
-gyTxSkeletonRefInsSet GYTxSkeletonNoRefIns    = Set.empty
-
-instance Semigroup (GYTxSkeletonRefIns v) where
-    GYTxSkeletonRefIns a <> GYTxSkeletonRefIns b = GYTxSkeletonRefIns (Set.union a b)
-    GYTxSkeletonRefIns a <> GYTxSkeletonNoRefIns = GYTxSkeletonRefIns a
-    GYTxSkeletonNoRefIns <> GYTxSkeletonRefIns b = GYTxSkeletonRefIns b
-    GYTxSkeletonNoRefIns <> GYTxSkeletonNoRefIns = GYTxSkeletonNoRefIns
-
-emptyGYTxSkeleton :: GYTxSkeleton v
-emptyGYTxSkeleton = GYTxSkeleton
-    { gytxIns           = []
-    , gytxOuts          = []
-    , gytxRefIns        = GYTxSkeletonNoRefIns
-    , gytxMint          = Map.empty
-    , gytxWdrls         = []
-    , gytxSigs          = Set.empty
-    , gytxCerts         = []
-    , gytxInvalidBefore = Nothing
-    , gytxInvalidAfter  = Nothing
-    , gytxMetadata      = Nothing
-    }
-
-instance Semigroup (GYTxSkeleton v) where
-    x <> y = GYTxSkeleton
-        { gytxIns           = combineIns (gytxIns x) (gytxIns y)
-        , gytxOuts          = gytxOuts x ++ gytxOuts y
-        , gytxRefIns        = gytxRefIns x <> gytxRefIns y
-        , gytxMint          = combineMint (gytxMint x) (gytxMint y)
-        , gytxWdrls         = combineWdrls (gytxWdrls x) (gytxWdrls y)
-        , gytxSigs          = Set.union (gytxSigs x) (gytxSigs y)
-        , gytxCerts         = gytxCerts x <> gytxCerts y
-        , gytxInvalidBefore = combineInvalidBefore (gytxInvalidBefore x) (gytxInvalidBefore y)
-        , gytxInvalidAfter  = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
-        , gytxMetadata      = gytxMetadata x <> gytxMetadata y
-        }
-      where
-        -- we keep only one input per utxo to spend
-        combineIns u v = nubBy ((==) `on` gyTxInTxOutRef) (u ++ v)
-        -- we cannot combine redeemers, so we just pick first.
-        combineMint = Map.unionWith (\(amt, r) (amt', _r) -> (Map.unionWith (+) amt amt', r))
-        -- we keep only one withdrawal per stake address
-        combineWdrls u v = nubBy ((==) `on` gyTxWdrlStakeAddress) (u ++ v)
-
-        combineInvalidBefore :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
-        combineInvalidBefore m        Nothing  = m
-        combineInvalidBefore Nothing  n        = n
-        combineInvalidBefore (Just s) (Just t) = Just (max s t)
-
-        combineInvalidAfter :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
-        combineInvalidAfter m        Nothing  = m
-        combineInvalidAfter Nothing  n        = n
-        combineInvalidAfter (Just s) (Just t) = Just (min s t)
-
-instance Monoid (GYTxSkeleton v) where
-    mempty = emptyGYTxSkeleton
 
 -------------------------------------------------------------------------------
 -- Utilities
@@ -774,3 +732,127 @@ wrapReqWithTimeLog label m = do
 -- | Synonym of 'wrapReqWithTimeLog'.
 wt :: (GYTxQueryMonad m, MonadIO m) => String -> m a -> m a
 wt = wrapReqWithTimeLog
+
+buildTxBodyWithStrategy' :: forall v m. (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
+                        => GYCoinSelectionStrategy
+                        -> GYTxSkeleton v
+                        -> m GYTxBody
+buildTxBodyWithStrategy' cstrat = fmap runIdentity . buildTxBodyF @Identity cstrat . Identity
+
+{- | The most basic version of 'GYTxMonadIO' interpreter over a generic 'Traversable'.
+
+== NOTE ==
+This is not meant to be used with structures containing _multiple_ 'GYTxSkeleton's. As the balancer
+will end up using the same utxos across the different txs.
+
+Consider using 'buildTxBodyParallel' or 'buildTxBodyChaining' instead.
+-}
+buildTxBodyF :: forall f v m. (Traversable f, GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
+             => GYCoinSelectionStrategy
+             -> f (GYTxSkeleton v)
+             -> m (f GYTxBody)
+buildTxBodyF cstrat m = do
+    x <- buildTxBodyCore (const id) cstrat [m]
+    case x of
+      GYTxBuildSuccess ne          -> pure $ NE.head ne
+      GYTxBuildPartialSuccess be _ -> throwError . GYBuildTxException $ GYBuildTxBalancingError be
+      GYTxBuildFailure be          -> throwError . GYBuildTxException $ GYBuildTxBalancingError be
+      -- We know there is precisely one input.
+      GYTxBuildNoInputs            -> error "runGYTxMonadIOF: absurd"
+
+{- | A multi transaction building 'GYTxMonadIO' interpreter.
+
+This does not perform chaining, i.e does not use utxos created by one of the given transactions in the next one.
+However, it does ensure that the balancer does not end up using the same own utxos when building multiple
+transactions at once.
+
+This supports failure recovery by utilizing 'GYTxBuildResult'.
+-}
+buildTxBodyParallelF :: (Traversable f, GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
+                     => GYCoinSelectionStrategy
+                     -> [f (GYTxSkeleton v)]
+                     -> m (GYTxBuildResult f)
+buildTxBodyParallelF cstrat m = do
+    buildTxBodyCore updateOwnUtxosParallel cstrat m
+
+{- | A chaining transaction building 'GYTxMonadIO' interpreter.
+
+This will perform chaining, i.e it will use utxos created by one of the given transactions, when building the next one.
+
+This supports failure recovery by utilizing 'GYTxBuildResult'.
+
+**EXPERIMENTAL**
+-}
+buildTxBodyChainingF :: (Traversable f, GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
+                     => GYCoinSelectionStrategy
+                     -> [f (GYTxSkeleton v)]
+                     -> m (GYTxBuildResult f)
+buildTxBodyChainingF cstrat m = do
+    addrs <- ownAddresses
+    buildTxBodyCore (updateOwnUtxosChaining $ Set.fromList addrs) cstrat m
+
+{- | The core implementation of buildTxBody: Building 'GYTxBody's out of one or more 'GYTxSkeleton's.
+
+Peculiarly, this is parameterized on:
+
+- An "own utxo update" function, this is meant to govern how the set of known "own utxos" is updated after building a transaction skeleton.
+
+  If the user chooses not to update this set, based on the newly created 'GYTxBody', the same own utxos set will be used for the next
+  transaction in the list (if any). Which may lead to the balancer choosing the same utxo inputs again - resulting in a transaction
+  conflict.
+
+See 'buildTxBodyF' for an example which _does not update_ used up own utxos for multi 'GYTxSkeleton' builds.
+
+See 'buildTxBodyParallel' for an example which  _removes_ used up own utxos for next 'GYTxSkeleton's (if any).
+
+See 'buildTxBodyChaining' for an example which _removes_ used up own utxos, **and** _adds_ newly created utxos addressed to
+own wallet, for next 'GYTxSkeleton's (if any).
+
+The function recovers successfully built tx skeletons, in case the list contains several of them. See: 'GYTxBuildResult'.
+-}
+buildTxBodyCore
+    :: forall f m v. (Traversable f, GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
+    => (GYTxBody -> GYUTxOs -> GYUTxOs)           -- ^ Function governing how to update UTxO set when building for multiple skeletons.
+    -> GYCoinSelectionStrategy                    -- ^ Coin selection strategy.
+    -> [f (GYTxSkeleton v)]                       -- ^ Skeleton(s).
+    -> m (GYTxBuildResult f)
+buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
+    logSkeletons skeletons
+
+    -- Obtain constant parameters to be used across several 'GYTxBody' generations.
+    ss    <- systemStart
+    eh    <- eraHistory
+    apiPp <- protocolParams
+    ps    <- stakePools
+
+    pp <- case Api.toLedgerPParams Api.ShelleyBasedEraBabbage apiPp of
+        Left e   -> throwError . GYBuildTxException $ GYBuildTxPPConversionError e
+        Right pp -> pure pp
+
+    collateral <- ownCollateral
+    addrs <- ownAddresses
+    change <- ownChangeAddress
+
+    e <- buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral skeletons
+    case e of
+        Left err  -> throwError $ GYBuildTxException err
+        Right res -> pure res
+
+    where
+      logSkeletons :: [f (GYTxSkeleton v)] -> m ()
+      logSkeletons = mapM_ (mapM_ (logMsg "buildTxBody" GYDebug . show))
+
+-- | Update own utxo set by removing any utxos used up in the given tx.
+updateOwnUtxosParallel :: GYTxBody -> GYUTxOs -> GYUTxOs
+updateOwnUtxosParallel txBody = utxosRemoveTxOutRefs (Set.fromList txIns)
+  where
+    txIns = txBodyTxIns txBody
+
+{- | Update own utxo set by removing any utxos used up in the given tx,
+**and** adding newly created utxos addressed to own wallet. -}
+updateOwnUtxosChaining :: Set GYAddress -> GYTxBody -> GYUTxOs -> GYUTxOs
+updateOwnUtxosChaining ownAddrs txBody utxos = utxosRemoveTxOutRefs (Set.fromList txIns) utxos <> txOutsOwn
+  where
+    txIns = txBodyTxIns txBody
+    txOuts = txBodyUTxOs txBody
+    txOutsOwn = filterUTxOs (\GYUTxO {utxoAddress} -> utxoAddress `Set.member` ownAddrs) txOuts

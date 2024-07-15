@@ -22,7 +22,6 @@ module GeniusYield.TxBuilder.IO (
 
 
 import           Control.Monad.Reader            (ReaderT(ReaderT), MonadReader, asks)
-import           Data.Maybe                      (maybeToList)
 import qualified Data.List.NonEmpty              as NE
 
 import           GeniusYield.TxBuilder.Class
@@ -48,6 +47,7 @@ newtype GYTxMonadIO a = GYTxMonadIO (GYTxIOEnv -> GYTxBuilderMonadIO a)
            , GYTxQueryMonad
            , GYTxSpecialQueryMonad
            , GYTxUserQueryMonad
+           , GYTxBuilderMonad
            )
   via ReaderT GYTxIOEnv GYTxBuilderMonadIO
 
@@ -72,14 +72,9 @@ liftQueryMonad :: GYTxQueryMonadIO a -> GYTxMonadIO a
 liftQueryMonad = GYTxMonadIO . pure . queryAsBuilderMonad
 
 instance GYTxMonad GYTxMonadIO where
-    signTxBody txBody = do
-      sKey <- asks envPaymentSKey
-      pure $ signGYTxBody txBody [sKey]
+    signTxBody = signTxBodyImpl $ asks envPaymentSKey
 
-    signTxBodyWithStake txBody = do
-      paymentSKey <- asks envPaymentSKey
-      stakeSKey <- asks envStakeSKey
-      pure . signGYTxBody txBody $ GYSomeSigningKey paymentSKey : (GYSomeSigningKey <$> maybeToList stakeSKey)
+    signTxBodyWithStake = signTxBodyWithStakeImpl $ asks ((,) . envPaymentSKey) <*> asks envStakeSKey
 
     submitTx tx = do
         txSubmitter <- asks (gySubmitTx . envProviders)

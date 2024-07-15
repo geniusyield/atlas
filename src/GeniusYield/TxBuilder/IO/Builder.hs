@@ -44,6 +44,7 @@ newtype GYTxBuilderMonadIO a = GYTxBuilderMonadIO (GYTxBuilderIOEnv -> GYTxQuery
            , GYTxSpecialQueryMonad
            )
   via ReaderT GYTxBuilderIOEnv GYTxQueryMonadIO
+  deriving anyclass GYTxBuilderMonad
 
 data GYTxBuilderIOEnv = GYTxBuilderIOEnv
     { envAddrs         :: ![GYAddress]

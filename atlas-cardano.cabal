@@ -106,6 +106,7 @@ library
     GeniusYield.TxBuilder.Common
     GeniusYield.TxBuilder.Errors
     GeniusYield.TxBuilder.IO
+    GeniusYield.TxBuilder.Query.Class
     GeniusYield.TxBuilder.User
     GeniusYield.Types
     GeniusYield.Types.Ada

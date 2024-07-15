@@ -86,6 +86,7 @@ library
     GeniusYield.Swagger.Utils
     GeniusYield.Test.Clb
     GeniusYield.Test.FakeCoin
+    GeniusYield.Test.FeeTracker
     GeniusYield.Test.Privnet.Asserts
     GeniusYield.Test.Privnet.Ctx
     GeniusYield.Test.Privnet.Examples

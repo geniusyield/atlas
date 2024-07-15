@@ -344,7 +344,8 @@ instance is expected to have its own unique 'GYTxMonad' instance. So
 instance.
 
 The solution to this is to simply have a wrapper data type that brings generativity to the table.
-Such as 'data ReaderTTxMonad m a = ReaderTTxMonad ((TxMonadOf m) a)' or similar.
+Such as 'data ReaderTTxMonad m a = ReaderTTxMonad ((TxMonadOf m) a)' or similar. See
+"GeniusYield.Test.FeeTracker.FeeTrackerGame" for a tutorial on how to do this.
 
 Since these wrapper data types are usage specific, and 'GYTxGameMonad' instances are meant to be some
 "overarching base" type, we do not provide these instances and users may define them if necessary.

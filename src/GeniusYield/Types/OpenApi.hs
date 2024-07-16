@@ -41,7 +41,15 @@ liftSwaggerSchema swaggerSchema =
   & OpenApi.uniqueItems .~ swaggerSchema ^. Swagger.uniqueItems
   & OpenApi.enum_ .~ swaggerSchema ^. Swagger.enum_
   & OpenApi.multipleOf .~ swaggerSchema ^. Swagger.multipleOf
+  & OpenApi.items .~ (convertSwaggerItems <$> swaggerSchema ^. Swagger.items)
   where
+
+    convertSwaggerItems :: Swagger.SwaggerItems Swagger.SwaggerKindSchema -> OpenApi.OpenApiItems
+    convertSwaggerItems (Swagger.SwaggerItemsObject s) = OpenApi.OpenApiItemsObject (convertSwaggerReferencedSchema s)
+    convertSwaggerItems (Swagger.SwaggerItemsArray s) = OpenApi.OpenApiItemsArray (convertSwaggerReferencedSchema <$> s)
+    convertSwaggerItems (Swagger.SwaggerItemsPrimitive _ _) = error "Primitive array items found in schema description, but should only be used for query params, headers and path pieces"
+
+
     convertSwaggerReferencedSchema :: Swagger.Referenced Swagger.Schema -> OpenApi.Referenced OpenApi.Schema
     convertSwaggerReferencedSchema (Swagger.Inline s) = OpenApi.Inline (liftSwaggerSchema s)
     convertSwaggerReferencedSchema (Swagger.Ref r) = OpenApi.Ref (convertSwaggerRef r)

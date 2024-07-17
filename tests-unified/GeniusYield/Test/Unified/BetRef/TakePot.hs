@@ -25,7 +25,7 @@ takeBetPotTests = testGroup "Take bet pot"
         , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
         , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> fakeGold 1_000)
         ]
-        4 w2 (Just 0_327_625)
+        4 w2
     , mkTestFor "Must fail if attempt to take is by wrong guesser" $ mustFail . takeBetsTrace
         400 1_000 (valueFromLovelace 10_000_000)
         [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
@@ -34,7 +34,7 @@ takeBetPotTests = testGroup "Take bet pot"
         , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
         , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> fakeGold 1_000)
         ]
-        5 w2 Nothing
+        5 w2
     , mkTestFor "Must fail even if old guess was closest but updated one is not" $
         mustFail . takeBetsTrace 400 1_000 (valueFromLovelace 10_000_000)
             [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
@@ -43,7 +43,7 @@ takeBetPotTests = testGroup "Take bet pot"
             , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
             , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> fakeGold 1_000)
             ]
-            2 w2 Nothing
+            2 w2
     ]
 
 -- | Run to call the `takeBets` operation.
@@ -60,9 +60,8 @@ takeBetsTrace :: Integer                                            -- ^ slot fo
               -> [(Wallets -> User, OracleAnswerDatum, GYValue)]    -- ^ List denoting the bets
               -> Integer                                            -- ^ Actual answer
               -> (Wallets -> User)                                  -- ^ Taker
-              -> Maybe Integer                                      -- ^ Expected fees
               -> Wallets -> GYTxMonadClb ()  -- Our continuation function
-takeBetsTrace betUntil' betReveal' betStep walletBets answer getTaker mExpectedFees ws@Wallets{..} = do
+takeBetsTrace betUntil' betReveal' betStep walletBets answer getTaker ws@Wallets{..} = do
   (brp, refScript) <- computeParamsAndAddRefScript betUntil' betReveal' betStep ws
   multipleBetsTraceCore brp refScript walletBets ws
   -- Now lets take the bet
@@ -70,16 +69,9 @@ takeBetsTrace betUntil' betReveal' betStep walletBets answer getTaker mExpectedF
   let taker = getTaker ws
   case ref of
     Just refInput -> do
-      void $ asUser taker $ do
-        betRefAddr <- betRefAddress brp
-        [_scriptUtxo@GYUTxO {utxoRef, utxoValue}] <- utxosToList <$> utxosAtAddress betRefAddr Nothing
-        gyLogInfo' "" "Slot await complete"
-        waitUntilSlot_ $ slotFromApi (fromInteger betReveal')
-        gyLogInfo' "" "Slot await complete"
-        case mExpectedFees of
-          Just expectedFees -> do
-            withWalletBalancesCheck [taker := utxoValue <> valueNegate (valueFromLovelace expectedFees)] $ do
-              gyLogDebug' "" (show utxoValue)
-              takeBetsRun refScript brp utxoRef refInput
-          Nothing -> takeBetsRun refScript brp utxoRef refInput
+      betRefAddr <- betRefAddress brp
+      [_scriptUtxo@GYUTxO {utxoRef, utxoValue}] <- utxosToList <$> utxosAtAddress betRefAddr Nothing
+      waitUntilSlot_ $ slotFromApi (fromInteger betReveal')
+      void . withWalletBalancesCheckSimple [taker := utxoValue] . asUser taker
+        $ takeBetsRun refScript brp utxoRef refInput
     _ -> fail "Couldn't place reference input successfully"

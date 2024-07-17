@@ -22,7 +22,7 @@ placeBetTests :: TestTree
 placeBetTests = testGroup "Place Bet"
     [  mkTestFor "Simple spending tx" simplSpendingTxTrace
     ,  mkTestFor "Balance checks after placing first bet" $
-        firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000) 0_176_545
+        firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000)
     , mkTestFor "Balance checks with multiple bets" $ multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
         [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
         , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
@@ -47,14 +47,14 @@ simplSpendingTxTrace :: Wallets -> GYTxMonadClb ()
 simplSpendingTxTrace Wallets{w1} = do
   gyLogDebug' "" "Hey there!"
   -- balance assetion check
-  void . withWalletBalancesCheck [w1 := valueNegate (valueFromLovelace 100_173_685)] . asUser w1 $ do -- TODO: w1 is the wallets that gets all funds for now
+  void . withWalletBalancesCheckSimple [w1 := valueFromLovelace (-100_000_000)] . asUser w1 $ do -- TODO: w1 is the wallets that gets all funds for now
     skeleton <- mkTrivialTx
     gyLogDebug' "" $ printf "tx skeleton: %s" (show skeleton)
 
-    dumpUtxoState
+    ftLift dumpUtxoState
     -- test itself
     txId <- buildTxBody skeleton >>= signAndSubmitConfirmed
-    dumpUtxoState
+    ftLift dumpUtxoState
     gyLogDebug' "" $ printf "tx submitted, txId: %s" txId
 
 -- Pretend off-chain code written in 'GYTxMonad m'
@@ -92,14 +92,13 @@ Level 3. The action (Off-chain code)
 -- | Trace for placing the first bet.
 firstBetTrace :: OracleAnswerDatum  -- ^ Guess
               -> GYValue            -- ^ Bet
-              -> Integer            -- ^ Expected fees
               -> Wallets -> GYTxMonadClb ()  -- Our continuation function
-firstBetTrace dat bet expectedFees ws@Wallets{w1} = do
+firstBetTrace dat bet ws@Wallets{w1} = do
 
   -- First step: Get the required parameters for initializing our parameterized script,
   -- claculate the script, and post it to the blockchain as a reference script.
   (brp, refScript) <- computeParamsAndAddRefScript 40 100 (valueFromLovelace 200_000_000) ws
-  void .  withWalletBalancesCheck [w1 := valueNegate (valueFromLovelace expectedFees <> bet)] . asUser w1 $ do  -- following operations are ran by first wallet, `w1`
+  void . withWalletBalancesCheckSimple [w1 := valueNegate bet] . asUser w1 $ do  -- following operations are ran by first wallet, `w1`
     -- Second step: Perform the actual run.
     placeBetRun refScript brp dat bet Nothing
 

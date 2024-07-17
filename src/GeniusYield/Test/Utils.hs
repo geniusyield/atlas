@@ -31,6 +31,7 @@ import           Control.Lens                     ((^.))
 import           Control.Monad.Random
 import           Data.List                        (findIndex)
 import qualified Data.Map.Strict                  as Map
+import qualified Data.Text                        as T
 
 import qualified Data.Sequence.Strict             as StrictSeq
 import           Prettyprinter                    (PageWidth (AvailablePerLine),
@@ -187,10 +188,10 @@ data Wallets = Wallets
     , w9 :: !User
     } deriving (Show, Eq, Ord)
 
-{- | Computes a `GYTxMonadClb` action and returns the result and how this action
+{- | Computes a `GYTx*Monad` action and returns the result and how this action
      changed the balance of some "Address".
 -}
-withBalance :: String -> User -> GYTxMonadClb b -> GYTxMonadClb (b, GYValue)
+withBalance :: GYTxQueryMonad m => String -> User -> m b -> m (b, GYValue)
 withBalance n a m = do
     old <- queryBalance $ userAddr a
     b   <- m
@@ -199,18 +200,18 @@ withBalance n a m = do
     gyLogDebug' "" $ printf "%s:\nold balance: %s\nnew balance: %s\ndiff: %s" n old new diff
     return (b, diff)
 
-{- | Computes a 'GYTxMonadClb' action, checking that the 'Wallet' balances
+{- | Computes a `GYTx*Monad` action, checking that the 'Wallet' balances
         change according to the input list.
 Notes:
 * An empty list means no checks are performed.
 * The 'GYValue' should be negative to check if the Wallet lost those funds.
 -}
-withWalletBalancesCheck :: [(User, GYValue)] -> GYTxMonadClb a -> GYTxMonadClb a
+withWalletBalancesCheck :: GYTxQueryMonad m => [(User, GYValue)] -> m a -> m a
 withWalletBalancesCheck []            m = m
 withWalletBalancesCheck ((w, v) : xs) m = do
     (b, diff) <- withBalance (show $ userAddr w) w $ withWalletBalancesCheck xs m
     unless (diff == v) $ do
-        fail $ printf "expected balance difference of %s for wallet %s, but the actual difference was %s" v (userAddr w) diff
+        throwAppError . someBackendError . T.pack $ printf "expected balance difference of %s for wallet %s, but the actual difference was %s" v (userAddr w) diff
     return b
 
 {- | Returns the list of outputs of the transaction for the given address.
@@ -249,6 +250,7 @@ findRefScriptsInBody body = do
     utxoToRefMap utxo
 
 -- | Adds the given script to the given address and returns the reference for it.
+-- Note: The new utxo is given an inline unit datum.
 addRefScript :: forall m. GYTxMonad m => GYAddress -> GYScript 'PlutusV2 -> m GYTxOutRef
 addRefScript addr sc = throwAppError absurdError `runEagerT` do
     existingUtxos <- lift $ utxosAtAddress addr Nothing

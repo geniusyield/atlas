@@ -23,6 +23,8 @@ module GeniusYield.TxBuilder.Class
     , buildTxBodyParallel
     , buildTxBodyChaining
     , waitNSlots
+    , waitNSlots_
+    , waitUntilSlot_
     , submitTx_
     , submitTxConfirmed
     , submitTxConfirmed_
@@ -267,6 +269,10 @@ Just one type inference (or signature) on the top most call that runs the 'GYTxG
 will be automatically inferred.
 -}
 
+-- | > waitUntilSlot_ = void . waitUntilSlot
+waitUntilSlot_ :: GYTxGameMonad m => GYSlot -> m ()
+waitUntilSlot_ = void . waitUntilSlot
+
 -- | Wait until the chain tip has progressed by N slots.
 waitNSlots :: GYTxGameMonad m => Word64 -> m GYSlot
 waitNSlots (slotFromWord64 -> n) = do
@@ -275,6 +281,10 @@ waitNSlots (slotFromWord64 -> n) = do
     waitUntilSlot . slotFromApi $ currentSlot `addSlots` n
   where
     addSlots = (+) `on` slotToApi
+
+-- | > waitNSlots_ = void . waitNSlots
+waitNSlots_ :: GYTxGameMonad m => Word64 -> m ()
+waitNSlots_ = void . waitNSlots
 
 -- | > submitTx_ = void . submitTx
 submitTx_ :: GYTxMonad m => GYTx -> m ()

@@ -25,9 +25,11 @@ module GeniusYield.Test.Utils
     , withMaxQCTests
     , pattern (:=)
     , logInfoS
+    , module X
     ) where
 
 import           Control.Lens                     ((^.))
+import           Control.Monad.Except             (ExceptT, runExceptT)
 import           Control.Monad.Random
 import           Data.List                        (findIndex)
 import qualified Data.Map.Strict                  as Map
@@ -62,13 +64,14 @@ import           Test.Tasty.HUnit                 (assertFailure, testCaseInfo)
 import qualified Test.Tasty.QuickCheck            as Tasty
 import qualified Test.Tasty.Runners               as Tasty
 
+import           GeniusYield.HTTP.Errors
 import           GeniusYield.Imports
 import           GeniusYield.Test.FakeCoin
 import           GeniusYield.TxBuilder
 import           GeniusYield.Test.Clb
 import           GeniusYield.Types
-import GeniusYield.HTTP.Errors
-import Control.Monad.Except
+
+import           GeniusYield.Test.FeeTracker      as X
 
 -------------------------------------------------------------------------------
 -- tasty tools

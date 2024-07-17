@@ -19,7 +19,6 @@ import           Test.Tasty                                           (TestTree,
 import           GeniusYield.Imports
 import           GeniusYield.HTTP.Errors
 import           GeniusYield.Test.Clb
-import           GeniusYield.Test.FeeTracker
 import           GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
 import           GeniusYield.Test.Utils
 import           GeniusYield.Transaction

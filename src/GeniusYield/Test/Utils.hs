@@ -9,9 +9,7 @@ Stability   : develop
 
 -}
 module GeniusYield.Test.Utils
-    ( Clb.Clb
-    , mkTestFor
-    , Wallets (..)
+    ( Wallets (..)
     , withBalance
     , withWalletBalancesCheck
     , findLockedUtxosInBody
@@ -24,43 +22,17 @@ module GeniusYield.Test.Utils
     , feesFromLovelace
     , withMaxQCTests
     , pattern (:=)
-    , logInfoS
     , module X
     ) where
 
-import           Control.Lens                     ((^.))
 import           Control.Monad.Except             (ExceptT, runExceptT)
 import           Control.Monad.Random
-import           Data.List                        (findIndex)
 import qualified Data.Map.Strict                  as Map
 import qualified Data.Text                        as T
 
-import qualified Data.Sequence.Strict             as StrictSeq
-import           Prettyprinter                    (PageWidth (AvailablePerLine),
-                                                   defaultLayoutOptions,
-                                                   layoutPageWidth,
-                                                   layoutPretty)
-import           Prettyprinter.Render.String      (renderString)
-
-import qualified Cardano.Api.Shelley              as Api.S
-import qualified Cardano.Ledger.Address           as L
-import qualified Cardano.Ledger.Api               as L
-import qualified Cardano.Ledger.Babbage.Tx        as L.B
-import qualified Cardano.Ledger.Babbage.TxOut     as L.B
-import qualified Cardano.Ledger.Binary            as L
-import qualified Clb                              (Clb, ClbState (mockInfo),
-                                                   ClbT, LogEntry (..),
-                                                   LogLevel (..), MockConfig,
-                                                   checkErrors, defaultBabbage,
-                                                   initClb, intToKeyPair,
-                                                   logInfo, ppLog, runClb)
 import qualified PlutusLedgerApi.V1.Value         as Plutus
-import qualified PlutusLedgerApi.V2               as PlutusV2
-
-import qualified Test.Cardano.Ledger.Core.KeyPair as TL
 
 import qualified Test.Tasty                       as Tasty
-import           Test.Tasty.HUnit                 (assertFailure, testCaseInfo)
 import qualified Test.Tasty.QuickCheck            as Tasty
 import qualified Test.Tasty.Runners               as Tasty
 
@@ -68,7 +40,6 @@ import           GeniusYield.HTTP.Errors
 import           GeniusYield.Imports
 import           GeniusYield.Test.FakeCoin
 import           GeniusYield.TxBuilder
-import           GeniusYield.Test.Clb
 import           GeniusYield.Types
 
 import           GeniusYield.Test.FeeTracker      as X
@@ -126,58 +97,6 @@ fakeIron = fromFakeCoin $ FakeCoin "Iron"
 -- helpers
 -------------------------------------------------------------------------------
 
-{- | Given a test name, runs the trace for every wallet, checking there weren't
-     errors.
--}
-mkTestFor :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
-mkTestFor name action =
-    testNoErrorsTraceClb v w Clb.defaultBabbage name $ do
-      asClb pureGen (w1 wallets) $ action wallets
-  where
-    v = valueFromLovelace 1_000_000_000_000_000 <>
-        fakeGold                  1_000_000_000 <>
-        fakeIron                  1_000_000_000
-
-    w = valueFromLovelace 1_000_000_000_000 <>
-        fakeGold                  1_000_000 <>
-        fakeIron                  1_000_000
-
-    wallets :: Wallets
-    wallets = Wallets (mkSimpleWallet (Clb.intToKeyPair 1))
-                      (mkSimpleWallet (Clb.intToKeyPair 2))
-                      (mkSimpleWallet (Clb.intToKeyPair 3))
-                      (mkSimpleWallet (Clb.intToKeyPair 4))
-                      (mkSimpleWallet (Clb.intToKeyPair 5))
-                      (mkSimpleWallet (Clb.intToKeyPair 6))
-                      (mkSimpleWallet (Clb.intToKeyPair 7))
-                      (mkSimpleWallet (Clb.intToKeyPair 8))
-                      (mkSimpleWallet (Clb.intToKeyPair 9))
-
-    -- | Helper for building tests
-    testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig -> String -> Clb.Clb a -> Tasty.TestTree
-    testNoErrorsTraceClb funds walletFunds cfg msg act =
-        testCaseInfo msg
-            $ maybe (pure mockLog) assertFailure
-            $ mbErrors >>= \errors -> pure (mockLog <> "\n\nError :\n-------\n" <>  errors)
-        where
-            -- _errors since we decided to store errors in the log as well.
-            (mbErrors, mock) = Clb.runClb (act >> Clb.checkErrors) $ Clb.initClb cfg (valueToApi funds) (valueToApi walletFunds)
-            mockLog = "\nEmulator log :\n--------------\n" <> logString
-            options = defaultLayoutOptions { layoutPageWidth = AvailablePerLine 150 1.0}
-            logDoc = Clb.ppLog $ Clb.mockInfo mock
-            logString = renderString $ layoutPretty options logDoc
-
-
-    mkSimpleWallet :: TL.KeyPair r L.StandardCrypto -> User
-    mkSimpleWallet kp =
-        let key = paymentSigningKeyFromLedgerKeyPair kp
-        in  User'
-                { userPaymentSKey' = key
-                , userStakeSKey'   = Nothing
-                , userAddr         = addressFromPaymentKeyHash GYTestnetPreprod . paymentKeyHash $
-                    paymentVerificationKey key
-                }
-
 -- | Available wallets.
 data Wallets = Wallets
     { w1 :: !User
@@ -224,13 +143,11 @@ withWalletBalancesCheck ((w, v) : xs) m = do
 findLockedUtxosInBody :: Num a => GYAddress -> GYTx -> Maybe [a]
 findLockedUtxosInBody addr tx =
   let
-    os = getTxOutputs tx
+    os = utxosToList . txBodyUTxOs $ getTxBody tx
     findAllMatches (_, [], acc) = Just acc
-    findAllMatches (index, txOut : os', acc) =
-        let txOutAddr = addressFromApi . Api.S.fromShelleyAddrToAny . either id L.decompactAddr $ L.B.getEitherAddrBabbageTxOut txOut
-        in if txOutAddr == addr
-            then findAllMatches (index + 1, os', index : acc)
-            else findAllMatches (index + 1, os', acc)
+    findAllMatches (index, txOut : os', acc) = if utxoAddress txOut == addr
+        then findAllMatches (index + 1, os', index : acc)
+        else findAllMatches (index + 1, os', acc)
   in
     findAllMatches (0, os, [])
 
@@ -269,63 +186,35 @@ addRefScript addr sc = throwAppError absurdError `runEagerT` do
     lift $ signAndSubmitConfirmed_ txBody
     maybeToEager . Map.lookup (Some sc) $ findRefScriptsInBody txBody
   where
-    -- The above function is written utilizing 'ExceptT' as a "eager" transformer.
-    -- 'Left' does not indicate failure, rather it indicates that "target value has
-    -- been obtained" and that we can exit eagerly.
-    -- | If we have a 'Just' value, we can exit with it immediately. So it gets converted
-    -- to 'Left'.
-    maybeToEager :: Maybe a -> ExceptT a m ()
-    maybeToEager (Just a) = throwError a
-    maybeToEager Nothing  = pure ()
     absurdError = someBackendError "Shouldn't happen: no ref in body"
-    -- If all goes well, we should finish with a 'Left'. if not, we perform the
-    -- given action to signal error.
-    runEagerT :: m a -> ExceptT a m () -> m a
-    runEagerT whenError = runExceptT >=> either pure (const whenError)
 
 -- | Adds an input (whose datum we'll refer later) and returns the reference to it.
 addRefInput :: GYTxMonad m
             => Bool       -- ^ Whether to inline this datum?
             -> GYAddress  -- ^ Where to place this output?
             -> GYDatum    -- ^ Our datum.
-            -> m (Maybe GYTxOutRef)
-addRefInput toInline addr dat = do
-    txBody <- buildTxBody
-        (mustHaveOutput
+            -> m GYTxOutRef
+addRefInput toInline addr dat = throwAppError absurdError `runEagerT` do
+    existingUtxos <- lift $ utxosAtAddress addr Nothing
+    maybeToEager $ findRefWithDatum existingUtxos
+    txBody <- lift . buildTxBody .
+        mustHaveOutput
             $ GYTxOut addr mempty (Just (dat, if toInline then GYTxOutUseInlineDatum else GYTxOutDontUseInlineDatum)) Nothing
-        )
-    tx@(txToApi -> Api.S.ShelleyTx _ ledgerTx) <- signTxBody txBody
-    txId <- submitTxConfirmed tx
 
-    let L.TxDats datumMap = ledgerTx ^. L.witsTxL . L.datsTxWitsL
-        datumWits         = datumFromLedgerData <$> datumMap
-    let outputsWithResolvedDatums = map
-            (\o ->
-                resolveDatumFromLedger datumWits $ o ^. L.B.datumBabbageTxOutL
+    lift $ signAndSubmitConfirmed_ txBody
+    maybeToEager . findRefWithDatum $ txBodyUTxOs txBody
+  where
+    findRefWithDatum :: GYUTxOs -> Maybe GYTxOutRef
+    findRefWithDatum utxos = fmap utxoRef
+        . find
+            (\GYUTxO {utxoOutDatum} ->
+                case utxoOutDatum of
+                    GYOutDatumHash dh       -> hashDatum dat == dh
+                    GYOutDatumInline dat' -> dat == dat'
+                    _                       -> False
             )
-            $ getTxOutputs tx
-    let mIndex = findIndex (\d -> Just dat == d) outputsWithResolvedDatums
-    pure $ (Just . txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx . fromInteger) . toInteger =<< mIndex
-
-resolveDatumFromLedger :: L.Era era => Map (L.DataHash (L.EraCrypto era)) GYDatum -> L.Datum era -> Maybe GYDatum
-resolveDatumFromLedger _ (L.Datum d) = Just
-                                        . datumFromLedgerData
-                                        $ L.binaryDataToData d
-resolveDatumFromLedger datumMap (L.DatumHash dh) = Map.lookup dh datumMap
-resolveDatumFromLedger _ L.NoDatum = Nothing
-
--- TODO: Add to CLB upstream?
-getTxOutputs :: GYTx -> [L.B.BabbageTxOut (L.BabbageEra L.StandardCrypto)]
-getTxOutputs (txToApi -> Api.S.ShelleyTx _ ledgerTx) = fmap L.sizedValue
-    . toList
-    . StrictSeq.fromStrict
-    . L.B.btbOutputs
-    $ L.B.body ledgerTx
-
-datumFromLedgerData :: L.Data era -> GYDatum
-datumFromLedgerData = datumFromPlutusData
-    . PlutusV2.BuiltinData
-    . L.getPlutusData
+        $ utxosToList utxos
+    absurdError = someBackendError "Shouldn't happen: no output with expected datum in body"
 
 {- | Abstraction for explicitly building a Value representing the fees of a
      transaction.
@@ -343,17 +232,20 @@ pattern (:=) x y = (x, y)
 
 infix 0 :=
 
--------------------------------------------------------------------------------
--- Preset StdGen
--------------------------------------------------------------------------------
+{- | Utilizing 'ExceptT' as a "eager monad" transformer.
 
-pureGen :: StdGen
-pureGen = mkStdGen 42
+'Left' does not indicate failure, rather it indicates that "target value has been obtained"
+and that we can exit eagerly.
+-}
+type EagerT m a = ExceptT a m ()
 
-{- -----------------------------------------------------------------------------
-  CLB
------------------------------------------------------------------------------ -}
+-- | If we have a 'Just' value, we can exit with it immediately. So it gets converted
+-- to 'Left'.
+maybeToEager :: Monad m => Maybe a -> EagerT m a
+maybeToEager (Just a) = throwError a
+maybeToEager Nothing  = pure ()
 
--- | Variant of `logInfo` from @Clb@ that logs a string with @Info@ severity.
-logInfoS :: Monad m => String -> Clb.ClbT m ()
-logInfoS s = Clb.logInfo $ Clb.LogEntry Clb.Info s
+-- If all goes well, we should finish with a 'Left'. if not, we perform the
+-- given action to signal error.
+runEagerT :: Monad m => m a -> ExceptT a m () -> m a
+runEagerT whenError = runExceptT >=> either pure (const whenError)

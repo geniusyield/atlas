@@ -10,6 +10,7 @@ Stability   : develop
 -}
 module GeniusYield.Test.Clb
     ( GYTxMonadClb
+    , mkTestFor
     , asClb
     , asRandClb
     , liftClb
@@ -30,6 +31,7 @@ import           Data.SOP.NonEmpty                         (NonEmpty (NonEmptyCo
 import           Data.Time.Clock                           (NominalDiffTime,
                                                             UTCTime)
 import           Data.Time.Clock.POSIX                     (posixSecondsToUTCTime)
+import qualified Data.Text                                 as T
 
 import qualified Cardano.Api                               as Api
 import qualified Cardano.Api.Script                        as Api
@@ -50,18 +52,28 @@ import           Clb                                       (ClbState (..), ClbT,
                                                             ValidationResult (..), getCurrentSlot, txOutRefAt,
                                                             txOutRefAtPaymentCred, sendTx, unLog, getFails,
                                                             logInfo, logError, waitSlot)
-import qualified Clb                                       (dumpUtxoState)
+import qualified Clb
 import           Control.Monad.Trans.Maybe                 (runMaybeT)
 import qualified Ouroboros.Consensus.Cardano.Block         as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History      as Ouroboros
 import qualified PlutusLedgerApi.V2                        as Plutus
+import           Prettyprinter                             (PageWidth (AvailablePerLine),
+                                                            defaultLayoutOptions,
+                                                            layoutPageWidth,
+                                                            layoutPretty)
+import           Prettyprinter.Render.String               (renderString)
+import qualified Test.Cardano.Ledger.Core.KeyPair          as TL
+import qualified Test.Tasty                                as Tasty
+import           Test.Tasty.HUnit                          (assertFailure, testCaseInfo)
 
+import           GeniusYield.HTTP.Errors
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.User
 import           GeniusYield.Types
+import           GeniusYield.Test.Utils
 
 -- FIXME: Fix this type synonym upstream.
 type Clb = ClbT Identity
@@ -69,7 +81,7 @@ type Clb = ClbT Identity
 newtype GYTxRunEnv = GYTxRunEnv { runEnvWallet :: User }
 
 newtype GYTxMonadClb a = GYTxMonadClb
-    { unGYTxMonadClb :: ReaderT GYTxRunEnv (ExceptT (Either String GYTxMonadException) (RandT StdGen Clb)) a
+    { unGYTxMonadClb :: ReaderT GYTxRunEnv (ExceptT GYTxMonadException (RandT StdGen Clb)) a
     }
     deriving newtype (Functor, Applicative, Monad, MonadReader GYTxRunEnv)
     deriving anyclass GYTxBuilderMonad
@@ -86,9 +98,8 @@ asRandClb :: User
 asRandClb w m = do
     e <- runExceptT $ unGYTxMonadClb m `runReaderT` GYTxRunEnv w
     case e of
-        Left (Left err)  -> lift (logError err) >> return Nothing
-        Left (Right err) -> lift (logError (show err)) >> return Nothing
-        Right a          -> return $ Just a
+        Left err -> lift (logError (show err)) >> return Nothing
+        Right a -> return $ Just a
 
 asClb :: StdGen
       -> User
@@ -98,6 +109,58 @@ asClb g w m = evalRandT (asRandClb w m) g
 
 liftClb :: Clb a -> GYTxMonadClb a
 liftClb = GYTxMonadClb . lift . lift . lift
+
+{- | Given a test name, runs the trace for every wallet, checking there weren't
+     errors.
+-}
+mkTestFor :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
+mkTestFor name action =
+    testNoErrorsTraceClb v w Clb.defaultBabbage name $ do
+      asClb pureGen (w1 wallets) $ action wallets
+  where
+    v = valueFromLovelace 1_000_000_000_000_000 <>
+        fakeGold                  1_000_000_000 <>
+        fakeIron                  1_000_000_000
+
+    w = valueFromLovelace 1_000_000_000_000 <>
+        fakeGold                  1_000_000 <>
+        fakeIron                  1_000_000
+
+    wallets :: Wallets
+    wallets = Wallets (mkSimpleWallet (Clb.intToKeyPair 1))
+                      (mkSimpleWallet (Clb.intToKeyPair 2))
+                      (mkSimpleWallet (Clb.intToKeyPair 3))
+                      (mkSimpleWallet (Clb.intToKeyPair 4))
+                      (mkSimpleWallet (Clb.intToKeyPair 5))
+                      (mkSimpleWallet (Clb.intToKeyPair 6))
+                      (mkSimpleWallet (Clb.intToKeyPair 7))
+                      (mkSimpleWallet (Clb.intToKeyPair 8))
+                      (mkSimpleWallet (Clb.intToKeyPair 9))
+
+    -- | Helper for building tests
+    testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig -> String -> Clb a -> Tasty.TestTree
+    testNoErrorsTraceClb funds walletFunds cfg msg act =
+        testCaseInfo msg
+            $ maybe (pure mockLog) assertFailure
+            $ mbErrors >>= \errors -> pure (mockLog <> "\n\nError :\n-------\n" <>  errors)
+        where
+            -- _errors since we decided to store errors in the log as well.
+            (mbErrors, mock) = Clb.runClb (act >> Clb.checkErrors) $ Clb.initClb cfg (valueToApi funds) (valueToApi walletFunds)
+            mockLog = "\nEmulator log :\n--------------\n" <> logString
+            options = defaultLayoutOptions { layoutPageWidth = AvailablePerLine 150 1.0}
+            logDoc = Clb.ppLog $ Clb.mockInfo mock
+            logString = renderString $ layoutPretty options logDoc
+
+
+    mkSimpleWallet :: TL.KeyPair r L.StandardCrypto -> User
+    mkSimpleWallet kp =
+        let key = paymentSigningKeyFromLedgerKeyPair kp
+        in  User'
+                { userPaymentSKey' = key
+                , userStakeSKey'   = Nothing
+                , userAddr         = addressFromPaymentKeyHash GYTestnetPreprod . paymentKeyHash $
+                    paymentVerificationKey key
+                }
 
 {- | Try to execute an action, and if it fails, restore to the current state
  while preserving logs. If the action succeeds, logs an error as we expect
@@ -131,16 +194,11 @@ mustFailWith isExpectedError act = do
         Log $ second (LogEntry Error . ((msg  <> ":") <> ). show) <$> Seq.drop (Seq.length pre) post
       msg = "Unnamed failure action"
 
-instance MonadFail GYTxMonadClb where
-    fail = GYTxMonadClb . throwError . Left
-
 instance MonadError GYTxMonadException GYTxMonadClb where
 
-    throwError = GYTxMonadClb . throwError . Right
+    throwError = GYTxMonadClb . throwError
 
-    catchError m handler = GYTxMonadClb $ catchError (unGYTxMonadClb m) $ \case
-        Left  err -> throwError $ Left err
-        Right err -> unGYTxMonadClb $ handler err
+    catchError m handler = GYTxMonadClb . catchError (unGYTxMonadClb m) $ unGYTxMonadClb . handler
 
 instance GYTxQueryMonad GYTxMonadClb where
 
@@ -285,7 +343,7 @@ instance GYTxMonad GYTxMonadClb where
         vRes <- liftClb . sendTx $ txToApi tx
         case vRes of
             Success _state _onChainTx -> pure $ txBodyTxId txBody
-            Fail _ err -> fail $ show err
+            Fail _ err -> throwAppError . someBackendError . T.pack $ show err
       where
         -- TODO: use Prettyprinter
         dumpBody :: GYTxBody -> GYTxMonadClb ()
@@ -413,4 +471,11 @@ instance GYTxSpecialQueryMonad GYTxMonadClb where
 
 dumpUtxoState :: GYTxMonadClb ()
 dumpUtxoState = liftClb Clb.dumpUtxoState
+
+-------------------------------------------------------------------------------
+-- Preset StdGen
+-------------------------------------------------------------------------------
+
+pureGen :: StdGen
+pureGen = mkStdGen 42
 

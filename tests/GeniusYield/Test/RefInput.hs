@@ -55,28 +55,25 @@ refInputTrace :: GYTxGameMonad m => Bool -> Integer -> Integer -> Wallets -> m (
 refInputTrace toInline actual guess Wallets{..} = do
   let myGuess :: Integer = guess
       outValue :: GYValue = valueFromLovelace 20_000_000
-  mMOref <- asUser w1 $ addRefInput toInline (userAddr w9) (datumFromPlutusData (RefInputDatum actual))
-  case mMOref of
-    Nothing -> throwAppError $ someBackendError "Couldn't find index for reference utxo in outputs"
-    Just refInputORef ->
-      withWalletBalancesCheckSimple [w1 := valueFromLovelace 0] . asUser w1 $ do
-        gyLogInfo' "" $ printf "Reference input ORef %s" refInputORef
-        addr <- scriptAddress gyGuessRefInputDatumValidator
-        txBody <- buildTxBody . mustHaveOutput $ mkGYTxOut addr outValue (datumFromPlutusData ())
-        tx <- signTxBody txBody
-        txId <- submitTxConfirmed tx
-        let mOrefIndices = findLockedUtxosInBody addr tx
-        orefIndices <- maybe (throwAppError . someBackendError $ "Unable to get GYAddress from some Plutus.Address in txBody") return mOrefIndices
-        oref        <- case fmap (txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx) orefIndices of
-          [oref']        -> return oref'
-          _non_singleton -> throwAppError . someBackendError $ "expected exactly one reference"
-        gyLogInfo' "" $ printf "Locked ORef %s" oref
-        guessRefInputRun refInputORef oref myGuess
+  refInputORef <- asUser w1 $ addRefInput toInline (userAddr w9) (datumFromPlutusData (RefInputDatum actual))
+  withWalletBalancesCheckSimple [w1 := valueFromLovelace 0] . asUser w1 $ do
+    gyLogInfo' "" $ printf "Reference input ORef %s" refInputORef
+    addr <- scriptAddress gyGuessRefInputDatumValidator
+    txBody <- buildTxBody . mustHaveOutput $ mkGYTxOut addr outValue (datumFromPlutusData ())
+    tx <- signTxBody txBody
+    txId <- submitTxConfirmed tx
+    let mOrefIndices = findLockedUtxosInBody addr tx
+    orefIndices <- maybe (throwAppError . someBackendError $ "Unable to get GYAddress from some Plutus.Address in txBody") return mOrefIndices
+    oref        <- case fmap (txOutRefFromApiTxIdIx (txIdToApi txId) . wordToApiIx) orefIndices of
+      [oref']        -> return oref'
+      _non_singleton -> throwAppError . someBackendError $ "expected exactly one reference"
+    gyLogInfo' "" $ printf "Locked ORef %s" oref
+    guessRefInputRun refInputORef oref myGuess
 
 tryRefInputConsume :: GYTxGameMonad m => Wallets -> m ()
 tryRefInputConsume Wallets{..} = do
   -- Approach: Create a new output with 60% of total ada. Mark this UTxO as reference input and try sending this same 60%, or any amount greater than 40% of this original balance. Since coin balancer can't consume this UTxO, it won't be able to build for it.
-  void $ asUser w1 $ do
+  asUser w1 $ do
     walletBalance <- queryBalance $ userAddr w1
     let walletLovelaceBalance = fst $ valueSplitAda walletBalance
         lovelaceToSend = (walletLovelaceBalance `div` 10) * 6  -- send 60% of total ada

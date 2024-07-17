@@ -10,6 +10,8 @@ Stability   : develop
 module GeniusYield.Test.FeeTracker (
   FeeTrackerGame,
   FeeTracker,
+  ftgLift,
+  ftLift,
   withWalletBalancesCheckSimple,
   withWalletBalancesCheckSimpleIgnoreMinDepFor
 ) where
@@ -78,6 +80,7 @@ deriving
   via StateT FeeTrackerState m
   instance MonadError GYTxMonadException m => MonadError GYTxMonadException (FeeTracker m)
 
+-- | Perform a special action supported by the specific wrapped monad instance by lifting it to 'FeeTracker'.
 ftLift :: Functor m => m a -> FeeTracker m a
 ftLift act = FeeTracker $ \s -> (, s) <$> act
 
@@ -161,6 +164,7 @@ walletExtraLovelace m = M.map (\FeeTrackerState {feesPerTx} -> foldMap snd . fil
   where
     validTxIds = S.fromList . concatMap submittedTxIds $ M.elems m
 
+-- | Perform a special action supported by the specific wrapped monad instance by lifting it to 'FeeTrackerGame'.
 ftgLift :: Functor m => m a -> FeeTrackerGame m a
 ftgLift act = FeeTrackerGame $ \s -> (, s) <$> act
 

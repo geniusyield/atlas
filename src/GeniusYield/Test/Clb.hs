@@ -113,10 +113,10 @@ liftClb = GYTxMonadClb . lift . lift . lift
 {- | Given a test name, runs the trace for every wallet, checking there weren't
      errors.
 -}
-mkTestFor :: String -> (Wallets -> GYTxMonadClb a) -> Tasty.TestTree
+mkTestFor :: String -> (TestInfo -> GYTxMonadClb a) -> Tasty.TestTree
 mkTestFor name action =
     testNoErrorsTraceClb v w Clb.defaultBabbage name $ do
-      asClb pureGen (w1 wallets) $ action wallets
+      asClb pureGen (w1 testWallets) $ action TestInfo { testGoldAsset = fakeGold, testIronAsset = fakeIron, testWallets }
   where
     v = valueFromLovelace 1_000_000_000_000_000 <>
         fakeGold                  1_000_000_000 <>
@@ -126,8 +126,9 @@ mkTestFor name action =
         fakeGold                  1_000_000 <>
         fakeIron                  1_000_000
 
-    wallets :: Wallets
-    wallets = Wallets (mkSimpleWallet (Clb.intToKeyPair 1))
+    testWallets :: Wallets
+    testWallets = Wallets
+                      (mkSimpleWallet (Clb.intToKeyPair 1))
                       (mkSimpleWallet (Clb.intToKeyPair 2))
                       (mkSimpleWallet (Clb.intToKeyPair 3))
                       (mkSimpleWallet (Clb.intToKeyPair 4))

@@ -20,7 +20,7 @@ betRefAddress :: (HasCallStack, GYTxQueryMonad m) => BetRefParams -> m GYAddress
 betRefAddress brp = scriptAddress $ betRefValidator' brp
 
 -- | Operation to place bet.
-placeBet :: (HasCallStack, GYTxMonad m)
+placeBet :: (HasCallStack, GYTxQueryMonad m)
               => GYTxOutRef         -- ^ Reference Script.
               -> BetRefParams       -- ^ Validator Params.
               -> OracleAnswerDatum  -- ^ Guess.

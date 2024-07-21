@@ -375,6 +375,7 @@ test-suite atlas-unified-tests
     , containers
     , tasty
     , tasty-hunit
+    , text
     , mtl
     -- OnChain
     , plutus-core

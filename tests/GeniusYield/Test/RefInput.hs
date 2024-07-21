@@ -30,11 +30,12 @@ gyGuessRefInputDatumValidator = validatorFromPlutus guessRefInputDatumValidator
 
 refInputTests :: TestTree
 refInputTests = testGroup "Reference Input"
-    [ mkTestFor "Inlined datum" $ refInputTrace True 5 5
-    , mkTestFor "Inlined datum - Wrong guess" $ mustFail . refInputTrace True 5 4
+    [ mkTestFor "Inlined datum" $ refInputTrace True 5 5 . testWallets
+    , mkTestFor "Inlined datum - Wrong guess" $ mustFail . refInputTrace True 5 4 . testWallets
     , mkTestFor "Reference input must not be consumed" $
         mustFailWith (\case { GYBuildTxException (GYBuildTxBalancingError (GYBalancingErrorInsufficientFunds _)) -> True; _ -> False })
         . tryRefInputConsume
+        . testWallets
     ]
 
 guessRefInputRun :: GYTxMonad m => GYTxOutRef -> GYTxOutRef -> Integer -> m ()

@@ -20,22 +20,21 @@ import           Control.Lens                             ((.~))
 import           Test.Tasty                               (TestTree, testGroup)
 import           Test.Tasty.HUnit                         (testCaseSteps)
 
+import           Data.Default                             (Default (def))
 import           Data.Maybe                               (fromJust)
 import           Data.Ratio                               ((%))
 import qualified Data.Set                                 as Set
-import           GeniusYield.Imports
-import           GeniusYield.Transaction
-import           GeniusYield.Types
 
-import           Data.Default                             (Default (def))
 import           GeniusYield.Examples.Gift
 import           GeniusYield.Examples.Treat
+import           GeniusYield.Imports
 import           GeniusYield.Providers.Common             (SubmitTxException)
 import           GeniusYield.Test.Privnet.Asserts
 import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Examples.Common
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder
+import           GeniusYield.Types
 
 pattern InsufficientFundsException :: GYTxMonadException
 pattern InsufficientFundsException <- GYBuildTxException (GYBuildTxBalancingError (GYBalancingErrorInsufficientFunds _))

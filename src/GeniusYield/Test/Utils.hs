@@ -9,7 +9,8 @@ Stability   : develop
 
 -}
 module GeniusYield.Test.Utils
-    ( Wallets (..)
+    ( TestInfo (..)
+    , Wallets (..)
     , withBalance
     , withWalletBalancesCheck
     , findLockedUtxosInBody
@@ -96,6 +97,9 @@ fakeIron = fromFakeCoin $ FakeCoin "Iron"
 -------------------------------------------------------------------------------
 -- helpers
 -------------------------------------------------------------------------------
+
+-- | General information about the test environment to help in running polymorphic tests.
+data TestInfo = TestInfo { testGoldAsset :: !GYAssetClass, testIronAsset :: !GYAssetClass, testWallets :: !Wallets }
 
 -- | Available wallets.
 data Wallets = Wallets

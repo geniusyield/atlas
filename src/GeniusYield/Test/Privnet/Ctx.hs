@@ -14,6 +14,7 @@ module GeniusYield.Test.Privnet.Ctx (
     User (..),
     CreateUserConfig (..),
     ctxUsers,
+    ctxWallets,
     userPkh,
     userPaymentPkh,
     userStakePkh,
@@ -21,6 +22,7 @@ module GeniusYield.Test.Privnet.Ctx (
     userPaymentVKey,
     userStakeVKey,
     -- * Operations
+    ctxRunGame,
     ctxRun,
     ctxRunQuery,
     ctxRunBuilder,
@@ -42,6 +44,7 @@ import           GeniusYield.Imports
 import           GeniusYield.Providers.Node
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
+import           GeniusYield.Test.Utils
 import           Test.Tasty.HUnit           (assertFailure)
 
 data CreateUserConfig =
@@ -86,6 +89,19 @@ ctxNetworkId Ctx {ctxNetworkInfo} = GYPrivnet ctxNetworkInfo
 ctxUsers :: Ctx -> [User]
 ctxUsers ctx = ($ ctx) <$> [ctxUser2, ctxUser3, ctxUser4, ctxUser5, ctxUser6, ctxUser7, ctxUser8, ctxUser9]
 
+ctxWallets :: Ctx -> Wallets
+ctxWallets Ctx{..} = Wallets
+  { w1 = ctxUserF
+  , w2 = ctxUser2
+  , w3 = ctxUser3
+  , w4 = ctxUser4
+  , w5 = ctxUser5
+  , w6 = ctxUser6
+  , w7 = ctxUser7
+  , w8 = ctxUser8
+  , w9 = ctxUser9
+  }
+
 -- | Creates a new user with the given balance. Note that the actual balance which this user get's could be more than what is provided to satisfy minimum ada requirement of a UTxO.
 newTempUserCtx:: Ctx
               -> User            -- ^ User which will fund this new user.
@@ -117,6 +133,8 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
 
   pure $ User' {userPaymentSKey' = newPaymentSKey, userAddr = newAddr, userStakeSKey' = newStakeSKey}
 
+ctxRunGame :: Ctx -> GYTxGameMonadIO a -> IO a
+ctxRunGame ctx = runGYTxGameMonadIO (ctxNetworkId ctx) (ctxProviders ctx)
 
 ctxRun :: Ctx -> User -> GYTxMonadIO a -> IO a
 ctxRun ctx User' {..} = runGYTxMonadIO (ctxNetworkId ctx) (ctxProviders ctx) userPaymentSKey' userStakeSKey' [userAddr] userAddr Nothing

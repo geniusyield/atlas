@@ -20,6 +20,8 @@ module GeniusYield.TxBuilder.Class
     , GYTxSkeleton (..)
     , GYTxSkeletonRefIns (..)
     , buildTxBody
+    , buildTxBodyParallel
+    , buildTxBodyChaining
     , waitNSlots
     , submitTx_
     , submitTxConfirmed
@@ -131,9 +133,18 @@ import qualified PlutusLedgerApi.V1.Value     as Plutus (AssetClass)
 -- | Class of monads for building transactions. This can be default derived if the requirements are met.
 -- Specifically, set 'TxBuilderStrategy' to 'GYCoinSelectionStrategy' if you wish to use the default in-house
 -- transaction building implementation.
-class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, Default (TxBuilderStrategy m)) => GYTxBuilderMonad m where
+class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m) => GYTxBuilderMonad m where
     type TxBuilderStrategy m :: Type
     type TxBuilderStrategy m = GYCoinSelectionStrategy
+
+    {- | The most basic version of 'GYTxSkeleton' builder.
+
+    == NOTE ==
+    This is not meant to be called multiple times with several 'GYTxSkeleton's before submission.
+    Because the balancer will end up using the same utxos across the different txs.
+
+    Consider using 'buildTxBodyParallel' or 'buildTxBodyChaining' instead.
+    -}
     buildTxBodyWithStrategy :: forall v. TxBuilderStrategy m -> GYTxSkeleton v -> m GYTxBody
     default buildTxBodyWithStrategy :: forall v. (MonadRandom m, TxBuilderStrategy m ~ GYCoinSelectionStrategy)
                                     => TxBuilderStrategy m
@@ -141,8 +152,45 @@ class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, Default (TxBuilderStrategy
                                     -> m GYTxBody
     buildTxBodyWithStrategy = buildTxBodyWithStrategy'
 
-buildTxBody :: GYTxBuilderMonad m => GYTxSkeleton v -> m GYTxBody
+    {- | A multi 'GYTxSkeleton' builder.
+
+    This does not perform chaining, i.e does not use utxos created by one of the given transactions in the next one.
+    However, it does ensure that the balancer does not end up using the same own utxos when building multiple
+    transactions at once.
+
+    This supports failure recovery by utilizing 'GYTxBuildResult'.
+    -}
+    buildTxBodyParallelWithStrategy :: forall v. TxBuilderStrategy m -> [GYTxSkeleton v] -> m GYTxBuildResult
+    default buildTxBodyParallelWithStrategy :: forall v. (MonadRandom m, TxBuilderStrategy m ~ GYCoinSelectionStrategy)
+                                    => TxBuilderStrategy m
+                                    -> [GYTxSkeleton v]
+                                    -> m GYTxBuildResult
+    buildTxBodyParallelWithStrategy = buildTxBodyParallelWithStrategy'
+
+    {- | A chaining 'GYTxSkeleton' builder.
+
+    This will perform chaining, i.e it will use utxos created by one of the given transactions, when building the next one.
+
+    This supports failure recovery by utilizing 'GYTxBuildResult'.
+    -}
+    buildTxBodyChainingWithStrategy :: forall v. TxBuilderStrategy m -> [GYTxSkeleton v] -> m GYTxBuildResult
+    default buildTxBodyChainingWithStrategy :: forall v. (MonadRandom m, TxBuilderStrategy m ~ GYCoinSelectionStrategy)
+                                    => TxBuilderStrategy m
+                                    -> [GYTxSkeleton v]
+                                    -> m GYTxBuildResult
+    buildTxBodyChainingWithStrategy = buildTxBodyChainingWithStrategy'
+
+-- | 'buildTxBodyWithStrategy' with the default coin selection strategy.
+buildTxBody :: (Default (TxBuilderStrategy m), GYTxBuilderMonad m) => GYTxSkeleton v -> m GYTxBody
 buildTxBody = buildTxBodyWithStrategy def
+
+-- | 'buildTxBodyParallelWithStrategy' with the default coin selection strategy.
+buildTxBodyParallel :: (Default (TxBuilderStrategy m), GYTxBuilderMonad m) => [GYTxSkeleton v] -> m GYTxBuildResult
+buildTxBodyParallel = buildTxBodyParallelWithStrategy def
+
+-- | 'buildTxBodyChainingWithStrategy' with the default coin selection strategy.
+buildTxBodyChaining :: (Default (TxBuilderStrategy m), GYTxBuilderMonad m) => [GYTxSkeleton v] -> m GYTxBuildResult
+buildTxBodyChaining = buildTxBodyChainingWithStrategy def
 
 -- | Class of monads for interacting with the blockchain using transactions.
 class GYTxBuilderMonad m => GYTxMonad m where
@@ -303,6 +351,8 @@ Since these wrapper data types are usage specific, and 'GYTxGameMonad' instances
 instance GYTxBuilderMonad m => GYTxBuilderMonad (RandT g m) where
     type TxBuilderStrategy (RandT g m) = TxBuilderStrategy m
     buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+    buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
+    buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
 instance GYTxMonad m => GYTxMonad (RandT g m) where
     signTxBody = lift . signTxBody
@@ -313,6 +363,8 @@ instance GYTxMonad m => GYTxMonad (RandT g m) where
 instance GYTxBuilderMonad m => GYTxBuilderMonad (ReaderT env m) where
     type TxBuilderStrategy (ReaderT env m) = TxBuilderStrategy m
     buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+    buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
+    buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
 instance GYTxMonad m => GYTxMonad (ReaderT env m) where
     signTxBody = lift . signTxBody
@@ -329,6 +381,8 @@ instance GYTxMonad m => GYTxMonad (ReaderT env m) where
 instance GYTxBuilderMonad m => GYTxBuilderMonad (Strict.StateT s m) where
     type TxBuilderStrategy (Strict.StateT s m) = TxBuilderStrategy m
     buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+    buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
+    buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
 instance GYTxMonad m => GYTxMonad (Strict.StateT s m) where
     signTxBody = lift . signTxBody
@@ -339,6 +393,8 @@ instance GYTxMonad m => GYTxMonad (Strict.StateT s m) where
 instance GYTxBuilderMonad m => GYTxBuilderMonad (Lazy.StateT s m) where
     type TxBuilderStrategy (Lazy.StateT s m) = TxBuilderStrategy m
     buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+    buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
+    buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
 instance GYTxMonad m => GYTxMonad (Lazy.StateT s m) where
     signTxBody = lift . signTxBody
@@ -349,6 +405,8 @@ instance GYTxMonad m => GYTxMonad (Lazy.StateT s m) where
 instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (CPS.WriterT w m) where
     type TxBuilderStrategy (CPS.WriterT w m) = TxBuilderStrategy m
     buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+    buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
+    buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
 instance (GYTxMonad m, Monoid w) => GYTxMonad (CPS.WriterT w m) where
     signTxBody = lift . signTxBody
@@ -359,6 +417,8 @@ instance (GYTxMonad m, Monoid w) => GYTxMonad (CPS.WriterT w m) where
 instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (Strict.WriterT w m) where
     type TxBuilderStrategy (Strict.WriterT w m) = TxBuilderStrategy m
     buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+    buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
+    buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
 instance (GYTxMonad m, Monoid w) => GYTxMonad (Strict.WriterT w m) where
     signTxBody = lift . signTxBody
@@ -369,6 +429,8 @@ instance (GYTxMonad m, Monoid w) => GYTxMonad (Strict.WriterT w m) where
 instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (Lazy.WriterT w m) where
     type TxBuilderStrategy (Lazy.WriterT w m) = TxBuilderStrategy m
     buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+    buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
+    buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
 instance (GYTxMonad m, Monoid w) => GYTxMonad (Lazy.WriterT w m) where
     signTxBody = lift . signTxBody
@@ -733,25 +795,19 @@ wrapReqWithTimeLog label m = do
 wt :: (GYTxQueryMonad m, MonadIO m) => String -> m a -> m a
 wt = wrapReqWithTimeLog
 
-buildTxBodyWithStrategy' :: forall v m. (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
-                        => GYCoinSelectionStrategy
-                        -> GYTxSkeleton v
-                        -> m GYTxBody
-buildTxBodyWithStrategy' cstrat = fmap runIdentity . buildTxBodyF @Identity cstrat . Identity
-
-{- | The most basic version of 'GYTxMonadIO' interpreter over a generic 'Traversable'.
+{- | The most basic version of 'GYTxSkeleton' builder.
 
 == NOTE ==
-This is not meant to be used with structures containing _multiple_ 'GYTxSkeleton's. As the balancer
+This is not meant to be called multiple times with several 'GYTxSkeleton's. As the balancer
 will end up using the same utxos across the different txs.
 
 Consider using 'buildTxBodyParallel' or 'buildTxBodyChaining' instead.
 -}
-buildTxBodyF :: forall f v m. (Traversable f, GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
+buildTxBodyWithStrategy' :: forall v m. (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
              => GYCoinSelectionStrategy
-             -> f (GYTxSkeleton v)
-             -> m (f GYTxBody)
-buildTxBodyF cstrat m = do
+             -> GYTxSkeleton v
+             -> m GYTxBody
+buildTxBodyWithStrategy' cstrat m = do
     x <- buildTxBodyCore (const id) cstrat [m]
     case x of
       GYTxBuildSuccess ne          -> pure $ NE.head ne
@@ -760,7 +816,7 @@ buildTxBodyF cstrat m = do
       -- We know there is precisely one input.
       GYTxBuildNoInputs            -> error "runGYTxMonadIOF: absurd"
 
-{- | A multi transaction building 'GYTxMonadIO' interpreter.
+{- | A multi 'GYTxSkeleton' builder.
 
 This does not perform chaining, i.e does not use utxos created by one of the given transactions in the next one.
 However, it does ensure that the balancer does not end up using the same own utxos when building multiple
@@ -768,14 +824,14 @@ transactions at once.
 
 This supports failure recovery by utilizing 'GYTxBuildResult'.
 -}
-buildTxBodyParallelF :: (Traversable f, GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
+buildTxBodyParallelWithStrategy' :: (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
                      => GYCoinSelectionStrategy
-                     -> [f (GYTxSkeleton v)]
-                     -> m (GYTxBuildResult f)
-buildTxBodyParallelF cstrat m = do
+                     -> [GYTxSkeleton v]
+                     -> m GYTxBuildResult
+buildTxBodyParallelWithStrategy' cstrat m = do
     buildTxBodyCore updateOwnUtxosParallel cstrat m
 
-{- | A chaining transaction building 'GYTxMonadIO' interpreter.
+{- | A chaining 'GYTxSkeleton' builder.
 
 This will perform chaining, i.e it will use utxos created by one of the given transactions, when building the next one.
 
@@ -783,11 +839,11 @@ This supports failure recovery by utilizing 'GYTxBuildResult'.
 
 **EXPERIMENTAL**
 -}
-buildTxBodyChainingF :: (Traversable f, GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
+buildTxBodyChainingWithStrategy' :: (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
                      => GYCoinSelectionStrategy
-                     -> [f (GYTxSkeleton v)]
-                     -> m (GYTxBuildResult f)
-buildTxBodyChainingF cstrat m = do
+                     -> [GYTxSkeleton v]
+                     -> m GYTxBuildResult
+buildTxBodyChainingWithStrategy' cstrat m = do
     addrs <- ownAddresses
     buildTxBodyCore (updateOwnUtxosChaining $ Set.fromList addrs) cstrat m
 
@@ -811,11 +867,11 @@ own wallet, for next 'GYTxSkeleton's (if any).
 The function recovers successfully built tx skeletons, in case the list contains several of them. See: 'GYTxBuildResult'.
 -}
 buildTxBodyCore
-    :: forall f m v. (Traversable f, GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
+    :: forall v m. (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m)
     => (GYTxBody -> GYUTxOs -> GYUTxOs)           -- ^ Function governing how to update UTxO set when building for multiple skeletons.
     -> GYCoinSelectionStrategy                    -- ^ Coin selection strategy.
-    -> [f (GYTxSkeleton v)]                       -- ^ Skeleton(s).
-    -> m (GYTxBuildResult f)
+    -> [GYTxSkeleton v]                       -- ^ Skeleton(s).
+    -> m GYTxBuildResult
 buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
     logSkeletons skeletons
 
@@ -839,8 +895,8 @@ buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
         Right res -> pure res
 
     where
-      logSkeletons :: [f (GYTxSkeleton v)] -> m ()
-      logSkeletons = mapM_ (mapM_ (logMsg "buildTxBody" GYDebug . show))
+      logSkeletons :: [GYTxSkeleton v] -> m ()
+      logSkeletons = mapM_ (logMsg "buildTxBody" GYDebug . show)
 
 -- | Update own utxo set by removing any utxos used up in the given tx.
 updateOwnUtxosParallel :: GYTxBody -> GYUTxOs -> GYUTxOs

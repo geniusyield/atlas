@@ -395,11 +395,11 @@ skeletonToTxBody skeleton = do
     ps <- stakePools
 
     addr <- ownAddress
-    e <- buildTxCore ss eh pp ps def (const id) [addr] addr Nothing [Identity skeleton]
+    e <- buildTxCore ss eh pp ps def (const id) [addr] addr Nothing [skeleton]
     case e of
         Left err  -> throwError $ GYBuildTxException err
         Right res -> case res of
-            GYTxBuildSuccess (Identity body :| _) -> return body
+            GYTxBuildSuccess (body :| _) -> return body
             GYTxBuildFailure (GYBalancingErrorInsufficientFunds v) -> throwError . GYBuildTxException . GYBuildTxBalancingError $ GYBalancingErrorInsufficientFunds v
             GYTxBuildFailure _                    -> error "impossible case"
             GYTxBuildPartialSuccess _ _           -> error "impossible case"

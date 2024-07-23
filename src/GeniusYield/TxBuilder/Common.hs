@@ -142,11 +142,11 @@ Consider the act of building five 'GYTxSkeleton's into 'GYTxBody's. If three out
 one fails due to insufficient funds - this type facilitates recovering the three rather than failing outright and discarding
 the results.
 -}
-data GYTxBuildResult f
+data GYTxBuildResult
     -- | All given 'GYTxSkeleton's were successfully built.
-    = GYTxBuildSuccess !(NonEmpty (f GYTxBody))
+    = GYTxBuildSuccess !(NonEmpty GYTxBody)
     -- | Some of the given 'GYTxSkeleton's were successfully built, but the rest failed due to _insufficient funds_.
-    | GYTxBuildPartialSuccess !GYBalancingError !(NonEmpty (f GYTxBody))
+    | GYTxBuildPartialSuccess !GYBalancingError !(NonEmpty GYTxBody)
     -- | None of the given 'GYTxSkeleton's could be built due to _insufficient funds_.
     | GYTxBuildFailure !GYBalancingError
     -- | Input did not contain any 'GYTxSkeleton's.
@@ -165,7 +165,7 @@ Peculiarly, this is parameterized on:
 The function recovers successfully built tx skeletons, in case the list contains several of them. See: 'GYTxBuildResult'.
 -}
 buildTxCore
-    :: forall m f v. (GYTxQueryMonad m, MonadRandom m, Traversable f)
+    :: forall m v. (GYTxQueryMonad m, MonadRandom m)
     => Api.SystemStart
     -> Api.EraHistory
     -> Ledger.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra)
@@ -175,9 +175,9 @@ buildTxCore
     -> [GYAddress]
     -> GYAddress
     -> Maybe GYUTxO  -- ^ Is `Nothing` if there was no 5 ada collateral returned by browser wallet.
-    -> [f (GYTxSkeleton v)]
-    -> m (Either GYBuildTxError (GYTxBuildResult f))
-buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral fbodies = do
+    -> [GYTxSkeleton v]
+    -> m (Either GYBuildTxError GYTxBuildResult)
+buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral skeletons = do
     ownUtxos <- utxosAtAddresses addrs
 
     let buildEnvWith ownUtxos' refIns collateralUtxo = GYBuildTxEnv
@@ -266,22 +266,22 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral fb
                     gytxSigs
                     gytxMetadata
 
-        go :: GYUTxOs -> GYTxBuildResult f -> [f (GYTxSkeleton v)] -> m (Either GYBuildTxError  (GYTxBuildResult f))
+        go :: GYUTxOs -> GYTxBuildResult -> [GYTxSkeleton v] -> m (Either GYBuildTxError GYTxBuildResult)
         go _         acc []             = pure $ Right $ reverseResult acc
-        go ownUtxos' acc (fbody : rest) = do
-            res <- sequence <$> traverse (helper ownUtxos') fbody
+        go ownUtxos' acc (skeleton : rest) = do
+            res <- helper ownUtxos' skeleton
             case res of
                 {- Not enough funds for this transaction
                 We assume it's not worth continuing with the next transactions (which is often the case) -}
                 Left (GYBuildTxBalancingError be) -> pure $ Right $ reverseResult $ updateBuildRes (Left be) acc
                 -- Any other exception is fatal. TODO: To think more on whether collateral error can be handled here.
                 Left err                      -> pure $ Left err
-                Right fres                    -> do
+                Right body                    -> do
                     -- Update the available utxos set by user supplied function.
-                    let ownUTxos'' = foldl' (flip ownUtxoUpdateF) ownUtxos' fres
+                    let ownUTxos'' = ownUtxoUpdateF body ownUtxos'
                     -- Continue with an updated accumulator (set of built results).
-                    go ownUTxos'' (updateBuildRes (Right fres) acc) rest
-    go ownUtxos GYTxBuildNoInputs fbodies
+                    go ownUTxos'' (updateBuildRes (Right body) acc) rest
+    go ownUtxos GYTxBuildNoInputs skeletons
   where
     {- This function updates 'GYTxBuildResult' based on a build outcome
 
@@ -303,7 +303,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral fb
 
     -- TODO: Move to @Data.Sequence.NonEmpty@?
     -- | To reverse the final non-empty list built.
-    reverseResult :: GYTxBuildResult f -> GYTxBuildResult f
+    reverseResult :: GYTxBuildResult -> GYTxBuildResult
     reverseResult (GYTxBuildSuccess ne) = GYTxBuildSuccess $ NE.reverse ne
     reverseResult (GYTxBuildPartialSuccess v ne) = GYTxBuildPartialSuccess v $ NE.reverse ne
     reverseResult anyOther = anyOther

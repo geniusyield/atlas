@@ -814,7 +814,7 @@ buildTxBodyWithStrategy' cstrat m = do
       GYTxBuildPartialSuccess be _ -> throwError . GYBuildTxException $ GYBuildTxBalancingError be
       GYTxBuildFailure be          -> throwError . GYBuildTxException $ GYBuildTxBalancingError be
       -- We know there is precisely one input.
-      GYTxBuildNoInputs            -> error "runGYTxMonadIOF: absurd"
+      GYTxBuildNoInputs            -> error "buildTxBodyWithStrategy': absurd"
 
 {- | A multi 'GYTxSkeleton' builder.
 

@@ -151,7 +151,7 @@ class GYTxQueryMonad m => GYTxUserQueryMonad m where
     -- | Get available own UTxOs that can be operated upon.
     availableUTxOs :: m GYUTxOs
 
-    -- | Return some unspend transaction output translatable to the given language corresponding to the script in question.
+    -- | Return some unspent transaction output translatable to the given language corresponding to the script in question.
     --
     -- /Law:/ Must return the different values.
     someUTxO :: PlutusVersion -> m GYTxOutRef
@@ -244,7 +244,7 @@ Perhaps said superclass constraint should be rethought? Does it really
 achieve what it is meant to achieve? The purpose of that contraint is to signal
 that the query methods _should_ throw errors of type 'GYTxMonadException'.
 After all, some queries are bound to fail. But this expectation does not really
-restrict the type of exceptinos. In fact, an IO based monad could still
+restrict the type of exceptions. In fact, an IO based monad could still
 be throwing exceptions of different types (and our implementation of 'GYTxMonadIO'
 likely does).
 

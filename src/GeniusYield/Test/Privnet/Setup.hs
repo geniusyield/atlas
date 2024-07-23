@@ -55,7 +55,7 @@ import           GeniusYield.Types
 -- Setup
 -------------------------------------------------------------------------------
 
--- | This setup represents a three argument function where first two arguments are for logging & second is for the continuation, in need of `Ctx`.
+-- | This setup represents a three argument function where first two arguments are for logging & third is for the continuation, in need of `Ctx`.
 --
 -- Once these arguments are given to this function, it will give `Ctx` to the continuation, where the logging part (the `ctxLog`) of `Ctx` would be obtained from the first two arguments of this function.
 --

@@ -27,9 +27,7 @@ import           GeniusYield.Types.PubKeyHash     (AsPubKeyHash(toPubKeyHash), G
 import           GeniusYield.Types.StakeKeyHash   (GYStakeKeyHash)
 import           GeniusYield.Types.TxOutRef       (GYTxOutRef)
 
--- If something is
--- it as well. But if boolean is `True`, framework would only use it as collateral and reserve it, if value in the given UTxO
--- is exactly 5 ada.
+-- | Information on a the designated collateral to use.
 data UserCollateral = UserCollateral
     { userCollateralRef :: GYTxOutRef
     , userCollateralCheck :: Bool

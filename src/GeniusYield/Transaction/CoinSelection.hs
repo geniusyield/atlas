@@ -21,6 +21,7 @@ import           Control.Monad.Random                          (MonadRandom)
 import           Control.Monad.Trans.Except                    (ExceptT (ExceptT),
                                                                 except)
 import qualified Data.ByteString                               as BS
+import           Data.Default                                  (Default (def))
 import qualified Data.Map                                      as Map
 import qualified Data.Set                                      as S
 import qualified Data.Text                                     as Text
@@ -102,6 +103,9 @@ data GYCoinSelectionStrategy
     | GYLegacy
     deriving stock (Eq, Show, Enum, Bounded)
 
+instance Default GYCoinSelectionStrategy where
+    def = GYRandomImproveMultiAsset
+
 {- | Select additional inputs from the set of own utxos given, such that when combined with given existing inputs,
 they cover for all the given outputs, as well as extraLovelace.
 
@@ -115,7 +119,7 @@ a positive amount of ada.
 selectInputs :: forall m v. MonadRandom m
              => GYCoinSelectionEnv v
              -> GYCoinSelectionStrategy
-             -> ExceptT BalancingError m ([GYTxInDetailed v], [GYTxOut v])
+             -> ExceptT GYBalancingError m ([GYTxInDetailed v], [GYTxOut v])
 selectInputs
     GYCoinSelectionEnv
         { existingInputs = existingInputs'
@@ -134,7 +138,7 @@ selectInputs
             -- We pick the UTxO having most value.
             let ownUtxosList = utxosToList ownUtxos
             in case ownUtxosList of
-                [] -> Left BalancingErrorEmptyOwnUTxOs
+                [] -> Left GYBalancingErrorEmptyOwnUTxOs
                 _  -> pure . pure $ utxoAsPubKeyInp $ maximumBy (compare `on` utxoValue) ownUtxosList
           else pure Nothing
     let
@@ -251,17 +255,17 @@ computeTokenBundleSerializedLengthBytes = CWallet.TxSize . safeCast
 selectInputsLegacy :: GYUTxOs            -- ^ Set of own utxos to select additional inputs from.
              -> Map GYAssetClass Natural -- ^ Target value total inputs must sum up to.
              -> [GYTxInDetailed v]       -- ^ List of existing inputs that must be used.
-             -> Either BalancingError ([GYTxInDetailed v], GYValue)
+             -> Either GYBalancingError ([GYTxInDetailed v], GYValue)
 selectInputsLegacy ownUtxos targetOut existingIns = go targetOut [] mempty $ utxosToList ownUtxos
   where
     inRefs = map (gyTxInTxOutRef . gyTxInDet) existingIns
     ownValueMap :: Map GYTxOutRef GYValue
     ownValueMap = mapUTxOs utxoValue ownUtxos
 
-    go :: Map GYAssetClass Natural -> [GYTxInDetailed v] -> GYValue -> [GYUTxO] -> Either BalancingError ([GYTxInDetailed v], GYValue)
+    go :: Map GYAssetClass Natural -> [GYTxInDetailed v] -> GYValue -> [GYUTxO] -> Either GYBalancingError ([GYTxInDetailed v], GYValue)
     go m addIns addVal _
         | Map.null m            = Right (addIns, addVal)
-    go m _      _      []       = Left $ BalancingErrorInsufficientFunds $ valueFromList [ (ac, toInteger n) | (ac, n) <- Map.toList m ]
+    go m _      _      []       = Left $ GYBalancingErrorInsufficientFunds $ valueFromList [ (ac, toInteger n) | (ac, n) <- Map.toList m ]
     go m addIns addVal (utxo : ys)
         | utxoRef utxo `elem` inRefs = go m addIns addVal ys
         | otherwise             =
@@ -421,10 +425,10 @@ fromCWalletTxIn CWallet.TxIn { inputId, inputIx } = txOutRefFromTuple (txId, fro
     txId = fromMaybe customError . txIdFromHex . Text.unpack $ toText inputId
     customError = error "fromCWalletTxIn: unable to deserialise txId"
 
-fromCWalletBalancingError :: CBalanceInternal.SelectionBalanceError ctx -> BalancingError
+fromCWalletBalancingError :: CBalanceInternal.SelectionBalanceError ctx -> GYBalancingError
 fromCWalletBalancingError (CBalance.BalanceInsufficient (CBalance.BalanceInsufficientError _ _ delta)) =
-    BalancingErrorInsufficientFunds $ fromTokenBundle delta
+    GYBalancingErrorInsufficientFunds $ fromTokenBundle delta
 
 fromCWalletBalancingError (CBalance.UnableToConstructChange (CBalance.UnableToConstructChangeError _ n)) =
-    BalancingErrorChangeShortFall $ CWallet.unCoin n
-fromCWalletBalancingError CBalance.EmptyUTxO = BalancingErrorEmptyOwnUTxOs
+    GYBalancingErrorChangeShortFall $ CWallet.unCoin n
+fromCWalletBalancingError CBalance.EmptyUTxO = GYBalancingErrorEmptyOwnUTxOs

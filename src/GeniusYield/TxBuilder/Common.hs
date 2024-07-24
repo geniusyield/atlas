@@ -7,7 +7,12 @@ Stability   : develop
 
 -}
 module GeniusYield.TxBuilder.Common
-    ( GYTxBuildResult (..)
+    ( GYTxSkeleton (..)
+    , GYTxSkeletonRefIns (..)
+    , emptyGYTxSkeleton
+    , gyTxSkeletonRefInsToList
+    , gyTxSkeletonRefInsSet
+    , GYTxBuildResult (..)
     , buildTxCore
     , collateralLovelace
     , collateralValue
@@ -19,6 +24,9 @@ import qualified Cardano.Api                    as Api
 import qualified Cardano.Api.Shelley            as Api.S
 import qualified Cardano.Ledger.Alonzo.Core     as Ledger
 import           Control.Applicative            ((<|>))
+import           Control.Monad.Except           (MonadError (throwError))
+import           Control.Monad.Random           (MonadRandom)
+import           Data.List                      (nubBy)
 import           Data.List.NonEmpty             (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty             as NE
 import qualified Data.Map.Strict                as Map
@@ -28,9 +36,105 @@ import qualified Data.Set                       as Set
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
 import           GeniusYield.Transaction.Common (minimumUTxO)
-import           GeniusYield.TxBuilder.Class
+import           GeniusYield.TxBuilder.Query.Class
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+
+-------------------------------------------------------------------------------
+-- Transaction skeleton
+-------------------------------------------------------------------------------
+
+-- | Transaction skeleton
+--
+-- /Note:/ let's add fields as we need them.
+--
+-- The parameter @v@ indicates the minimum version of scripts allowed
+-- as inputs.
+--
+data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
+    { gytxIns           :: ![GYTxIn v]
+    , gytxOuts          :: ![GYTxOut v]
+    , gytxRefIns        :: !(GYTxSkeletonRefIns v)
+    , gytxMint          :: !(Map (GYMintScript v) (Map GYTokenName Integer, GYRedeemer))
+    , gytxWdrls         :: ![GYTxWdrl v]
+    , gytxSigs          :: !(Set GYPubKeyHash)
+    , gytxCerts         :: ![GYTxCert v]
+    , gytxInvalidBefore :: !(Maybe GYSlot)
+    , gytxInvalidAfter  :: !(Maybe GYSlot)
+    , gytxMetadata      :: !(Maybe GYTxMetadata)
+    } deriving Show
+
+data GYTxSkeletonRefIns :: PlutusVersion -> Type where
+    GYTxSkeletonRefIns :: VersionIsGreaterOrEqual v 'PlutusV2 => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
+    GYTxSkeletonNoRefIns :: GYTxSkeletonRefIns v
+
+deriving instance Show (GYTxSkeletonRefIns v)
+deriving instance Eq (GYTxSkeletonRefIns v)
+
+gyTxSkeletonRefInsToList :: GYTxSkeletonRefIns v -> [GYTxOutRef]
+gyTxSkeletonRefInsToList = Set.toList . gyTxSkeletonRefInsSet
+
+gyTxSkeletonRefInsSet :: GYTxSkeletonRefIns v -> Set GYTxOutRef
+gyTxSkeletonRefInsSet (GYTxSkeletonRefIns xs) = xs
+gyTxSkeletonRefInsSet GYTxSkeletonNoRefIns    = Set.empty
+
+instance Semigroup (GYTxSkeletonRefIns v) where
+    GYTxSkeletonRefIns a <> GYTxSkeletonRefIns b = GYTxSkeletonRefIns (Set.union a b)
+    GYTxSkeletonRefIns a <> GYTxSkeletonNoRefIns = GYTxSkeletonRefIns a
+    GYTxSkeletonNoRefIns <> GYTxSkeletonRefIns b = GYTxSkeletonRefIns b
+    GYTxSkeletonNoRefIns <> GYTxSkeletonNoRefIns = GYTxSkeletonNoRefIns
+
+emptyGYTxSkeleton :: GYTxSkeleton v
+emptyGYTxSkeleton = GYTxSkeleton
+    { gytxIns           = []
+    , gytxOuts          = []
+    , gytxRefIns        = GYTxSkeletonNoRefIns
+    , gytxMint          = Map.empty
+    , gytxWdrls         = []
+    , gytxSigs          = Set.empty
+    , gytxCerts         = []
+    , gytxInvalidBefore = Nothing
+    , gytxInvalidAfter  = Nothing
+    , gytxMetadata      = Nothing
+    }
+
+instance Semigroup (GYTxSkeleton v) where
+    x <> y = GYTxSkeleton
+        { gytxIns           = combineIns (gytxIns x) (gytxIns y)
+        , gytxOuts          = gytxOuts x ++ gytxOuts y
+        , gytxRefIns        = gytxRefIns x <> gytxRefIns y
+        , gytxMint          = combineMint (gytxMint x) (gytxMint y)
+        , gytxWdrls         = combineWdrls (gytxWdrls x) (gytxWdrls y)
+        , gytxSigs          = Set.union (gytxSigs x) (gytxSigs y)
+        , gytxCerts         = gytxCerts x <> gytxCerts y
+        , gytxInvalidBefore = combineInvalidBefore (gytxInvalidBefore x) (gytxInvalidBefore y)
+        , gytxInvalidAfter  = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
+        , gytxMetadata      = gytxMetadata x <> gytxMetadata y
+        }
+      where
+        -- we keep only one input per utxo to spend
+        combineIns u v = nubBy ((==) `on` gyTxInTxOutRef) (u ++ v)
+        -- we cannot combine redeemers, so we just pick first.
+        combineMint = Map.unionWith (\(amt, r) (amt', _r) -> (Map.unionWith (+) amt amt', r))
+        -- we keep only one withdrawal per stake address
+        combineWdrls u v = nubBy ((==) `on` gyTxWdrlStakeAddress) (u ++ v)
+
+        combineInvalidBefore :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
+        combineInvalidBefore m        Nothing  = m
+        combineInvalidBefore Nothing  n        = n
+        combineInvalidBefore (Just s) (Just t) = Just (max s t)
+
+        combineInvalidAfter :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
+        combineInvalidAfter m        Nothing  = m
+        combineInvalidAfter Nothing  n        = n
+        combineInvalidAfter (Just s) (Just t) = Just (min s t)
+
+instance Monoid (GYTxSkeleton v) where
+    mempty = emptyGYTxSkeleton
+
+-------------------------------------------------------------------------------
+-- Transaction building
+-------------------------------------------------------------------------------
 
 {- | Result of building 'GYTxBody's with the option of recovery from error.
 
@@ -38,13 +142,13 @@ Consider the act of building five 'GYTxSkeleton's into 'GYTxBody's. If three out
 one fails due to insufficient funds - this type facilitates recovering the three rather than failing outright and discarding
 the results.
 -}
-data GYTxBuildResult f
+data GYTxBuildResult
     -- | All given 'GYTxSkeleton's were successfully built.
-    = GYTxBuildSuccess !(NonEmpty (f GYTxBody))
+    = GYTxBuildSuccess !(NonEmpty GYTxBody)
     -- | Some of the given 'GYTxSkeleton's were successfully built, but the rest failed due to _insufficient funds_.
-    | GYTxBuildPartialSuccess !BalancingError !(NonEmpty (f GYTxBody))
+    | GYTxBuildPartialSuccess !GYBalancingError !(NonEmpty GYTxBody)
     -- | None of the given 'GYTxSkeleton's could be built due to _insufficient funds_.
-    | GYTxBuildFailure !BalancingError
+    | GYTxBuildFailure !GYBalancingError
     -- | Input did not contain any 'GYTxSkeleton's.
     | GYTxBuildNoInputs
 
@@ -61,7 +165,7 @@ Peculiarly, this is parameterized on:
 The function recovers successfully built tx skeletons, in case the list contains several of them. See: 'GYTxBuildResult'.
 -}
 buildTxCore
-    :: forall m f v. (GYTxQueryMonad m, MonadRandom m, Traversable f)
+    :: forall m v. (GYTxQueryMonad m, MonadRandom m)
     => Api.SystemStart
     -> Api.EraHistory
     -> Ledger.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra)
@@ -71,10 +175,9 @@ buildTxCore
     -> [GYAddress]
     -> GYAddress
     -> Maybe GYUTxO  -- ^ Is `Nothing` if there was no 5 ada collateral returned by browser wallet.
-    -> m [f (GYTxSkeleton v)]
-    -> m (Either BuildTxException (GYTxBuildResult f))
-buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral action = do
-    fbodies <- action
+    -> [GYTxSkeleton v]
+    -> m (Either GYBuildTxError GYTxBuildResult)
+buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral skeletons = do
     ownUtxos <- utxosAtAddresses addrs
 
     let buildEnvWith ownUtxos' refIns collateralUtxo = GYBuildTxEnv
@@ -87,7 +190,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
             , gyBTxEnvCollateral     = collateralUtxo
             }
 
-        helper :: GYUTxOs -> GYTxSkeleton v -> m (Either BuildTxException GYTxBody)
+        helper :: GYUTxOs -> GYTxSkeleton v -> m (Either GYBuildTxError GYTxBody)
         helper ownUtxos' GYTxSkeleton {..} = do
             let gytxMint' :: Maybe (GYValue, [(GYMintScript v, GYRedeemer)])
                 gytxMint'
@@ -146,7 +249,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                       (utxosToList ownUtxos')
 
             case mCollateralUtxo of
-              Nothing -> return (Left BuildTxNoSuitableCollateral)
+              Nothing -> return (Left GYBuildTxNoSuitableCollateral)
               Just collateralUtxo ->
                 -- Build the transaction.
                 buildUnsignedTxBody
@@ -163,22 +266,22 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
                     gytxSigs
                     gytxMetadata
 
-        go :: GYUTxOs -> GYTxBuildResult f -> [f (GYTxSkeleton v)] -> m (Either BuildTxException  (GYTxBuildResult f))
+        go :: GYUTxOs -> GYTxBuildResult -> [GYTxSkeleton v] -> m (Either GYBuildTxError GYTxBuildResult)
         go _         acc []             = pure $ Right $ reverseResult acc
-        go ownUtxos' acc (fbody : rest) = do
-            res <- sequence <$> traverse (helper ownUtxos') fbody
+        go ownUtxos' acc (skeleton : rest) = do
+            res <- helper ownUtxos' skeleton
             case res of
                 {- Not enough funds for this transaction
                 We assume it's not worth continuing with the next transactions (which is often the case) -}
-                Left (BuildTxBalancingError be) -> pure $ Right $ reverseResult $ updateBuildRes (Left be) acc
+                Left (GYBuildTxBalancingError be) -> pure $ Right $ reverseResult $ updateBuildRes (Left be) acc
                 -- Any other exception is fatal. TODO: To think more on whether collateral error can be handled here.
                 Left err                      -> pure $ Left err
-                Right fres                    -> do
+                Right body                    -> do
                     -- Update the available utxos set by user supplied function.
-                    let ownUTxos'' = foldl' (flip ownUtxoUpdateF) ownUtxos' fres
+                    let ownUTxos'' = ownUtxoUpdateF body ownUtxos'
                     -- Continue with an updated accumulator (set of built results).
-                    go ownUTxos'' (updateBuildRes (Right fres) acc) rest
-    go ownUtxos GYTxBuildNoInputs fbodies
+                    go ownUTxos'' (updateBuildRes (Right body) acc) rest
+    go ownUtxos GYTxBuildNoInputs skeletons
   where
     {- This function updates 'GYTxBuildResult' based on a build outcome
 
@@ -200,7 +303,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ac
 
     -- TODO: Move to @Data.Sequence.NonEmpty@?
     -- | To reverse the final non-empty list built.
-    reverseResult :: GYTxBuildResult f -> GYTxBuildResult f
+    reverseResult :: GYTxBuildResult -> GYTxBuildResult
     reverseResult (GYTxBuildSuccess ne) = GYTxBuildSuccess $ NE.reverse ne
     reverseResult (GYTxBuildPartialSuccess v ne) = GYTxBuildPartialSuccess v $ NE.reverse ne
     reverseResult anyOther = anyOther

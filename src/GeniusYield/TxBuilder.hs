@@ -9,6 +9,7 @@ Stability   : develop
 module GeniusYield.TxBuilder
     ( module X
     , queryBalance
+    , queryBalances
     , getAdaOnlyUTxO
     , adaOnlyUTxOPure
     , getCollateral'
@@ -19,13 +20,11 @@ module GeniusYield.TxBuilder
 import qualified Cardano.Api                     as Api
 import qualified Data.Map.Strict                 as Map
 
-import           GeniusYield.TxBuilder.Class     as X
+import           GeniusYield.TxBuilder.Class     as X hiding (signTxBodyImpl, signTxBodyWithStakeImpl)
 import           GeniusYield.TxBuilder.Common    as X
 import           GeniusYield.TxBuilder.Errors    as X
-import           GeniusYield.TxBuilder.Node      as X
-import           GeniusYield.TxBuilder.NodeQuery as X
-import           GeniusYield.TxBuilder.Random    as X
-import           GeniusYield.TxBuilder.Clb       as X
+import           GeniusYield.TxBuilder.IO        as X
+import           GeniusYield.TxBuilder.User      as X
 
 import           GeniusYield.Imports
 import           GeniusYield.Types
@@ -33,6 +32,10 @@ import           GeniusYield.Types
 -- | Query the balance at given address.
 queryBalance :: GYTxQueryMonad m => GYAddress -> m GYValue
 queryBalance addr = foldMapUTxOs utxoValue <$> utxosAtAddress addr Nothing
+
+-- | Query the balances at given addresses.
+queryBalances :: GYTxQueryMonad m => [GYAddress] -> m GYValue
+queryBalances addrs = foldMapUTxOs utxoValue <$> utxosAtAddresses addrs
 
 -- | Query the txoutrefs at given address with ADA-only values.
 --

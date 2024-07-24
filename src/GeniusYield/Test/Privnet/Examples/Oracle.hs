@@ -20,7 +20,7 @@ import           GeniusYield.OnChain.Examples.ReadOracle.Compiled
 import           GeniusYield.Test.Privnet.Asserts
 import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Setup
-import           GeniusYield.TxBuilder.Class
+import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
 readOracleValidatorV2 :: GYValidator 'PlutusV2
@@ -28,75 +28,76 @@ readOracleValidatorV2 = validatorFromPlutus readOracleValidator
 
 tests :: Setup -> TestTree
 tests setup = testGroup "oracle"
-    [ testCaseSteps "without-ref" $ \info -> withSetup setup info $ \ctx -> do
+    [ testCaseSteps "without-ref" $ \info -> withSetup info setup $ \ctx -> do
         let goldAC = ctxGold ctx
 
         -- create output with read oracle script
-        txBodyPlaceOracle <- ctxRunI ctx (ctxUserF ctx) $ do
+        ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress readOracleValidatorV2
-            return $ mconcat
+            txBodyPlaceOracle <- buildTxBody $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-        void $ submitTx ctx (ctxUserF ctx) txBodyPlaceOracle
+            signAndSubmitConfirmed_ txBodyPlaceOracle
 
         -- fails: no reference input with datum
-        assertThrown isTxBodyErrorAutoBalance $ ctxRunI ctx (ctxUserF ctx) $ do
+        assertThrown isTxBodyErrorAutoBalance $ ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress readOracleValidatorV2
             utxo <- utxosAtAddress addr Nothing
             datums <- utxosDatums utxo
-            return (mconcat
+            buildTxBody $ mconcat
                 [ mustHaveInput GYTxIn
                     { gyTxInTxOutRef = ref
                     , gyTxInWitness  = GYTxInWitnessScript
-                        (GYInScript readOracleValidatorV2)
+                        (GYInScript @PlutusV2 readOracleValidatorV2)
                         (datumFromPlutusData (d :: ()))
                         unitRedeemer
                     }
                 | (ref, (_, _, d)) <- Map.toList datums
-                ] :: GYTxSkeleton 'PlutusV2)
+                ]
 
-    , testCaseSteps "with-ref" $ \info -> withSetup setup info $ \ctx -> do
+    , testCaseSteps "with-ref" $ \info -> withSetup info setup $ \ctx -> do
         let goldAC = ctxGold ctx
 
         -- address
-        giftValidatorV2Addr <- ctxRunC ctx (ctxUserF ctx) $
+        giftValidatorV2Addr <- ctxRunQuery ctx $
             scriptAddress giftValidatorV2
 
         -- create output with input
-        txBodyPlaceDatum <- ctxRunI ctx (ctxUserF ctx) $ do
-            return $ mconcat
+        txBodyPlaceDatum <- ctxRun ctx (ctxUserF ctx) $ do
+            txBodyPlaceDatum <- buildTxBody $ mconcat
                 [ mustHaveOutput $ mkGYTxOut giftValidatorV2Addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                     & gyTxOutDatumL .~ GYTxOutUseInlineDatum
                 ]
-        void $ submitTx ctx (ctxUserF ctx) txBodyPlaceDatum
+            signAndSubmitConfirmed_ txBodyPlaceDatum
+            pure txBodyPlaceDatum
 
         -- get datum ref.
         datumRef <- findOutput giftValidatorV2Addr txBodyPlaceDatum
 
         -- create output with read oracle script
-        txBodyPlaceOracle <- ctxRunI ctx (ctxUserF ctx) $ do
+        ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress readOracleValidatorV2
-            return $ mconcat
+            txBodyPlaceOracle <- buildTxBody $ mconcat
                 [ mustHaveOutput $ mkGYTxOut addr (valueSingleton goldAC 10) (datumFromPlutusData ())
                 ]
-        void $ submitTx ctx (ctxUserF ctx) txBodyPlaceOracle
+            signAndSubmitConfirmed_ txBodyPlaceOracle
 
-        txBodyConsume <- ctxRunI ctx (ctxUserF ctx) $ do
+        ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress readOracleValidatorV2
             utxo <- utxosAtAddress addr Nothing
             datums <- utxosDatums utxo
-            return (mconcat $
+            txBodyConsume <- buildTxBody . mconcat $
                 [ mustHaveInput GYTxIn
                     { gyTxInTxOutRef = ref
                     , gyTxInWitness  = GYTxInWitnessScript
-                        (GYInScript readOracleValidatorV2)
+                        (GYInScript @PlutusV2 readOracleValidatorV2)
                         (datumFromPlutusData (d :: ()))
                         unitRedeemer
                     }
                 | (ref, (_, _, d)) <- Map.toList datums
                 ] ++
                 [ mustHaveRefInput datumRef
-                ] :: GYTxSkeleton 'PlutusV2)
+                ]
 
-        void $ submitTx ctx (ctxUserF ctx) txBodyConsume
+            signAndSubmitConfirmed_ txBodyConsume
     ]

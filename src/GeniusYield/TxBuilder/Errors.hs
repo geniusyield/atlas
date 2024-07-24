@@ -15,22 +15,23 @@ module GeniusYield.TxBuilder.Errors
     , throwAppError
     ) where
 
-import           Control.Monad.Except       (MonadError, throwError)
+import           Control.Monad.Except           (MonadError, throwError)
 
-import           Cardano.Slotting.Time      (SystemStart)
-import qualified PlutusLedgerApi.V1.Value   as Plutus (Value)
+import           Cardano.Slotting.Time          (SystemStart)
+import qualified PlutusLedgerApi.V1.Value       as Plutus (Value)
 
 import           GeniusYield.HTTP.Errors
 import           GeniusYield.Imports
-import           GeniusYield.Types.Address  (GYAddress)
-import           GeniusYield.Types.Datum    (GYDatum, GYDatumHash)
-import           GeniusYield.Types.Ledger   (PlutusToCardanoError (..))
-import           GeniusYield.Types.Slot     (GYSlot)
-import           GeniusYield.Types.Time     (GYTime)
-import           GeniusYield.Types.TxOutRef (GYTxOutRef)
-import           GeniusYield.Types.UTxO     (GYUTxO, GYOutDatum)
-import           GeniusYield.Types.Value    (GYFromPlutusValueError)
-import           GeniusYield.Types.TxIn     (GYTxIn)
+import           GeniusYield.Transaction.Common
+import           GeniusYield.Types.Address      (GYAddress)
+import           GeniusYield.Types.Datum        (GYDatum, GYDatumHash)
+import           GeniusYield.Types.Ledger       (PlutusToCardanoError (..))
+import           GeniusYield.Types.Slot         (GYSlot)
+import           GeniusYield.Types.Time         (GYTime)
+import           GeniusYield.Types.TxOutRef     (GYTxOutRef)
+import           GeniusYield.Types.UTxO         (GYUTxO, GYOutDatum)
+import           GeniusYield.Types.Value        (GYFromPlutusValueError)
+import           GeniusYield.Types.TxIn         (GYTxIn)
 
 -------------------------------------------------------------------------------
 -- Exception
@@ -89,6 +90,8 @@ data GYTxMonadException :: Type where
     GYConversionException :: GYConversionError -> GYTxMonadException
     -- | Errors encountered during utxo related queries.
     GYQueryUTxOException ::  GYQueryUTxOError -> GYTxMonadException
+    -- | Errors encountered during transaction building related functions.
+    GYBuildTxException :: GYBuildTxError -> GYTxMonadException
     -- | Raised when no suitable collateral of at least 'tmeMinLovelace' amount is found at 'tmeAddress'.
     GYNoSuitableCollateralException :: { tmeMinLovelace :: Natural, tmeAddress :: GYAddress } -> GYTxMonadException
     -- | Raised if 'tmeSlot' value overflows when advancing it by 'tmeAdvanceAmount'.

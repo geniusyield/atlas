@@ -13,7 +13,6 @@ module GeniusYield.Test.Privnet.Ctx (
     -- * User
     User (..),
     CreateUserConfig (..),
-
     ctxUsers,
     userPkh,
     userPaymentPkh,
@@ -22,20 +21,15 @@ module GeniusYield.Test.Privnet.Ctx (
     userPaymentVKey,
     userStakeVKey,
     -- * Operations
-    ctxRunI,
-    ctxRunIWithStrategy,
-    ctxRunC,
-    ctxRunCWithStrategy,
-    ctxRunF,
-    ctxRunFWithStrategy,
-    ctxRunFWithCollateral,
+    ctxRun,
+    ctxRunQuery,
+    ctxRunBuilder,
+    ctxRunBuilderWithCollateral,
     ctxSlotOfCurrentBlock,
     ctxWaitNextBlock,
     ctxWaitUntilSlot,
     ctxProviders,
     ctxSlotConfig,
-    submitTx,
-    submitTx',
     -- * Helpers
     newTempUserCtx,
     ctxQueryBalance,
@@ -47,11 +41,11 @@ module GeniusYield.Test.Privnet.Ctx (
 import qualified Cardano.Api                as Api
 import           Data.Default               (Default (..))
 import qualified Data.Map.Strict            as Map
-import qualified Data.Set                   as Set
+
 import qualified GeniusYield.Examples.Limbo as Limbo
+import           GeniusYield.HTTP.Errors    (someBackendError)
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Node
-import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 import           Test.Tasty.HUnit           (assertFailure)
@@ -67,30 +61,6 @@ data CreateUserConfig =
 instance Default CreateUserConfig where
    def = CreateUserConfig { cucGenerateCollateral = False, cucGenerateStakeKey = False }
 
-data User = User
-    { userPaymentSKey :: !GYPaymentSigningKey
-    , userStakeSKey   :: !(Maybe GYStakeSigningKey)
-    , userAddr        :: !GYAddress
-    }
-
-{-# DEPRECATED userVKey "Use userPaymentVKey." #-}
-userVKey :: User -> GYPaymentVerificationKey
-userVKey = paymentVerificationKey . userPaymentSKey
-
-userPaymentVKey :: User -> GYPaymentVerificationKey
-userPaymentVKey = userVKey
-
-userStakeVKey :: User -> Maybe GYStakeVerificationKey
-userStakeVKey = fmap stakeVerificationKey . userStakeSKey
-
-userPkh :: User -> GYPubKeyHash
-userPkh = toPubKeyHash . paymentKeyHash . paymentVerificationKey . userPaymentSKey
-
-userPaymentPkh :: User -> GYPaymentKeyHash
-userPaymentPkh = paymentKeyHash . paymentVerificationKey . userPaymentSKey
-
-userStakePkh :: User -> Maybe GYStakeKeyHash
-userStakePkh = fmap (stakeKeyHash . stakeVerificationKey) . userStakeSKey
 
 data Ctx = Ctx
     { ctxNetworkInfo       :: !GYNetworkInfo
@@ -142,44 +112,40 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
   -- Our balancer would add minimum ada required for other utxo in case of equality
   when (cucGenerateCollateral && adaInValue < collateralLovelace) $ fail "Given value for new user has less than 5 ada"
 
-  txBody <- ctxRunI ctx fundUser $ return $
-    if cucGenerateCollateral then
-      mustHaveOutput (mkGYTxOutNoDatum newAddr (otherValue <> (valueFromLovelace adaInValue `valueMinus` collateralValue))) <>
-      mustHaveOutput (mkGYTxOutNoDatum newAddr collateralValue)
-    else
-      mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
+  ctxRun ctx fundUser $ do
+    txBody <- buildTxBody $
+      if cucGenerateCollateral then
+        mustHaveOutput (mkGYTxOutNoDatum newAddr (otherValue <> (valueFromLovelace adaInValue `valueMinus` collateralValue))) <>
+        mustHaveOutput (mkGYTxOutNoDatum newAddr collateralValue)
+      else
+        mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
+    signAndSubmitConfirmed_ txBody
 
-  void $ submitTx ctx fundUser txBody
-  return $ User {userPaymentSKey = newPaymentSKey, userAddr = newAddr, userStakeSKey = newStakeSKey}
+  pure $ User' {userPaymentSKey' = newPaymentSKey, userAddr = newAddr, userStakeSKey' = newStakeSKey}
 
 
-ctxRunF :: forall t v. Traversable t => Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
-ctxRunF ctx User {..} =  runGYTxMonadNodeF GYRandomImproveMultiAsset (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
+ctxRun :: Ctx -> User -> GYTxMonadIO a -> IO a
+ctxRun ctx User' {..} = runGYTxMonadIO (ctxNetworkId ctx) (ctxProviders ctx) userPaymentSKey' userStakeSKey' [userAddr] userAddr Nothing
 
-ctxRunFWithStrategy :: forall t v. Traversable t => GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadNode (t (GYTxSkeleton v)) -> IO (t GYTxBody)
-ctxRunFWithStrategy strat ctx User {..} =  runGYTxMonadNodeF strat (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
+ctxRunQuery :: Ctx -> GYTxQueryMonadIO a -> IO a
+ctxRunQuery ctx = runGYTxQueryMonadIO (ctxNetworkId ctx) (ctxProviders ctx)
 
--- | Variant of `ctxRunF` where caller can also give the UTxO to be used as collateral.
-ctxRunFWithCollateral :: forall t v. Traversable t
-                      => Ctx
-                      -> User
-                      -> GYTxOutRef  -- ^ Reference to UTxO to be used as collateral.
-                      -> Bool        -- ^ To check whether this given collateral UTxO has value of exact 5 ada? If it doesn't have exact 5 ada, it would be ignored.
-                      -> GYTxMonadNode (t (GYTxSkeleton v))
-                      -> IO (t GYTxBody)
-ctxRunFWithCollateral ctx User {..} coll toCheck5Ada =  runGYTxMonadNodeF GYRandomImproveMultiAsset (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr $ Just (coll, toCheck5Ada)
+ctxRunBuilder :: Ctx -> User -> GYTxBuilderMonadIO a -> IO a
+ctxRunBuilder ctx User' {..} = runGYTxBuilderMonadIO (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
 
-ctxRunC :: forall a. Ctx -> User -> GYTxMonadNode a -> IO a
-ctxRunC = coerce (ctxRunF @(Const a))
-
-ctxRunCWithStrategy :: forall a. GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadNode a -> IO a
-ctxRunCWithStrategy = coerce (ctxRunFWithStrategy @(Const a))
-
-ctxRunI :: Ctx -> User -> GYTxMonadNode (GYTxSkeleton v) -> IO GYTxBody
-ctxRunI = coerce (ctxRunF @Identity)
-
-ctxRunIWithStrategy :: GYCoinSelectionStrategy -> Ctx -> User -> GYTxMonadNode (GYTxSkeleton v) -> IO GYTxBody
-ctxRunIWithStrategy = coerce (ctxRunFWithStrategy @Identity)
+-- | Variant of `ctxRun` where caller can also give the UTxO to be used as collateral.
+ctxRunBuilderWithCollateral :: Ctx
+                     -> User
+                     -> GYTxOutRef  -- ^ Reference to UTxO to be used as collateral.
+                     -> Bool        -- ^ To check whether this given collateral UTxO has value of exact 5 ada? If it doesn't have exact 5 ada, it would be ignored.
+                     -> GYTxBuilderMonadIO a
+                     -> IO a
+ctxRunBuilderWithCollateral ctx User' {..} coll toCheck5Ada = runGYTxBuilderMonadIO
+    (ctxNetworkId ctx)
+    (ctxProviders ctx)
+    [userAddr]
+    userAddr
+    (Just (coll, toCheck5Ada))
 
 ctxSlotOfCurrentBlock :: Ctx -> IO GYSlot
 ctxSlotOfCurrentBlock (ctxProviders -> providers) =
@@ -192,10 +158,10 @@ ctxWaitUntilSlot :: Ctx -> GYSlot -> IO ()
 ctxWaitUntilSlot (ctxProviders -> providers) slot = void $ gyWaitUntilSlot providers slot
 
 ctxSlotConfig :: Ctx -> IO GYSlotConfig
-ctxSlotConfig (ctxProviders -> providers) = gyGetSlotConfig providers
+ctxSlotConfig ctx = ctxRunQuery ctx slotConfig
 
 ctxQueryBalance :: Ctx -> User -> IO GYValue
-ctxQueryBalance ctx u = ctxRunC ctx u $ do
+ctxQueryBalance ctx u = ctxRunQuery ctx $ do
     queryBalance $ userAddr u
 
 ctxProviders :: Ctx -> GYProviders
@@ -210,23 +176,6 @@ ctxProviders ctx = GYProviders
     , gyGetStakeAddressInfo = nodeStakeAddressInfo (ctxInfo ctx)
     }
 
-submitTx :: Ctx -> User -> GYTxBody -> IO GYTxId
-submitTx ctx User {..} txBody = do
-    let reqSigs = txBodyReqSignatories txBody
-        tx =
-          signGYTxBody' txBody $
-            case userStakeSKey of
-              Nothing -> [GYSomeSigningKey userPaymentSKey]
-              -- It might be the case that @cardano-api@ is clever enough to not add signature if it is not required but cursory look at their code suggests otherwise.
-              Just stakeKey -> if Set.member (toPubKeyHash . stakeKeyHash . stakeVerificationKey $ stakeKey) reqSigs then [GYSomeSigningKey userPaymentSKey, GYSomeSigningKey stakeKey] else [GYSomeSigningKey userPaymentSKey]
-    submitTx' ctx tx
-
-submitTx' :: Ctx -> GYTx -> IO GYTxId
-submitTx' ctx@Ctx { ctxInfo } tx = do
-    txId <- nodeSubmitTx ctxInfo tx
-    gyAwaitTxConfirmed (ctxProviders ctx) (GYAwaitTxParameters { maxAttempts = 30, checkInterval = 1_000_000, confirmations = 0 }) txId
-    return txId
-
 -- | Function to find for the first locked output in the given `GYTxBody` at the given `GYAddress`.
 findOutput :: GYAddress -> GYTxBody -> IO GYTxOutRef
 findOutput addr txBody = do
@@ -239,17 +188,17 @@ addRefScriptCtx :: Ctx                 -- ^ Given context.
                 -> User                -- ^ User which will execute the transaction (if required).
                 -> GYScript 'PlutusV2  -- ^ Given script.
                 -> IO GYTxOutRef       -- ^ Returns the reference for the desired output.
-addRefScriptCtx ctx user script = do
-  txBodyRefScript <- ctxRunF ctx user $ Limbo.addRefScript script
+addRefScriptCtx ctx user script = ctxRun ctx user $ do
+  txBodyRefScript <- Limbo.addRefScript script >>= traverse buildTxBody
   case txBodyRefScript of
-    Left ref -> return ref
+    Left ref -> pure ref
     Right body -> do
       let refs = Limbo.findRefScriptsInBody body
       ref <- case Map.lookup (Some script) refs of
         Just ref -> return ref
-        Nothing  -> fail "Shouldn't happen: no ref in body"
-      void $ submitTx ctx user body
-      return ref
+        Nothing  -> throwAppError $ someBackendError "Shouldn't happen: no ref in body"
+      signAndSubmitConfirmed_ body
+      pure ref
 
 -- | Function to add for a reference input.
 addRefInputCtx :: Ctx            -- ^ Given context.
@@ -258,8 +207,8 @@ addRefInputCtx :: Ctx            -- ^ Given context.
                -> GYAddress      -- ^ Address to put this output at.
                -> GYDatum        -- ^ The datum to put.
                -> IO GYTxOutRef  -- ^ Returns the reference for the required output.
-addRefInputCtx ctx user toInline addr ourDatum = do
-  txBody <- ctxRunI ctx user $ return $ mustHaveOutput (GYTxOut addr mempty (Just (ourDatum, if toInline then GYTxOutUseInlineDatum else GYTxOutDontUseInlineDatum)) Nothing)
+addRefInputCtx ctx user toInline addr ourDatum = ctxRun ctx user $ do
+  txBody <- buildTxBody $ mustHaveOutput (GYTxOut addr mempty (Just (ourDatum, if toInline then GYTxOutUseInlineDatum else GYTxOutDontUseInlineDatum)) Nothing)
   let utxos = utxosToList $ txBodyUTxOs txBody
       ourDatumHash = hashDatum ourDatum
       mRefInputUtxo = find (\utxo ->
@@ -269,7 +218,7 @@ addRefInputCtx ctx user toInline addr ourDatum = do
           GYOutDatumNone     -> False
         ) utxos
   case mRefInputUtxo of
-    Nothing               -> fail "Shouldn't happen: Couldn't find desired UTxO in tx outputs"
+    Nothing               -> throwAppError $ someBackendError "Shouldn't happen: Couldn't find desired UTxO in tx outputs"
     Just GYUTxO {utxoRef} -> do
-      void $ submitTx ctx user txBody
-      return utxoRef
+      signAndSubmitConfirmed_ txBody
+      pure utxoRef

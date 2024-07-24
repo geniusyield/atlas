@@ -28,16 +28,16 @@ providersMashupTests configs =
     , testCase "Parameters" $ do
         paramsList <- forM configs $ \config -> withCfgProviders config mempty $ \provider -> do
            delayBySecond
-           protocolParams <- gyGetProtocolParameters provider
+           pp <- gyGetProtocolParameters provider
            delayBySecond
-           systemStart <- gyGetSystemStart provider
+           ss <- gyGetSystemStart provider
            delayBySecond
            Api.EraHistory interpreter <- gyGetEraHistory provider
            delayBySecond
-           stakePools <- gyGetStakePools provider
+           sp <- gyGetStakePools provider
            delayBySecond
            slotConfig' <- gyGetSlotConfig provider
-           pure (protocolParams, systemStart, interpreter, stakePools, slotConfig')
+           pure (pp, ss, interpreter, sp, slotConfig')
         assertBool "Parameters are not all equal" $ allEqual paramsList
     , testCase "Stake address info" $ do
         saInfos <- forM configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> do
@@ -75,15 +75,15 @@ providersMashupTests configs =
           delayBySecond
           utxosAtRefsWithDatums' <- gyQueryUtxosAtTxOutRefsWithDatums provider outputRefs
           delayBySecond
-          utxoAtRefWithDatum' <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxoAtTxOutRefWithDatum refWithDatumHash
+          utxoAtRefWithDatum' <- runGYTxQueryMonadIO (cfgNetworkId config) provider $ utxoAtTxOutRefWithDatum refWithDatumHash
           delayBySecond
-          utxosAtScriptCredential <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxosAtPaymentCredential alwaysFailCredential Nothing
+          utxosAtScriptCredential <- runGYTxQueryMonadIO (cfgNetworkId config) provider $ utxosAtPaymentCredential alwaysFailCredential Nothing
           delayBySecond
-          utxosAtScriptCredentialWithAsset <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxosAtPaymentCredential alwaysFailCredential (Just "6d24161a60592755dcbcc2c1330bbe968f913acc15ec40f0be3873ee.61757468")
+          utxosAtScriptCredentialWithAsset <- runGYTxQueryMonadIO (cfgNetworkId config) provider $ utxosAtPaymentCredential alwaysFailCredential (Just "6d24161a60592755dcbcc2c1330bbe968f913acc15ec40f0be3873ee.61757468")
           delayBySecond
-          utxosAtKeyCredential <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxosAtPaymentCredential ciWalletCredential Nothing
+          utxosAtKeyCredential <- runGYTxQueryMonadIO (cfgNetworkId config) provider $ utxosAtPaymentCredential ciWalletCredential Nothing
           delayBySecond
-          utxosAtScriptCredentialWithDatums <- runGYTxQueryMonadNode (cfgNetworkId config) provider $ utxosAtPaymentCredentialWithDatums alwaysFailCredential Nothing
+          utxosAtScriptCredentialWithDatums <- runGYTxQueryMonadIO (cfgNetworkId config) provider $ utxosAtPaymentCredentialWithDatums alwaysFailCredential Nothing
           delayBySecond
           utxosAtScriptAddressWithAsset <- gyQueryUtxosAtAddress provider alwaysFailAddress (Just "6d24161a60592755dcbcc2c1330bbe968f913acc15ec40f0be3873ee.61757468")  -- An asset I saw by random chance.
           -- TODO: Write variant of above for with datums.
@@ -116,12 +116,12 @@ providersMashupTests configs =
             senderAddress = addressFromPaymentKeyHash GYTestnetPreprod $ paymentKeyHash $ paymentVerificationKey skey
         forM_ configs $ \config -> withCfgProviders config mempty $ \provider@GYProviders {..} -> do
           delayBySecond
-          senderUTxOs <- runGYTxQueryMonadNode nid provider $ utxosAtAddress senderAddress Nothing
+          senderUTxOs <- runGYTxQueryMonadIO nid provider $ utxosAtAddress senderAddress Nothing
           delayBySecond
           let totalSenderFunds = foldMapUTxOs utxoValue senderUTxOs
               valueToSend     = totalSenderFunds `valueMinus` valueFromLovelace 5_000_000
               -- This way, UTxO distribution in test wallet should remain same.
-          txBody <- runGYTxMonadNode nid provider [senderAddress] senderAddress Nothing $ pure $ mustHaveOutput $ mkGYTxOutNoDatum @'PlutusV2 senderAddress valueToSend
+          txBody <- runGYTxBuilderMonadIO nid provider [senderAddress] senderAddress Nothing $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum @'PlutusV2 senderAddress valueToSend
           delayBySecond
           let signedTxBody = signGYTxBody txBody [skey]
           printf "Signed tx: %s\n" (txToHex signedTxBody)

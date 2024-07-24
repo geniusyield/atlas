@@ -32,7 +32,7 @@ stakeTests config =
 
 testWithdrawalWithStrategy :: GYCoinSelectionStrategy -> GYStakeAddressInfo -> GYAddress -> GYStakeAddress -> GYCoreConfig -> GYProviders -> IO ()
 testWithdrawalWithStrategy strat GYStakeAddressInfo {..} addr stakeAddr config provider = do
-  txBody <- runGYTxMonadNodeWithStrategy strat (cfgNetworkId config) provider [addr] addr Nothing $ pure $ mustHaveWithdrawal (GYTxWdrl stakeAddr gyStakeAddressInfoAvailableRewards GYTxWdrlWitnessKey)
+  txBody <- runGYTxBuilderMonadIO (cfgNetworkId config) provider [addr] addr Nothing $ buildTxBodyWithStrategy strat $ mustHaveWithdrawal (GYTxWdrl stakeAddr gyStakeAddressInfoAvailableRewards GYTxWdrlWitnessKey)
   -- Check if tx is balanced (sum inputs + withdrawal == sum outputs + tx fees).
   let inputRefs = txBodyTxIns txBody
       outputUtxos = txBodyUTxOs txBody

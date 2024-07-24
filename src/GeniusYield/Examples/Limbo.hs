@@ -83,7 +83,7 @@ getRefInfos = do
 -- First it checks whether there is an UTxO already with a script.
 -- Only if there aren't the new transaction skeleton is constructed.
 --
-addRefScript :: GYTxMonad m => GYScript 'PlutusV2 -> m (Either GYTxOutRef (GYTxSkeleton v))
+addRefScript :: GYTxQueryMonad m => GYScript 'PlutusV2 -> m (Either GYTxOutRef (GYTxSkeleton v))
 addRefScript sc = do
     addr <- scriptAddress limboValidatorV2
     utxo <- utxosAtAddress addr Nothing
@@ -97,7 +97,7 @@ addRefScript sc = do
 
 -- | Create UTxO with a reference script.
 --
-addRefScript' :: GYTxMonad m => GYScript 'PlutusV2 -> m (GYTxSkeleton v)
+addRefScript' :: GYTxQueryMonad m => GYScript 'PlutusV2 -> m (GYTxSkeleton v)
 addRefScript' sc = do
     addr <- scriptAddress limboValidatorV2
     return $ mustHaveOutput (mkGYTxOut addr mempty (datumFromPlutusData ())) { gyTxOutRefS = Just $ GYPlutusScript sc }

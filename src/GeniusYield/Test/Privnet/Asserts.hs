@@ -21,8 +21,10 @@ import           Data.Typeable     (typeRep)
 import           Test.Tasty.HUnit  (assertBool, assertEqual, assertFailure)
 
 import           GeniusYield.Imports
-import           GeniusYield.Types
 import           GeniusYield.Transaction
+import           GeniusYield.TxBuilder.Errors
+import           GeniusYield.Types
+
 import           GeniusYield.Test.Privnet.Ctx
 
 assertFee :: HasCallStack => GYTxBody -> Integer -> Integer -> IO ()
@@ -54,6 +56,6 @@ assertUserFunds fees ctx u expectedValue = do
                          "\nCurrent: ", show currentValue])
                (currentValue == expectedValue')
 
-isTxBodyErrorAutoBalance :: BuildTxException -> Bool
-isTxBodyErrorAutoBalance (BuildTxBodyErrorAutoBalance _) = True
-isTxBodyErrorAutoBalance _                               = False
+isTxBodyErrorAutoBalance :: GYTxMonadException -> Bool
+isTxBodyErrorAutoBalance (GYBuildTxException (GYBuildTxBodyErrorAutoBalance _)) = True
+isTxBodyErrorAutoBalance _                                                      = False

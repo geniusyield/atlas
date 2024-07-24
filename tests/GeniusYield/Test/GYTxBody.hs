@@ -41,7 +41,7 @@ import           GeniusYield.Providers.Common         (mainnetEraHist)
 import           GeniusYield.Transaction              (GYBuildTxEnv (..),
                                                        GYCoinSelectionStrategy (..),
                                                        balanceTxStep)
-import           GeniusYield.Transaction.Common       (BalancingError (..),
+import           GeniusYield.Transaction.Common       (GYBalancingError (..),
                                                        adjustTxOut, minimumUTxO)
 -------------------------------------------------------------------------------
 -- Tests
@@ -116,7 +116,7 @@ balanceTxStepTests =
                 []
                 GYRandomImproveMultiAsset
                 2_000_000
-        res @?= Left BalancingErrorEmptyOwnUTxOs
+        res @?= Left GYBalancingErrorEmptyOwnUTxOs
     , testCase "No collateral needed" $ do
         Right (_, collaterals, _) <- balanceTxStep
                                         (mockBuildTxEnv [valueFromLovelace 10_000_000])

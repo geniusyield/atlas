@@ -10,6 +10,8 @@ module GeniusYield.Test.Privnet.Setup (
     Setup,
     withPrivnet,
     withSetup,
+    withSetup',
+    withSetupOld,
     -- * "Cardano.Testnet" re-exports
     cardanoDefaultTestnetOptions,
     cardanoDefaultTestnetNodeOptions,
@@ -25,6 +27,7 @@ import           Control.Exception                    (finally)
 import           Control.Monad                        (forever)
 import           Control.Monad.IO.Class               (liftIO)
 import           Control.Monad.Trans.Resource         (resourceForkIO, MonadResource (liftResourceT))
+import qualified Data.Text                            as Txt
 import qualified Data.Vector                          as V
 
 import qualified Hedgehog                             as H
@@ -52,10 +55,12 @@ import           GeniusYield.Types
 -- Setup
 -------------------------------------------------------------------------------
 
--- | This setup represents a two argument function where first argument is for logging & second represents for continuation, in need of `Ctx`.
+-- | This setup represents a three argument function where first two arguments are for logging & third is for the continuation, in need of `Ctx`.
 --
--- Once these two arguments are given to this function, it will give `Ctx` to the continuation, where the logging part (the `ctxLog`) of `Ctx` would be obtained from first argument of this function.
-newtype Setup = Setup ((String -> IO ()) -> (Ctx -> IO ()) -> IO ())
+-- Once these arguments are given to this function, it will give `Ctx` to the continuation, where the logging part (the `ctxLog`) of `Ctx` would be obtained from the first two arguments of this function.
+--
+-- The first argument is the log severity filter. Only logs of this severity or higher will be passed on to the second argument, which is a logging action.
+newtype Setup = Setup (GYLogSeverity -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ())
 
 data PrivnetRuntime = PrivnetRuntime
   { runtimeNodeSocket  :: !FilePath
@@ -64,10 +69,18 @@ data PrivnetRuntime = PrivnetRuntime
   , runtimeThreadId    :: !ThreadId
   }
 
--- | Calls the `Setup` function with a logging function and the action you wish to use with the privnet.
-withSetup :: Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
-withSetup (Setup cokont) putLog kont = do
-    cokont putLog kont
+{-# DEPRECATED withSetupOld "Use withSetup." #-}
+withSetupOld :: Setup -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ()
+withSetupOld = flip withSetup
+
+-- | Calls the `Setup` function with a logging function that receives info severity logs, and the action you wish to use with the privnet.
+withSetup :: (String -> IO ()) -> Setup -> (Ctx -> IO ()) -> IO ()
+withSetup = withSetup' GYInfo
+
+-- | Calls the `Setup` function with target logging severity, a logging function and the action you wish to use with the privnet.
+withSetup' :: GYLogSeverity -> (String -> IO ()) -> Setup -> (Ctx -> IO ()) -> IO ()
+withSetup' targetSev putLog (Setup cokont) kont = do
+    cokont targetSev putLog kont
 
 {-
 TODO: WIP: Provide a variant of `withSetup` that can access `Ctx` to return a non-unit result.
@@ -164,20 +177,20 @@ withPrivnet testnetOpts setupUser = do
                 debug $ printf "userF = %s\n" (show idx)
                 userAddr <- addressFromBech32 <$> urlPieceFromText paymentKeyInfoAddr
                 debug $ printf "userF addr = %s\n" userAddr
-                userPaymentSKey <- readPaymentSigningKey $ paymentSKey paymentKeyInfoPair
-                debug $ printf "userF skey = %s\n" userPaymentSKey
-                pure User {userPaymentSKey, userStakeSKey=Nothing, userAddr}
+                userPaymentSKey' <- readPaymentSigningKey $ paymentSKey paymentKeyInfoPair
+                debug $ printf "userF skey = %s\n" userPaymentSKey'
+                pure User' {userPaymentSKey', userStakeSKey'=Nothing, userAddr}
 
         -- Generate upto 9 users.
         let extraIndices = [length genesisUsers + 1..9]
         extraUsers <- fmap V.fromList . forM extraIndices $ \idx -> do
-            User {userPaymentSKey, userAddr, userStakeSKey} <- generateUser runtimeNetworkId
+            User' {userPaymentSKey', userAddr, userStakeSKey'} <- generateUser runtimeNetworkId
             debug $ printf "user = %s\n" (show idx)
             debug $ printf "user addr = %s\n" userAddr
-            debug $ printf "user skey = %s\n" (show userPaymentSKey)
-            debug $ printf "user vkey = %s\n" (show $ paymentVerificationKey userPaymentSKey)
-            debug $ printf "user pkh  = %s\n" (show $ paymentKeyHash $ paymentVerificationKey userPaymentSKey)
-            pure User {userPaymentSKey, userAddr, userStakeSKey}
+            debug $ printf "user skey = %s\n" (show userPaymentSKey')
+            debug $ printf "user vkey = %s\n" (show $ paymentVerificationKey userPaymentSKey')
+            debug $ printf "user pkh  = %s\n" (show $ paymentKeyHash $ paymentVerificationKey userPaymentSKey')
+            pure User' {userPaymentSKey', userAddr, userStakeSKey'}
 
         -- Further down we need local node connection
         let info :: Api.LocalNodeConnectInfo
@@ -235,13 +248,13 @@ withPrivnet testnetOpts setupUser = do
                     }
 
             userBalances <- V.mapM
-                (\(i, User{userAddr=userIaddr}) -> do
-                    userIbalance <- ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
+                (\(i, User'{userAddr=userIaddr}) -> do
+                    userIbalance <- ctxRunQuery ctx0 $ queryBalance userIaddr
                     when (isEmptyValue userIbalance) $ do
-                        debug $ printf "User %s balance is empty, giving some ada\n" (show i)
+                        debug $ printf "User' %s balance is empty, giving some ada\n" (show i)
                         giveAda ctx0 userIaddr
                         when (i == 0) (giveAda ctx0 . userAddr $ ctxUserF ctx0) -- we also give ada to itself to create some small utxos
-                    ctxRunC ctx0 (ctxUserF ctx0) $ queryBalance userIaddr
+                    ctxRunQuery ctx0 $ queryBalance userIaddr
                 ) $ V.zip
                     (V.fromList extraIndices)
                     extraUsers
@@ -263,7 +276,7 @@ withPrivnet testnetOpts setupUser = do
             mapM_
                 (\(i, userIbalance, user) -> do
                     when (isEmptyValue $ snd $ valueSplitAda userIbalance) $ do
-                        debug $ printf "User%s has no tokens, giving some\n" (show i)
+                        debug $ printf "User'%s has no tokens, giving some\n" (show i)
                         giveTokens ctx (userAddr user)
                 )
                 $ V.zip3
@@ -271,7 +284,7 @@ withPrivnet testnetOpts setupUser = do
                     userBalances
                     extraUsers
 
-            let setup = Setup $ \putLog kont -> kont $ ctx { ctxLog = simpleConsoleLogging putLog }
+            let setup = Setup $ \targetSev putLog kont -> kont $ ctx { ctxLog = simpleLogging targetSev (putLog . Txt.unpack) }
             setupUser setup
 
 -------------------------------------------------------------------------------
@@ -296,7 +309,7 @@ generateUser network = do
                 stake
             )
 
-    pure User {userPaymentSKey=paymentSigningKeyFromApi skey, userAddr=addr, userStakeSKey=Nothing}
+    pure User' {userPaymentSKey'=paymentSigningKeyFromApi skey, userAddr=addr, userStakeSKey'=Nothing}
   where
     stake   = Api.NoStakeAddress
 
@@ -305,17 +318,17 @@ generateUser network = do
 -------------------------------------------------------------------------------
 
 giveAda :: Ctx -> GYAddress -> IO ()
-giveAda ctx addr = do
-    txBody <- ctxRunI ctx (ctxUserF ctx) $ return $ mconcat $ replicate 5 $
+giveAda ctx addr = ctxRun ctx (ctxUserF ctx) $ do
+    txBody <- buildTxBody $ mconcat $ replicate 5 $
         mustHaveOutput $ mkGYTxOutNoDatum addr (valueFromLovelace 1_000_000_000)
-    void $ submitTx ctx (ctxUserF ctx) txBody
+    signAndSubmitConfirmed_ txBody
 
 giveTokens :: Ctx -> GYAddress -> IO ()
-giveTokens ctx addr = do
-    txBody <- ctxRunI ctx (ctxUserF ctx) $ return $
+giveTokens ctx addr = ctxRun ctx (ctxUserF ctx) $ do
+    txBody <- buildTxBody $
         mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxGold ctx) 1_000_000)) <>
         mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxIron ctx) 1_000_000))
-    void $ submitTx ctx (ctxUserF ctx) txBody
+    signAndSubmitConfirmed_ txBody
 
 -------------------------------------------------------------------------------
 -- minting tokens
@@ -323,11 +336,10 @@ giveTokens ctx addr = do
 
 mintTestTokens :: Ctx -> String -> IO GYAssetClass
 mintTestTokens ctx tn' = do
-    (ac, txBody) <- ctxRunF ctx (ctxUserF ctx) $
-        GY.TestTokens.mintTestTokens tn 10_000_000
-    void $ submitTx ctx (ctxUserF ctx) txBody
-
-    pure ac
+    ctxRun ctx (ctxUserF ctx) $ do
+        (ac, txBody) <- GY.TestTokens.mintTestTokens tn 10_000_000 >>= traverse buildTxBody
+        signAndSubmitConfirmed_ txBody
+        pure ac
   where
     tn :: GYTokenName
     tn = fromString tn'

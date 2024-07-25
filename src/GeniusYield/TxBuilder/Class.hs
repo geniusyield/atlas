@@ -130,10 +130,12 @@ import qualified PlutusLedgerApi.V1           as Plutus (Address, DatumHash,
                                                          TxOutRef, Value)
 import qualified PlutusLedgerApi.V1.Value     as Plutus (AssetClass)
 
+-- NOTE: The 'Default (TxBuilderStrategy m)' constraint is not necessary, but it is usually desired everytime
+-- someone is building transactions with the below machinery.
 -- | Class of monads for building transactions. This can be default derived if the requirements are met.
 -- Specifically, set 'TxBuilderStrategy' to 'GYCoinSelectionStrategy' if you wish to use the default in-house
 -- transaction building implementation.
-class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m) => GYTxBuilderMonad m where
+class (Default (TxBuilderStrategy m), GYTxSpecialQueryMonad m, GYTxUserQueryMonad m) => GYTxBuilderMonad m where
     type TxBuilderStrategy m :: Type
     type TxBuilderStrategy m = GYCoinSelectionStrategy
 
@@ -152,7 +154,7 @@ class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m) => GYTxBuilderMonad m wher
                                     -> m GYTxBody
     buildTxBodyWithStrategy = buildTxBodyWithStrategy'
 
-    {- | A multi 'GYTxSkeleton' builder.
+    {- | A multi 'GYTxSkeleton' builder. The result containing built bodies must be in the same order as the skeletons.
 
     This does not perform chaining, i.e does not use utxos created by one of the given transactions in the next one.
     However, it does ensure that the balancer does not end up using the same own utxos when building multiple
@@ -167,7 +169,7 @@ class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m) => GYTxBuilderMonad m wher
                                     -> m GYTxBuildResult
     buildTxBodyParallelWithStrategy = buildTxBodyParallelWithStrategy'
 
-    {- | A chaining 'GYTxSkeleton' builder.
+    {- | A chaining 'GYTxSkeleton' builder. The result containing built bodies must be in the same order as the skeletons.
 
     This will perform chaining, i.e it will use utxos created by one of the given transactions, when building the next one.
 
@@ -181,15 +183,15 @@ class (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m) => GYTxBuilderMonad m wher
     buildTxBodyChainingWithStrategy = buildTxBodyChainingWithStrategy'
 
 -- | 'buildTxBodyWithStrategy' with the default coin selection strategy.
-buildTxBody :: (Default (TxBuilderStrategy m), GYTxBuilderMonad m) => GYTxSkeleton v -> m GYTxBody
+buildTxBody :: GYTxBuilderMonad m => GYTxSkeleton v -> m GYTxBody
 buildTxBody = buildTxBodyWithStrategy def
 
 -- | 'buildTxBodyParallelWithStrategy' with the default coin selection strategy.
-buildTxBodyParallel :: (Default (TxBuilderStrategy m), GYTxBuilderMonad m) => [GYTxSkeleton v] -> m GYTxBuildResult
+buildTxBodyParallel :: GYTxBuilderMonad m => [GYTxSkeleton v] -> m GYTxBuildResult
 buildTxBodyParallel = buildTxBodyParallelWithStrategy def
 
 -- | 'buildTxBodyChainingWithStrategy' with the default coin selection strategy.
-buildTxBodyChaining :: (Default (TxBuilderStrategy m), GYTxBuilderMonad m) => [GYTxSkeleton v] -> m GYTxBuildResult
+buildTxBodyChaining :: GYTxBuilderMonad m => [GYTxSkeleton v] -> m GYTxBuildResult
 buildTxBodyChaining = buildTxBodyChainingWithStrategy def
 
 -- | Class of monads for interacting with the blockchain using transactions.

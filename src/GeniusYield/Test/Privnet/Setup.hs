@@ -12,6 +12,8 @@ module GeniusYield.Test.Privnet.Setup (
     withSetup,
     withSetup',
     withSetupOld,
+    mkPrivnetTestFor,
+    mkPrivnetTestFor',
     -- * "Cardano.Testnet" re-exports
     cardanoDefaultTestnetOptions,
     cardanoDefaultTestnetNodeOptions,
@@ -32,6 +34,8 @@ import qualified Data.Vector                          as V
 
 import qualified Hedgehog                             as H
 import qualified Hedgehog.Extras.Stock                as H'
+import           Test.Tasty                           (TestName, TestTree)
+import           Test.Tasty.HUnit                     (testCaseSteps)
 
 import qualified Cardano.Api                          as Api
 import           Cardano.Testnet
@@ -47,6 +51,7 @@ import           GeniusYield.Providers.Node.AwaitTx   (nodeAwaitTxConfirmed)
 import           GeniusYield.Providers.Node.Query     (nodeQueryUTxO)
 import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Test.Privnet.Utils
+import           GeniusYield.Test.Utils
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
@@ -81,6 +86,15 @@ withSetup = withSetup' GYInfo
 withSetup' :: GYLogSeverity -> (String -> IO ()) -> Setup -> (Ctx -> IO ()) -> IO ()
 withSetup' targetSev putLog (Setup cokont) kont = do
     cokont targetSev putLog kont
+
+-- | Given a test name, runs the test under privnet.
+mkPrivnetTestFor :: TestName -> Setup -> (TestInfo -> GYTxGameMonadIO ()) -> TestTree
+mkPrivnetTestFor name = mkPrivnetTestFor' name GYInfo
+
+-- | Given a test name, runs the test under privnet with target logging severity.
+mkPrivnetTestFor' :: TestName -> GYLogSeverity -> Setup -> (TestInfo -> GYTxGameMonadIO ()) -> TestTree
+mkPrivnetTestFor' name targetSev setup action = testCaseSteps name $ \info -> withSetup' targetSev info setup $ \ctx -> do
+    ctxRunGame ctx $ action TestInfo { testGoldAsset = ctxGold ctx, testIronAsset = ctxIron ctx, testWallets = ctxWallets ctx }
 
 {-
 TODO: WIP: Provide a variant of `withSetup` that can access `Ctx` to return a non-unit result.
@@ -172,7 +186,7 @@ withPrivnet testnetOpts setupUser = do
 
         -- Read pre-existing users.
         -- NOTE: As of writing, cardano-testnet creates three (3) users.
-        genesisUsers <- fmap V.fromList . liftIO . forM (zip [0 :: Int ..] runtimeWallets)
+        genesisUsers <- fmap V.fromList . liftIO . forM (zip [1 :: Int ..] runtimeWallets)
             $ \(idx, PaymentKeyInfo {paymentKeyInfoPair, paymentKeyInfoAddr}) -> do
                 debug $ printf "userF = %s\n" (show idx)
                 userAddr <- addressFromBech32 <$> urlPieceFromText paymentKeyInfoAddr
@@ -247,17 +261,14 @@ withPrivnet testnetOpts setupUser = do
                     , ctxGetParams        = localGetParams
                     }
 
-            userBalances <- V.mapM
-                (\(i, User'{userAddr=userIaddr}) -> do
+            V.imapM_
+                (\i User'{userAddr=userIaddr} -> do
                     userIbalance <- ctxRunQuery ctx0 $ queryBalance userIaddr
                     when (isEmptyValue userIbalance) $ do
-                        debug $ printf "User' %s balance is empty, giving some ada\n" (show i)
+                        debug $ printf "User %d balance is empty, giving some ada\n" $ i + 1
                         giveAda ctx0 userIaddr
                         when (i == 0) (giveAda ctx0 . userAddr $ ctxUserF ctx0) -- we also give ada to itself to create some small utxos
-                    ctxRunQuery ctx0 $ queryBalance userIaddr
-                ) $ V.zip
-                    (V.fromList extraIndices)
-                    extraUsers
+                ) allUsers
 
             -- mint test tokens
             goldAC <- mintTestTokens ctx0 "GOLD"
@@ -273,16 +284,14 @@ withPrivnet testnetOpts setupUser = do
                     }
 
             -- distribute tokens
-            mapM_
-                (\(i, userIbalance, user) -> do
+            V.imapM_
+                (\i User'{userAddr=userIaddr} -> do
+                    userIbalance <- ctxRunQuery ctx0 $ queryBalance userIaddr
                     when (isEmptyValue $ snd $ valueSplitAda userIbalance) $ do
-                        debug $ printf "User'%s has no tokens, giving some\n" (show i)
-                        giveTokens ctx (userAddr user)
+                        debug $ printf "User %d has no tokens, giving some\n" $ i + 1
+                        giveTokens ctx userIaddr
                 )
-                $ V.zip3
-                    (V.fromList extraIndices)
-                    userBalances
-                    extraUsers
+                allUsers
 
             let setup = Setup $ \targetSev putLog kont -> kont $ ctx { ctxLog = simpleLogging targetSev (putLog . Txt.unpack) }
             setupUser setup
@@ -326,8 +335,8 @@ giveAda ctx addr = ctxRun ctx (ctxUserF ctx) $ do
 giveTokens :: Ctx -> GYAddress -> IO ()
 giveTokens ctx addr = ctxRun ctx (ctxUserF ctx) $ do
     txBody <- buildTxBody $
-        mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxGold ctx) 1_000_000)) <>
-        mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxIron ctx) 1_000_000))
+        mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxGold ctx) 10_000_000)) <>
+        mustHaveOutput (mkGYTxOutNoDatum addr (valueSingleton (ctxIron ctx) 10_000_000))
     signAndSubmitConfirmed_ txBody
 
 -------------------------------------------------------------------------------
@@ -337,7 +346,7 @@ giveTokens ctx addr = ctxRun ctx (ctxUserF ctx) $ do
 mintTestTokens :: Ctx -> String -> IO GYAssetClass
 mintTestTokens ctx tn' = do
     ctxRun ctx (ctxUserF ctx) $ do
-        (ac, txBody) <- GY.TestTokens.mintTestTokens tn 10_000_000 >>= traverse buildTxBody
+        (ac, txBody) <- GY.TestTokens.mintTestTokens tn 1_000_000_000 >>= traverse buildTxBody
         signAndSubmitConfirmed_ txBody
         pure ac
   where

@@ -12,6 +12,8 @@ module GeniusYield.TxBuilder.Errors
     , GYQueryUTxOError (..)
     , GYQueryDatumError (..)
     , GYTxMonadException (..)
+    , GYBuildTxError (..)
+    , GYBalancingError (..)
     , throwAppError
     ) where
 

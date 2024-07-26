@@ -14,6 +14,7 @@ module GeniusYield.Test.Privnet.Ctx (
     User (..),
     CreateUserConfig (..),
     ctxUsers,
+    ctxWallets,
     userPkh,
     userPaymentPkh,
     userStakePkh,
@@ -21,6 +22,7 @@ module GeniusYield.Test.Privnet.Ctx (
     userPaymentVKey,
     userStakeVKey,
     -- * Operations
+    ctxRunGame,
     ctxRun,
     ctxRunQuery,
     ctxRunBuilder,
@@ -34,20 +36,15 @@ module GeniusYield.Test.Privnet.Ctx (
     newTempUserCtx,
     ctxQueryBalance,
     findOutput,
-    addRefScriptCtx,
-    addRefInputCtx,
 ) where
 
 import qualified Cardano.Api                as Api
 import           Data.Default               (Default (..))
-import qualified Data.Map.Strict            as Map
-
-import qualified GeniusYield.Examples.Limbo as Limbo
-import           GeniusYield.HTTP.Errors    (someBackendError)
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Node
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
+import           GeniusYield.Test.Utils
 import           Test.Tasty.HUnit           (assertFailure)
 
 data CreateUserConfig =
@@ -92,6 +89,19 @@ ctxNetworkId Ctx {ctxNetworkInfo} = GYPrivnet ctxNetworkInfo
 ctxUsers :: Ctx -> [User]
 ctxUsers ctx = ($ ctx) <$> [ctxUser2, ctxUser3, ctxUser4, ctxUser5, ctxUser6, ctxUser7, ctxUser8, ctxUser9]
 
+ctxWallets :: Ctx -> Wallets
+ctxWallets Ctx{..} = Wallets
+  { w1 = ctxUserF
+  , w2 = ctxUser2
+  , w3 = ctxUser3
+  , w4 = ctxUser4
+  , w5 = ctxUser5
+  , w6 = ctxUser6
+  , w7 = ctxUser7
+  , w8 = ctxUser8
+  , w9 = ctxUser9
+  }
+
 -- | Creates a new user with the given balance. Note that the actual balance which this user get's could be more than what is provided to satisfy minimum ada requirement of a UTxO.
 newTempUserCtx:: Ctx
               -> User            -- ^ User which will fund this new user.
@@ -123,6 +133,8 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
 
   pure $ User' {userPaymentSKey' = newPaymentSKey, userAddr = newAddr, userStakeSKey' = newStakeSKey}
 
+ctxRunGame :: Ctx -> GYTxGameMonadIO a -> IO a
+ctxRunGame ctx = runGYTxGameMonadIO (ctxNetworkId ctx) (ctxProviders ctx)
 
 ctxRun :: Ctx -> User -> GYTxMonadIO a -> IO a
 ctxRun ctx User' {..} = runGYTxMonadIO (ctxNetworkId ctx) (ctxProviders ctx) userPaymentSKey' userStakeSKey' [userAddr] userAddr Nothing
@@ -182,43 +194,3 @@ findOutput addr txBody = do
     let utxos = txBodyUTxOs txBody
     maybe (assertFailure "expecting an order in utxos") return $
         findFirst (\utxo -> if utxoAddress utxo == addr then Just (utxoRef utxo) else Nothing) $ utxosToList utxos
-
--- | Function to add for a reference script. It adds the script in so called "Always failing" validator so that it won't be later possible to spend this output. There is a slight optimisation here in that if the desired reference script already exists then we don't add another one and return the reference for the found one else, we create a new one.
-addRefScriptCtx :: Ctx                 -- ^ Given context.
-                -> User                -- ^ User which will execute the transaction (if required).
-                -> GYScript 'PlutusV2  -- ^ Given script.
-                -> IO GYTxOutRef       -- ^ Returns the reference for the desired output.
-addRefScriptCtx ctx user script = ctxRun ctx user $ do
-  txBodyRefScript <- Limbo.addRefScript script >>= traverse buildTxBody
-  case txBodyRefScript of
-    Left ref -> pure ref
-    Right body -> do
-      let refs = Limbo.findRefScriptsInBody body
-      ref <- case Map.lookup (Some script) refs of
-        Just ref -> return ref
-        Nothing  -> throwAppError $ someBackendError "Shouldn't happen: no ref in body"
-      signAndSubmitConfirmed_ body
-      pure ref
-
--- | Function to add for a reference input.
-addRefInputCtx :: Ctx            -- ^ Given context.
-               -> User           -- ^ User which will execute this transaction.
-               -> Bool           -- ^ Whether to inline the datum.
-               -> GYAddress      -- ^ Address to put this output at.
-               -> GYDatum        -- ^ The datum to put.
-               -> IO GYTxOutRef  -- ^ Returns the reference for the required output.
-addRefInputCtx ctx user toInline addr ourDatum = ctxRun ctx user $ do
-  txBody <- buildTxBody $ mustHaveOutput (GYTxOut addr mempty (Just (ourDatum, if toInline then GYTxOutUseInlineDatum else GYTxOutDontUseInlineDatum)) Nothing)
-  let utxos = utxosToList $ txBodyUTxOs txBody
-      ourDatumHash = hashDatum ourDatum
-      mRefInputUtxo = find (\utxo ->
-        case utxoOutDatum utxo of
-          GYOutDatumHash dh  -> ourDatumHash == dh
-          GYOutDatumInline d -> ourDatum == d
-          GYOutDatumNone     -> False
-        ) utxos
-  case mRefInputUtxo of
-    Nothing               -> throwAppError $ someBackendError "Shouldn't happen: Couldn't find desired UTxO in tx outputs"
-    Just GYUTxO {utxoRef} -> do
-      signAndSubmitConfirmed_ txBody
-      pure utxoRef

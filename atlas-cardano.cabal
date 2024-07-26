@@ -84,11 +84,13 @@ library
     GeniusYield.ReadJSON
     GeniusYield.Scripts.TestToken
     GeniusYield.Swagger.Utils
-    GeniusYield.Test.Address
+    GeniusYield.Test.Clb
     GeniusYield.Test.FakeCoin
+    GeniusYield.Test.FeeTracker
     GeniusYield.Test.Privnet.Asserts
     GeniusYield.Test.Privnet.Ctx
     GeniusYield.Test.Privnet.Examples
+    GeniusYield.Test.Privnet.Examples.Common
     GeniusYield.Test.Privnet.Examples.Gift
     GeniusYield.Test.Privnet.Examples.Misc
     GeniusYield.Test.Privnet.Examples.Oracle
@@ -103,7 +105,6 @@ library
     GeniusYield.Transaction.Common
     GeniusYield.TxBuilder
     GeniusYield.TxBuilder.Class
-    GeniusYield.TxBuilder.Clb
     GeniusYield.TxBuilder.Common
     GeniusYield.TxBuilder.Errors
     GeniusYield.TxBuilder.IO
@@ -352,3 +353,32 @@ test-suite atlas-privnet-tests
     , tasty
     , tasty-hunit
 
+test-suite atlas-unified-tests
+  import:         common, plutus-ghc-options
+  type:           exitcode-stdio-1.0
+  main-is:        atlas-unified-tests.hs
+  hs-source-dirs: tests-unified
+  ghc-options:    -threaded -rtsopts -Wall
+
+  -- set target plutus-core version
+  ghc-options:    -fplugin-opt PlutusTx.Plugin:target-version=1.0.0
+  other-modules:
+    GeniusYield.Test.Unified.OnChain.BetRef
+    GeniusYield.Test.Unified.OnChain.BetRef.Compiled
+    GeniusYield.Test.Unified.BetRef.Operations
+    GeniusYield.Test.Unified.BetRef.PlaceBet
+    GeniusYield.Test.Unified.BetRef.TakePot
+  -- Dependencies inherited from the library. No need to specify bounds.
+  build-depends:
+    , atlas-cardano
+    , base
+    , containers
+    , tasty
+    , tasty-hunit
+    , text
+    , mtl
+    -- OnChain
+    , plutus-core
+    , plutus-ledger-api
+    , plutus-tx
+    , plutus-tx-plugin

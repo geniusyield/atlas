@@ -10,34 +10,31 @@ Stability   : develop
 {-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE PatternSynonyms #-}
 
-module GeniusYield.Test.Privnet.Examples.Gift (tests, resolveRefScript, resolveRefScript') where
+module GeniusYield.Test.Privnet.Examples.Gift (tests) where
 
-import qualified Cardano.Api                      as Api
-import qualified Cardano.Api.Shelley              as Api.S
-import           Control.Applicative              ((<|>))
-import           Control.Concurrent               (threadDelay)
-import           Control.Lens                     ((.~))
-import           Test.Tasty                       (TestTree, testGroup)
-import           Test.Tasty.HUnit                 (testCaseSteps)
+import qualified Cardano.Api                              as Api
+import qualified Cardano.Api.Shelley                      as Api.S
+import           Control.Applicative                      ((<|>))
+import           Control.Concurrent                       (threadDelay)
+import           Control.Lens                             ((.~))
+import           Test.Tasty                               (TestTree, testGroup)
+import           Test.Tasty.HUnit                         (testCaseSteps)
 
-import qualified Data.Map.Strict                  as Map
-import           Data.Maybe                       (fromJust)
-import           Data.Ratio                       ((%))
-import qualified Data.Set                         as Set
-import           GeniusYield.Imports
-import           GeniusYield.Transaction
-import           GeniusYield.Types
+import           Data.Default                             (Default (def))
+import           Data.Maybe                               (fromJust)
+import           Data.Ratio                               ((%))
+import qualified Data.Set                                 as Set
 
-import           Data.Default                     (Default (def))
 import           GeniusYield.Examples.Gift
-import           GeniusYield.Examples.Limbo
 import           GeniusYield.Examples.Treat
-import           GeniusYield.HTTP.Errors          (someBackendError)
-import           GeniusYield.Providers.Common     (SubmitTxException)
+import           GeniusYield.Imports
+import           GeniusYield.Providers.Common             (SubmitTxException)
 import           GeniusYield.Test.Privnet.Asserts
 import           GeniusYield.Test.Privnet.Ctx
+import           GeniusYield.Test.Privnet.Examples.Common
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder
+import           GeniusYield.Types
 
 pattern InsufficientFundsException :: GYTxMonadException
 pattern InsufficientFundsException <- GYBuildTxException (GYBuildTxBalancingError (GYBalancingErrorInsufficientFunds _))
@@ -284,9 +281,7 @@ tests setup = testGroup "gift"
     , testCaseSteps "Matching Reference Script from UTxO" $ \info -> withSetup info setup $ \ctx -> do
         giftCleanup ctx
 
-        ref <- ctxRun ctx (ctxUserF ctx) $ do
-            txBodyRefScript <- addRefScript' (validatorToScript giftValidatorV2) >>= buildTxBody
-            resolveRefScript' txBodyRefScript (Some (validatorToScript giftValidatorV2))
+        ref <- ctxRun ctx (ctxUserF ctx) . addRefScriptToLimbo $ validatorToScript giftValidatorV2
 
         info $ "Reference at " ++ show ref
 
@@ -311,9 +306,7 @@ tests setup = testGroup "gift"
         -- this creates utxo which looks like
         --
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
-        ref <- ctxRun ctx (ctxUserF ctx) $ do
-            txBodyRefScript <- addRefScript (validatorToScript giftValidatorV2) >>= traverse buildTxBody
-            resolveRefScript txBodyRefScript (Some (validatorToScript giftValidatorV2))
+        ref <- ctxRun ctx (ctxUserF ctx) . addRefScriptToLimbo $ validatorToScript giftValidatorV2
 
         info $ "Reference at " ++ show ref
 
@@ -362,9 +355,7 @@ tests setup = testGroup "gift"
         -- this creates utxo which looks like
         --
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
-        ref <- ctxRun ctx (ctxUserF ctx) $ do
-            txBodyRefScript <- addRefScript (validatorToScript giftValidatorV2) >>= traverse buildTxBody
-            resolveRefScript txBodyRefScript (Some (validatorToScript giftValidatorV2))
+        ref <- ctxRun ctx (ctxUserF ctx) . addRefScriptToLimbo $ validatorToScript giftValidatorV2
 
         info $ "Reference at " ++ show ref
 
@@ -414,9 +405,7 @@ tests setup = testGroup "gift"
         -- this creates utxo which looks like
         --
         -- 3c6ad9c5c512c06add1cd6bb513f1e879d5cadbe70f4762d4ff810d37ab9e0c0     1        1081810 lovelace + TxOutDatumHash ScriptDataInBabbageEra "923918e403bf43c34b4ef6b48eb2ee04babed17320d8d1b9ff9ad086e86f44ec"
-        ref <- ctxRun ctx (ctxUserF ctx) $ do
-            txBodyRefScript <- addRefScript (validatorToScript giftValidatorV2) >>= traverse buildTxBody
-            resolveRefScript txBodyRefScript (Some (validatorToScript giftValidatorV2))
+        ref <- ctxRun ctx (ctxUserF ctx) . addRefScriptToLimbo $ validatorToScript giftValidatorV2
 
         info $ "Reference at " ++ show ref
 
@@ -656,19 +645,3 @@ checkCollateral inputValue returnValue totalCollateralLovelace txFee collPer =
   && balanceLovelace>= ceiling (txFee * collPer % 100)  -- Api checks via `balanceLovelace * 100 >= txFee * collPer` which IMO works as `balanceLovelace` is an integer & 100 but in general `c >= ceil (a / b)` is not equivalent to `c * b >= a`.
   && inputValue == returnValue <> valueFromLovelace totalCollateralLovelace
   where (balanceLovelace, balanceOther) = valueSplitAda $ inputValue `valueMinus` returnValue
-
-resolveRefScript :: Either GYTxOutRef GYTxBody -> Some GYScript -> GYTxMonadIO GYTxOutRef
-resolveRefScript txBodyRefScript script =
-  case txBodyRefScript of
-    Left ref   -> pure ref
-    Right body -> resolveRefScript' body script
-
-resolveRefScript' :: GYTxBody -> Some GYScript -> GYTxMonadIO GYTxOutRef
-resolveRefScript' txBodyRefScript script = do
-  let refs = findRefScriptsInBody txBodyRefScript
-  ref <- case Map.lookup script refs of
-      Just ref -> return ref
-      Nothing  -> throwAppError $ someBackendError "Shouldn't happen: no ref in body"
-
-  void $ signAndSubmitConfirmed_ txBodyRefScript
-  return ref

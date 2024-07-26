@@ -9,18 +9,16 @@ Stability   : develop
 
 module GeniusYield.Test.Privnet.Examples.Misc (tests) where
 
-import           Control.Concurrent                     (threadDelay)
-import           Test.Tasty                             (TestTree, testGroup)
-import           Test.Tasty.HUnit                       (testCaseSteps)
+import           Control.Concurrent                       (threadDelay)
+import           Test.Tasty                               (TestTree, testGroup)
+import           Test.Tasty.HUnit                         (testCaseSteps)
 
-import           GeniusYield.Imports
 import           GeniusYield.Scripts.TestToken
 import           GeniusYield.Types
 
-import           GeniusYield.Examples.Limbo             (addRefScript)
 import           GeniusYield.Test.Privnet.Asserts
 import           GeniusYield.Test.Privnet.Ctx
-import           GeniusYield.Test.Privnet.Examples.Gift (resolveRefScript)
+import           GeniusYield.Test.Privnet.Examples.Common
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder
 
@@ -35,9 +33,7 @@ tests setup = testGroup "misc"
             policyAsScript = mintingPolicyToScript policy
             ac = GYToken (mintingPolicyId policy) tn
 
-        refScript <- ctxRun ctx (ctxUserF ctx) $ do
-            txBodyRefScript <- addRefScript policyAsScript >>= traverse buildTxBody
-            resolveRefScript txBodyRefScript (Some policyAsScript)
+        refScript <- ctxRun ctx (ctxUserF ctx) $ addRefScriptToLimbo policyAsScript
         -- wait a tiny bit.
         threadDelay 1_000_000
 

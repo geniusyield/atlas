@@ -16,7 +16,8 @@ module GeniusYield.CardanoApi.Query (
     CardanoQueryException (..),
 ) where
 
-import           Control.Exception                               (Exception, throwIO)
+import           Control.Exception                               (Exception,
+                                                                  throwIO)
 
 import qualified Cardano.Api                                     as Api
 import qualified Cardano.Api.Shelley                             as Api.S
@@ -38,7 +39,7 @@ newtype CardanoQueryException = CardanoQueryException String
 
 queryCardanoMode :: Api.LocalNodeConnectInfo -> Api.QueryInMode a -> IO a
 queryCardanoMode info q = do
-    e <- Api.queryNodeLocalState info Ouroboros.VolatileTip q
+    e <- Api.runExceptT $ Api.queryNodeLocalState info Ouroboros.VolatileTip q
     case e of
         Left err -> throwIO $ CardanoQueryException $ show err
         Right x  -> return x

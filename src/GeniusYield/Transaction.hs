@@ -473,27 +473,31 @@ finalizeGYBalancedTx
     unregisteredStakeCredsMap = Map.fromList [ (stakeCredentialToApi sc, ppStakeAddressDeposit) | GYStakeAddressDeregistrationCertificate sc  <- map gyTxCertCertificate certs]
 
     body :: Api.TxBodyContent Api.BuildTx Api.BabbageEra
-    body = Api.TxBodyContent
-        ins'
-        collaterals'
-        inRefs
-        outs'
-        dummyTotCol
-        dummyRetCol
-        fee
-        lb'
-        ub'
-        txMetadata
-        Api.TxAuxScriptsNone
-        extra
-        (Api.BuildTxWith $ Just $ Api.S.LedgerProtocolParameters pp)
-        wdrls'
-        certs'
-        Api.TxUpdateProposalNone
-        mint
-        Api.TxScriptValidityNone
-        Nothing
-        Nothing
+    body =
+      Api.TxBodyContent {
+        Api.txIns = ins',
+        Api.txInsCollateral = collaterals',
+        Api.txInsReference = inRefs,
+        Api.txOuts = outs',
+        Api.txTotalCollateral = dummyTotCol,
+        Api.txReturnCollateral = dummyRetCol,
+        Api.txFee = fee,
+        Api.txValidityLowerBound = lb',
+        Api.txValidityUpperBound = ub',
+        Api.txMetadata = txMetadata,
+        Api.txAuxScripts = Api.TxAuxScriptsNone,
+        Api.txExtraKeyWits = extra,
+        Api.txProtocolParams = Api.BuildTxWith $ Just $ Api.S.LedgerProtocolParameters pp,
+        Api.txWithdrawals = wdrls',
+        Api.txCertificates = certs',
+        Api.txUpdateProposal = Api.TxUpdateProposalNone,
+        Api.txMintValue = mint,
+        Api.txScriptValidity = Api.TxScriptValidityNone,
+        Api.txProposalProcedures = Nothing,
+        Api.txVotingProcedures = Nothing,
+        Api.txCurrentTreasuryValue = Nothing,  -- FIXME:?
+        Api.txTreasuryDonation = Nothing
+      }
 
 {- | Wraps around 'Api.makeTransactionBodyAutoBalance' just to verify the final ex units and tx size are within limits.
 

@@ -19,61 +19,80 @@ module GeniusYield.Test.Clb
     , mustFailWith
     ) where
 
-import           Control.Lens                              ((^.))
+import           Control.Lens                                   ((^.))
 import           Control.Monad.Except
 import           Control.Monad.Random
 import           Control.Monad.Reader
 import           Control.Monad.State
-import qualified Data.Map.Strict                           as Map
-import qualified Data.Sequence                             as Seq
-import qualified Data.Set                                  as Set
-import           Data.SOP.NonEmpty                         (NonEmpty (NonEmptyCons, NonEmptyOne))
-import           Data.Time.Clock                           (NominalDiffTime,
-                                                            UTCTime)
-import           Data.Time.Clock.POSIX                     (posixSecondsToUTCTime)
-import qualified Data.Text                                 as T
+import qualified Data.Map.Strict                                as Map
+import qualified Data.Sequence                                  as Seq
+import qualified Data.Set                                       as Set
+import           Data.SOP.NonEmpty                              (NonEmpty (NonEmptyCons, NonEmptyOne))
+import qualified Data.Text                                      as T
+import           Data.Time.Clock                                (NominalDiffTime,
+                                                                 UTCTime)
+import           Data.Time.Clock.POSIX                          (posixSecondsToUTCTime)
 
-import qualified Cardano.Api                               as Api
-import qualified Cardano.Api.Script                        as Api
-import qualified Cardano.Api.Shelley                       as Api.S
-import qualified Cardano.Ledger.Address                    as L
-import qualified Cardano.Ledger.Alonzo.Core                as AlonzoCore
-import qualified Cardano.Ledger.Api                        as L
-import qualified Cardano.Ledger.Babbage.TxOut              as L
-import qualified Cardano.Ledger.Compactible                as L
-import qualified Cardano.Ledger.Plutus.TxInfo              as L
-import qualified Cardano.Ledger.Shelley.API                as L.S
-import qualified Cardano.Ledger.UTxO                       as L
-import           Cardano.Slotting.Time                     (RelativeTime (RelativeTime),
-                                                            mkSlotLength)
-import           Clb                                       (ClbState (..), ClbT, EmulatedLedgerState (..),
-                                                            Log (Log), LogEntry (LogEntry), LogLevel (..),
-                                                            MockConfig(..), SlotConfig(..),
-                                                            ValidationResult (..), getCurrentSlot, txOutRefAt,
-                                                            txOutRefAtPaymentCred, sendTx, unLog, getFails,
-                                                            logInfo, logError, waitSlot)
+import qualified Cardano.Api                                    as Api
+import qualified Cardano.Api.Script                             as Api
+import qualified Cardano.Api.Shelley                            as Api.S
+import qualified Cardano.Ledger.Address                         as L
+import qualified Cardano.Ledger.Alonzo.Core                     as AlonzoCore
+import qualified Cardano.Ledger.Api                             as L
+import qualified Cardano.Ledger.Babbage.TxOut                   as L
+import qualified Cardano.Ledger.Compactible                     as L
+import qualified Cardano.Ledger.Plutus.TxInfo                   as L
+import qualified Cardano.Ledger.Shelley.API                     as L.S
+import qualified Cardano.Ledger.UTxO                            as L
+import           Cardano.Slotting.Slot                          (EpochNo (..),
+                                                                 EpochSize (..))
+import           Cardano.Slotting.Time                          (RelativeTime (RelativeTime),
+                                                                 mkSlotLength)
+import           Clb                                            (ClbState (..),
+                                                                 ClbT,
+                                                                 EmulatedLedgerState (..),
+                                                                 Log (Log),
+                                                                 LogEntry (LogEntry),
+                                                                 LogLevel (..),
+                                                                 MockConfig (..),
+                                                                 SlotConfig (..),
+                                                                 ValidationResult (..),
+                                                                 getCurrentSlot,
+                                                                 getFails,
+                                                                 logError,
+                                                                 logInfo,
+                                                                 sendTx,
+                                                                 txOutRefAt,
+                                                                 txOutRefAtPaymentCred,
+                                                                 unLog,
+                                                                 waitSlot)
 import qualified Clb
-import           Control.Monad.Trans.Maybe                 (runMaybeT)
-import qualified Ouroboros.Consensus.Cardano.Block         as Ouroboros
-import qualified Ouroboros.Consensus.HardFork.History      as Ouroboros
-import qualified PlutusLedgerApi.V2                        as Plutus
-import           Prettyprinter                             (PageWidth (AvailablePerLine),
-                                                            defaultLayoutOptions,
-                                                            layoutPageWidth,
-                                                            layoutPretty)
-import           Prettyprinter.Render.String               (renderString)
-import qualified Test.Cardano.Ledger.Core.KeyPair          as TL
-import qualified Test.Tasty                                as Tasty
-import           Test.Tasty.HUnit                          (assertFailure, testCaseInfo)
+import           Control.Monad.Trans.Maybe                      (runMaybeT)
+import qualified Ouroboros.Consensus.Cardano.Block              as Ouroboros
+import qualified Ouroboros.Consensus.HardFork.History           as Ouroboros
+import qualified PlutusLedgerApi.V2                             as Plutus
+import           Prettyprinter                                  (PageWidth (AvailablePerLine),
+                                                                 defaultLayoutOptions,
+                                                                 layoutPageWidth,
+                                                                 layoutPretty)
+import           Prettyprinter.Render.String                    (renderString)
+import qualified Test.Cardano.Ledger.Core.KeyPair               as TL
+import qualified Test.Tasty                                     as Tasty
+import           Test.Tasty.HUnit                               (assertFailure,
+                                                                 testCaseInfo)
 
 import           GeniusYield.HTTP.Errors
 import           GeniusYield.Imports
+import           GeniusYield.Test.Utils
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.User
 import           GeniusYield.Types
-import           GeniusYield.Test.Utils
+import           Ouroboros.Consensus.HardFork.History.EraParams (EraParams (eraGenesisWin))
+
+deriving newtype instance Num EpochSize
+deriving newtype instance Num EpochNo
 
 -- FIXME: Fix this type synonym upstream.
 type Clb = ClbT Identity
@@ -99,7 +118,7 @@ asRandClb w m = do
     e <- runExceptT $ unGYTxMonadClb m `runReaderT` GYTxRunEnv w
     case e of
         Left err -> lift (logError (show err)) >> return Nothing
-        Right a -> return $ Just a
+        Right a  -> return $ Just a
 
 asClb :: StdGen
       -> User
@@ -437,37 +456,37 @@ instance GYTxSpecialQueryMonad GYTxMonadClb where
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864, eraGenesisWin = 0}
                 }
         shelleyEra =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
                 }
         allegraEra =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
                 }
         maryEra =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
                 }
         alonzoEra =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
                 }
         babbageEra len =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraUnbounded
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
                 }
 
 dumpUtxoState :: GYTxMonadClb ()

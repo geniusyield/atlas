@@ -471,10 +471,10 @@ maestroProtocolParams env = do
       , protocolParamMaxCollateralInputs = Just protocolParametersMaxCollateralInputs
       , protocolParamCostModels          = M.fromList
                                               [ ( Api.S.AnyPlutusScriptVersion Api.PlutusScriptV1
-                                                , Api.CostModel $ M.elems $ coerce $ Maestro.costModelsPlutusV1 protocolParametersCostModels
+                                                , Api.CostModel $ fromInteger <$> M.elems (coerce $ Maestro.costModelsPlutusV1 protocolParametersCostModels)
                                                 )
                                               , ( Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2
-                                                , Api.CostModel $ M.elems $ coerce $ Maestro.costModelsPlutusV2 protocolParametersCostModels
+                                                , Api.CostModel $ fromInteger <$> M.elems (coerce $ Maestro.costModelsPlutusV2 protocolParametersCostModels)
                                                 )
                                               ]
       , protocolParamUTxOCostPerByte     = Just . Ledger.Coin $ toInteger protocolParametersCoinsPerUtxoByte

@@ -28,6 +28,7 @@ import qualified Data.ByteString.Base16               as BS16
 import qualified Data.ByteString.Lazy                 as LBS
 import           Data.Either.Combinators              (maybeToRight)
 import           Data.Foldable                        (fold)
+import           Data.Int                             (Int64)
 import qualified Data.Map.Strict                      as Map
 import qualified Data.Set                             as Set
 import qualified Data.Text                            as Text
@@ -377,8 +378,8 @@ blockfrostProtocolParams proj = do
   where
     toApiCostModel = Map.fromList
         . Map.foldlWithKey (\acc k x -> case k of
-            Blockfrost.PlutusV1 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV1, Api.CostModel $ Map.elems x) : acc
-            Blockfrost.PlutusV2 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2, Api.CostModel $ Map.elems x) : acc
+            Blockfrost.PlutusV1 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV1, Api.CostModel $ fromInteger <$> Map.elems x) : acc
+            Blockfrost.PlutusV2 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2, Api.CostModel $ fromInteger <$> Map.elems x) : acc
             -- Don't care about non plutus cost models.
             Blockfrost.Timelock -> acc
         )

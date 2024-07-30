@@ -182,10 +182,6 @@ jobs:
         echo "===========================[ RUN DOCSPEC ]==========================="
         ./cabal-docspec -q --ignore-trailing-space
         echo " ============================[ FINISHED ]============================"
-    - name: Install cardano-node
-      run: |
-        curl -sL https://github.com/input-output-hk/cardano-node/releases/download/8.1.2/cardano-node-8.1.2-linux.tar.gz > ./cardano-node.tar.gz
-        tar xf ./cardano-node.tar.gz -C $HOME/.local/bin
     - name: Symlink cardano-node binaries
       run: cabal install --package-env=$(pwd) --overwrite-policy=always cardano-cli cardano-node
     - name: Run privnet tests

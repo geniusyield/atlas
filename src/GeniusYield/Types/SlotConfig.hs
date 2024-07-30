@@ -129,7 +129,7 @@ makeSlotConfig sysStart eraHist = GYSlotConfig sysStart <$!> simplifiedEraSumms
 
 -- The era start bound for the very first era.
 pattern FirstEraBound :: Ouroboros.Bound
-pattern FirstEraBound <- Ouroboros.Bound (CSlot.RelativeTime 0) 0 0
+pattern FirstEraBound <- Ouroboros.Bound (CSlot.RelativeTime 0) 0 (CSlot.EpochNo 0)
 
 {- | Create a single era slot config (useful for emulator traces).
 

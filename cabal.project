@@ -1,5 +1,5 @@
 repository cardano-haskell-packages
-  url: https://input-output-hk.github.io/cardano-haskell-packages
+  url: https://chap.intersectmbo.org/
   secure: True
   root-keys:
     3e0cce471cf09815f930210f7827266fd09045445d65923e6d0238a6cd15126f
@@ -14,11 +14,11 @@ packages: .
 tests: true
 
 -- repeating the index-state for hackage to work around hackage.nix parsing limitation
-index-state: 2024-06-15T17:35:54Z
+index-state: 2024-06-23T23:01:13Z
 
 index-state:
-  , hackage.haskell.org 2024-06-15T17:35:54Z
-  , cardano-haskell-packages 2024-06-13T23:12:13Z
+  , hackage.haskell.org 2024-07-29T00:00:00Z
+  , cardano-haskell-packages 2024-07-24T14:16:32Z
 
 -- TODO: Default value should be @direct@ in upcoming 3.10 version of cabal, omit this line then.
 test-show-details: direct
@@ -26,15 +26,12 @@ test-show-details: direct
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
 
--- TODO: This is fixed for in their later version, omit this when we update to it.
-package strict-containers
-  ghc-options: -Wwarn=noncanonical-monad-instances
-
+-- FIXME: Push these changes to main repo.
 source-repository-package
   type: git
-  location: https://github.com/maestro-org/haskell-sdk
-  tag: d70479ce3be06d6b7c52bf39d783f36d6771e36d
-  --sha256: sha256-8se+xlIB1BDEuKGwjaldmW5G4LpCujD1ABgBaY0cY6Y=
+  location: https://github.com/sourabhxyz/haskell-sdk
+  tag: 2c93a3e65da99f3b46a2031d5279c08e96d1809c
+  --sha256: FIXME:
 
 source-repository-package
   type: git
@@ -42,25 +39,22 @@ source-repository-package
   tag: 18e781b5b53adc1aa1d8c057c1b606b536a80350
   --sha256: sha256-PDmrXYTBHPcY0x+JnF21uupLMBwURLSiNMqNmwwapkc=
 
--- Obtaining cardano-node stuff for 8.9.*. These aren't published on CHaP yet.
+-- Obtaining cardano-node stuff for 9.1.0. These aren't published on CHaP yet.
 source-repository-package
   type: git
   location: https://github.com/IntersectMBO/cardano-node
-  tag: 8.9.2
-  --sha256: sha256-PxMlVzTLMuVeu04QcGOxjaSMnpWJG78J0Rul3423too=
+  tag: 9.1.0
+  --sha256: FIXME:
   subdir:
     cardano-node
     cardano-testnet
-    cardano-git-rev
     trace-dispatcher
-
--- Everything below is essentially copied from cardano-wallet's cabal.project.
 
 source-repository-package
   type: git
-  location: https://github.com/input-output-hk/cardano-wallet
-  tag: v2024-03-27
-  --sha256: sha256-rxMPopa3nxQaM0yOxUCq5oj3+XSL68jkuuFVhj/SY+w=
+  location: https://github.com/geniusyield/cardano-wallet
+  tag: 3413fdf74fd25b100662abf2a49c1afc892f1b79
+  --sha256: FIXME:
   subdir:
     lib/address-derivation-discovery
     lib/balance-tx/
@@ -83,15 +77,15 @@ source-repository-package
     lib/wallet-benchmarks/
     lib/wallet/
 
------- Begin contents from @cardano-wallet@'s @cabal.project@ file. --------
+------ Following is mostly from @cardano-wallet@'s @cabal.project@ file. -------
 
 --------------------------------------------------------------------------------
 
 source-repository-package
     type: git
     location: https://github.com/IntersectMBO/cardano-addresses
-    tag: 126964483d188c2362393d2a6eea8c65dfc43097
-    --sha256: 1w152imj28ap5dfdc8x9ly0cy7dn500v7k63vw11f70gvgg6x7my
+    tag: 2bca06deaa60e54a5322ac757387d744bf043367
+    --sha256: 1y1mzfly7jac40b9g4xc078rcm5zqhc3xxv77kwxi10yph1jwq7z
     subdir: command-line
             core
 
@@ -132,21 +126,30 @@ source-repository-package
 --------------------------------------------------------------------------------
 -- BEGIN Constraints tweaking section
 
--- cardano-addresses unit tests bring in some version constraint conflicts.
---
--- 1. hjsonschema and hjsonpointer deps have overly strict bounds.
--- 2. it has strict aeson < 1.5 dep - this will be fixed in the next release.
 allow-newer:
-    hjsonschema:*
-  , hjsonpointer:*
-  , *:aeson
-  , *:hashable
-  , async-timer:unliftio-core
-  , ekg:*
-  , ntp-client:*
-  , libsystemd-journal:base
-  , cardano-addresses-cli:mtl
+    async-timer:unliftio-core
   , servant-openapi3:*
+  , katip:Win32
+  , raven-haskell:aeson
+
+constraints:
+    base >= 4.18.2.0 && < 5
+  , openapi3 >= 3.2.0
+  , persistent ^>= 2.14.6.0
+  , cardano-node ^>= 9.1.0
+  , bech32 >= 1.1.7
+
+  -- lower versions of katip won't build with the Win32-2.12.0.1
+  -- which is shipped with the ghc-9.2.8
+  , katip >= 0.8.7.4
+
+
+  -- Cardano Node dependencies:
+  , io-classes >= 1.4
+  , io-classes -asserts
+  , ouroboros-consensus-cardano ^>= 0.18
+  , ouroboros-network ^>= 0.16.1
+  , ouroboros-network-protocols ^>= 0.9
 
 -- END Constraints tweaking section
 --------------------------------------------------------------------------------
@@ -167,6 +170,9 @@ package cardano-config
 
 package cardano-node
   flags: -systemd
+
+package bitvec
+   flags: -simd
 
 -- -------------------------------------------------------------------------
 

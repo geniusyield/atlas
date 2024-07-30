@@ -24,31 +24,33 @@ module GeniusYield.Providers.Maestro
   , maestroStakeAddressInfo
   ) where
 
-import qualified Cardano.Api                          as Api
-import qualified Cardano.Api.Shelley                  as Api.S
-import qualified Cardano.Ledger.BaseTypes             as Ledger
-import qualified Cardano.Slotting.Slot                as CSlot
-import qualified Cardano.Slotting.Time                as CTime
-import           Control.Concurrent                   (threadDelay)
-import           Control.Exception                    (try)
-import           Control.Monad                        ((<=<))
-import qualified Data.Aeson                           as Aeson
-import           Data.Either.Combinators              (maybeToRight)
-import qualified Data.Map.Strict                      as M
-import           Data.Maybe                           (fromJust)
-import qualified Data.Set                             as Set
-import qualified Data.Text                            as Text
-import qualified Data.Time                            as Time
+import qualified Cardano.Api                                    as Api
+import qualified Cardano.Api.Shelley                            as Api.S
+import qualified Cardano.Ledger.BaseTypes                       as Ledger
+import qualified Cardano.Ledger.Coin                            as Ledger
+import qualified Cardano.Slotting.Slot                          as CSlot
+import qualified Cardano.Slotting.Time                          as CTime
+import           Control.Concurrent                             (threadDelay)
+import           Control.Exception                              (try)
+import           Control.Monad                                  ((<=<))
+import qualified Data.Aeson                                     as Aeson
+import           Data.Either.Combinators                        (maybeToRight)
+import qualified Data.Map.Strict                                as M
+import           Data.Maybe                                     (fromJust)
+import qualified Data.Set                                       as Set
+import qualified Data.Text                                      as Text
+import qualified Data.Time                                      as Time
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
 import           GeniusYield.Types
-import           GHC.Natural                          (wordToNatural)
-import qualified Maestro.Client.V1                    as Maestro
-import qualified Maestro.Client.V1.Accounts           as Maestro
-import qualified Maestro.Types.V1                     as Maestro
-import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
-import qualified PlutusTx.Builtins                    as Plutus
-import qualified Web.HttpApiData                      as Web
+import           GHC.Natural                                    (wordToNatural)
+import qualified Maestro.Client.V1                              as Maestro
+import qualified Maestro.Client.V1.Accounts                     as Maestro
+import qualified Maestro.Types.V1                               as Maestro
+import qualified Ouroboros.Consensus.HardFork.History           as Ouroboros
+import           Ouroboros.Consensus.HardFork.History.EraParams (EraParams (eraGenesisWin))
+import qualified PlutusTx.Builtins                              as Plutus
+import qualified Web.HttpApiData                                as Web
 
 -- | Convert our representation of Network ID to Maestro's.
 networkIdToMaestroEnv :: Text -> GYNetworkId -> IO (Maestro.MaestroEnv 'Maestro.V1)
@@ -443,12 +445,12 @@ maestroProtocolParams env = do
       , protocolParamMaxBlockHeaderSize  = protocolParametersMaxBlockHeaderSize
       , protocolParamMaxBlockBodySize    = protocolParametersMaxBlockBodySize
       , protocolParamMaxTxSize           = protocolParametersMaxTxSize
-      , protocolParamTxFeeFixed          = Api.Lovelace $ toInteger protocolParametersMinFeeConstant
-      , protocolParamTxFeePerByte        = Api.Lovelace $ toInteger protocolParametersMinFeeCoefficient
+      , protocolParamTxFeeFixed          = Ledger.Coin $ toInteger protocolParametersMinFeeConstant
+      , protocolParamTxFeePerByte        = Ledger.Coin $ toInteger protocolParametersMinFeeCoefficient
       , protocolParamMinUTxOValue        = Nothing -- Deprecated in Alonzo.
-      , protocolParamStakeAddressDeposit = Api.Lovelace $ toInteger protocolParametersStakeKeyDeposit
-      , protocolParamStakePoolDeposit    = Api.Lovelace $ toInteger protocolParametersPoolDeposit
-      , protocolParamMinPoolCost         = Api.Lovelace $ toInteger protocolParametersMinPoolCost
+      , protocolParamStakeAddressDeposit = Ledger.Coin $ toInteger protocolParametersStakeKeyDeposit
+      , protocolParamStakePoolDeposit    = Ledger.Coin $ toInteger protocolParametersPoolDeposit
+      , protocolParamMinPoolCost         = Ledger.Coin $ toInteger protocolParametersMinPoolCost
       , protocolParamPoolRetireMaxEpoch  = Ledger.EpochInterval . fromIntegral
                                               $ Maestro.unEpochNo protocolParametersPoolRetirementEpochBound
       , protocolParamStakePoolTargetNum  = protocolParametersDesiredNumberOfPools
@@ -475,7 +477,7 @@ maestroProtocolParams env = do
                                                 , Api.CostModel $ M.elems $ coerce $ Maestro.costModelsPlutusV2 protocolParametersCostModels
                                                 )
                                               ]
-      , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ toInteger protocolParametersCoinsPerUtxoByte
+      , protocolParamUTxOCostPerByte     = Just . Ledger.Coin $ toInteger protocolParametersCoinsPerUtxoByte
       }
 
 -- | Returns a set of all Stake Pool's 'Api.S.PoolId'.
@@ -514,6 +516,7 @@ maestroEraHistory env = do
         { eraEpochSize = CSlot.EpochSize $ fromIntegral eraParametersEpochLength
         , eraSlotLength = CTime.mkSlotLength eraParametersSlotLength
         , eraSafeZone = Ouroboros.StandardSafeZone $ fromJust eraParametersSafeZone
+        , eraGenesisWin = 0
         }
     mkEra Maestro.EraSummary {eraSummaryStart, eraSummaryEnd, eraSummaryParameters} = Ouroboros.EraSummary
         { eraStart = mkBound eraSummaryStart

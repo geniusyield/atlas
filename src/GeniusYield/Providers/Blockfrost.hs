@@ -17,6 +17,7 @@ import qualified Blockfrost.Client                    as Blockfrost
 import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api.S
 import qualified Cardano.Ledger.BaseTypes             as Ledger
+import qualified Cardano.Ledger.Coin                  as Ledger
 import qualified Cardano.Slotting.Slot                as CSlot
 import qualified Cardano.Slotting.Time                as CTime
 import           Control.Concurrent                   (threadDelay)
@@ -41,6 +42,7 @@ import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
 import           GeniusYield.Types
 import           GeniusYield.Utils                    (serialiseToBech32WithPrefix)
+import           Ouroboros.Consensus.HardFork.History (EraParams (eraGenesisWin))
 
 data BlockfrostProviderException
     = BlpvApiError !Text !Blockfrost.BlockfrostError
@@ -355,9 +357,9 @@ blockfrostProtocolParams proj = do
         , protocolParamTxFeeFixed          = fromInteger _protocolParamsMinFeeB
         , protocolParamTxFeePerByte        = fromInteger _protocolParamsMinFeeA
         , protocolParamMinUTxOValue        = Nothing  -- Deprecated in Alonzo.
-        , protocolParamStakeAddressDeposit = Api.Lovelace $ lovelacesToInteger _protocolParamsKeyDeposit
-        , protocolParamStakePoolDeposit    = Api.Lovelace $ lovelacesToInteger _protocolParamsPoolDeposit
-        , protocolParamMinPoolCost         = Api.Lovelace $ lovelacesToInteger _protocolParamsMinPoolCost
+        , protocolParamStakeAddressDeposit = Ledger.Coin $ lovelacesToInteger _protocolParamsKeyDeposit
+        , protocolParamStakePoolDeposit    = Ledger.Coin $ lovelacesToInteger _protocolParamsPoolDeposit
+        , protocolParamMinPoolCost         = Ledger.Coin $ lovelacesToInteger _protocolParamsMinPoolCost
         , protocolParamPoolRetireMaxEpoch  = Ledger.EpochInterval $ fromInteger _protocolParamsEMax
         , protocolParamStakePoolTargetNum  = fromInteger _protocolParamsNOpt
         , protocolParamPoolPledgeInfluence = _protocolParamsA0
@@ -370,7 +372,7 @@ blockfrostProtocolParams proj = do
         , protocolParamCollateralPercent   = Just $ fromInteger _protocolParamsCollateralPercent
         , protocolParamMaxCollateralInputs = Just $ fromInteger _protocolParamsMaxCollateralInputs
         , protocolParamCostModels          = toApiCostModel _protocolParamsCostModels
-        , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ lovelacesToInteger _protocolParamsCoinsPerUtxoSize
+        , protocolParamUTxOCostPerByte     = Just . Ledger.Coin $ lovelacesToInteger _protocolParamsCoinsPerUtxoSize
         }
   where
     toApiCostModel = Map.fromList
@@ -419,6 +421,7 @@ blockfrostEraHistory proj = do
         { eraEpochSize = CSlot.EpochSize $ fromIntegral _parametersEpochLength
         , eraSlotLength = CTime.mkSlotLength _parametersSlotLength
         , eraSafeZone = Ouroboros.StandardSafeZone _parametersSafeZone
+        , eraGenesisWin = 0
         }
     mkEra Blockfrost.NetworkEraSummary {_networkEraStart, _networkEraEnd, _networkEraParameters} = Ouroboros.EraSummary
         { eraStart = mkBound _networkEraStart

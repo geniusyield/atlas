@@ -48,6 +48,7 @@ module GeniusYield.Types.TxBody (
 
 import qualified Cardano.Api                  as Api
 import qualified Cardano.Api.Shelley          as Api.S
+import qualified Cardano.Ledger.Coin          as Ledger
 import qualified Data.ByteString              as BS
 import qualified Data.ByteString.Base16       as BS16
 import qualified Data.ByteString.Char8        as BS8
@@ -162,7 +163,7 @@ txBodyToCBOR = Api.serialiseToCBOR . txBodyToApi
 txBodyFee :: GYTxBody -> Integer
 txBodyFee (GYTxBody (Api.TxBody Api.TxBodyContent { Api.txFee = fee })) =
     case fee of
-        Api.TxFeeExplicit _ (Api.Lovelace actual) -> actual
+        Api.TxFeeExplicit _ (Ledger.Coin actual) -> actual
 
 -- | Return the fees as 'GYValue'.
 txBodyFeeValue :: GYTxBody -> GYValue
@@ -223,7 +224,7 @@ txBodyValidityRange body =
     f (Api.TxValidityLowerBound _ sn) = Just $ slotFromApi sn
 
     g :: Api.TxValidityUpperBound Api.BabbageEra -> Maybe GYSlot
-    g (Api.TxValidityUpperBound _ Nothing) = Nothing
+    g (Api.TxValidityUpperBound _ Nothing)   = Nothing
     g (Api.TxValidityUpperBound _ (Just sn)) = Just $ slotFromApi sn
 
 -- | Returns the set of 'GYTxOutRef' used as collateral in the given 'GYTxBody'.
@@ -236,7 +237,7 @@ txBodyCollateral body = case Api.txInsCollateral $ txBodyToApiTxBodyContent body
 txBodyTotalCollateralLovelace :: GYTxBody -> Natural
 txBodyTotalCollateralLovelace body = case Api.txTotalCollateral $ txBodyToApiTxBodyContent body of
     Api.TxTotalCollateralNone -> 0
-    Api.TxTotalCollateral _ (Api.Lovelace l)
+    Api.TxTotalCollateral _ (Ledger.Coin l)
         | l >= 0              -> fromInteger l
         | otherwise           -> error $ "negative total collateral: " <> show l
 

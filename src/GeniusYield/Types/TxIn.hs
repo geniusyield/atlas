@@ -92,7 +92,7 @@ txInToApi useInline (GYTxIn oref m) = (txOutRefToApi oref, Api.BuildTxWith $ f m
     f GYTxInWitnessKey = Api.KeyWitness Api.KeyWitnessForSpending
     f (GYTxInWitnessScript v d r) =
         Api.ScriptWitness Api.ScriptWitnessForSpending $ g v
-        (if useInline then Api.InlineScriptDatum else Api.ScriptDatumForTxIn $ datumToApi' d)
+        (if useInline then Api.InlineScriptDatum else Api.ScriptDatumForTxIn $ Just $ datumToApi' d)
         (redeemerToApi r)
         (Api.ExecutionUnits 0 0)
     f (GYTxInWitnessSimpleScript v) =

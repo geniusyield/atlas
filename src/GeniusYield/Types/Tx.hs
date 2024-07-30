@@ -59,13 +59,16 @@ import qualified Data.Text                          as T
 import qualified Data.Text.Encoding                 as TE
 import qualified Database.PostgreSQL.Simple         as PQ
 import qualified Database.PostgreSQL.Simple.ToField as PQ
-import qualified PlutusLedgerApi.V1                 as Plutus (TxId (..))
+import qualified PlutusLedgerApi.V1                 as PlutusV1 (TxId (..))
+import qualified PlutusLedgerApi.V3                 as PlutusV3 (TxId (..))
 import qualified PlutusTx.Builtins.Internal         as Plutus
 import qualified Text.Printf                        as Printf
 import qualified Web.HttpApiData                    as Web
 
 import           Cardano.Ledger.Core                (eraProtVerHigh)
 import           GeniusYield.Imports
+import           GeniusYield.Types.PlutusVersion    (PlutusVersion (..),
+                                                     VersionIsGreater)
 
 -- $setup
 --
@@ -171,6 +174,10 @@ writeTx file tx = do
         Left err -> ioError $ userError $ show err
         Right () -> pure ()
 
+data PlutusTxId (v :: PlutusVersion) where
+  PlutusTxIdBeforeV3 :: PlutusV3 `VersionIsGreater` v => PlutusV1.TxId -> PlutusTxId v
+  PlutusTxIdV3 :: PlutusV3.TxId -> PlutusTxId 'PlutusV3
+
 -- | Transaction hash/id of a particular transaction.
 newtype GYTxId = GYTxId Api.TxId
     deriving (Eq, Ord)
@@ -244,8 +251,9 @@ txIdToApi = coerce
 txIdFromApi :: Api.TxId -> GYTxId
 txIdFromApi = coerce
 
-txIdFromPlutus :: Plutus.TxId -> Either Api.S.SerialiseAsRawBytesError GYTxId
-txIdFromPlutus (Plutus.TxId (Plutus.BuiltinByteString bs)) = txIdFromApi <$> Api.deserialiseFromRawBytes Api.AsTxId bs
+txIdFromPlutus :: PlutusTxId v -> Either Api.S.SerialiseAsRawBytesError GYTxId
+txIdFromPlutus (PlutusTxIdBeforeV3 (PlutusV1.TxId (Plutus.BuiltinByteString bs))) = txIdFromApi <$> Api.deserialiseFromRawBytes Api.AsTxId bs
+txIdFromPlutus (PlutusTxIdV3 (PlutusV3.TxId (Plutus.BuiltinByteString bs))) = txIdFromApi <$> Api.deserialiseFromRawBytes Api.AsTxId bs
 
 -- | Wrapper around transaction witness set. Note that Babbage ledger also uses the same @TxWitness@ type defined in Alonzo ledger, which was updated for Plutus-V2 scripts and same is expected for Plutus-V3.
 newtype GYTxWitness = GYTxWitness (AlonzoTxWits (Babbage.BabbageEra Crypto.StandardCrypto))

@@ -64,11 +64,12 @@ import qualified Cardano.Api.Shelley                   as Api
 import qualified Cardano.Api.Shelley                   as Api.S
 import           Cardano.Crypto.DSIGN                  (sizeSigDSIGN,
                                                         sizeVerKeyDSIGN)
+import qualified Cardano.Ledger.Alonzo.Core            as AlonzoCore
 import qualified Cardano.Ledger.Alonzo.Scripts         as AlonzoScripts
 import qualified Cardano.Ledger.Alonzo.Tx              as AlonzoTx
-import qualified Cardano.Ledger.Alonzo.Core            as AlonzoCore
 import qualified Cardano.Ledger.Binary                 as CBOR
 import qualified Cardano.Ledger.Binary.Crypto          as CBOR
+import qualified Cardano.Ledger.Coin                   as Ledger
 import           Cardano.Ledger.Core                   (EraTx (sizeTxF),
                                                         eraProtVerLow)
 import           Cardano.Ledger.Crypto                 (Crypto (..))
@@ -399,7 +400,7 @@ finalizeGYBalancedTx
 
     -- will be filled by makeTransactionBodyAutoBalance
     fee :: Api.TxFee Api.BabbageEra
-    fee = Api.TxFeeExplicit Api.ShelleyBasedEraBabbage $ Api.Lovelace 0
+    fee = Api.TxFeeExplicit Api.ShelleyBasedEraBabbage $ Ledger.Coin 0
 
     lb' :: Api.TxValidityLowerBound Api.BabbageEra
     lb' = maybe
@@ -434,7 +435,7 @@ finalizeGYBalancedTx
       else
         (
         -- Total collateral must be <= lovelaces available in collateral inputs.
-          Api.TxTotalCollateral retColSup (Api.Lovelace $ fst $ valueSplitAda collateralTotalValue)
+          Api.TxTotalCollateral retColSup (Ledger.Coin $ fst $ valueSplitAda collateralTotalValue)
         -- Return collateral must be <= what is in collateral inputs.
         , Api.TxReturnCollateral retColSup $ txOutToApi $ GYTxOut changeAddr collateralTotalValue Nothing Nothing
         )
@@ -506,7 +507,7 @@ makeTransactionBodyAutoBalanceWrapper :: GYUTxOs
                                       -> Api.S.UTxO Api.S.BabbageEra
                                       -> Api.S.TxBodyContent Api.S.BuildTx Api.S.BabbageEra
                                       -> GYAddress
-                                      -> Map.Map Api.StakeCredential Api.Lovelace
+                                      -> Map.Map Api.StakeCredential Ledger.Coin
                                       -> Word
                                       -> Int
                                       -> Either GYBuildTxError GYTxBody
@@ -524,7 +525,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body cha
     ledgerPP <- first GYBuildTxPPConversionError $ Api.S.convertToLedgerProtocolParameters Api.ShelleyBasedEraBabbage apiPP
 
     -- First we obtain the calculated fees to correct for our collaterals.
-    bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ _ (Api.Lovelace feeOld)) <-
+    bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ _ (Ledger.Coin feeOld)) <-
       first GYBuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
         Api.ShelleyBasedEraBabbage
         ss
@@ -552,7 +553,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body cha
         (txColl, collRet) <-
           if collateralTotalLovelace >= balanceNeeded then return
             (
-              Api.TxTotalCollateral retColSup (Api.Lovelace balanceNeeded)
+              Api.TxTotalCollateral retColSup (Ledger.Coin balanceNeeded)
             , Api.TxReturnCollateral retColSup $ txOutToApi $ GYTxOut changeAddr (collateralTotalValue `valueMinus` valueFromLovelace balanceNeeded) Nothing Nothing
 
             )

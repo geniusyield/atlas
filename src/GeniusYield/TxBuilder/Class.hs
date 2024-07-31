@@ -185,15 +185,15 @@ class (Default (TxBuilderStrategy m), GYTxSpecialQueryMonad m, GYTxUserQueryMona
     buildTxBodyChainingWithStrategy = buildTxBodyChainingWithStrategy'
 
 -- | 'buildTxBodyWithStrategy' with the default coin selection strategy.
-buildTxBody :: GYTxBuilderMonad m => GYTxSkeleton v -> m GYTxBody
+buildTxBody :: forall v m. GYTxBuilderMonad m => GYTxSkeleton v -> m GYTxBody
 buildTxBody = buildTxBodyWithStrategy def
 
 -- | 'buildTxBodyParallelWithStrategy' with the default coin selection strategy.
-buildTxBodyParallel :: GYTxBuilderMonad m => [GYTxSkeleton v] -> m GYTxBuildResult
+buildTxBodyParallel :: forall v m. GYTxBuilderMonad m => [GYTxSkeleton v] -> m GYTxBuildResult
 buildTxBodyParallel = buildTxBodyParallelWithStrategy def
 
 -- | 'buildTxBodyChainingWithStrategy' with the default coin selection strategy.
-buildTxBodyChaining :: GYTxBuilderMonad m => [GYTxSkeleton v] -> m GYTxBuildResult
+buildTxBodyChaining :: forall v m. GYTxBuilderMonad m => [GYTxSkeleton v] -> m GYTxBuildResult
 buildTxBodyChaining = buildTxBodyChainingWithStrategy def
 
 -- | Class of monads for interacting with the blockchain using transactions.
@@ -314,12 +314,12 @@ awaitTxConfirmed :: GYTxMonad m => GYTxId -> m ()
 awaitTxConfirmed = awaitTxConfirmed' def
 
 -- | > submitTxBody_ t = void . submitTxBody t
-submitTxBody_ :: (GYTxMonad f, ToShelleyWitnessSigningKey a) => GYTxBody -> [a] -> f ()
+submitTxBody_ :: forall a m. (GYTxMonad m, ToShelleyWitnessSigningKey a) => GYTxBody -> [a] -> m ()
 submitTxBody_ txBody = void . submitTxBody txBody
 
 -- | Signs a 'GYTxBody' with the given keys and submits the transaction.
 -- Equivalent to a call to 'signGYTxBody', followed by a call to 'submitTx'
-submitTxBody :: (GYTxMonad m, ToShelleyWitnessSigningKey a) => GYTxBody -> [a] -> m GYTxId
+submitTxBody :: forall a m. (GYTxMonad m, ToShelleyWitnessSigningKey a) => GYTxBody -> [a] -> m GYTxId
 submitTxBody txBody = submitTx . signGYTxBody txBody
 
 -- | > submitTxBodyConfirmed_ t = void . submitTxBodyConfirmed t
@@ -328,7 +328,7 @@ submitTxBodyConfirmed_ txBody = void . submitTxBodyConfirmed txBody
 
 -- | Signs a 'GYTxBody' with the given keys, submits the transaction, and waits for its confirmation.
 -- Equivalent to a call to 'signGYTxBody', followed by a call to 'submitTxConfirmed'.
-submitTxBodyConfirmed :: (GYTxMonad m, ToShelleyWitnessSigningKey a) => GYTxBody -> [a] ->  m GYTxId
+submitTxBodyConfirmed :: forall a m. (GYTxMonad m, ToShelleyWitnessSigningKey a) => GYTxBody -> [a] ->  m GYTxId
 submitTxBodyConfirmed txBody = submitTxConfirmed . signGYTxBody txBody
 
 signAndSubmitConfirmed_ :: GYTxMonad m => GYTxBody -> m ()

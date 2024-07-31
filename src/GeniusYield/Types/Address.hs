@@ -138,7 +138,7 @@ instance Hashable GYAddress where
 -- |
 --
 -- >>> addressToApi addr
--- AddressShelley (ShelleyAddress Testnet (KeyHashObj (KeyHash "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d")) (StakeRefBase (KeyHashObj (KeyHash "1b930e9f7add78a174a21000e989ff551366dcd127028cb2aa39f616"))))
+-- AddressShelley (ShelleyAddress Testnet (KeyHashObj (KeyHash {unKeyHash = "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"})) (StakeRefBase (KeyHashObj (KeyHash {unKeyHash = "1b930e9f7add78a174a21000e989ff551366dcd127028cb2aa39f616"}))))
 -- >>> addressToApi addrByron1
 -- AddressByron (ByronAddress (Address {addrRoot = 04865e42d2373addbebd5d2acf81c760c848970142889f7ee763091b, addrAttributes = Attributes { data_ = AddrAttributes {aaVKDerivationPath = Nothing, aaNetworkMagic = NetworkMainOrStage} }, addrType = ATVerKey}))
 -- >>> addressToApi addrByron2

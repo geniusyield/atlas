@@ -17,17 +17,17 @@ module GeniusYield.Transaction.Common (
     adjustTxOut
 ) where
 
-import qualified Cardano.Api         as Api
-import qualified Cardano.Api.Shelley as Api.S
+import qualified Cardano.Api                  as Api
+import qualified Cardano.Api.Shelley          as Api.S
+import qualified Cardano.Ledger.Coin          as Ledger
 
-import qualified Cardano.Ledger.Alonzo.Core as Ledger
+import qualified Cardano.Ledger.Alonzo.Core   as Ledger
 
-import qualified Text.Printf         as Printf
+import qualified Text.Printf                  as Printf
 
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Types.Address
-import           GeniusYield.Types.TxOut
 import           GeniusYield.Types.PubKeyHash
 import           GeniusYield.Types.Redeemer
 import           GeniusYield.Types.Script
@@ -35,6 +35,7 @@ import           GeniusYield.Types.Slot
 import           GeniusYield.Types.TxCert
 import           GeniusYield.Types.TxIn
 import           GeniusYield.Types.TxMetadata
+import           GeniusYield.Types.TxOut
 import           GeniusYield.Types.TxWdrl
 import           GeniusYield.Types.UTxO
 import           GeniusYield.Types.Value
@@ -140,4 +141,4 @@ adjustTxOut minimumUTxOF = helper
                 in helper txOut'
 
 extractLovelace :: Api.Value -> Natural
-extractLovelace v = case Api.selectLovelace v of Api.Lovelace n -> fromIntegral $ max 0 n
+extractLovelace v = case Api.selectLovelace v of Ledger.Coin n -> fromIntegral $ max 0 n

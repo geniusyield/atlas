@@ -20,6 +20,7 @@ module GeniusYield.Providers.Node
 
 import qualified Cardano.Api                                       as Api
 import qualified Cardano.Api.Shelley                               as Api.S
+import qualified Cardano.Ledger.Coin                               as Ledger
 import           Cardano.Slotting.Time                             (SystemStart)
 import           Control.Exception                                 (throwIO)
 import qualified Data.Map.Strict                                   as Map
@@ -89,7 +90,7 @@ stakePools GYBabbage info = queryBabbageEra info Api.QueryStakePools
 nodeStakeAddressInfo :: Api.LocalNodeConnectInfo -> GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
 nodeStakeAddressInfo info saddr = resolveStakeAddressInfoFromApi saddr <$> queryBabbageEra info (Api.QueryStakeAddresses (Set.singleton $ stakeCredentialToApi $ stakeAddressToCredential saddr) (Api.localNodeNetworkId info))
 
-resolveStakeAddressInfoFromApi :: GYStakeAddress -> (Map.Map Api.StakeAddress Api.Lovelace, Map.Map Api.StakeAddress Api.S.PoolId) -> Maybe GYStakeAddressInfo
+resolveStakeAddressInfoFromApi :: GYStakeAddress -> (Map.Map Api.StakeAddress Ledger.Coin, Map.Map Api.StakeAddress Api.S.PoolId) -> Maybe GYStakeAddressInfo
 resolveStakeAddressInfoFromApi (stakeAddressToApi -> stakeAddr) (rewards, delegations) =
     if Map.member stakeAddr rewards
     then Just $ GYStakeAddressInfo

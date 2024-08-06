@@ -23,12 +23,14 @@ module GeniusYield.Test.Privnet.Setup (
     NodeConfigurationYaml (..)
 ) where
 
-import           Control.Concurrent                   (ThreadId, threadDelay, killThread)
+import           Control.Concurrent                   (ThreadId, killThread,
+                                                       threadDelay)
 import qualified Control.Concurrent.STM               as STM
 import           Control.Exception                    (finally)
 import           Control.Monad                        (forever)
 import           Control.Monad.IO.Class               (liftIO)
-import           Control.Monad.Trans.Resource         (resourceForkIO, MonadResource (liftResourceT))
+import           Control.Monad.Trans.Resource         (MonadResource (liftResourceT),
+                                                       resourceForkIO)
 import qualified Data.Text                            as Txt
 import qualified Data.Vector                          as V
 
@@ -39,8 +41,8 @@ import           Test.Tasty.HUnit                     (testCaseSteps)
 
 import qualified Cardano.Api                          as Api
 import           Cardano.Testnet
+import           Testnet.Property.Util
 import           Testnet.Runtime
-import           Testnet.Property.Utils
 
 
 import qualified GeniusYield.Api.TestTokens           as GY.TestTokens
@@ -54,6 +56,7 @@ import           GeniusYield.Test.Privnet.Utils
 import           GeniusYield.Test.Utils
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
+import           Testnet.Types
 
 
 -------------------------------------------------------------------------------
@@ -191,7 +194,7 @@ withPrivnet testnetOpts setupUser = do
                 debug $ printf "userF = %s\n" (show idx)
                 userAddr <- addressFromBech32 <$> urlPieceFromText paymentKeyInfoAddr
                 debug $ printf "userF addr = %s\n" userAddr
-                userPaymentSKey' <- readPaymentSigningKey $ paymentSKey paymentKeyInfoPair
+                userPaymentSKey' <- readPaymentSigningKey $ Api.unFile $ signingKey paymentKeyInfoPair
                 debug $ printf "userF skey = %s\n" userPaymentSKey'
                 pure User' {userPaymentSKey', userStakeSKey'=Nothing, userAddr}
 

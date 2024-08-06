@@ -70,6 +70,7 @@ module GeniusYield.Types.Value (
     makeAssetClass
 ) where
 
+import qualified Cardano.Ledger.Coin              as Ledger
 import           Control.Lens                     ((?~))
 import           Data.Aeson                       (object, (.=))
 import qualified Data.Aeson.Key                   as K
@@ -78,7 +79,7 @@ import qualified Data.Csv                         as Csv
 import           Data.List                        (intercalate)
 import qualified Data.Scientific                  as SC
 import           GeniusYield.Imports
-import           PlutusTx.Builtins.Class          (fromBuiltin, toBuiltin)
+import           PlutusTx.Builtins                (fromBuiltin, toBuiltin)
 
 import qualified Cardano.Api                      as Api
 -- import qualified Cardano.Api.Value                as Api
@@ -201,7 +202,7 @@ valueFromApi v = valueFromList
     ]
 
 valueFromApiTxOutValue :: Api.TxOutValue era -> GYValue
-valueFromApiTxOutValue (Api.TxOutValueByron (Api.Lovelace x)) = valueFromLovelace x
+valueFromApiTxOutValue (Api.TxOutValueByron (Ledger.Coin x)) = valueFromLovelace x
 valueFromApiTxOutValue (Api.TxOutValueShelleyBased e v) =
   valueFromApi $ Api.fromLedgerValue e v
 

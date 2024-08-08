@@ -98,7 +98,8 @@ asRandClb :: User
 asRandClb w m = do
     e <- runExceptT $ unGYTxMonadClb m `runReaderT` GYTxRunEnv w
     case e of
-        Left err -> lift (logError (show err)) >> return Nothing
+        Left (GYApplicationException (toApiError -> GYApiError {gaeMsg})) -> lift (logError $ T.unpack gaeMsg) >> return Nothing
+        Left err -> lift (logError $ show err) >> return Nothing
         Right a -> return $ Just a
 
 asClb :: StdGen

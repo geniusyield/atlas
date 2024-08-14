@@ -300,7 +300,7 @@ balanceTxStep
     isWdrlScriptWitness GYTxWdrlWitnessScript{} = True
     isWdrlScriptWitness _                       = False
 
-retColSup :: Api.BabbageEraOnwards Api.ConwayEra
+retColSup :: Api.BabbageEraOnwards ApiEra
 retColSup = Api.BabbageEraOnwardsConway
 
 finalizeGYBalancedTx :: GYBuildTxEnv -> GYBalancedTx v -> Int -> Either GYBuildTxError GYTxBody
@@ -369,7 +369,7 @@ finalizeGYBalancedTx
                   GYInReferenceSimpleScript _ s -> getTotalKeysInSimpleScript s <> acc
               estimateKeyWitnessesFromNativeScripts acc _ = acc
 
-    inRefs :: Api.TxInsReference Api.BuildTx Api.ConwayEra
+    inRefs :: Api.TxInsReference Api.BuildTx ApiEra
     inRefs = case inRefs' of
         [] -> Api.TxInsReferenceNone
         _  -> Api.TxInsReference Api.BabbageEraOnwardsConway inRefs'
@@ -388,33 +388,33 @@ finalizeGYBalancedTx
     outs' :: [Api.S.TxOut Api.S.CtxTx Api.S.ConwayEra]
     outs' = txOutToApi <$> outs
 
-    ins' :: [(Api.TxIn, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxTxIn Api.ConwayEra))]
+    ins' :: [(Api.TxIn, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxTxIn ApiEra))]
     ins' = [ txInToApi (isInlineDatum $ gyTxInDetDatum i) (gyTxInDet i) |  i <- ins ]
 
-    collaterals' :: Api.TxInsCollateral Api.ConwayEra
+    collaterals' :: Api.TxInsCollateral ApiEra
     collaterals' = case utxosRefs collaterals of
         []    -> Api.TxInsCollateralNone
         orefs -> Api.TxInsCollateral Api.AlonzoEraOnwardsConway $ txOutRefToApi <$> orefs
 
     -- will be filled by makeTransactionBodyAutoBalance
-    fee :: Api.TxFee Api.ConwayEra
+    fee :: Api.TxFee ApiEra
     fee = Api.TxFeeExplicit Api.ShelleyBasedEraConway $ Ledger.Coin 0
 
-    lb' :: Api.TxValidityLowerBound Api.ConwayEra
+    lb' :: Api.TxValidityLowerBound ApiEra
     lb' = maybe
         Api.TxValidityNoLowerBound
         (Api.TxValidityLowerBound Api.AllegraEraOnwardsConway . slotToApi)
         lb
 
-    ub' :: Api.TxValidityUpperBound Api.ConwayEra
+    ub' :: Api.TxValidityUpperBound ApiEra
     ub' = Api.TxValidityUpperBound Api.ShelleyBasedEraConway $ slotToApi <$> ub
 
-    extra :: Api.TxExtraKeyWitnesses Api.ConwayEra
+    extra :: Api.TxExtraKeyWitnesses ApiEra
     extra = case toList signers of
         []   -> Api.TxExtraKeyWitnessesNone
         pkhs -> Api.TxExtraKeyWitnesses Api.AlonzoEraOnwardsConway $ pubKeyHashToApi <$> pkhs
 
-    mint :: Api.TxMintValue Api.BuildTx Api.ConwayEra
+    mint :: Api.TxMintValue Api.BuildTx ApiEra
     mint = case mmint of
         Nothing      -> Api.TxMintNone
         Just (v, xs) -> Api.TxMintValue Api.MaryEraOnwardsConway (valueToApi v) $ Api.BuildTxWith $ Map.fromList
@@ -427,7 +427,7 @@ finalizeGYBalancedTx
             ]
 
     -- Putting `TxTotalCollateralNone` & `TxReturnCollateralNone` would have them appropriately calculated by `makeTransactionBodyAutoBalance` but then return collateral it generates is only for ada. To support multi-asset collateral input we therefore calculate correct values ourselves and put appropriate entries here to have `makeTransactionBodyAutoBalance` calculate appropriate overestimated fees.
-    (dummyTotCol :: Api.TxTotalCollateral Api.ConwayEra, dummyRetCol :: Api.TxReturnCollateral Api.CtxTx Api.ConwayEra) =
+    (dummyTotCol :: Api.TxTotalCollateral ApiEra, dummyRetCol :: Api.TxReturnCollateral Api.CtxTx ApiEra) =
       if mempty == collaterals then
         (Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)
       else
@@ -441,14 +441,14 @@ finalizeGYBalancedTx
         collateralTotalValue :: GYValue
         collateralTotalValue = foldMapUTxOs utxoValue collaterals
 
-    txMetadata :: Api.TxMetadataInEra Api.ConwayEra
+    txMetadata :: Api.TxMetadataInEra ApiEra
     txMetadata = maybe Api.TxMetadataNone toMetaInEra mbTxMetadata
       where
-        toMetaInEra :: GYTxMetadata -> Api.TxMetadataInEra Api.ConwayEra
+        toMetaInEra :: GYTxMetadata -> Api.TxMetadataInEra ApiEra
         toMetaInEra gymd = let md = txMetadataToApi gymd in
           if md == mempty then Api.TxMetadataNone else Api.TxMetadataInEra Api.ShelleyBasedEraConway md
 
-    wdrls' :: Api.TxWithdrawals Api.BuildTx Api.ConwayEra
+    wdrls' :: Api.TxWithdrawals Api.BuildTx ApiEra
     wdrls' = if wdrls == mempty then Api.TxWithdrawalsNone else Api.TxWithdrawals Api.ShelleyBasedEraConway $ map txWdrlToApi wdrls
 
     certs' =
@@ -466,7 +466,7 @@ finalizeGYBalancedTx
 
     unregisteredStakeCredsMap = Map.fromList [ (stakeCredentialToApi sc, fromIntegral amt) | GYStakeAddressDeregistrationCertificate amt sc  <- map gyTxCertCertificate' certs]
 
-    body :: Api.TxBodyContent Api.BuildTx Api.ConwayEra
+    body :: Api.TxBodyContent Api.BuildTx ApiEra
     body =
       Api.TxBodyContent {
         Api.txIns = ins',
@@ -655,4 +655,4 @@ collapseExtraOut apiOut@(Api.TxOut _ outVal _ _) bodyContent@Api.TxBodyContent {
   where
     (skeletonOuts, changeOuts) = splitAt numSkeletonOuts txOuts
 
-type ShelleyBasedConwayEra = Api.S.ShelleyLedgerEra Api.ConwayEra
+type ShelleyBasedConwayEra = Api.S.ShelleyLedgerEra ApiEra

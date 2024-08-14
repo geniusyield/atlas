@@ -164,6 +164,7 @@ import qualified Data.Swagger.Internal.Schema          as Swagger
 import qualified Data.Text                             as Text
 import qualified Data.Text.Encoding                    as TE
 import           GeniusYield.Imports
+import           GeniusYield.Types.Era                 (ApiEra)
 import           GeniusYield.Types.Ledger              (PlutusToCardanoError (..))
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.Script.ScriptHash
@@ -229,7 +230,7 @@ validatorToApiPlutusScriptWitness
     -> Api.ScriptDatum Api.WitCtxTxIn
     -> Api.ScriptRedeemer
     -> Api.ExecutionUnits
-    -> Api.ScriptWitness Api.WitCtxTxIn Api.ConwayEra
+    -> Api.ScriptWitness Api.WitCtxTxIn ApiEra
 validatorToApiPlutusScriptWitness (GYValidator s) =
     scriptToApiPlutusScriptWitness s
 
@@ -345,7 +346,7 @@ mintingPolicyToApiPlutusScriptWitness
     :: GYMintingPolicy v
     -> Api.ScriptRedeemer
     -> Api.ExecutionUnits
-    -> Api.ScriptWitness Api.WitCtxMint Api.ConwayEra
+    -> Api.ScriptWitness Api.WitCtxMint ApiEra
 mintingPolicyToApiPlutusScriptWitness (GYMintingPolicy s) =
     scriptToApiPlutusScriptWitness s Api.NoScriptDatumForMint
 
@@ -518,7 +519,7 @@ stakeValidatorToApiPlutusScriptWitness
     :: GYStakeValidator v
     -> Api.ScriptRedeemer
     -> Api.ExecutionUnits
-    -> Api.ScriptWitness Api.WitCtxStake Api.ConwayEra
+    -> Api.ScriptWitness Api.WitCtxStake ApiEra
 stakeValidatorToApiPlutusScriptWitness (GYStakeValidator s) =
     scriptToApiPlutusScriptWitness s Api.NoScriptDatumForStake
 
@@ -781,7 +782,7 @@ scriptToApiPlutusScriptWitness
     -> Api.S.ScriptDatum ctx
     -> Api.ScriptRedeemer
     -> Api.ExecutionUnits
-    -> Api.ScriptWitness ctx Api.ConwayEra
+    -> Api.ScriptWitness ctx ApiEra
 scriptToApiPlutusScriptWitness (GYScript v api _) = case v of
     SingPlutusV1 -> Api.PlutusScriptWitness
         Api.PlutusScriptV1InConway

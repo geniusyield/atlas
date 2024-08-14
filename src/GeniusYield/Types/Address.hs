@@ -92,6 +92,7 @@ import           GeniusYield.Types.Credential         (GYPaymentCredential,
                                                        stakeCredentialFromApi,
                                                        stakeCredentialToApi,
                                                        stakeCredentialToHexText)
+import           GeniusYield.Types.Era
 import           GeniusYield.Types.Ledger
 import           GeniusYield.Types.NetworkId
 import           GeniusYield.Types.PaymentKeyHash     (GYPaymentKeyHash,
@@ -147,11 +148,11 @@ instance Hashable GYAddress where
 addressToApi :: GYAddress -> Api.AddressAny
 addressToApi = coerce
 
-addressToApi' :: GYAddress -> Api.AddressInEra Api.ConwayEra
+addressToApi' :: GYAddress -> Api.AddressInEra ApiEra
 addressToApi' = coerce addrAnyToConwayEra
 
 -- not exported
-addrAnyToConwayEra :: Api.AddressAny -> Api.AddressInEra Api.ConwayEra
+addrAnyToConwayEra :: Api.AddressAny -> Api.AddressInEra ApiEra
 addrAnyToConwayEra (Api.AddressByron   addr) = Api.AddressInEra Api.ByronAddressInAnyEra                             addr
 addrAnyToConwayEra (Api.AddressShelley addr) = Api.AddressInEra (Api.ShelleyAddressInEra Api.ShelleyBasedEraConway) addr
 

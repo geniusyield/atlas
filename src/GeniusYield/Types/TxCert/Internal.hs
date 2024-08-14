@@ -20,6 +20,7 @@ import           Data.Functor                         ((<&>))
 import           GeniusYield.Imports                  ((&))
 import           GeniusYield.Types.Certificate
 import           GeniusYield.Types.Credential         (stakeCredentialToApi)
+import           GeniusYield.Types.Era
 import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters)
 import           GeniusYield.Types.Redeemer
 import           GeniusYield.Types.Script
@@ -56,10 +57,10 @@ data GYTxCertWitness v
 
 txCertToApi
     :: GYTxCert' v
-    -> (Api.Certificate Api.ConwayEra, Maybe (Api.StakeCredential, Api.Witness Api.WitCtxStake Api.ConwayEra))
+    -> (Api.Certificate ApiEra, Maybe (Api.StakeCredential, Api.Witness Api.WitCtxStake ApiEra))
 txCertToApi (GYTxCert' cert wit) = (certificateToApi cert, wit <&> (\wit' -> (certificateToStakeCredential cert & stakeCredentialToApi, f wit')) )
   where
-    f :: GYTxCertWitness v -> Api.Witness Api.WitCtxStake Api.ConwayEra
+    f :: GYTxCertWitness v -> Api.Witness Api.WitCtxStake ApiEra
     f GYTxCertWitnessKey = Api.KeyWitness Api.KeyWitnessForStakeAddr
     f (GYTxCertWitnessScript v r) =
         Api.ScriptWitness Api.ScriptWitnessForStakeAddr $

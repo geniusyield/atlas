@@ -46,6 +46,7 @@ import           GeniusYield.Types                 (GYNetworkId, GYQueryUTxO,
                                                     gyQueryUtxoRefsAtAddress',
                                                     gyQueryUtxosAtAddress',
                                                     gyQueryUtxosAtAddresses')
+import           GeniusYield.Types.Era
 import qualified Maestro.Types.V1                  as Maestro
 import           Web.HttpApiData                   (ToHttpApiData (..))
 
@@ -154,19 +155,19 @@ maestroTests token netId =
     getQueryUtxo :: Text.Text -> IO GYQueryUTxO
     getQueryUtxo pToken = maestroQueryUtxo <$> networkIdToMaestroEnv pToken netId
 
-    getUTxOsAtAddress :: GYAddress -> Text.Text -> IO (Api.UTxO Api.ConwayEra)
+    getUTxOsAtAddress :: GYAddress -> Text.Text -> IO (Api.UTxO ApiEra)
     getUTxOsAtAddress addr pToken = do
         queryUtxo <- getQueryUtxo pToken
         utxos <- gyQueryUtxosAtAddress' queryUtxo addr Nothing
         return $ utxosToApi utxos
 
-    getUTxOsAtAddresses :: [GYAddress] -> Text.Text -> IO (Api.UTxO Api.ConwayEra)
+    getUTxOsAtAddresses :: [GYAddress] -> Text.Text -> IO (Api.UTxO ApiEra)
     getUTxOsAtAddresses addrs pToken = do
         queryUtxo <- getQueryUtxo pToken
         utxos <- gyQueryUtxosAtAddresses' queryUtxo addrs
         return $ utxosToApi utxos
 
-    getUTxOAtRef :: GYTxOutRef -> Text.Text -> IO (Api.UTxO Api.ConwayEra)
+    getUTxOAtRef :: GYTxOutRef -> Text.Text -> IO (Api.UTxO ApiEra)
     getUTxOAtRef ref pToken = do
         queryUtxo <- getQueryUtxo pToken
         utxo <- gyQueryUtxoAtTxOutRef' queryUtxo ref
@@ -184,13 +185,13 @@ maestroTests token netId =
             refs = utxosRefs $ utxosFromApi utxos
         return refs
 
-    getFileUTxOs :: String -> IO (Api.UTxO Api.ConwayEra)
+    getFileUTxOs :: String -> IO (Api.UTxO ApiEra)
     getFileUTxOs fileName = do
         json <- BS.readFile fileName
         let utxos = fromMaybe (utxosToApi $ utxosFromList []) (Aeson.decodeStrict (toStrict json))
         return utxos
 
-    compareUTxOs :: Api.UTxO Api.ConwayEra -> Api.UTxO Api.ConwayEra -> IO (Maybe String)
+    compareUTxOs :: Api.UTxO ApiEra -> Api.UTxO ApiEra -> IO (Maybe String)
     compareUTxOs utxosFile utxosQuery = do
         let utxosFileMap = Api.unUTxO utxosFile
             utxosQueryMap = Api.unUTxO utxosQuery
@@ -209,7 +210,7 @@ maestroTests token netId =
     updateGolden :: Show a => a -> IO ()
     updateGolden = error . show
 
-    goldenTestUtxos :: TestName -> IO (Api.UTxO Api.ConwayEra) -> IO (Api.UTxO Api.ConwayEra) -> TestTree
+    goldenTestUtxos :: TestName -> IO (Api.UTxO ApiEra) -> IO (Api.UTxO ApiEra) -> TestTree
     goldenTestUtxos name queryData getFileData =
         goldenTest name queryData getFileData compareUTxOs updateGolden
 

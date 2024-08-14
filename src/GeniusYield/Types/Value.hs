@@ -103,6 +103,7 @@ import           Data.Either.Combinators          (mapLeft)
 import           Data.Foldable                    (for_)
 import           Data.Hashable                    (Hashable (..))
 import qualified GeniusYield.Types.Ada            as Ada
+import           GeniusYield.Types.Era
 import           GeniusYield.Types.Script
 
 -- $setup
@@ -207,7 +208,7 @@ valueFromApiTxOutValue (Api.TxOutValueShelleyBased e v) =
   valueFromApi $ Api.fromLedgerValue e v
 
 -- FIXME: should we use Conway?
-valueToApiTxOutValue :: GYValue -> Api.TxOutValue Api.ConwayEra
+valueToApiTxOutValue :: GYValue -> Api.TxOutValue ApiEra
 valueToApiTxOutValue v =
   Api.TxOutValueShelleyBased
     Api.ShelleyBasedEraConway

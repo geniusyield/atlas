@@ -55,6 +55,7 @@ import qualified Data.ByteString.Char8        as BS8
 import qualified Data.Set                     as Set
 
 import           GeniusYield.Imports
+import           GeniusYield.Types.Era
 import           GeniusYield.Types.Key        (GYSomeSigningKey (GYSomeSigningKey))
 import           GeniusYield.Types.Key.Class  (ToShelleyWitnessSigningKey,
                                                toShelleyWitnessSigningKey)
@@ -66,13 +67,13 @@ import           GeniusYield.Types.UTxO
 import           GeniusYield.Types.Value
 
 -- | Transaction body: the part which is then signed.
-newtype GYTxBody = GYTxBody (Api.TxBody Api.ConwayEra)
+newtype GYTxBody = GYTxBody (Api.TxBody ApiEra)
   deriving Show
 
-txBodyFromApi :: Api.TxBody Api.ConwayEra -> GYTxBody
+txBodyFromApi :: Api.TxBody ApiEra -> GYTxBody
 txBodyFromApi = coerce
 
-txBodyToApi :: GYTxBody -> Api.TxBody Api.ConwayEra
+txBodyToApi :: GYTxBody -> Api.TxBody ApiEra
 txBodyToApi = coerce
 
 -- | Sign a transaction body with (potentially) multiple keys.
@@ -100,7 +101,7 @@ makeSignedTransaction :: GYTxWitness -> GYTxBody -> GYTx
 makeSignedTransaction txWit txBody = makeSignedTransaction' (txWitToKeyWitnessApi txWit) $ txBodyToApi txBody
 
 -- | Make a signed transaction given the transaction body & list of key witnesses.
-makeSignedTransaction' :: [Api.S.KeyWitness Api.S.ConwayEra] -> Api.TxBody Api.ConwayEra -> GYTx
+makeSignedTransaction' :: [Api.S.KeyWitness Api.S.ConwayEra] -> Api.TxBody ApiEra -> GYTx
 makeSignedTransaction' = fmap txFromApi <$> Api.makeSignedTransaction
 
 -- | Add a key witness(s) to a transaction, represented in `GYTxWitness`, which might already have previous key witnesses.
@@ -176,7 +177,7 @@ txBodyUTxOs (GYTxBody body@(Api.TxBody Api.TxBodyContent {txOuts})) =
   where
     txId = Api.getTxId body
 
-    f :: Word -> Api.TxOut Api.CtxTx Api.ConwayEra -> GYUTxO
+    f :: Word -> Api.TxOut Api.CtxTx ApiEra -> GYUTxO
     f i = utxoFromApi (Api.TxIn txId (Api.TxIx i))
 
 -- | Returns the 'GYTxOutRef' consumed by the tx.
@@ -197,7 +198,7 @@ txBodyTxId = txIdFromApi . Api.getTxId . txBodyToApi
 getTxBody :: GYTx -> GYTxBody
 getTxBody = txBodyFromApi . Api.getTxBody . txToApi
 
-txBodyToApiTxBodyContent :: GYTxBody -> Api.TxBodyContent Api.ViewTx Api.ConwayEra
+txBodyToApiTxBodyContent :: GYTxBody -> Api.TxBodyContent Api.ViewTx ApiEra
 txBodyToApiTxBodyContent body = let Api.TxBody bc = txBodyToApi body in bc
 
 -- | Returns the required signatories of the given 'GYTxBody'.
@@ -219,11 +220,11 @@ txBodyValidityRange body =
   in case (Api.txValidityLowerBound cnt, Api.txValidityUpperBound cnt)  of
     (lb, ub) -> (f lb, g ub)
   where
-    f :: Api.TxValidityLowerBound Api.ConwayEra -> Maybe GYSlot
+    f :: Api.TxValidityLowerBound ApiEra -> Maybe GYSlot
     f Api.TxValidityNoLowerBound      = Nothing
     f (Api.TxValidityLowerBound _ sn) = Just $ slotFromApi sn
 
-    g :: Api.TxValidityUpperBound Api.ConwayEra -> Maybe GYSlot
+    g :: Api.TxValidityUpperBound ApiEra -> Maybe GYSlot
     g (Api.TxValidityUpperBound _ Nothing)   = Nothing
     g (Api.TxValidityUpperBound _ (Just sn)) = Just $ slotFromApi sn
 
@@ -241,7 +242,7 @@ txBodyTotalCollateralLovelace body = case Api.txTotalCollateral $ txBodyToApiTxB
         | l >= 0              -> fromInteger l
         | otherwise           -> error $ "negative total collateral: " <> show l
 
-txBodyCollateralReturnOutput :: GYTxBody -> Api.TxReturnCollateral Api.CtxTx Api.ConwayEra
+txBodyCollateralReturnOutput :: GYTxBody -> Api.TxReturnCollateral Api.CtxTx ApiEra
 txBodyCollateralReturnOutput body = Api.txReturnCollateral $ txBodyToApiTxBodyContent body
 
 txBodyCollateralReturnOutputValue :: GYTxBody -> GYValue

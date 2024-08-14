@@ -89,13 +89,13 @@ import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.User
 import           GeniusYield.Types
+import           GeniusYield.Types.ProtocolParameters           (protocolParametersFromApi)
 import           Ouroboros.Consensus.HardFork.History.EraParams (EraParams (eraGenesisWin))
-import GeniusYield.Types.ProtocolParameters (protocolParametersFromApi)
 
 deriving newtype instance Num EpochSize
 deriving newtype instance Num EpochNo
 
-type Clb = ClbT Api.ConwayEra Identity
+type Clb = ClbT ApiEra Identity
 
 newtype GYTxRunEnv = GYTxRunEnv { runEnvWallet :: User }
 
@@ -158,7 +158,7 @@ mkTestFor name action =
                       (mkSimpleWallet (Clb.intToKeyPair 9))
 
     -- | Helper for building tests
-    testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig Api.ConwayEra -> String -> Clb a -> Tasty.TestTree
+    testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig ApiEra -> String -> Clb a -> Tasty.TestTree
     testNoErrorsTraceClb funds walletFunds cfg msg act =
         testCaseInfo msg
             $ maybe (pure mockLog) assertFailure
@@ -228,7 +228,6 @@ instance GYTxQueryMonad GYTxMonadClb where
         pure . GYPrivnet $ GYNetworkInfo
             { gyNetworkMagic = Api.S.unNetworkMagic $ Api.S.toNetworkMagic magic
             , gyNetworkEpochSlots = 500
-            , gyNetworkEra = GYConway
             }
 
     lookupDatum :: GYDatumHash -> GYTxMonadClb (Maybe GYDatum)

@@ -20,6 +20,7 @@ import qualified Cardano.Api.Shelley             as Api.S
 import           Control.Lens                    (Traversal)
 import           GeniusYield.Types.Address
 import           GeniusYield.Types.Datum
+import           GeniusYield.Types.Era
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.Script
 import           GeniusYield.Types.Value
@@ -68,7 +69,7 @@ gyTxOutDatumL f (GYTxOut addr v md s) =
 
 txOutToApi
     :: GYTxOut v
-    -> Api.TxOut Api.CtxTx Api.ConwayEra
+    -> Api.TxOut Api.CtxTx ApiEra
 txOutToApi (GYTxOut addr v md mrs) = Api.TxOut
     (addressToApi' addr)
     (valueToApiTxOutValue v)
@@ -81,7 +82,7 @@ txOutToApi (GYTxOut addr v md mrs) = Api.TxOut
         let version = singPlutusVersionToApi $ scriptVersion s
         in Api.ScriptInAnyLang (Api.PlutusScriptLanguage version) (Api.PlutusScript version (scriptToApi s))
 
-    mkDatum :: Maybe (GYDatum, GYTxOutUseInlineDatum v) -> Api.TxOutDatum Api.CtxTx Api.ConwayEra
+    mkDatum :: Maybe (GYDatum, GYTxOutUseInlineDatum v) -> Api.TxOutDatum Api.CtxTx ApiEra
     mkDatum Nothing        = Api.TxOutDatumNone
     mkDatum (Just (d, di))
         | di'       = Api.TxOutDatumInline Api.BabbageEraOnwardsConway d'

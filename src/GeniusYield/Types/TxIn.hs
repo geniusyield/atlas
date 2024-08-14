@@ -19,6 +19,7 @@ import qualified Cardano.Api                     as Api
 import qualified Cardano.Api.Shelley             as Api
 import           Data.GADT.Compare               (defaultEq)
 import           GeniusYield.Types.Datum
+import           GeniusYield.Types.Era
 import           GeniusYield.Types.PlutusVersion
 import           GeniusYield.Types.Redeemer
 import           GeniusYield.Types.Script
@@ -86,9 +87,9 @@ instance Eq (GYInSimpleScript v) where
 txInToApi
     :: Bool   -- ^ does corresponding utxo contains inline datum?
     -> GYTxIn v
-    -> (Api.TxIn, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxTxIn Api.ConwayEra))
+    -> (Api.TxIn, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxTxIn ApiEra))
 txInToApi useInline (GYTxIn oref m) = (txOutRefToApi oref, Api.BuildTxWith $ f m) where
-    f :: GYTxInWitness v -> Api.Witness Api.WitCtxTxIn Api.ConwayEra
+    f :: GYTxInWitness v -> Api.Witness Api.WitCtxTxIn ApiEra
     f GYTxInWitnessKey = Api.KeyWitness Api.KeyWitnessForSpending
     f (GYTxInWitnessScript v d r) =
         Api.ScriptWitness Api.ScriptWitnessForSpending $ g v

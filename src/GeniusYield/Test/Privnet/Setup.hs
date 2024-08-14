@@ -141,10 +141,6 @@ withPrivnet testnetOpts setupUser = do
             , testnetMagic
             } <- cardanoTestnetDefault testnetOpts conf
 
-        era <- case cardanoNodeEra testnetOpts of
-            Api.AnyCardanoEra Api.BabbageEra -> pure GYBabbage
-            Api.AnyCardanoEra Api.ConwayEra -> pure GYConway
-            Api.AnyCardanoEra x -> liftIO . die $ printf "Unsupported era: %s" (show x)
         liftIO . STM.atomically
             $ STM.writeTMVar tmvRuntime PrivnetRuntime
                 -- TODO: Consider obtaining everything here from shelleyGenesis rather than testnetOpts.
@@ -155,9 +151,8 @@ withPrivnet testnetOpts setupUser = do
                         . poolRuntime
                         $ head poolNodes
                 , runtimeNetworkInfo = GYNetworkInfo
-                    { gyNetworkEra        = era
-                        -- TODO: Conway support.
-                    , gyNetworkEpochSlots = fromIntegral $ cardanoEpochLength testnetOpts
+                    { -- TODO: Conway support.
+                      gyNetworkEpochSlots = fromIntegral $ cardanoEpochLength testnetOpts
                     , gyNetworkMagic      = fromIntegral testnetMagic
                     }
                 , runtimeWallets = wallets
@@ -217,16 +212,14 @@ withPrivnet testnetOpts setupUser = do
         debug $ printf "slotOfCurrentBlock = %s\n" slot
 
         withLCIClient info [] $ \lci -> do
-            let era = gyNetworkEra runtimeNetworkInfo
-
             let localLookupDatum :: GYLookupDatum
                 localLookupDatum = lciLookupDatum lci
 
             let localAwaitTxConfirmed :: GYAwaitTx
-                localAwaitTxConfirmed = nodeAwaitTxConfirmed era info
+                localAwaitTxConfirmed = nodeAwaitTxConfirmed info
 
             let localQueryUtxo :: GYQueryUTxO
-                localQueryUtxo = nodeQueryUTxO era info
+                localQueryUtxo = nodeQueryUTxO info
 
             let localGetParams :: GYGetParameters
                 localGetParams = nodeGetParameters info

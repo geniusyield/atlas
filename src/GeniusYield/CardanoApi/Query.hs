@@ -10,7 +10,6 @@ module GeniusYield.CardanoApi.Query (
     -- * Low-level query runners
     queryCardanoMode,
     queryConwayEra,
-    queryBabbageEra,
     queryUTxO,
     -- * Exception
     CardanoQueryException (..),
@@ -44,21 +43,12 @@ queryCardanoMode info q = do
         Left err -> throwIO $ CardanoQueryException $ show err
         Right x  -> return x
 
-queryConwayEra :: Api.LocalNodeConnectInfo -> Api.QueryInShelleyBasedEra Api.ConwayEra a -> IO a
+queryConwayEra :: Api.LocalNodeConnectInfo -> Api.QueryInShelleyBasedEra ApiEra a -> IO a
 queryConwayEra info q = do
     e <- queryCardanoMode info $ Api.QueryInEra $ Api.QueryInShelleyBasedEra Api.ShelleyBasedEraConway q
     case e of
         Left err -> throwIO $ CardanoQueryException $ show err
         Right x  -> return x
 
-queryBabbageEra :: Api.LocalNodeConnectInfo -> Api.QueryInShelleyBasedEra Api.BabbageEra a -> IO a
-queryBabbageEra info q = do
-    e <- queryCardanoMode info $ Api.QueryInEra $ Api.QueryInShelleyBasedEra Api.ShelleyBasedEraBabbage q
-    case e of
-        Left err -> throwIO $ CardanoQueryException $ show err
-        Right x  -> return x
-
-
-queryUTxO :: GYEra -> Api.S.LocalNodeConnectInfo -> Api.QueryUTxOFilter -> IO GYUTxOs
-queryUTxO GYBabbage info q = fmap utxosFromApi $ queryBabbageEra info $ Api.QueryUTxO q
-queryUTxO GYConway  info q = fmap utxosFromApi $ queryConwayEra  info $ Api.QueryUTxO q
+queryUTxO :: Api.S.LocalNodeConnectInfo -> Api.QueryUTxOFilter -> IO GYUTxOs
+queryUTxO info q = fmap utxosFromApi $ queryConwayEra info $ Api.QueryUTxO q

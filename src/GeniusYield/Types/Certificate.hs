@@ -26,6 +26,7 @@ import           GeniusYield.Types.Credential         (GYStakeCredential,
 import           GeniusYield.Types.Delegatee          (GYDelegatee,
                                                        delegateeFromLedger,
                                                        delegateeToLedger)
+import           GeniusYield.Types.Era
 import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters,
                                                        protocolParametersToApi)
 import           GHC.Natural                          (Natural)
@@ -58,7 +59,7 @@ finaliseCert (protocolParametersToApi -> pp) = \case
     Ledger.Coin ppDep = pp ^. Ledger.ppKeyDepositL
     ppDep' :: Natural = fromIntegral ppDep
 
-certificateToApi :: GYCertificate -> Api.Certificate Api.ConwayEra
+certificateToApi :: GYCertificate -> Api.Certificate ApiEra
 certificateToApi = \case
   GYStakeAddressRegistrationCertificate dep sc -> Api.makeStakeAddressRegistrationCertificate
     . Api.StakeAddrRegistrationConway Api.ConwayEraOnwardsConway (fromIntegral dep) $ f sc
@@ -71,7 +72,7 @@ certificateToApi = \case
     f = stakeCredentialToApi
     g = delegateeToLedger
 
-certificateFromApiMaybe :: Api.Certificate Api.ConwayEra -> Maybe GYCertificate
+certificateFromApiMaybe :: Api.Certificate ApiEra -> Maybe GYCertificate
 certificateFromApiMaybe (Api.ConwayCertificate _ x) = case x of
   Ledger.ConwayTxCertDeleg delCert -> case delCert of
     Ledger.ConwayRegCert sc (Ledger.SJust dep) -> Just $ GYStakeAddressRegistrationCertificate (fromIntegral dep) (f sc)

@@ -12,7 +12,6 @@ module GeniusYield.Types.NetworkId
     , networkIdToApi
     , networkIdToLedger
     , networkIdToEpochSlots
-    , networkIdToEra
     ) where
 
 import qualified Cardano.Api              as Api
@@ -21,8 +20,6 @@ import qualified Data.Aeson.Types         as Aeson
 import qualified Data.Text                as T
 import           Data.Word                (Word32, Word64)
 import           Deriving.Aeson
-
-import           GeniusYield.Types.Era
 
 -- $setup
 --
@@ -57,18 +54,9 @@ networkIdToEpochSlots GYTestnetPreprod    = Api.EpochSlots 432000
 networkIdToEpochSlots GYTestnetPreview    = Api.EpochSlots 86400
 networkIdToEpochSlots GYTestnetLegacy     = Api.EpochSlots 432000
 
--- This needs to be updated whenever a hardfork happens.
-networkIdToEra :: GYNetworkId -> GYEra
-networkIdToEra (GYPrivnet netInfo) = gyNetworkEra netInfo
-networkIdToEra GYMainnet           = GYBabbage
-networkIdToEra GYTestnetPreprod    = GYBabbage
-networkIdToEra GYTestnetPreview    = GYBabbage
-networkIdToEra GYTestnetLegacy     = GYBabbage
-
 data GYNetworkInfo = GYNetworkInfo
     { gyNetworkMagic      :: !Word32
     , gyNetworkEpochSlots :: !Word64
-    , gyNetworkEra        :: !GYEra
     }
     deriving (Show, Read, Eq, Ord, Generic)
     deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "gy", CamelToSnake]] GYNetworkInfo

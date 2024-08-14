@@ -60,6 +60,7 @@ import qualified Text.Printf                as Printf
 import           Data.Maybe                 (isNothing)
 import           GeniusYield.Types.Address
 import           GeniusYield.Types.Datum
+import           GeniusYield.Types.Era
 import           GeniusYield.Types.Script
 import           GeniusYield.Types.TxOutRef
 import           GeniusYield.Types.Value
@@ -115,15 +116,15 @@ utxosFromApi (Api.UTxO m) = utxosFromList
     | (txIn, out) <- Map.toList m
     ]
 
-utxosToApi :: GYUTxOs -> Api.UTxO Api.ConwayEra
+utxosToApi :: GYUTxOs -> Api.UTxO ApiEra
 utxosToApi (GYUTxOs m) = Api.UTxO $ Map.foldlWithKey' f Map.empty m
   where
-    f :: Map Api.TxIn (Api.TxOut Api.CtxUTxO Api.ConwayEra)
+    f :: Map Api.TxIn (Api.TxOut Api.CtxUTxO ApiEra)
       -> GYTxOutRef -> (GYAddress, GYValue, GYOutDatum, Maybe (Some GYScript))
-      -> Map Api.TxIn (Api.TxOut Api.CtxUTxO Api.ConwayEra)
+      -> Map Api.TxIn (Api.TxOut Api.CtxUTxO ApiEra)
     f m' oref out = Map.insert (txOutRefToApi oref) (g out) m'
 
-    g :: (GYAddress, GYValue, GYOutDatum, Maybe (Some GYScript)) -> Api.TxOut Api.CtxUTxO Api.ConwayEra
+    g :: (GYAddress, GYValue, GYOutDatum, Maybe (Some GYScript)) -> Api.TxOut Api.CtxUTxO ApiEra
     g (addr, v, md, ms) = Api.TxOut
         (addressToApi' addr)
         (valueToApiTxOutValue v)
@@ -136,7 +137,7 @@ utxosToApi (GYUTxOs m) = Api.UTxO $ Map.foldlWithKey' f Map.empty m
     outDatumToApi (GYOutDatumInline d) =
       Api.TxOutDatumInline Api.BabbageEraOnwardsConway $ datumToApi' d
 
-utxoFromApi :: Api.TxIn -> Api.TxOut Api.CtxTx Api.ConwayEra -> GYUTxO
+utxoFromApi :: Api.TxIn -> Api.TxOut Api.CtxTx ApiEra -> GYUTxO
 utxoFromApi txIn (Api.TxOut a v d s) = GYUTxO
     { utxoRef       = txOutRefFromApi txIn
     , utxoAddress   = addressFromApi' a
@@ -145,7 +146,7 @@ utxoFromApi txIn (Api.TxOut a v d s) = GYUTxO
     , utxoRefScript = someScriptFromReferenceApi s
     }
   where
-    f :: Api.TxOutDatum Api.CtxTx Api.ConwayEra -> GYOutDatum
+    f :: Api.TxOutDatum Api.CtxTx ApiEra -> GYOutDatum
     f Api.TxOutDatumNone          = GYOutDatumNone
     f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
     f (Api.TxOutDatumInTx _ sd)   = GYOutDatumHash . hashDatum $ datumFromApi' sd

@@ -158,7 +158,6 @@ withCfgProviders
       (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo) <- case cfgCoreProvider of
         GYNodeKupo path kupoUrl -> do
           let info = nodeConnectInfo path cfgNetworkId
-              era = networkIdToEra cfgNetworkId
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
           nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetSlotOfCurrentBlock info
           pure

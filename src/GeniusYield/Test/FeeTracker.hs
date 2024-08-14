@@ -13,7 +13,8 @@ module GeniusYield.Test.FeeTracker (
   ftgLift,
   ftLift,
   withWalletBalancesCheckSimple,
-  withWalletBalancesCheckSimpleIgnoreMinDepFor
+  withWalletBalancesCheckSimpleIgnoreMinDepFor,
+  withoutFeeTracking
 ) where
 
 import           Control.Monad.Except
@@ -25,6 +26,10 @@ import qualified Data.Map.Strict            as M
 import           Data.Monoid
 import qualified Data.Set                   as S
 import qualified Data.Text                  as T
+import qualified Data.Text.Lazy as LT
+import qualified Data.Text.Lazy.Encoding as LTE
+
+import qualified Data.Aeson as Aeson
 
 import           GeniusYield.HTTP.Errors    (someBackendError)
 import           GeniusYield.Imports
@@ -34,8 +39,14 @@ import           GeniusYield.Types
 type FeesLovelace = Sum Integer
 type MinAdaLovelace = Sum Integer
 
--- | Extra lovelace consumed by tx fees and utxo min ada deposits for the transactions submitted by a user.
-data UserExtraLovelace = UserExtraLovelace { uelFees :: FeesLovelace, uelMinAda :: MinAdaLovelace }
+-- | Extra lovelaces that were gained or lost by a user which a smart contract need not be expecting.
+data UserExtraLovelace = UserExtraLovelace
+    { uelFees   :: !FeesLovelace
+    -- ^ Lovelaces lost to fees.
+    , uelMinAda :: !MinAdaLovelace
+    -- ^ Lovelaces lost to min ada deposit(s).
+    -- Also takes into account any min ada deposit _gained_ from utxo(s).
+    }
   deriving stock (Eq, Ord, Show)
 
 instance Semigroup UserExtraLovelace where
@@ -44,22 +55,21 @@ instance Semigroup UserExtraLovelace where
 instance Monoid UserExtraLovelace where
     mempty = UserExtraLovelace mempty mempty
 
--- | Track extra lovelace per transaction and submitted transactions. Only the submitted transactions' extra
--- lovelace is considered in the end.
-data FeeTrackerState = FeeTrackerState { feesPerTx :: !(Map GYTxId UserExtraLovelace), submittedTxIds :: ![GYTxId] }
+-- | Track extra lovelace per user.
+-- Note: This does the tracking during tranasaction building.
+-- If you do not wish to submit said transaction, you should not have it tracked.
+-- Use 'ignoreFeeTracking . buildTxBody' etc in those cases.
+newtype FeeTrackerState = FeeTrackerState { feesPerUser :: Map GYPubKeyHash UserExtraLovelace }
   deriving stock (Eq, Ord, Show)
 
 instance Semigroup FeeTrackerState where
-    FeeTrackerState fees txIds <> FeeTrackerState fees' txIds' = FeeTrackerState (M.unionWith (<>) fees fees') (txIds <> txIds')
+    FeeTrackerState fees <> FeeTrackerState fees' = FeeTrackerState (M.unionWith (<>) fees fees')
 
 instance Monoid FeeTrackerState where
-    mempty = FeeTrackerState mempty mempty
+    mempty = FeeTrackerState mempty
 
-insertFeesPerTx :: GYTxId -> UserExtraLovelace -> FeeTrackerState -> FeeTrackerState
-insertFeesPerTx txId extraLovelace st = st { feesPerTx = M.insert txId extraLovelace $ feesPerTx st }
-
-addSubmittedTx :: GYTxId -> FeeTrackerState -> FeeTrackerState
-addSubmittedTx txId st = st { submittedTxIds = txId : submittedTxIds st }
+stSingleton :: GYPubKeyHash -> UserExtraLovelace -> FeeTrackerState
+stSingleton k = FeeTrackerState . M.singleton k
 
 -- | A wrapper around 'GYTxMonad' that "injects" code around transaction building and submitting to track fees.
 newtype FeeTracker m a = FeeTracker (FeeTrackerState -> m (a, FeeTrackerState))
@@ -71,6 +81,7 @@ newtype FeeTracker m a = FeeTracker (FeeTrackerState -> m (a, FeeTrackerState))
            , GYTxQueryMonad
            , GYTxSpecialQueryMonad
            , GYTxUserQueryMonad
+           , GYTxMonad
            )
   via StateT FeeTrackerState m
 
@@ -87,34 +98,33 @@ ftLift act = FeeTracker $ \s -> (, s) <$> act
 -- | Override given transaction building function to track extra lovelace per transaction.
 wrapBodyBuilder :: GYTxUserQueryMonad m => ([GYTxSkeleton v] -> m GYTxBuildResult) -> [GYTxSkeleton v] -> FeeTracker m GYTxBuildResult
 wrapBodyBuilder f skeletons = do
-    userAddress <- ownChangeAddress
+    ownPkh <- ownChangeAddress >>= addressToPubKeyHash'
     res <- ftLift $ f skeletons
-    let helpers txBodies = forM_ (zip skeletons (NE.toList txBodies)) (helper userAddress)
+    let helpers txBodies = forM_ (zip skeletons (NE.toList txBodies)) (helper ownPkh)
     case res of
         GYTxBuildSuccess          txBodies -> helpers txBodies
         GYTxBuildPartialSuccess _ txBodies -> helpers txBodies
         _ -> pure ()
     pure res
   where
-
-    helper userAddress (skeleton, txBody) = do
-        let txId = txBodyTxId txBody
+    helper ownPkh (skeleton, txBody) = do
             -- Actual outputs with their blueprints (counterpart from skeleton)
             -- NOTE: This relies on proper ordering. 'txBodyUTxOs txBody' is expected to have the same order
             -- as the outputs in the skeleton. The extra balancing outputs at the end of the list of 'txBodyUTxOs txBody'
             -- should be truncated by 'zip'.
-            outsWithBlueprint = zip (gytxOuts skeleton) . utxosToList $ txBodyUTxOs txBody
-        modify' . insertFeesPerTx txId $ UserExtraLovelace
-            { uelFees    = Sum $ txBodyFee txBody
-            , uelMinAda  = Sum . flip valueAssetClass GYLovelace $
-                foldMap'
+        let outsWithBlueprint = zip (gytxOuts skeleton) . utxosToList $ txBodyUTxOs txBody
+            feeExtraLovelace = stSingleton ownPkh mempty { uelFees = Sum $ txBodyFee txBody }
+            depositsExtraLovelace = foldMap'
                 (\(blueprint, actual) ->
-                    -- If this additional ada is coming back to one's own self, we need not account for it.
-                    if gyTxOutAddress blueprint == userAddress then mempty
-                    else utxoValue actual `valueMinus` gyTxOutValue blueprint
+                    let targetAddr = gyTxOutAddress blueprint
+                        deposit = Sum . flip valueAssetClass GYLovelace $ utxoValue actual `valueMinus` gyTxOutValue blueprint
+                        -- These two will cancel out if the ada is going to own address.
+                        ownLostDeposit = stSingleton ownPkh mempty { uelMinAda = deposit }
+                        otherGainedDeposit = maybe mempty (`stSingleton` mempty { uelMinAda = negate deposit }) $ addressToPubKeyHash targetAddr
+                    in ownLostDeposit <> otherGainedDeposit
                 )
                 outsWithBlueprint
-            }
+        modify' (\prev -> prev <> feeExtraLovelace <> depositsExtraLovelace)
 
 -- | Override transaction building code of the inner monad to track extra lovelace per transaction.
 instance GYTxBuilderMonad m => GYTxBuilderMonad (FeeTracker m) where
@@ -127,42 +137,36 @@ instance GYTxBuilderMonad m => GYTxBuilderMonad (FeeTracker m) where
     buildTxBodyParallelWithStrategy strat = wrapBodyBuilder $ buildTxBodyParallelWithStrategy strat
     buildTxBodyChainingWithStrategy strat = wrapBodyBuilder $ buildTxBodyChainingWithStrategy strat
 
--- | Override transaction submitting code of the inner monad to track submitted transaction ids.
-instance GYTxMonad m => GYTxMonad (FeeTracker m) where
-    signTxBody = ftLift . signTxBody
-    signTxBodyWithStake = ftLift . signTxBodyWithStake
-    submitTx tx = do
-        txId <- ftLift $ submitTx tx
-        modify $ addSubmittedTx txId
-        pure txId
-    awaitTxConfirmed' p = ftLift . awaitTxConfirmed' p
+-- | Run an action and ignore any tracked fees.
+-- Useful for building a tx body without the intent to submit it later. Thereby ignoring all the tracked fees
+-- from that txbody that won't actually take effect in the wallet (since it won't be submitted).
+withoutFeeTracking :: Monad m => FeeTracker m a -> FeeTracker m a
+withoutFeeTracking act = do
+    s <- get
+    a <- act
+    put s
+    pure a
 
 -- | A wrapper around 'GYTxGameMonad' that uses 'FeeTracker' as its 'GYTxMonad' to track extra lovelaces per transaction.
-newtype FeeTrackerGame m a = FeeTrackerGame (Map GYAddress FeeTrackerState -> m (a, Map GYAddress FeeTrackerState))
+newtype FeeTrackerGame m a = FeeTrackerGame (FeeTrackerState -> m (a, FeeTrackerState))
   deriving ( Functor
            , Applicative
            , Monad
-           , MonadState (Map GYAddress FeeTrackerState)
+           , MonadState FeeTrackerState
            , MonadRandom
            , GYTxQueryMonad
            , GYTxSpecialQueryMonad
            )
-  via StateT (Map GYAddress FeeTrackerState) m
+  via StateT FeeTrackerState m
 
 -- The context cannot be inferred since it contains non-type variables (i.e 'GYTxMonadException')
 -- Must use standalone deriving with explicit context.
 deriving
-  via StateT (Map GYAddress FeeTrackerState) m
+  via StateT FeeTrackerState m
   instance MonadError GYTxMonadException m => MonadError GYTxMonadException (FeeTrackerGame m)
 
 evalFtg :: Functor f => FeeTrackerGame f b -> f b
 evalFtg (FeeTrackerGame act) = fst <$> act mempty
-
--- | Convert 'FeeTrackerState' to the effective extra lovelace map per user. Filtering out irrelevant transactions (not submitted).
-walletExtraLovelace :: Map GYAddress FeeTrackerState -> Map GYAddress UserExtraLovelace
-walletExtraLovelace m = M.map (\FeeTrackerState {feesPerTx} -> foldMap snd . filter ((`S.member` validTxIds) . fst) $ M.assocs feesPerTx) m
-  where
-    validTxIds = S.fromList . concatMap submittedTxIds $ M.elems m
 
 -- | Perform a special action supported by the specific wrapped monad instance by lifting it to 'FeeTrackerGame'.
 ftgLift :: Functor m => m a -> FeeTrackerGame m a
@@ -170,9 +174,7 @@ ftgLift act = FeeTrackerGame $ \s -> (, s) <$> act
 
 instance GYTxGameMonad m => GYTxGameMonad (FeeTrackerGame m) where
     type TxMonadOf (FeeTrackerGame m) = FeeTracker (TxMonadOf m)
-    asUser u (FeeTracker act) = FeeTrackerGame $ \s -> do
-        (a, innerS) <- asUser u $ act mempty
-        pure (a, M.insertWith (<>) (userChangeAddress u) innerS s)
+    asUser u (FeeTracker act) = FeeTrackerGame $ asUser u . act
     waitUntilSlot = ftgLift . waitUntilSlot
     waitForNextBlock = ftgLift waitForNextBlock
 
@@ -214,16 +216,32 @@ withWalletBalancesCheckSimpleIgnoreMinDepFor :: GYTxGameMonad m => [(User, GYVal
 withWalletBalancesCheckSimpleIgnoreMinDepFor wallValueDiffs ignoreMinDepFor m = evalFtg $ do
     bs <- mapM (queryBalances . userAddresses' . fst) wallValueDiffs
     a <- m
-    walletExtraLovelaceMap <- gets walletExtraLovelace
+    walletExtraLovelaceMap <- gets feesPerUser
     bs' <- mapM (queryBalances . userAddresses' . fst) wallValueDiffs
 
     forM_ (zip3 wallValueDiffs bs' bs) $
         \((w, v), b', b) ->
-        let addr = userChangeAddress w
-            newBalance = case M.lookup addr walletExtraLovelaceMap of
+        let pkh = userPkh w
+            newBalance = case M.lookup pkh walletExtraLovelaceMap of
                 Nothing -> b'
                 Just UserExtraLovelace {uelFees, uelMinAda} -> b' <> valueFromLovelace (getSum $ uelFees <> if w `S.member` ignoreMinDepFor then mempty else uelMinAda)
             diff = newBalance `valueMinus` b
         in unless (diff == v) . throwAppError . someBackendError . T.pack $
-            printf "Wallet: %s. Old balance: %s. New balance: %s. New balance after adding extra lovelaces %s. Expected balance difference of %s, but the actual difference was %s" addr b b' newBalance v diff
+            printf
+                (  "Wallet PKH: %s.\n"
+                ++ "Old balance: %s.\n"
+                ++ "New balance: %s.\n"
+                ++ "New balance after adding extra lovelaces %s.\n"
+                ++ "    Expected balance difference of: %s\n"
+                ++ "    But the actual difference was: %s"
+                )
+                (encodeJsonText pkh)
+                (encodeJsonText b)
+                (encodeJsonText b')
+                (encodeJsonText newBalance)
+                (encodeJsonText v)
+                (encodeJsonText diff)
     pure a
+  where
+    encodeJsonText :: ToJSON a => a -> Text
+    encodeJsonText = LT.toStrict . LTE.decodeUtf8 . Aeson.encode

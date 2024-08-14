@@ -31,6 +31,7 @@ module GeniusYield.Types.Datum (
 
 import qualified Cardano.Api                          as Api
 import           Control.Monad                        ((>=>))
+import qualified Data.Aeson                           as Aeson
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString.Base16               as Base16
 import qualified Data.ByteString.Char8                as BS8
@@ -48,6 +49,10 @@ import qualified Cardano.Api.Shelley                  as Api
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
 import qualified Web.HttpApiData                      as Web
+
+-- $setup
+--
+-- >>> :set -XOverloadedStrings -XTypeApplications
 
 -- | Datum
 --
@@ -97,6 +102,26 @@ unitDatum = datumFromPlutusData ()
 -- | Returns the 'GYDatumHash' of the given 'GYDatum'
 hashDatum :: GYDatum -> GYDatumHash
 hashDatum = datumHashFromApi . Api.hashScriptDataBytes . datumToApi'
+
+-------------------------------------------------------------------------------
+-- aeson
+-------------------------------------------------------------------------------
+
+-- | Datums use cardano-api's detailed schema for JSON representation.
+--
+-- >>> Aeson.decode @GYDatum "{\"constructor\":0,\"fields\":[{\"int\":42},{\"list\":[{\"bytes\":\"\"}]}]}"
+-- Just (GYDatum Constr 0 [I 42,List [B ""]])
+--
+instance Aeson.FromJSON GYDatum where
+    parseJSON = either (fail . show) (pure . datumFromApi') . Api.scriptDataFromJsonDetailedSchema
+
+-- |
+--
+-- >>> BS8.putStrLn . Aeson.encode . GYDatum . PlutusTx.dataToBuiltinData $ PlutusTx.Constr 0 [ PlutusTx.I 42, PlutusTx.List [ PlutusTx.B "" ] ]
+-- "{\"constructor\":0,\"fields\":[{\"int\":42},{\"list\":[{\"bytes\":\"\"}]}]}"
+--
+instance Aeson.ToJSON GYDatum where
+    toJSON = Api.scriptDataToJsonDetailedSchema . datumToApi'
 
 -------------------------------------------------------------------------------
 -- DatumHash

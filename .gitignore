@@ -28,3 +28,4 @@ blockfrost-config.json
 *.skey
 .direnv
 secrets/
+.vscode

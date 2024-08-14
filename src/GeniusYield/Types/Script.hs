@@ -767,6 +767,7 @@ scriptFromCBOR' b = do
     case singPlutusVersion @v of
       SingPlutusV1 -> fmap scriptFromApi $ rightToMaybe $ flip Api.deserialiseFromRawBytes bs $ Api.AsPlutusScript $ Api.proxyToAsType $ Proxy @(PlutusVersionToApi v)
       SingPlutusV2 -> fmap scriptFromApi $ rightToMaybe $ flip Api.deserialiseFromRawBytes bs $ Api.AsPlutusScript $ Api.proxyToAsType $ Proxy @(PlutusVersionToApi v)
+      SingPlutusV3 -> fmap scriptFromApi $ rightToMaybe $ flip Api.deserialiseFromRawBytes bs $ Api.AsPlutusScript $ Api.proxyToAsType $ Proxy @(PlutusVersionToApi v)
 
 scriptPlutusHash :: GYScript v -> PlutusV1.ScriptHash
 scriptPlutusHash = apiHashToPlutus . scriptApiHash
@@ -791,6 +792,10 @@ scriptToApiPlutusScriptWitness (GYScript v api _) = case v of
     SingPlutusV2 -> Api.PlutusScriptWitness
         Api.PlutusScriptV2InConway
         Api.PlutusScriptV2
+        (Api.S.PScript api)
+    SingPlutusV3 -> Api.PlutusScriptWitness
+        Api.PlutusScriptV3InConway
+        Api.PlutusScriptV3
         (Api.S.PScript api)
 
 referenceScriptToApiPlutusScriptWitness
@@ -830,11 +835,18 @@ readScript file = case singPlutusVersion @v of
             Left (err :: Api.FileError Api.TextEnvelopeError) -> throwIO $ userError $ show err
             Right s                                           -> return $ scriptFromApi s
 
+    SingPlutusV3 -> do
+        e <- Api.readFileTextEnvelope (Api.AsPlutusScript Api.AsPlutusScriptV3) (Api.File file)
+        case e of
+            Left (err :: Api.FileError Api.TextEnvelopeError) -> throwIO $ userError $ show err
+            Right s                                           -> return $ scriptFromApi s
+
 writeScriptCore :: forall v. Api.S.TextEnvelopeDescr -> FilePath -> GYScript v -> IO ()
 writeScriptCore desc file s = do
     e <- case scriptVersion @v s of
         SingPlutusV1 -> Api.writeFileTextEnvelope (Api.File file) (Just desc) $ scriptToApi s
         SingPlutusV2 -> Api.writeFileTextEnvelope (Api.File file) (Just desc) $ scriptToApi s
+        SingPlutusV3 -> Api.writeFileTextEnvelope (Api.File file) (Just desc) $ scriptToApi s
     case e of
         Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
         Right ()                       -> return ()

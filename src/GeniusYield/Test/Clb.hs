@@ -343,14 +343,17 @@ instance GYTxUserQueryMonad GYTxMonadClb where
         addrs <- ownAddresses
         utxos <- availableUTxOs
         case lang of
-          PlutusV2 ->
-            case someTxOutRef utxos of
-                Nothing       -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress addrs
-                Just (ref, _) -> return ref
+          PlutusV3 -> ifNotV1 utxos addrs
+          PlutusV2 -> ifNotV1 utxos addrs
           PlutusV1 ->
             case find utxoTranslatableToV1 $ utxosToList utxos of
               Just u  -> return $ utxoRef u
               Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
+        where
+          ifNotV1 utxos addrs =
+            case someTxOutRef utxos of
+                Nothing       -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress addrs
+                Just (ref, _) -> return ref
 
 instance GYTxMonad GYTxMonadClb where
     signTxBody = signTxBodyImpl . asks $ userPaymentSKey . runEnvWallet

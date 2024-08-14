@@ -177,9 +177,7 @@ library
     , containers           
     , data-default         
     , deriving-aeson       
-    , directory            
     , either               
-    , filepath             
     , hashable             
     , hedgehog             
     , hedgehog-extras      
@@ -240,11 +238,9 @@ library
     , cardano-ledger-conway
     , cardano-ledger-shelley
     , cardano-ledger-alonzo
-    , cardano-ledger-babbage
     , cardano-ledger-binary
     , cardano-ledger-shelley
     , cardano-slotting
-    , cardano-strict-containers
     , cardano-testnet
     , cardano-wallet-primitive
     , ouroboros-consensus
@@ -309,7 +305,6 @@ test-suite atlas-tests
     , base
     , bytestring
     , cardano-api
-    , cardano-ledger-alonzo
     , clb
     , containers
     , data-default
@@ -379,7 +374,6 @@ test-suite atlas-unified-tests
     , base
     , containers
     , tasty
-    , tasty-hunit
     , text
     , mtl
     -- OnChain

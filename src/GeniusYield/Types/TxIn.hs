@@ -60,6 +60,7 @@ data GYInScript (u :: PlutusVersion) where
 inScriptVersion :: GYInScript v -> PlutusVersion
 inScriptVersion (GYInReference _ _) = PlutusV2
 inScriptVersion (GYInScript v)      = case validatorVersion v of
+    SingPlutusV3 -> PlutusV3
     SingPlutusV2 -> PlutusV2
     SingPlutusV1 -> PlutusV1
 

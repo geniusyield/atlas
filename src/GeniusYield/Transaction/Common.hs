@@ -11,34 +11,33 @@ Stability   : develop
 module GeniusYield.Transaction.Common (
     GYBalancedTx (..),
     GYTxInDetailed (..),
+    utxoFromTxInDetailed,
     GYBuildTxError (..),
     GYBalancingError (..),
     minimumUTxO,
     adjustTxOut
 ) where
 
-import qualified Cardano.Api                  as Api
-import qualified Cardano.Api.Shelley          as Api.S
-import qualified Cardano.Ledger.Coin          as Ledger
-
-import qualified Cardano.Ledger.Alonzo.Core   as Ledger
-
-import qualified Text.Printf                  as Printf
-
+import qualified Cardano.Api                          as Api
+import qualified Cardano.Api.Shelley                  as Api.S
+import qualified Cardano.Ledger.Coin                  as Ledger
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Types.Address
+import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters,
+                                                       protocolParametersToApi)
 import           GeniusYield.Types.PubKeyHash
 import           GeniusYield.Types.Redeemer
 import           GeniusYield.Types.Script
 import           GeniusYield.Types.Slot
-import           GeniusYield.Types.TxCert
+import           GeniusYield.Types.TxCert.Internal
 import           GeniusYield.Types.TxIn
 import           GeniusYield.Types.TxMetadata
 import           GeniusYield.Types.TxOut
 import           GeniusYield.Types.TxWdrl
 import           GeniusYield.Types.UTxO
 import           GeniusYield.Types.Value
+import qualified Text.Printf                          as Printf
 
 
 {- | An *almost* finalized Tx.
@@ -52,7 +51,7 @@ data GYBalancedTx v = GYBalancedTx
     , gybtxOuts          :: ![GYTxOut v]
     , gybtxMint          :: !(Maybe (GYValue, [(GYMintScript v, GYRedeemer)]))
     , gybtxWdrls         :: ![GYTxWdrl v]
-    , gybtxCerts         :: ![GYTxCert v]
+    , gybtxCerts         :: ![GYTxCert' v]
     , gybtxInvalidBefore :: !(Maybe GYSlot)
     , gybtxInvalidAfter  :: !(Maybe GYSlot)
     , gybtxSigners       :: !(Set GYPubKeyHash)
@@ -69,6 +68,9 @@ data GYTxInDetailed v = GYTxInDetailed
     , gyTxInDetScriptRef :: !(Maybe (Some GYScript))
     }
   deriving (Eq, Show)
+
+utxoFromTxInDetailed :: GYTxInDetailed v -> GYUTxO
+utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref _witns) addr val d ms) = GYUTxO ref addr val d ms
 
 -------------------------------------------------------------------------------
 -- Transaction Building Errors
@@ -98,7 +100,7 @@ instance Eq GYBalancingError where
 -- Insufficient funds and similar are considered trivial transaction building errors.
 data GYBuildTxError
     = GYBuildTxBalancingError !GYBalancingError
-    | GYBuildTxBodyErrorAutoBalance !(Api.TxBodyErrorAutoBalance Api.S.BabbageEra)
+    | GYBuildTxBodyErrorAutoBalance !(Api.TxBodyErrorAutoBalance Api.S.ConwayEra)
     | GYBuildTxPPConversionError !Api.ProtocolParametersConversionError
     | GYBuildTxMissingMaxExUnitsParam
     -- ^ Missing max ex units in protocol params
@@ -122,9 +124,9 @@ data GYBuildTxError
 -- Transaction Utilities
 -------------------------------------------------------------------------------
 
-minimumUTxO :: Ledger.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra) -> GYTxOut v -> Natural
+minimumUTxO :: GYProtocolParameters -> GYTxOut v -> Natural
 minimumUTxO pp txOut = fromInteger $ coerce $
-  Api.calculateMinimumUTxO Api.ShelleyBasedEraBabbage (txOutToApi txOut) pp
+  Api.calculateMinimumUTxO Api.ShelleyBasedEraConway (txOutToApi txOut) $ protocolParametersToApi pp
 
 adjustTxOut :: (GYTxOut v -> Natural) -> GYTxOut v -> GYTxOut v
 adjustTxOut minimumUTxOF = helper

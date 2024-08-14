@@ -16,7 +16,7 @@ import qualified Cardano.Api                              as Api
 import qualified Cardano.Api.Shelley                      as Api.S
 import           Control.Applicative                      ((<|>))
 import           Control.Concurrent                       (threadDelay)
-import           Control.Lens                             ((.~))
+import           Control.Lens                             ((.~), (^.))
 import           Test.Tasty                               (TestTree, testGroup)
 import           Test.Tasty.HUnit                         (testCaseSteps)
 
@@ -25,6 +25,8 @@ import           Data.Maybe                               (fromJust)
 import           Data.Ratio                               ((%))
 import qualified Data.Set                                 as Set
 
+import           Cardano.Ledger.Alonzo.PParams            (AlonzoEraPParams (hkdCollateralPercentageL),
+                                                           ppCollateralPercentageL)
 import           GeniusYield.Examples.Gift
 import           GeniusYield.Examples.Treat
 import           GeniusYield.Imports
@@ -35,6 +37,7 @@ import           GeniusYield.Test.Privnet.Examples.Common
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
+import           GeniusYield.Types.ProtocolParameters     (protocolParametersToApi)
 
 pattern InsufficientFundsException :: GYTxMonadException
 pattern InsufficientFundsException <- GYBuildTxException (GYBuildTxBalancingError (GYBalancingErrorInsufficientFunds _))
@@ -187,7 +190,7 @@ tests setup = testGroup "gift"
         pp <- gyGetProtocolParameters $ ctxProviders ctx
         let colls = txBodyCollateral grabGiftsTxBody'
         colls' <- ctxRunQuery ctx $ utxosAtTxOutRefs (Set.toList colls)
-        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
+        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ protocolParametersToApi pp ^. ppCollateralPercentageL)
         ctxRun ctx newUser $ signAndSubmitConfirmed_ grabGiftsTxBody'
 
     , testCaseSteps "Checking if collateral is reserved in case we send an exact 5 ada only UTxO as collateral (simulating browser's case) + is collateral spendable if we want?" $ \info -> withSetup info setup $ \ctx -> do
@@ -208,10 +211,10 @@ tests setup = testGroup "gift"
         -- Would have thrown error if unable to build body.
         void $ ctxRunBuilder ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
-    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when no UTxO is greater than or equal to maximum possible total collateral" $ \info -> withSetup info setup $ \ctx -> do
+    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when no UTxO is greater than or equal to maximum possible total collateral (assuming no reference scripts)" $ \info -> withSetup info setup $ \ctx -> do
         ----------- Create a new user and fund it
         pp <- gyGetProtocolParameters (ctxProviders ctx)
-        let newUserValue = maximumRequiredCollateralValue pp `valueMinus` valueFromLovelace 1
+        let newUserValue = maximumRequiredCollateralValue pp 0 `valueMinus` valueFromLovelace 1
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue def
 
         info $ printf "UTxOs at this new user"
@@ -219,10 +222,10 @@ tests setup = testGroup "gift"
         forUTxOs_ newUserUtxos (info . show)
         assertThrown (\case (GYBuildTxException GYBuildTxNoSuitableCollateral) -> True; _anyOther -> False) $ ctxRun ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
-    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when UTxO is greater than or equal to maximum possible total collateral but resulting return collateral doesn't satisfy minimum ada requirement" $ \info -> withSetup info setup $ \ctx -> do
+    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when UTxO is greater than or equal to maximum possible total collateral (assuming no reference scripts) but resulting return collateral doesn't satisfy minimum ada requirement" $ \info -> withSetup info setup $ \ctx -> do
         pp <- gyGetProtocolParameters (ctxProviders ctx)
         ----------- Create a new user and fund it
-        let newUserValue = maximumRequiredCollateralValue pp <> valueFromLovelace 0_500_000
+        let newUserValue = maximumRequiredCollateralValue pp 0 <> valueFromLovelace 0_500_000
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue def
 
         info $ printf "UTxOs at this new user"
@@ -233,7 +236,7 @@ tests setup = testGroup "gift"
     , testCaseSteps "No 'GYBuildTxNoSuitableCollateral' error is thrown when collateral input is sufficient" $ \info -> withSetup info setup $ \ctx -> do
         pp <- gyGetProtocolParameters (ctxProviders ctx)
         ----------- Create a new user and fund it
-        let newUserValue = maximumRequiredCollateralValue pp <> valueFromLovelace 1_500_000
+        let newUserValue = maximumRequiredCollateralValue pp 0 <> valueFromLovelace 1_500_000
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue def
 
         info $ printf "UTxOs at this new user"

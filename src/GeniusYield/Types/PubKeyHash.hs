@@ -14,12 +14,17 @@ module GeniusYield.Types.PubKeyHash (
     pubKeyHashToPlutus,
     pubKeyHashToApi,
     pubKeyHashFromApi,
+    pubKeyHashToLedger,
+    pubKeyHashFromLedger,
 ) where
 
 import           Control.Lens                 ((?~))
 import           GeniusYield.Imports
 
 import qualified Cardano.Api                  as Api
+import qualified Cardano.Api.Ledger           as Ledger
+import qualified Cardano.Api.Shelley          as Api
+import qualified Cardano.Ledger.Keys          as Ledger
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.Csv                     as Csv
 import qualified Data.Swagger                 as Swagger
@@ -99,6 +104,14 @@ pubKeyHashToApi = coerce
 --
 pubKeyHashFromApi :: Api.Hash Api.PaymentKey -> GYPubKeyHash
 pubKeyHashFromApi = coerce
+
+-- | Convert to corresponding ledger representation.
+pubKeyHashToLedger :: GYPubKeyHash -> Ledger.KeyHash (a :: Ledger.KeyRole) Ledger.StandardCrypto
+pubKeyHashToLedger = pubKeyHashToApi >>> Api.unPaymentKeyHash >>> Ledger.coerceKeyRole
+
+-- | Convert from corresponding ledger representation.
+pubKeyHashFromLedger :: Ledger.KeyHash (a :: Ledger.KeyRole) Ledger.StandardCrypto -> GYPubKeyHash
+pubKeyHashFromLedger = Ledger.coerceKeyRole >>> Api.PaymentKeyHash >>> pubKeyHashFromApi
 
 -- |
 --

@@ -86,9 +86,9 @@ instance Eq (GYInSimpleScript v) where
 txInToApi
     :: Bool   -- ^ does corresponding utxo contains inline datum?
     -> GYTxIn v
-    -> (Api.TxIn, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxTxIn Api.BabbageEra))
+    -> (Api.TxIn, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxTxIn Api.ConwayEra))
 txInToApi useInline (GYTxIn oref m) = (txOutRefToApi oref, Api.BuildTxWith $ f m) where
-    f :: GYTxInWitness v -> Api.Witness Api.WitCtxTxIn Api.BabbageEra
+    f :: GYTxInWitness v -> Api.Witness Api.WitCtxTxIn Api.ConwayEra
     f GYTxInWitnessKey = Api.KeyWitness Api.KeyWitnessForSpending
     f (GYTxInWitnessScript v d r) =
         Api.ScriptWitness Api.ScriptWitnessForSpending $ g v
@@ -96,7 +96,7 @@ txInToApi useInline (GYTxIn oref m) = (txOutRefToApi oref, Api.BuildTxWith $ f m
         (redeemerToApi r)
         (Api.ExecutionUnits 0 0)
     f (GYTxInWitnessSimpleScript v) =
-        Api.ScriptWitness Api.ScriptWitnessForSpending $ Api.SimpleScriptWitness Api.SimpleScriptInBabbage $ h v
+        Api.ScriptWitness Api.ScriptWitnessForSpending $ Api.SimpleScriptWitness Api.SimpleScriptInConway $ h v
 
     g (GYInScript v)        = validatorToApiPlutusScriptWitness v
     g (GYInReference ref s) = referenceScriptToApiPlutusScriptWitness ref s

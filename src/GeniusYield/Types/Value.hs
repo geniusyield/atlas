@@ -207,11 +207,11 @@ valueFromApiTxOutValue (Api.TxOutValueShelleyBased e v) =
   valueFromApi $ Api.fromLedgerValue e v
 
 -- FIXME: should we use Conway?
-valueToApiTxOutValue :: GYValue -> Api.TxOutValue Api.BabbageEra
+valueToApiTxOutValue :: GYValue -> Api.TxOutValue Api.ConwayEra
 valueToApiTxOutValue v =
   Api.TxOutValueShelleyBased
-    Api.ShelleyBasedEraBabbage
-    (Api.toLedgerValue Api.MaryEraOnwardsBabbage $ valueToApi v)
+    Api.ShelleyBasedEraConway
+    (Api.toLedgerValue Api.MaryEraOnwardsConway $ valueToApi v)
 
 -- | Create 'GYValue' from a list of asset class and amount.
 -- Duplicates are merged.

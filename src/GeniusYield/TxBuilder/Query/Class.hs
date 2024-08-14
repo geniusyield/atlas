@@ -8,23 +8,24 @@ Stability   : develop
 -}
 module GeniusYield.TxBuilder.Query.Class (GYTxQueryMonad (..), GYTxSpecialQueryMonad (..), GYTxUserQueryMonad (..)) where
 
-import qualified Cardano.Api                  as Api
-import qualified Cardano.Api.Shelley          as Api.S
-import           Control.Monad.Except         (MonadError (..))
-import qualified Control.Monad.State.Strict   as Strict
-import qualified Control.Monad.State.Lazy     as Lazy
-import qualified Control.Monad.Writer.CPS     as CPS
-import qualified Control.Monad.Writer.Strict  as Strict
-import qualified Control.Monad.Writer.Lazy    as Lazy
-import           Control.Monad.Random         (RandT, lift)
-import           Control.Monad.Reader         (ReaderT)
-import qualified Data.Map.Strict              as Map
-import           Data.Maybe                   (listToMaybe)
-import           GHC.Stack                    (withFrozenCallStack)
+import qualified Cardano.Api                          as Api
+import qualified Cardano.Api.Shelley                  as Api.S
+import           Control.Monad.Except                 (MonadError (..))
+import           Control.Monad.Random                 (RandT, lift)
+import           Control.Monad.Reader                 (ReaderT)
+import qualified Control.Monad.State.Lazy             as Lazy
+import qualified Control.Monad.State.Strict           as Strict
+import qualified Control.Monad.Writer.CPS             as CPS
+import qualified Control.Monad.Writer.Lazy            as Lazy
+import qualified Control.Monad.Writer.Strict          as Strict
+import qualified Data.Map.Strict                      as Map
+import           Data.Maybe                           (listToMaybe)
+import           GHC.Stack                            (withFrozenCallStack)
 
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters)
 
 -------------------------------------------------------------------------------
 -- Class
@@ -134,7 +135,7 @@ under the class method in question?
 class GYTxQueryMonad m => GYTxSpecialQueryMonad m where
     systemStart :: m Api.SystemStart
     eraHistory :: m Api.EraHistory
-    protocolParams :: m Api.S.ProtocolParameters
+    protocolParams :: m GYProtocolParameters
     stakePools :: m (Set Api.S.PoolId)
 
 -- | Class of monads for querying as a user.

@@ -120,8 +120,8 @@ makeSlotConfig sysStart eraHist = GYSlotConfig sysStart <$!> simplifiedEraSumms
             ++ " (Era Start bound should be 0)"
     toEraSlotConf :: Ouroboros.EraSummary -> GYEraSlotConfig
     toEraSlotConf Ouroboros.EraSummary
-        { eraStart=Ouroboros.Bound {boundTime, boundSlot}
-        , eraParams=Ouroboros.EraParams {eraSlotLength}
+        { eraStart = Ouroboros.Bound {boundTime, boundSlot}
+        , eraParams = Ouroboros.EraParams {eraSlotLength}
         } = GYEraSlotConfig { gyEraSlotStart = slotFromApi boundSlot, gyEraSlotLength = eraSlotLength, gyEraSlotZeroTime = boundTime }
     toNonEmpty :: Ouroboros.NonEmpty xs a -> NonEmpty a
     toNonEmpty (Ouroboros.NonEmptyOne x)     = x :| []

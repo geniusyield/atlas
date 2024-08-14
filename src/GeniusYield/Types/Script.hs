@@ -37,6 +37,9 @@ module GeniusYield.Types.Script (
     GYScriptHash,
     scriptHashFromApi,
     scriptHashToApi,
+    scriptHashFromLedger,
+    scriptHashToLedger,
+    scriptHashToPlutus,
 
     -- * MintingPolicy
     GYMintingPolicy,
@@ -114,6 +117,8 @@ module GeniusYield.Types.Script (
     mintingPolicyToScript,
     stakeValidatorToScript,
     scriptToApi,
+    scriptToApiScript,
+    scriptToApiScriptInEra,
     scriptFromCBOR,
     scriptFromCBOR',
     scriptFromPlutus,
@@ -126,6 +131,7 @@ module GeniusYield.Types.Script (
     someScriptFromReferenceApi,
     referenceScriptToApiPlutusScriptWitness,
     apiHashToPlutus,
+    scriptSize,
 
     -- ** File operations
     writeScript,
@@ -139,7 +145,9 @@ module GeniusYield.Types.Script (
 ) where
 
 import qualified Cardano.Api                           as Api
+import qualified Cardano.Api.Script                    as Api
 import qualified Cardano.Api.Shelley                   as Api.S
+import           Cardano.Ledger.SafeHash               (SafeToHash (originalBytesSize))
 import           Control.Lens                          ((?~))
 import           Data.Aeson.Types                      (FromJSONKey (fromJSONKey),
                                                         FromJSONKeyFunction (FromJSONKeyTextParser),
@@ -221,7 +229,7 @@ validatorToApiPlutusScriptWitness
     -> Api.ScriptDatum Api.WitCtxTxIn
     -> Api.ScriptRedeemer
     -> Api.ExecutionUnits
-    -> Api.ScriptWitness Api.WitCtxTxIn Api.BabbageEra
+    -> Api.ScriptWitness Api.WitCtxTxIn Api.ConwayEra
 validatorToApiPlutusScriptWitness (GYValidator s) =
     scriptToApiPlutusScriptWitness s
 
@@ -337,7 +345,7 @@ mintingPolicyToApiPlutusScriptWitness
     :: GYMintingPolicy v
     -> Api.ScriptRedeemer
     -> Api.ExecutionUnits
-    -> Api.ScriptWitness Api.WitCtxMint Api.BabbageEra
+    -> Api.ScriptWitness Api.WitCtxMint Api.ConwayEra
 mintingPolicyToApiPlutusScriptWitness (GYMintingPolicy s) =
     scriptToApiPlutusScriptWitness s Api.NoScriptDatumForMint
 
@@ -369,7 +377,7 @@ gyMintingScriptWitnessToApiPlutusSW
   :: GYMintScript u
   -> Api.S.ScriptRedeemer
   -> Api.S.ExecutionUnits
-  -> Api.S.ScriptWitness Api.S.WitCtxMint Api.S.BabbageEra
+  -> Api.S.ScriptWitness Api.S.WitCtxMint Api.S.ConwayEra
 gyMintingScriptWitnessToApiPlutusSW (GYMintScript p) = mintingPolicyToApiPlutusScriptWitness p
 gyMintingScriptWitnessToApiPlutusSW (GYMintReference r s) =
     referenceScriptToApiPlutusScriptWitness r s
@@ -510,7 +518,7 @@ stakeValidatorToApiPlutusScriptWitness
     :: GYStakeValidator v
     -> Api.ScriptRedeemer
     -> Api.ExecutionUnits
-    -> Api.ScriptWitness Api.WitCtxStake Api.BabbageEra
+    -> Api.ScriptWitness Api.WitCtxStake Api.ConwayEra
 stakeValidatorToApiPlutusScriptWitness (GYStakeValidator s) =
     scriptToApiPlutusScriptWitness s Api.NoScriptDatumForStake
 
@@ -542,7 +550,7 @@ gyStakeValScriptWitnessToApiPlutusSW
   :: GYStakeValScript u
   -> Api.S.ScriptRedeemer
   -> Api.S.ExecutionUnits
-  -> Api.S.ScriptWitness Api.S.WitCtxStake Api.S.BabbageEra
+  -> Api.S.ScriptWitness Api.S.WitCtxStake Api.S.ConwayEra
 gyStakeValScriptWitnessToApiPlutusSW (GYStakeValScript p) = stakeValidatorToApiPlutusScriptWitness p
 gyStakeValScriptWitnessToApiPlutusSW (GYStakeValReference r s) =
     referenceScriptToApiPlutusScriptWitness r s
@@ -673,11 +681,22 @@ scriptVersion (GYScript v _ _) = v
 scriptToApi :: GYScript v -> Api.PlutusScript (PlutusVersionToApi v)
 scriptToApi (GYScript _ api _) = api
 
+scriptToApiScript :: GYScript v -> Api.Script (PlutusVersionToApi v)
+scriptToApiScript (GYScript v api _) = Api.PlutusScript (singPlutusVersionToApi v) api
+
+scriptToApiScriptInEra :: GYScript v -> Api.ScriptInEra Api.S.ConwayEra
+scriptToApiScriptInEra s@(GYScript v _ _) = Api.ScriptInEra scriptInLanguageEra (scriptToApiScript s)
+  where
+    scriptInLanguageEra = case singPlutusVersionToApi v of
+      Api.PlutusScriptV1 -> Api.PlutusScriptV1InConway
+      Api.PlutusScriptV2 -> Api.PlutusScriptV2InConway
+      Api.PlutusScriptV3 -> Api.PlutusScriptV3InConway
+
 -- FIXME: Should we use Conway here?
-someScriptToReferenceApi :: Some GYScript -> Api.S.ReferenceScript Api.S.BabbageEra
+someScriptToReferenceApi :: Some GYScript -> Api.S.ReferenceScript Api.S.ConwayEra
 someScriptToReferenceApi (Some (GYScript v apiScript _)) =
     Api.S.ReferenceScript
-      Api.S.BabbageEraOnwardsBabbage $
+      Api.S.BabbageEraOnwardsConway $
       Api.ScriptInAnyLang (Api.PlutusScriptLanguage v') $
         Api.PlutusScript v' apiScript
   where
@@ -689,10 +708,10 @@ someScriptToReferenceApi (Some (GYScript v apiScript _)) =
 someScriptFromReferenceApi :: Api.S.ReferenceScript era -> Maybe (Some GYScript)
 someScriptFromReferenceApi Api.S.ReferenceScriptNone = Nothing
 someScriptFromReferenceApi
-  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsBabbage
+  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsConway
     (Api.ScriptInAnyLang Api.SimpleScriptLanguage _)) = Nothing
 someScriptFromReferenceApi
-  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsBabbage
+  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsConway
     (Api.ScriptInAnyLang
       (Api.PlutusScriptLanguage Api.PlutusScriptV1)
       (Api.PlutusScript _ x)
@@ -703,7 +722,7 @@ someScriptFromReferenceApi
     y = scriptFromApi x
 
 someScriptFromReferenceApi
-  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsBabbage
+  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsConway
     (Api.ScriptInAnyLang
       (Api.PlutusScriptLanguage Api.PlutusScriptV2)
       (Api.PlutusScript _ x)
@@ -715,7 +734,7 @@ someScriptFromReferenceApi
 
 -- FIXME: V3 is not possible in Babbage, shold we indicate it?
 someScriptFromReferenceApi
-  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsBabbage
+  (Api.S.ReferenceScript Api.S.BabbageEraOnwardsConway
     (Api.ScriptInAnyLang
       (Api.PlutusScriptLanguage Api.PlutusScriptV3)
       (Api.PlutusScript _ _))) = Nothing
@@ -751,9 +770,6 @@ scriptFromCBOR' b = do
 scriptPlutusHash :: GYScript v -> PlutusV1.ScriptHash
 scriptPlutusHash = apiHashToPlutus . scriptApiHash
 
-apiHashToPlutus :: Api.ScriptHash -> PlutusV1.ScriptHash
-apiHashToPlutus h = PlutusV1.ScriptHash $ PlutusTx.toBuiltin $ Api.serialiseToRawBytes h
-
 someScriptPlutusHash :: Some GYScript -> PlutusV1.ScriptHash
 someScriptPlutusHash (Some s) = scriptPlutusHash s
 
@@ -765,14 +781,14 @@ scriptToApiPlutusScriptWitness
     -> Api.S.ScriptDatum ctx
     -> Api.ScriptRedeemer
     -> Api.ExecutionUnits
-    -> Api.ScriptWitness ctx Api.BabbageEra
+    -> Api.ScriptWitness ctx Api.ConwayEra
 scriptToApiPlutusScriptWitness (GYScript v api _) = case v of
     SingPlutusV1 -> Api.PlutusScriptWitness
-        Api.PlutusScriptV1InBabbage
+        Api.PlutusScriptV1InConway
         Api.PlutusScriptV1
         (Api.S.PScript api)
     SingPlutusV2 -> Api.PlutusScriptWitness
-        Api.PlutusScriptV2InBabbage
+        Api.PlutusScriptV2InConway
         Api.PlutusScriptV2
         (Api.S.PScript api)
 
@@ -782,12 +798,15 @@ referenceScriptToApiPlutusScriptWitness
   -> Api.S.ScriptDatum witctx
   -> Api.S.ScriptRedeemer
   -> Api.S.ExecutionUnits
-  -> Api.S.ScriptWitness witctx Api.S.BabbageEra
+  -> Api.S.ScriptWitness witctx Api.S.ConwayEra
 referenceScriptToApiPlutusScriptWitness r s =
     Api.PlutusScriptWitness
-    Api.PlutusScriptV2InBabbage
+    Api.PlutusScriptV2InConway
     Api.PlutusScriptV2
     (Api.S.PReferenceScript (txOutRefToApi r) (Just (scriptApiHash s)))
+
+scriptSize :: Some GYScript -> Int
+scriptSize (Some s) = scriptToApiScriptInEra s & Api.toShelleyScript & originalBytesSize  -- Maybe we could have simply obtained size from serialised bytestring but this is how it script size is actually determined inside ledger codebase.
 
 -- | Writes a script to a file.
 --

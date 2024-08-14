@@ -30,6 +30,8 @@ import           GeniusYield.CardanoApi.Query
 import           GeniusYield.Providers.Common                      (SubmitTxException (SubmitTxException))
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+import           GeniusYield.Types.ProtocolParameters              (GYProtocolParameters,
+                                                                    protocolParametersFromApi)
 import           Ouroboros.Network.Protocol.LocalTxSubmission.Type (SubmitResult (..))
 
 -------------------------------------------------------------------------------
@@ -39,7 +41,7 @@ import           Ouroboros.Network.Protocol.LocalTxSubmission.Type (SubmitResult
 nodeSubmitTx :: Api.LocalNodeConnectInfo -> GYSubmitTx
 nodeSubmitTx info tx = do
     -- We may submit transaction in older eras as well, it seems.
-    res <- Api.submitTxToNodeLocal info $ Api.TxInMode Api.ShelleyBasedEraBabbage (txToApi tx)
+    res <- Api.submitTxToNodeLocal info $ Api.TxInMode Api.ShelleyBasedEraConway (txToApi tx)
     case res of
         SubmitSuccess  -> return $ txIdFromApi $ Api.getTxId $ Api.getTxBody $ txToApi tx
         SubmitFail err -> throwIO $ SubmitTxException $ Txt.pack $ show err
@@ -66,10 +68,10 @@ nodeSlotActions info = GYSlotActions
 -- Parameters
 -------------------------------------------------------------------------------
 
-nodeGetParameters :: GYEra -> Api.LocalNodeConnectInfo -> GYGetParameters
-nodeGetParameters era info = GYGetParameters
-    { gyGetProtocolParameters' = nodeGetProtocolParameters era info
-    , gyGetStakePools'         = stakePools era info
+nodeGetParameters :: Api.LocalNodeConnectInfo -> GYGetParameters
+nodeGetParameters info = GYGetParameters
+    { gyGetProtocolParameters' = nodeGetProtocolParameters info
+    , gyGetStakePools'         = stakePools info
     , gyGetSystemStart'        = systemStart info
     , gyGetEraHistory'         = eraHistory info
     , gyGetSlotConfig'         = either
@@ -78,17 +80,14 @@ nodeGetParameters era info = GYGetParameters
                                     =<< (makeSlotConfig <$> systemStart info <*> eraHistory info)
     }
 
-nodeGetProtocolParameters :: GYEra -> Api.LocalNodeConnectInfo -> IO Api.S.ProtocolParameters
-nodeGetProtocolParameters GYAlonzo  info = Api.fromLedgerPParams Api.ShelleyBasedEraAlonzo <$> queryAlonzoEra info Api.QueryProtocolParameters
-nodeGetProtocolParameters GYBabbage info = Api.fromLedgerPParams Api.ShelleyBasedEraBabbage <$> queryBabbageEra info Api.QueryProtocolParameters
--- FIXME: add Conway
+nodeGetProtocolParameters :: Api.LocalNodeConnectInfo -> IO GYProtocolParameters
+nodeGetProtocolParameters info = protocolParametersFromApi <$> queryConwayEra info Api.QueryProtocolParameters
 
-stakePools :: GYEra -> Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)
-stakePools GYAlonzo  info = queryAlonzoEra  info Api.QueryStakePools
-stakePools GYBabbage info = queryBabbageEra info Api.QueryStakePools
+stakePools :: Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)
+stakePools info = queryConwayEra  info Api.QueryStakePools
 
 nodeStakeAddressInfo :: Api.LocalNodeConnectInfo -> GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
-nodeStakeAddressInfo info saddr = resolveStakeAddressInfoFromApi saddr <$> queryBabbageEra info (Api.QueryStakeAddresses (Set.singleton $ stakeCredentialToApi $ stakeAddressToCredential saddr) (Api.localNodeNetworkId info))
+nodeStakeAddressInfo info saddr = resolveStakeAddressInfoFromApi saddr <$> queryConwayEra info (Api.QueryStakeAddresses (Set.singleton $ stakeCredentialToApi $ stakeAddressToCredential saddr) (Api.localNodeNetworkId info))
 
 resolveStakeAddressInfoFromApi :: GYStakeAddress -> (Map.Map Api.StakeAddress Ledger.Coin, Map.Map Api.StakeAddress Api.S.PoolId) -> Maybe GYStakeAddressInfo
 resolveStakeAddressInfoFromApi (stakeAddressToApi -> stakeAddr) (rewards, delegations) =

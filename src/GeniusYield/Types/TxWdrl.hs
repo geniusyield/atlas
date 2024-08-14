@@ -41,9 +41,9 @@ data GYTxWdrlWitness v
 
 txWdrlToApi
     :: GYTxWdrl v
-    -> (Api.StakeAddress, Ledger.Coin, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxStake Api.BabbageEra))
+    -> (Api.StakeAddress, Ledger.Coin, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxStake Api.ConwayEra))
 txWdrlToApi (GYTxWdrl stakeAddr amt wit) = (stakeAddressToApi stakeAddr, Ledger.Coin (toInteger amt), Api.BuildTxWith $ f wit) where
-    f :: GYTxWdrlWitness v -> Api.Witness Api.WitCtxStake Api.BabbageEra
+    f :: GYTxWdrlWitness v -> Api.Witness Api.WitCtxStake Api.ConwayEra
     f GYTxWdrlWitnessKey = Api.KeyWitness Api.KeyWitnessForStakeAddr
     f (GYTxWdrlWitnessScript v r) =
         Api.ScriptWitness Api.ScriptWitnessForStakeAddr $

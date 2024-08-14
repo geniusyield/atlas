@@ -115,15 +115,15 @@ utxosFromApi (Api.UTxO m) = utxosFromList
     | (txIn, out) <- Map.toList m
     ]
 
-utxosToApi :: GYUTxOs -> Api.UTxO Api.BabbageEra
+utxosToApi :: GYUTxOs -> Api.UTxO Api.ConwayEra
 utxosToApi (GYUTxOs m) = Api.UTxO $ Map.foldlWithKey' f Map.empty m
   where
-    f :: Map Api.TxIn (Api.TxOut Api.CtxUTxO Api.BabbageEra)
+    f :: Map Api.TxIn (Api.TxOut Api.CtxUTxO Api.ConwayEra)
       -> GYTxOutRef -> (GYAddress, GYValue, GYOutDatum, Maybe (Some GYScript))
-      -> Map Api.TxIn (Api.TxOut Api.CtxUTxO Api.BabbageEra)
+      -> Map Api.TxIn (Api.TxOut Api.CtxUTxO Api.ConwayEra)
     f m' oref out = Map.insert (txOutRefToApi oref) (g out) m'
 
-    g :: (GYAddress, GYValue, GYOutDatum, Maybe (Some GYScript)) -> Api.TxOut Api.CtxUTxO Api.BabbageEra
+    g :: (GYAddress, GYValue, GYOutDatum, Maybe (Some GYScript)) -> Api.TxOut Api.CtxUTxO Api.ConwayEra
     g (addr, v, md, ms) = Api.TxOut
         (addressToApi' addr)
         (valueToApiTxOutValue v)
@@ -132,11 +132,11 @@ utxosToApi (GYUTxOs m) = Api.UTxO $ Map.foldlWithKey' f Map.empty m
 
     outDatumToApi GYOutDatumNone     = Api.TxOutDatumNone
     outDatumToApi (GYOutDatumHash h) =
-      Api.TxOutDatumHash Api.AlonzoEraOnwardsBabbage $ datumHashToApi h
+      Api.TxOutDatumHash Api.AlonzoEraOnwardsConway $ datumHashToApi h
     outDatumToApi (GYOutDatumInline d) =
-      Api.TxOutDatumInline Api.BabbageEraOnwardsBabbage $ datumToApi' d
+      Api.TxOutDatumInline Api.BabbageEraOnwardsConway $ datumToApi' d
 
-utxoFromApi :: Api.TxIn -> Api.TxOut Api.CtxTx Api.BabbageEra -> GYUTxO
+utxoFromApi :: Api.TxIn -> Api.TxOut Api.CtxTx Api.ConwayEra -> GYUTxO
 utxoFromApi txIn (Api.TxOut a v d s) = GYUTxO
     { utxoRef       = txOutRefFromApi txIn
     , utxoAddress   = addressFromApi' a
@@ -145,7 +145,7 @@ utxoFromApi txIn (Api.TxOut a v d s) = GYUTxO
     , utxoRefScript = someScriptFromReferenceApi s
     }
   where
-    f :: Api.TxOutDatum Api.CtxTx Api.BabbageEra -> GYOutDatum
+    f :: Api.TxOutDatum Api.CtxTx Api.ConwayEra -> GYOutDatum
     f Api.TxOutDatumNone          = GYOutDatumNone
     f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
     f (Api.TxOutDatumInTx _ sd)   = GYOutDatumHash . hashDatum $ datumFromApi' sd

@@ -66,32 +66,34 @@ module GeniusYield.Types.Providers
     , GYProviders (..)
     ) where
 
-import qualified Cardano.Api                        as Api
-import qualified Cardano.Api.Shelley                as Api.S
-import           Cardano.Slotting.Time              (SystemStart)
-import           Control.Concurrent                 (MVar, modifyMVar, newMVar,
-                                                     threadDelay)
-import           Control.Monad                      ((<$!>))
-import           Control.Monad.IO.Class             (MonadIO (..))
-import           Data.Default                       (Default, def)
-import qualified Data.Text                          as Txt
+import qualified Cardano.Api                          as Api
+import qualified Cardano.Api.Ledger                   as Api.L
+import qualified Cardano.Api.Shelley                  as Api.S
+import           Cardano.Slotting.Time                (SystemStart)
+import           Control.Concurrent                   (MVar, modifyMVar,
+                                                       newMVar, threadDelay)
+import           Control.Monad                        ((<$!>))
+import           Control.Monad.IO.Class               (MonadIO (..))
+import           Data.Default                         (Default, def)
+import qualified Data.Text                            as Txt
 import           Data.Time
-import           Data.Word                          (Word64)
-import           GeniusYield.CardanoApi.EraHistory  (getEraEndSlot)
+import           Data.Word                            (Word64)
+import           GeniusYield.CardanoApi.EraHistory    (getEraEndSlot)
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types.Address
-import           GeniusYield.Types.Credential       (GYPaymentCredential)
+import           GeniusYield.Types.Credential         (GYPaymentCredential)
 import           GeniusYield.Types.Datum
 import           GeniusYield.Types.Logging
+import           GeniusYield.Types.ProtocolParameters
 import           GeniusYield.Types.Slot
 import           GeniusYield.Types.SlotConfig
-import           GeniusYield.Types.StakeAddressInfo (GYStakeAddressInfo)
+import           GeniusYield.Types.StakeAddressInfo   (GYStakeAddressInfo)
 import           GeniusYield.Types.Tx
 import           GeniusYield.Types.TxOutRef
 import           GeniusYield.Types.UTxO
-import           GeniusYield.Types.Value            (GYAssetClass)
-import           GHC.Stack                          (withFrozenCallStack)
+import           GeniusYield.Types.Value              (GYAssetClass)
+import           GHC.Stack                            (withFrozenCallStack)
 
 {- Note [Caching and concurrently accessible MVars]
 
@@ -200,7 +202,7 @@ gyQueryUtxoAtTxOutRef = gyQueryUtxoAtTxOutRef' . gyQueryUTxO
 gyQueryUtxoRefsAtAddress :: GYProviders -> GYAddress -> IO [GYTxOutRef]
 gyQueryUtxoRefsAtAddress = gyQueryUtxoRefsAtAddress' . gyQueryUTxO
 
-gyGetProtocolParameters :: GYProviders -> IO Api.S.ProtocolParameters
+gyGetProtocolParameters :: GYProviders -> IO GYProtocolParameters
 gyGetProtocolParameters = gyGetProtocolParameters' . gyGetParameters
 
 gyGetSystemStart :: GYProviders -> IO SystemStart
@@ -347,7 +349,7 @@ makeSlotActions t getSlotOfCurrentBlock = do
 
 -- | How to get protocol parameters? ... and other data to do balancing.
 data GYGetParameters = GYGetParameters
-    { gyGetProtocolParameters' :: !(IO Api.S.ProtocolParameters)
+    { gyGetProtocolParameters' :: !(IO GYProtocolParameters)
     , gyGetSystemStart'        :: !(IO SystemStart)
     , gyGetEraHistory'         :: !(IO Api.EraHistory)
     , gyGetStakePools'         :: !(IO (Set Api.S.PoolId))
@@ -363,7 +365,7 @@ This uses IO to set up some mutable references used for caching.
 -}
 makeGetParameters :: IO GYSlot
                 -- ^ Getting current slot
-                -> IO Api.S.ProtocolParameters
+                -> IO GYProtocolParameters
                 -- ^ Getting protocol parameters
                 -> IO SystemStart
                 -- ^ Getting system start

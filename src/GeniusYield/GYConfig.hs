@@ -162,7 +162,7 @@ withCfgProviders
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
           nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetSlotOfCurrentBlock info
           pure
-            ( Node.nodeGetParameters era info
+            ( Node.nodeGetParameters info
             , nodeSlotActions
             , KupoApi.kupoQueryUtxo kEnv
             , KupoApi.kupoLookupDatum kEnv

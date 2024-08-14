@@ -90,12 +90,12 @@ import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.User
 import           GeniusYield.Types
 import           Ouroboros.Consensus.HardFork.History.EraParams (EraParams (eraGenesisWin))
+import GeniusYield.Types.ProtocolParameters (protocolParametersFromApi)
 
 deriving newtype instance Num EpochSize
 deriving newtype instance Num EpochNo
 
--- FIXME: Fix this type synonym upstream.
-type Clb = ClbT Identity
+type Clb = ClbT Api.ConwayEra Identity
 
 newtype GYTxRunEnv = GYTxRunEnv { runEnvWallet :: User }
 
@@ -134,7 +134,7 @@ liftClb = GYTxMonadClb . lift . lift . lift
 -}
 mkTestFor :: String -> (TestInfo -> GYTxMonadClb a) -> Tasty.TestTree
 mkTestFor name action =
-    testNoErrorsTraceClb v w Clb.defaultBabbage name $ do
+    testNoErrorsTraceClb v w Clb.defaultConway name $ do
       asClb pureGen (w1 testWallets) $ action TestInfo { testGoldAsset = fakeGold, testIronAsset = fakeIron, testWallets }
   where
     v = valueFromLovelace 1_000_000_000_000_000 <>
@@ -158,7 +158,7 @@ mkTestFor name action =
                       (mkSimpleWallet (Clb.intToKeyPair 9))
 
     -- | Helper for building tests
-    testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig -> String -> Clb a -> Tasty.TestTree
+    testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig Api.ConwayEra -> String -> Clb a -> Tasty.TestTree
     testNoErrorsTraceClb funds walletFunds cfg msg act =
         testCaseInfo msg
             $ maybe (pure mockLog) assertFailure
@@ -228,7 +228,7 @@ instance GYTxQueryMonad GYTxMonadClb where
         pure . GYPrivnet $ GYNetworkInfo
             { gyNetworkMagic = Api.S.unNetworkMagic $ Api.S.toNetworkMagic magic
             , gyNetworkEpochSlots = 500
-            , gyNetworkEra = GYBabbage
+            , gyNetworkEra = GYConway
             }
 
     lookupDatum :: GYDatumHash -> GYTxMonadClb (Maybe GYDatum)
@@ -295,7 +295,7 @@ instance GYTxQueryMonad GYTxMonadClb where
 
             let s = case o ^. L.referenceScriptBabbageTxOutL of
                         L.S.SJust x  -> someScriptFromReferenceApi
-                                        $ Api.fromShelleyScriptToReferenceScript Api.ShelleyBasedEraBabbage x
+                                        $ Api.fromShelleyScriptToReferenceScript Api.ShelleyBasedEraConway x
                         L.S.SNothing -> Nothing
 
             return GYUTxO
@@ -416,7 +416,7 @@ slotConfig' = liftClb $ do
         zero = posixSecondsToUTCTime $ timeToPOSIX $ timeFromPlutus $ scSlotZeroTime sc
     return (zero, len)
 
-protocolParameters :: GYTxMonadClb (AlonzoCore.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra))
+protocolParameters :: GYTxMonadClb (AlonzoCore.PParams (Api.S.ShelleyLedgerEra Api.S.ConwayEra))
 protocolParameters = do
     pparams <- liftClb $ gets $ mockConfigProtocol . mockConfig
     pure $ coerce pparams
@@ -424,7 +424,7 @@ protocolParameters = do
 instance GYTxSpecialQueryMonad GYTxMonadClb where
     systemStart = gyscSystemStart <$> slotConfig
 
-    protocolParams = Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage <$> protocolParameters
+    protocolParams = protocolParametersFromApi <$> protocolParameters
 
     stakePools = pure Set.empty
     -- stakePools = do
@@ -450,7 +450,8 @@ instance GYTxSpecialQueryMonad GYTxMonadClb where
                     . NonEmptyCons allegraEra
                     . NonEmptyCons maryEra
                     . NonEmptyCons alonzoEra
-                    . NonEmptyOne . babbageEra
+                    . NonEmptyCons babbageEra
+                    . NonEmptyOne . conwayEra
 
         byronEra =
             Ouroboros.EraSummary
@@ -482,7 +483,13 @@ instance GYTxSpecialQueryMonad GYTxMonadClb where
                 , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
                 , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
                 }
-        babbageEra len =
+        babbageEra =
+            Ouroboros.EraSummary
+                { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+                , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+                }
+        conwayEra len =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraUnbounded

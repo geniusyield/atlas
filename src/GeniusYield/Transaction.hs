@@ -60,34 +60,35 @@ module GeniusYield.Transaction (
 ) where
 
 import qualified Cardano.Api                           as Api
+import qualified Cardano.Api.Ledger                    as Ledger
 import qualified Cardano.Api.Shelley                   as Api
 import qualified Cardano.Api.Shelley                   as Api.S
 import           Cardano.Crypto.DSIGN                  (sizeSigDSIGN,
                                                         sizeVerKeyDSIGN)
-import qualified Cardano.Ledger.Alonzo.Core            as AlonzoCore
+import           Cardano.Ledger.Alonzo.PParams         (ppCollateralPercentageL)
+import qualified Cardano.Ledger.Alonzo.PParams         as Ledger
 import qualified Cardano.Ledger.Alonzo.Scripts         as AlonzoScripts
 import qualified Cardano.Ledger.Alonzo.Tx              as AlonzoTx
 import qualified Cardano.Ledger.Binary                 as CBOR
 import qualified Cardano.Ledger.Binary.Crypto          as CBOR
-import qualified Cardano.Ledger.Coin                   as Ledger
 import           Cardano.Ledger.Core                   (EraTx (sizeTxF),
                                                         eraProtVerLow)
+import qualified Cardano.Ledger.Core                   as Ledger
 import           Cardano.Ledger.Crypto                 (Crypto (..))
 import           Cardano.Ledger.Era                    (Era (..))
 import           Cardano.Ledger.Keys.WitVKey           (WitVKey (..))
+import qualified Cardano.Ledger.Plutus                 as Ledger
 import qualified Cardano.Ledger.Shelley.API.Wallet     as Shelley
 import           Cardano.Slotting.Time                 (SystemStart)
 import           Control.Arrow                         ((&&&))
-import           Control.Lens                          (view)
+import           Control.Lens                          (view, (^.))
 import           Control.Monad.Random
 import           Control.Monad.Trans.Except            (runExceptT, throwE)
 import qualified Data.ByteString.Lazy                  as LBS
-import           Data.Either.Combinators               (maybeToRight)
 import           Data.Foldable                         (Foldable (foldMap'),
                                                         for_)
 import           Data.List                             (delete)
 import qualified Data.Map                              as Map
-import           Data.Maybe                            (fromJust)
 import           Data.Ratio                            ((%))
 import           Data.Semigroup                        (Sum (..))
 import qualified Data.Set                              as Set
@@ -96,22 +97,21 @@ import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Transaction.CoinSelection
 import           GeniusYield.Transaction.Common
 import           GeniusYield.Types
+import           GeniusYield.Types.ProtocolParameters  (GYProtocolParameters,
+                                                        protocolParametersToApi)
 import           GeniusYield.Types.TxCert.Internal
 
 -- | A container for various network parameters, and user wallet information, used by balancer.
 data GYBuildTxEnv = GYBuildTxEnv
     { gyBTxEnvSystemStart    :: !SystemStart
     , gyBTxEnvEraHistory     :: !Api.EraHistory
-    , gyBTxEnvProtocolParams :: !(AlonzoCore.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra))
+    , gyBTxEnvProtocolParams :: !GYProtocolParameters
     , gyBTxEnvPools          :: !(Set Api.S.PoolId)
     , gyBTxEnvOwnUtxos       :: !GYUTxOs
     -- ^ own utxos available for use as _additional_ input
     , gyBTxEnvChangeAddr     :: !GYAddress
     , gyBTxEnvCollateral     :: !GYUTxO
     }
-
-utxoFromTxInDetailed :: GYTxInDetailed v -> GYUTxO
-utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref _witns) addr val d ms) = GYUTxO ref addr val d ms
 
 -------------------------------------------------------------------------------
 -- Top level wrappers around core balancing logic
@@ -151,8 +151,10 @@ buildUnsignedTxBody :: forall m v.
         -> m (Either GYBuildTxError GYTxBody)
 buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata = buildTxLoop cstrat extraLovelaceStart
   where
+    certsFinalised = finaliseTxCert (gyBTxEnvProtocolParams env) <$> certs
+
     step :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
-    step stepStrat = fmap (first GYBuildTxBalancingError) . balanceTxStep env mmint wdrls certs insOld outsOld stepStrat
+    step stepStrat = fmap (first GYBuildTxBalancingError) . balanceTxStep env mmint wdrls certsFinalised insOld outsOld stepStrat
 
     buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError GYTxBody)
     buildTxLoop stepStrat n
@@ -203,7 +205,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub sig
                     , gybtxOuts          = outs
                     , gybtxMint          = mmint
                     , gybtxWdrls         = wdrls
-                    , gybtxCerts         = certs
+                    , gybtxCerts         = certsFinalised
                     , gybtxInvalidBefore = lb
                     , gybtxInvalidAfter  = ub
                     , gybtxSigners       = signers
@@ -230,7 +232,7 @@ balanceTxStep :: (HasCallStack, MonadRandom m)
     => GYBuildTxEnv
     -> Maybe (GYValue, [(GYMintScript v, GYRedeemer)])  -- ^ minting
     -> [GYTxWdrl v]                                     -- ^ withdrawals
-    -> [GYTxCert v]                                     -- ^ certificates
+    -> [GYTxCert' v]                                     -- ^ certificates
     -> [GYTxInDetailed v]                               -- ^ transaction inputs
     -> [GYTxOut v]                                      -- ^ transaction outputs
     -> GYCoinSelectionStrategy                          -- ^ Coin selection strategy to use
@@ -251,20 +253,18 @@ balanceTxStep
     cstrat
     = let adjustedOuts = map (adjustTxOut (minimumUTxO pp)) outs
           valueMint       = maybe mempty fst mmint
-          needsCollateral = valueMint /= mempty || any (isScriptWitness . gyTxInWitness . gyTxInDet) ins || any (isCertScriptWitness . gyTxCertWitness) certs || any (isWdrlScriptWitness . gyTxWdrlWitness) wdrls
-          apiPP = Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage pp
-          ppStakeAddressDeposit = Api.S.protocolParamStakeAddressDeposit apiPP
-          (stakeCredDeregsAmt :: Natural, stakeCredRegsAmt :: Natural) = foldl' (\acc@(!accDeregs, !accRegs) (gyTxCertCertificate -> cert) -> case cert of
-                  GYStakeAddressDeregistrationCertificate _ -> (accDeregs + 1, accRegs)
-                  GYStakeAddressRegistrationCertificate _   -> (accDeregs, accRegs + 1)
+          needsCollateral = valueMint /= mempty || any (isScriptWitness . gyTxInWitness . gyTxInDet) ins || any (isCertScriptWitness . gyTxCertWitness') certs || any (isWdrlScriptWitness . gyTxWdrlWitness) wdrls
+          (stakeCredDeregsAmt :: Natural, stakeCredRegsAmt :: Natural) = foldl' (\acc@(!accDeregsAmt, !accRegsAmt) (gyTxCertCertificate' -> cert) -> case cert of
+                  GYStakeAddressDeregistrationCertificate amt _ -> (accDeregsAmt + amt, accRegsAmt)
+                  GYStakeAddressRegistrationCertificate amt _   -> (accDeregsAmt, accRegsAmt + amt)
+                  GYStakeAddressRegistrationDelegationCertificate amt _ _  -> (accDeregsAmt, accRegsAmt + amt)
                   _                                         -> acc) (0, 0) certs
           -- Extra ada is received from withdrawals and stake credential deregistration.
           adaSource =
             let wdrlsAda = getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls
-                stakeCredDeregsAda = stakeCredDeregsAmt * fromIntegral ppStakeAddressDeposit
-            in wdrlsAda + stakeCredDeregsAda
+            in wdrlsAda + stakeCredDeregsAmt
           -- Ada lost due to stake credential registration.
-          adaSink = stakeCredRegsAmt * fromIntegral ppStakeAddressDeposit
+          adaSink = stakeCredRegsAmt
           collaterals
             | needsCollateral = utxosFromUTxO collateral
             | otherwise       = mempty
@@ -285,9 +285,7 @@ balanceTxStep
                         . flip valueAssetClass GYLovelace
                           . gyTxOutValue
                             . adjustTxOut (minimumUTxO pp)
-                    , maxValueSize    = fromMaybe
-                                            (error "protocolParamMaxValueSize missing from protocol params")
-                                            $ Api.S.protocolParamMaxValueSize apiPP
+                    , maxValueSize    = protocolParametersToApi pp ^. Ledger.ppMaxValSizeL
                     , adaSource = adaSource
                     , adaSink   = adaSink
                     }
@@ -302,8 +300,8 @@ balanceTxStep
     isWdrlScriptWitness GYTxWdrlWitnessScript{} = True
     isWdrlScriptWitness _                       = False
 
-retColSup :: Api.BabbageEraOnwards Api.BabbageEra
-retColSup = Api.BabbageEraOnwardsBabbage
+retColSup :: Api.BabbageEraOnwards Api.ConwayEra
+retColSup = Api.BabbageEraOnwardsConway
 
 finalizeGYBalancedTx :: GYBuildTxEnv -> GYBalancedTx v -> Int -> Either GYBuildTxError GYTxBody
 finalizeGYBalancedTx
@@ -331,7 +329,7 @@ finalizeGYBalancedTx
         collaterals
         ss
         eh
-        apiPP
+        pp
         ps
         (utxosToApi utxos)
         body
@@ -344,7 +342,7 @@ finalizeGYBalancedTx
     estimateKeyWitnesses :: Word = fromIntegral $ countUnique $
          mapMaybe (extractPaymentPkhFromAddress . utxoAddress) (utxosToList collaterals)
       <> [apkh | GYTxWdrl {gyTxWdrlWitness = GYTxWdrlWitnessKey, gyTxWdrlStakeAddress = saddr} <- wdrls, let sc = stakeAddressToCredential saddr, Just apkh <- [preferSCByKey sc]]
-      <> [apkh | cert@GYTxCert {gyTxCertWitness = Just GYTxCertWitnessKey} <- certs, let sc = certificateToStakeCredential $ gyTxCertCertificate cert, Just apkh <- [preferSCByKey sc]]
+      <> [apkh | cert@GYTxCert' {gyTxCertWitness' = Just GYTxCertWitnessKey} <- certs, let sc = certificateToStakeCredential $ gyTxCertCertificate' cert, Just apkh <- [preferSCByKey sc]]
       <> estimateKeyWitnessesFromInputs ins
       <> Set.toList signers
       where
@@ -371,10 +369,10 @@ finalizeGYBalancedTx
                   GYInReferenceSimpleScript _ s -> getTotalKeysInSimpleScript s <> acc
               estimateKeyWitnessesFromNativeScripts acc _ = acc
 
-    inRefs :: Api.TxInsReference Api.BuildTx Api.BabbageEra
+    inRefs :: Api.TxInsReference Api.BuildTx Api.ConwayEra
     inRefs = case inRefs' of
         [] -> Api.TxInsReferenceNone
-        _  -> Api.TxInsReference Api.BabbageEraOnwardsBabbage inRefs'
+        _  -> Api.TxInsReference Api.BabbageEraOnwardsConway inRefs'
 
     inRefs' :: [Api.TxIn]
     inRefs' = [ txOutRefToApi r | r <- utxosRefs utxosRefInputs ]
@@ -387,39 +385,39 @@ finalizeGYBalancedTx
     utxos :: GYUTxOs
     utxos = utxosIn <> utxosRefInputs <> collaterals
 
-    outs' :: [Api.S.TxOut Api.S.CtxTx Api.S.BabbageEra]
+    outs' :: [Api.S.TxOut Api.S.CtxTx Api.S.ConwayEra]
     outs' = txOutToApi <$> outs
 
-    ins' :: [(Api.TxIn, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxTxIn Api.BabbageEra))]
+    ins' :: [(Api.TxIn, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxTxIn Api.ConwayEra))]
     ins' = [ txInToApi (isInlineDatum $ gyTxInDetDatum i) (gyTxInDet i) |  i <- ins ]
 
-    collaterals' :: Api.TxInsCollateral Api.BabbageEra
+    collaterals' :: Api.TxInsCollateral Api.ConwayEra
     collaterals' = case utxosRefs collaterals of
         []    -> Api.TxInsCollateralNone
-        orefs -> Api.TxInsCollateral Api.AlonzoEraOnwardsBabbage $ txOutRefToApi <$> orefs
+        orefs -> Api.TxInsCollateral Api.AlonzoEraOnwardsConway $ txOutRefToApi <$> orefs
 
     -- will be filled by makeTransactionBodyAutoBalance
-    fee :: Api.TxFee Api.BabbageEra
-    fee = Api.TxFeeExplicit Api.ShelleyBasedEraBabbage $ Ledger.Coin 0
+    fee :: Api.TxFee Api.ConwayEra
+    fee = Api.TxFeeExplicit Api.ShelleyBasedEraConway $ Ledger.Coin 0
 
-    lb' :: Api.TxValidityLowerBound Api.BabbageEra
+    lb' :: Api.TxValidityLowerBound Api.ConwayEra
     lb' = maybe
         Api.TxValidityNoLowerBound
-        (Api.TxValidityLowerBound Api.AllegraEraOnwardsBabbage . slotToApi)
+        (Api.TxValidityLowerBound Api.AllegraEraOnwardsConway . slotToApi)
         lb
 
-    ub' :: Api.TxValidityUpperBound Api.BabbageEra
-    ub' = Api.TxValidityUpperBound Api.ShelleyBasedEraBabbage $ slotToApi <$> ub
+    ub' :: Api.TxValidityUpperBound Api.ConwayEra
+    ub' = Api.TxValidityUpperBound Api.ShelleyBasedEraConway $ slotToApi <$> ub
 
-    extra :: Api.TxExtraKeyWitnesses Api.BabbageEra
+    extra :: Api.TxExtraKeyWitnesses Api.ConwayEra
     extra = case toList signers of
         []   -> Api.TxExtraKeyWitnessesNone
-        pkhs -> Api.TxExtraKeyWitnesses Api.AlonzoEraOnwardsBabbage $ pubKeyHashToApi <$> pkhs
+        pkhs -> Api.TxExtraKeyWitnesses Api.AlonzoEraOnwardsConway $ pubKeyHashToApi <$> pkhs
 
-    mint :: Api.TxMintValue Api.BuildTx Api.BabbageEra
+    mint :: Api.TxMintValue Api.BuildTx Api.ConwayEra
     mint = case mmint of
         Nothing      -> Api.TxMintNone
-        Just (v, xs) -> Api.TxMintValue Api.MaryEraOnwardsBabbage (valueToApi v) $ Api.BuildTxWith $ Map.fromList
+        Just (v, xs) -> Api.TxMintValue Api.MaryEraOnwardsConway (valueToApi v) $ Api.BuildTxWith $ Map.fromList
             [ ( mintingPolicyApiIdFromWitness p
               , gyMintingScriptWitnessToApiPlutusSW p
                       (redeemerToApi r)
@@ -429,7 +427,7 @@ finalizeGYBalancedTx
             ]
 
     -- Putting `TxTotalCollateralNone` & `TxReturnCollateralNone` would have them appropriately calculated by `makeTransactionBodyAutoBalance` but then return collateral it generates is only for ada. To support multi-asset collateral input we therefore calculate correct values ourselves and put appropriate entries here to have `makeTransactionBodyAutoBalance` calculate appropriate overestimated fees.
-    (dummyTotCol :: Api.TxTotalCollateral Api.BabbageEra, dummyRetCol :: Api.TxReturnCollateral Api.CtxTx Api.BabbageEra) =
+    (dummyTotCol :: Api.TxTotalCollateral Api.ConwayEra, dummyRetCol :: Api.TxReturnCollateral Api.CtxTx Api.ConwayEra) =
       if mempty == collaterals then
         (Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)
       else
@@ -443,15 +441,15 @@ finalizeGYBalancedTx
         collateralTotalValue :: GYValue
         collateralTotalValue = foldMapUTxOs utxoValue collaterals
 
-    txMetadata :: Api.TxMetadataInEra Api.BabbageEra
+    txMetadata :: Api.TxMetadataInEra Api.ConwayEra
     txMetadata = maybe Api.TxMetadataNone toMetaInEra mbTxMetadata
       where
-        toMetaInEra :: GYTxMetadata -> Api.TxMetadataInEra Api.BabbageEra
+        toMetaInEra :: GYTxMetadata -> Api.TxMetadataInEra Api.ConwayEra
         toMetaInEra gymd = let md = txMetadataToApi gymd in
-          if md == mempty then Api.TxMetadataNone else Api.TxMetadataInEra Api.ShelleyBasedEraBabbage md
+          if md == mempty then Api.TxMetadataNone else Api.TxMetadataInEra Api.ShelleyBasedEraConway md
 
-    wdrls' :: Api.TxWithdrawals Api.BuildTx Api.BabbageEra
-    wdrls' = if wdrls == mempty then Api.TxWithdrawalsNone else Api.TxWithdrawals Api.ShelleyBasedEraBabbage $ map txWdrlToApi wdrls
+    wdrls' :: Api.TxWithdrawals Api.BuildTx Api.ConwayEra
+    wdrls' = if wdrls == mempty then Api.TxWithdrawalsNone else Api.TxWithdrawals Api.ShelleyBasedEraConway $ map txWdrlToApi wdrls
 
     certs' =
       if certs == mempty
@@ -464,15 +462,11 @@ finalizeGYBalancedTx
                         apiWit = maybe Map.empty (uncurry Map.singleton) mapiWit
                     in (apiCert : accCerts, accWits <> apiWit)
                   ) (mempty, mempty) certs
-          in Api.TxCertificates Api.ShelleyBasedEraBabbage (reverse $ fst apiCertsFromGY) $ Api.BuildTxWith (snd apiCertsFromGY)
+          in Api.TxCertificates Api.ShelleyBasedEraConway (reverse $ fst apiCertsFromGY) $ Api.BuildTxWith (snd apiCertsFromGY)
 
-    apiPP = Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage pp
+    unregisteredStakeCredsMap = Map.fromList [ (stakeCredentialToApi sc, fromIntegral amt) | GYStakeAddressDeregistrationCertificate amt sc  <- map gyTxCertCertificate' certs]
 
-    ppStakeAddressDeposit = fromIntegral $ Api.S.protocolParamStakeAddressDeposit apiPP
-
-    unregisteredStakeCredsMap = Map.fromList [ (stakeCredentialToApi sc, ppStakeAddressDeposit) | GYStakeAddressDeregistrationCertificate sc  <- map gyTxCertCertificate certs]
-
-    body :: Api.TxBodyContent Api.BuildTx Api.BabbageEra
+    body :: Api.TxBodyContent Api.BuildTx Api.ConwayEra
     body =
       Api.TxBodyContent {
         Api.txIns = ins',
@@ -487,7 +481,7 @@ finalizeGYBalancedTx
         Api.txMetadata = txMetadata,
         Api.txAuxScripts = Api.TxAuxScriptsNone,
         Api.txExtraKeyWits = extra,
-        Api.txProtocolParams = Api.BuildTxWith $ Just $ Api.S.LedgerProtocolParameters pp,
+        Api.txProtocolParams = Api.BuildTxWith $ Just $ Api.S.LedgerProtocolParameters pp',
         Api.txWithdrawals = wdrls',
         Api.txCertificates = certs',
         Api.txUpdateProposal = Api.TxUpdateProposalNone,
@@ -499,6 +493,8 @@ finalizeGYBalancedTx
         Api.txTreasuryDonation = Nothing
       }
 
+    pp' = protocolParametersToApi pp
+
 {- | Wraps around 'Api.makeTransactionBodyAutoBalance' just to verify the final ex units and tx size are within limits.
 
 If not checked, the returned txbody may fail during submission.
@@ -506,35 +502,33 @@ If not checked, the returned txbody may fail during submission.
 makeTransactionBodyAutoBalanceWrapper :: GYUTxOs
                                       -> SystemStart
                                       -> Api.S.EraHistory
-                                      -> Api.ProtocolParameters
+                                      -> GYProtocolParameters
                                       -> Set Api.S.PoolId
-                                      -> Api.S.UTxO Api.S.BabbageEra
-                                      -> Api.S.TxBodyContent Api.S.BuildTx Api.S.BabbageEra
+                                      -> Api.S.UTxO Api.S.ConwayEra
+                                      -> Api.S.TxBodyContent Api.S.BuildTx Api.S.ConwayEra
                                       -> GYAddress
                                       -> Map.Map Api.StakeCredential Ledger.Coin
                                       -> Word
                                       -> Int
                                       -> Either GYBuildTxError GYTxBody
-makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body changeAddr stakeDelegDeposits nkeys numSkeletonOuts = do
+makeTransactionBodyAutoBalanceWrapper collaterals ss eh (protocolParametersToApi -> pp) _ps utxos body changeAddr stakeDelegDeposits nkeys numSkeletonOuts = do
     let poolids = Set.empty -- TODO: This denotes the set of registered stake pools, that are being unregistered in this transaction.
 
-    Api.ExecutionUnits
-        { executionSteps  = maxSteps
-        , executionMemory = maxMemory
-        } <- maybeToRight GYBuildTxMissingMaxExUnitsParam $ Api.S.protocolParamMaxTxExUnits apiPP
-    let maxTxSize = Api.S.protocolParamMaxTxSize apiPP
-        changeAddrApi :: Api.S.AddressInEra Api.S.BabbageEra = addressToApi' changeAddr
+    let Ledger.ExUnits
+          { exUnitsSteps = maxSteps
+          , exUnitsMem = maxMemory
+          } = pp ^. Ledger.ppMaxTxExUnitsL
+    let maxTxSize = fromIntegral $ pp ^. Ledger.ppMaxTxSizeL
+        changeAddrApi :: Api.S.AddressInEra Api.S.ConwayEra = addressToApi' changeAddr
         drepDelegDeposits = mempty -- TODO:
-
-    ledgerPP <- first GYBuildTxPPConversionError $ Api.S.convertToLedgerProtocolParameters Api.ShelleyBasedEraBabbage apiPP
 
     -- First we obtain the calculated fees to correct for our collaterals.
     bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ _ (Ledger.Coin feeOld)) <-
       first GYBuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
-        Api.ShelleyBasedEraBabbage
+        Api.ShelleyBasedEraConway
         ss
         (Api.toLedgerEpochInfo eh)
-        ledgerPP
+        (Api.LedgerProtocolParameters pp)
         poolids
         stakeDelegDeposits
         drepDelegDeposits
@@ -550,7 +544,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body cha
 
         collateralTotalValue :: GYValue = foldMapUTxOs utxoValue collaterals
         collateralTotalLovelace :: Integer = fst $ valueSplitAda collateralTotalValue
-        balanceNeeded :: Integer = ceiling $ (feeOld * toInteger (fromJust $ Api.S.protocolParamCollateralPercent apiPP)) % 100
+        balanceNeeded :: Integer = ceiling $ (feeOld * toInteger (pp ^. ppCollateralPercentageL)) % 100
 
       in do
 
@@ -567,10 +561,10 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body cha
           -- an error but instead returns `(Api.TxTotalCollateralNone, Api.TxReturnCollateralNone)`
 
         first GYBuildTxBodyErrorAutoBalance $ Api.makeTransactionBodyAutoBalance
-          Api.ShelleyBasedEraBabbage
+          Api.ShelleyBasedEraConway
           ss
           (Api.toLedgerEpochInfo eh)
-          ledgerPP
+          (Api.LedgerProtocolParameters pp)
           poolids
           stakeDelegDeposits
           drepDelegDeposits
@@ -589,8 +583,8 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body cha
           let
               -- This low level code is taken verbatim from here: https://github.com/IntersectMBO/cardano-ledger/blob/6db84a7b77e19af58feb2f45dfc50aa70435967b/eras/shelley/impl/src/Cardano/Ledger/Shelley/API/Wallet.hs#L475-L494, as this is what is referred by @cardano-api@ under the hood.
               -- This does not take into account the bootstrap (byron) witnesses.
-              version = eraProtVerLow @ShelleyBasedBabbageEra
-              sigSize = fromIntegral $ sizeSigDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedBabbageEra)))
+              version = eraProtVerLow @ShelleyBasedConwayEra
+              sigSize = fromIntegral $ sizeSigDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedConwayEra)))
               dummySig =
                 fromRight
                   (error "corrupt dummy signature")
@@ -600,7 +594,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body cha
                       CBOR.decodeSignedDSIGN
                       (CBOR.serialize version $ LBS.replicate sigSize 0)
                   )
-              vkeySize = fromIntegral $ sizeVerKeyDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedBabbageEra)))
+              vkeySize = fromIntegral $ sizeVerKeyDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedConwayEra)))
               dummyVKey w =
                 let padding = LBS.replicate paddingSize 0
                     paddingSize = vkeySize - LBS.length sw
@@ -628,15 +622,15 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh apiPP _ps utxos body cha
     outputs are at the start of the txOuts list.
 -}
 collapseExtraOut
-  :: Api.TxOut Api.S.CtxTx Api.S.BabbageEra
+  :: Api.TxOut Api.S.CtxTx Api.S.ConwayEra
   -- ^ The extra output generated by @makeTransactionBodyAutoBalance@.
-  -> Api.TxBodyContent Api.S.BuildTx Api.S.BabbageEra
+  -> Api.TxBodyContent Api.S.BuildTx Api.S.ConwayEra
   -- ^ The body content generated by @makeTransactionBodyAutoBalance@.
-  -> Api.TxBody Api.S.BabbageEra
+  -> Api.TxBody Api.S.ConwayEra
   -- ^ The body generated by @makeTransactionBodyAutoBalance@.
   -> Int
   -- ^ The number of skeleton outputs we don't want to touch.
-  -> Either Api.S.TxBodyError (Api.TxBody Api.S.BabbageEra)
+  -> Either Api.S.TxBodyError (Api.TxBody Api.S.ConwayEra)
   -- ^ The updated body with the collapsed outputs
 collapseExtraOut apiOut@(Api.TxOut _ outVal _ _) bodyContent@Api.TxBodyContent {txOuts} txBody numSkeletonOuts
  | Api.txOutValueToLovelace outVal == 0 = pure txBody
@@ -646,8 +640,8 @@ collapseExtraOut apiOut@(Api.TxOut _ outVal _ _) bodyContent@Api.TxBodyContent {
         ((Api.TxOut sOutAddr sOutVal sOutDat sOutRefScript) : remOuts) ->
           let
 
-            nOutVal = Api.TxOutValueShelleyBased Api.ShelleyBasedEraBabbage
-                        $ Api.toLedgerValue Api.MaryEraOnwardsBabbage
+            nOutVal = Api.TxOutValueShelleyBased Api.ShelleyBasedEraConway
+                        $ Api.toLedgerValue Api.MaryEraOnwardsConway
                         $ foldMap' Api.txOutValueToValue [sOutVal, outVal]
 
             -- nOut == new Out == The merging of both apiOut and sOut
@@ -656,9 +650,9 @@ collapseExtraOut apiOut@(Api.TxOut _ outVal _ _) bodyContent@Api.TxBodyContent {
             nOuts = skeletonOuts ++ remOuts ++ [nOut]
 
           in
-            Api.S.createAndValidateTransactionBody Api.ShelleyBasedEraBabbage
+            Api.S.createAndValidateTransactionBody Api.ShelleyBasedEraConway
               $ bodyContent { Api.txOuts = nOuts }
   where
     (skeletonOuts, changeOuts) = splitAt numSkeletonOuts txOuts
 
-type ShelleyBasedBabbageEra = Api.S.ShelleyLedgerEra Api.BabbageEra
+type ShelleyBasedConwayEra = Api.S.ShelleyLedgerEra Api.ConwayEra

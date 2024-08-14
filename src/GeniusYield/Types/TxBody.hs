@@ -66,13 +66,13 @@ import           GeniusYield.Types.UTxO
 import           GeniusYield.Types.Value
 
 -- | Transaction body: the part which is then signed.
-newtype GYTxBody = GYTxBody (Api.TxBody Api.BabbageEra)
+newtype GYTxBody = GYTxBody (Api.TxBody Api.ConwayEra)
   deriving Show
 
-txBodyFromApi :: Api.TxBody Api.BabbageEra -> GYTxBody
+txBodyFromApi :: Api.TxBody Api.ConwayEra -> GYTxBody
 txBodyFromApi = coerce
 
-txBodyToApi :: GYTxBody -> Api.TxBody Api.BabbageEra
+txBodyToApi :: GYTxBody -> Api.TxBody Api.ConwayEra
 txBodyToApi = coerce
 
 -- | Sign a transaction body with (potentially) multiple keys.
@@ -83,7 +83,7 @@ signGYTxBody = signTx
 signTx :: ToShelleyWitnessSigningKey a =>  GYTxBody -> [a] -> GYTx
 signTx (GYTxBody txBody) skeys = txFromApi
   $ Api.signShelleyTransaction
-      Api.ShelleyBasedEraBabbage
+      Api.ShelleyBasedEraConway
       txBody
       $ map toShelleyWitnessSigningKey skeys
 
@@ -91,7 +91,7 @@ signTx (GYTxBody txBody) skeys = txFromApi
 signGYTxBody' :: GYTxBody -> [GYSomeSigningKey] -> GYTx
 signGYTxBody' (txBodyToApi -> txBody) skeys = txFromApi
   $ Api.signShelleyTransaction
-      Api.ShelleyBasedEraBabbage
+      Api.ShelleyBasedEraConway
       txBody
       $ map (\(GYSomeSigningKey a) -> toShelleyWitnessSigningKey a) skeys
 
@@ -100,7 +100,7 @@ makeSignedTransaction :: GYTxWitness -> GYTxBody -> GYTx
 makeSignedTransaction txWit txBody = makeSignedTransaction' (txWitToKeyWitnessApi txWit) $ txBodyToApi txBody
 
 -- | Make a signed transaction given the transaction body & list of key witnesses.
-makeSignedTransaction' :: [Api.S.KeyWitness Api.S.BabbageEra] -> Api.TxBody Api.BabbageEra -> GYTx
+makeSignedTransaction' :: [Api.S.KeyWitness Api.S.ConwayEra] -> Api.TxBody Api.ConwayEra -> GYTx
 makeSignedTransaction' = fmap txFromApi <$> Api.makeSignedTransaction
 
 -- | Add a key witness(s) to a transaction, represented in `GYTxWitness`, which might already have previous key witnesses.
@@ -108,7 +108,7 @@ appendWitnessGYTx :: GYTxWitness -> GYTx -> GYTx
 appendWitnessGYTx = appendWitnessGYTx' . txWitToKeyWitnessApi
 
 -- | Add a key witness(s) to a transaction, which might already have previous key witnesses.
-appendWitnessGYTx' :: [Api.S.KeyWitness Api.S.BabbageEra] -> GYTx -> GYTx
+appendWitnessGYTx' :: [Api.S.KeyWitness Api.S.ConwayEra] -> GYTx -> GYTx
 appendWitnessGYTx' appendKeyWitnessList previousTx =
   let (txBody, previousKeyWitnessesList) = Api.S.getTxBodyAndWitnesses $ txToApi previousTx
   in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
@@ -124,7 +124,7 @@ signGYTx'' previousTx skeys =
   -- but that would duplicate work to obtain @txBody@ as it's also
   -- required here to get for `appendKeyWitnessList`.
   let (txBody, previousKeyWitnessesList) = Api.S.getTxBodyAndWitnesses $ txToApi previousTx
-      appendKeyWitnessList = map (Api.makeShelleyKeyWitness Api.ShelleyBasedEraBabbage txBody) skeys
+      appendKeyWitnessList = map (Api.makeShelleyKeyWitness Api.ShelleyBasedEraConway txBody) skeys
   in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
 
 -- | Sign a transaction with (potentially) multiple keys of potentially different nature and add your witness(s) among previous key witnesses, if any.
@@ -145,7 +145,7 @@ txBodyFromHexBS bs = BS16.decode bs >>= txBodyFromCBOR
 
 -- | Get `GYTxBody` from it's CBOR encoding. Note that the given serialized input is not of form @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
 txBodyFromCBOR :: BS.ByteString -> Either String GYTxBody
-txBodyFromCBOR = fmap txBodyFromApi . first show . Api.deserialiseFromCBOR (Api.AsTxBody Api.AsBabbageEra)
+txBodyFromCBOR = fmap txBodyFromApi . first show . Api.deserialiseFromCBOR (Api.AsTxBody Api.AsConwayEra)
 
 -- | Serialise `GYTxBody` to get hex encoded CBOR string represented as `String`. Obtained result does not correspond to @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
 txBodyToHex :: GYTxBody -> String
@@ -176,7 +176,7 @@ txBodyUTxOs (GYTxBody body@(Api.TxBody Api.TxBodyContent {txOuts})) =
   where
     txId = Api.getTxId body
 
-    f :: Word -> Api.TxOut Api.CtxTx Api.BabbageEra -> GYUTxO
+    f :: Word -> Api.TxOut Api.CtxTx Api.ConwayEra -> GYUTxO
     f i = utxoFromApi (Api.TxIn txId (Api.TxIx i))
 
 -- | Returns the 'GYTxOutRef' consumed by the tx.
@@ -187,7 +187,7 @@ txBodyTxIns (GYTxBody (Api.TxBody Api.TxBodyContent {txIns})) = map (txOutRefFro
 txBodyTxInsReference :: GYTxBody -> [GYTxOutRef]
 txBodyTxInsReference (GYTxBody (Api.TxBody Api.TxBodyContent {txInsReference})) = case txInsReference of
   Api.TxInsReferenceNone                                                        -> []
-  Api.TxInsReference Api.S.BabbageEraOnwardsBabbage inRefs -> map txOutRefFromApi inRefs
+  Api.TxInsReference Api.S.BabbageEraOnwardsConway inRefs -> map txOutRefFromApi inRefs
 
 -- | Returns the 'GYTxId' of the given 'GYTxBody'.
 txBodyTxId :: GYTxBody -> GYTxId
@@ -197,7 +197,7 @@ txBodyTxId = txIdFromApi . Api.getTxId . txBodyToApi
 getTxBody :: GYTx -> GYTxBody
 getTxBody = txBodyFromApi . Api.getTxBody . txToApi
 
-txBodyToApiTxBodyContent :: GYTxBody -> Api.TxBodyContent Api.ViewTx Api.BabbageEra
+txBodyToApiTxBodyContent :: GYTxBody -> Api.TxBodyContent Api.ViewTx Api.ConwayEra
 txBodyToApiTxBodyContent body = let Api.TxBody bc = txBodyToApi body in bc
 
 -- | Returns the required signatories of the given 'GYTxBody'.
@@ -219,11 +219,11 @@ txBodyValidityRange body =
   in case (Api.txValidityLowerBound cnt, Api.txValidityUpperBound cnt)  of
     (lb, ub) -> (f lb, g ub)
   where
-    f :: Api.TxValidityLowerBound Api.BabbageEra -> Maybe GYSlot
+    f :: Api.TxValidityLowerBound Api.ConwayEra -> Maybe GYSlot
     f Api.TxValidityNoLowerBound      = Nothing
     f (Api.TxValidityLowerBound _ sn) = Just $ slotFromApi sn
 
-    g :: Api.TxValidityUpperBound Api.BabbageEra -> Maybe GYSlot
+    g :: Api.TxValidityUpperBound Api.ConwayEra -> Maybe GYSlot
     g (Api.TxValidityUpperBound _ Nothing)   = Nothing
     g (Api.TxValidityUpperBound _ (Just sn)) = Just $ slotFromApi sn
 
@@ -241,7 +241,7 @@ txBodyTotalCollateralLovelace body = case Api.txTotalCollateral $ txBodyToApiTxB
         | l >= 0              -> fromInteger l
         | otherwise           -> error $ "negative total collateral: " <> show l
 
-txBodyCollateralReturnOutput :: GYTxBody -> Api.TxReturnCollateral Api.CtxTx Api.BabbageEra
+txBodyCollateralReturnOutput :: GYTxBody -> Api.TxReturnCollateral Api.CtxTx Api.ConwayEra
 txBodyCollateralReturnOutput body = Api.txReturnCollateral $ txBodyToApiTxBodyContent body
 
 txBodyCollateralReturnOutputValue :: GYTxBody -> GYValue

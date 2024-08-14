@@ -8,16 +8,19 @@ Stability   : develop
 -}
 module GeniusYield.Types.TxCert.Internal (
     GYTxCert (..),
+    GYTxCert' (..),
+    finaliseTxCert,
     GYTxCertWitness (..),
     txCertToApi,
 ) where
 
 
-import qualified Cardano.Api                   as Api
-import           Data.Functor                  ((<&>))
-import           GeniusYield.Imports           ((&))
+import qualified Cardano.Api                          as Api
+import           Data.Functor                         ((<&>))
+import           GeniusYield.Imports                  ((&))
 import           GeniusYield.Types.Certificate
-import           GeniusYield.Types.Credential  (stakeCredentialToApi)
+import           GeniusYield.Types.Credential         (stakeCredentialToApi)
+import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters)
 import           GeniusYield.Types.Redeemer
 import           GeniusYield.Types.Script
 -- | A transaction certificate.
@@ -28,10 +31,20 @@ import           GeniusYield.Types.Script
 -- Note that witness is not required for registering a stake address and for moving instantaneous rewards. Thus, we provide helper utilities to interact with `GYTxCert` sanely and thus keep it's representation opaque.
 --
 data GYTxCert v = GYTxCert
-    { gyTxCertCertificate :: !GYCertificate
+    { gyTxCertCertificate :: !GYCertificatePreBuild
     , gyTxCertWitness     :: !(Maybe (GYTxCertWitness v))
     }
   deriving (Eq, Show)
+
+data GYTxCert' v = GYTxCert'
+    { gyTxCertCertificate' :: !GYCertificate
+    , gyTxCertWitness'     :: !(Maybe (GYTxCertWitness v))
+    }
+  deriving (Eq, Show)
+
+finaliseTxCert :: GYProtocolParameters -> GYTxCert v -> GYTxCert' v
+finaliseTxCert pp (GYTxCert cert wit) = GYTxCert' (finaliseCert pp cert) wit
+
 
 -- | Represents witness type and associated information for a certificate.
 data GYTxCertWitness v
@@ -42,11 +55,11 @@ data GYTxCertWitness v
     deriving stock (Eq, Show)
 
 txCertToApi
-    :: GYTxCert v
-    -> (Api.Certificate Api.BabbageEra, Maybe (Api.StakeCredential, Api.Witness Api.WitCtxStake Api.BabbageEra))
-txCertToApi (GYTxCert cert wit) = (certificateToApi cert, wit <&> (\wit' -> (certificateToStakeCredential cert & stakeCredentialToApi, f wit')) )
+    :: GYTxCert' v
+    -> (Api.Certificate Api.ConwayEra, Maybe (Api.StakeCredential, Api.Witness Api.WitCtxStake Api.ConwayEra))
+txCertToApi (GYTxCert' cert wit) = (certificateToApi cert, wit <&> (\wit' -> (certificateToStakeCredential cert & stakeCredentialToApi, f wit')) )
   where
-    f :: GYTxCertWitness v -> Api.Witness Api.WitCtxStake Api.BabbageEra
+    f :: GYTxCertWitness v -> Api.Witness Api.WitCtxStake Api.ConwayEra
     f GYTxCertWitnessKey = Api.KeyWitness Api.KeyWitnessForStakeAddr
     f (GYTxCertWitnessScript v r) =
         Api.ScriptWitness Api.ScriptWitnessForStakeAddr $

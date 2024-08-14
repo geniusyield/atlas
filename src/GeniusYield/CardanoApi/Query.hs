@@ -9,7 +9,7 @@ Stability   : develop
 module GeniusYield.CardanoApi.Query (
     -- * Low-level query runners
     queryCardanoMode,
-    queryAlonzoEra,
+    queryConwayEra,
     queryBabbageEra,
     queryUTxO,
     -- * Exception
@@ -44,9 +44,9 @@ queryCardanoMode info q = do
         Left err -> throwIO $ CardanoQueryException $ show err
         Right x  -> return x
 
-queryAlonzoEra :: Api.LocalNodeConnectInfo -> Api.QueryInShelleyBasedEra Api.AlonzoEra a -> IO a
-queryAlonzoEra info q = do
-    e <- queryCardanoMode info $ Api.QueryInEra $ Api.QueryInShelleyBasedEra Api.ShelleyBasedEraAlonzo q
+queryConwayEra :: Api.LocalNodeConnectInfo -> Api.QueryInShelleyBasedEra Api.ConwayEra a -> IO a
+queryConwayEra info q = do
+    e <- queryCardanoMode info $ Api.QueryInEra $ Api.QueryInShelleyBasedEra Api.ShelleyBasedEraConway q
     case e of
         Left err -> throwIO $ CardanoQueryException $ show err
         Right x  -> return x
@@ -60,5 +60,5 @@ queryBabbageEra info q = do
 
 
 queryUTxO :: GYEra -> Api.S.LocalNodeConnectInfo -> Api.QueryUTxOFilter -> IO GYUTxOs
-queryUTxO GYAlonzo  info q = fmap utxosFromApi $ queryAlonzoEra  info $ Api.QueryUTxO q
 queryUTxO GYBabbage info q = fmap utxosFromApi $ queryBabbageEra info $ Api.QueryUTxO q
+queryUTxO GYConway  info q = fmap utxosFromApi $ queryConwayEra  info $ Api.QueryUTxO q

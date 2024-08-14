@@ -23,6 +23,8 @@ module GeniusYield.Test.Privnet.Setup (
     NodeConfigurationYaml (..)
 ) where
 
+import qualified Cardano.Api                          as Api
+import           Cardano.Testnet
 import           Control.Concurrent                   (ThreadId, killThread,
                                                        threadDelay)
 import qualified Control.Concurrent.STM               as STM
@@ -33,18 +35,6 @@ import           Control.Monad.Trans.Resource         (MonadResource (liftResour
                                                        resourceForkIO)
 import qualified Data.Text                            as Txt
 import qualified Data.Vector                          as V
-
-import qualified Hedgehog                             as H
-import qualified Hedgehog.Extras.Stock                as H'
-import           Test.Tasty                           (TestName, TestTree)
-import           Test.Tasty.HUnit                     (testCaseSteps)
-
-import qualified Cardano.Api                          as Api
-import           Cardano.Testnet
-import           Testnet.Property.Util
-import           Testnet.Runtime
-
-
 import qualified GeniusYield.Api.TestTokens           as GY.TestTokens
 import           GeniusYield.Imports
 import           GeniusYield.Providers.LiteChainIndex
@@ -56,6 +46,11 @@ import           GeniusYield.Test.Privnet.Utils
 import           GeniusYield.Test.Utils
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
+import qualified Hedgehog                             as H
+import qualified Hedgehog.Extras.Stock                as H'
+import           Test.Tasty                           (TestName, TestTree)
+import           Test.Tasty.HUnit                     (testCaseSteps)
+import           Testnet.Property.Util
 import           Testnet.Types
 
 
@@ -147,8 +142,8 @@ withPrivnet testnetOpts setupUser = do
             } <- cardanoTestnetDefault testnetOpts conf
 
         era <- case cardanoNodeEra testnetOpts of
-            Api.AnyCardanoEra Api.AlonzoEra -> pure GYAlonzo
             Api.AnyCardanoEra Api.BabbageEra -> pure GYBabbage
+            Api.AnyCardanoEra Api.ConwayEra -> pure GYConway
             Api.AnyCardanoEra x -> liftIO . die $ printf "Unsupported era: %s" (show x)
         liftIO . STM.atomically
             $ STM.writeTMVar tmvRuntime PrivnetRuntime
@@ -234,7 +229,7 @@ withPrivnet testnetOpts setupUser = do
                 localQueryUtxo = nodeQueryUTxO era info
 
             let localGetParams :: GYGetParameters
-                localGetParams = nodeGetParameters era info
+                localGetParams = nodeGetParameters info
 
             -- context used for tests
             --

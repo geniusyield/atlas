@@ -68,12 +68,12 @@ gyTxOutDatumL f (GYTxOut addr v md s) =
 
 txOutToApi
     :: GYTxOut v
-    -> Api.TxOut Api.CtxTx Api.BabbageEra
+    -> Api.TxOut Api.CtxTx Api.ConwayEra
 txOutToApi (GYTxOut addr v md mrs) = Api.TxOut
     (addressToApi' addr)
     (valueToApiTxOutValue v)
     (mkDatum md)
-    (maybe Api.S.ReferenceScriptNone (Api.S.ReferenceScript Api.S.BabbageEraOnwardsBabbage . resolveOutputScript) mrs)
+    (maybe Api.S.ReferenceScriptNone (Api.S.ReferenceScript Api.S.BabbageEraOnwardsConway . resolveOutputScript) mrs)
   where
 
     resolveOutputScript (GYSimpleScript s) = Api.ScriptInAnyLang Api.SimpleScriptLanguage (Api.SimpleScript $ simpleScriptToApi s)
@@ -81,11 +81,11 @@ txOutToApi (GYTxOut addr v md mrs) = Api.TxOut
         let version = singPlutusVersionToApi $ scriptVersion s
         in Api.ScriptInAnyLang (Api.PlutusScriptLanguage version) (Api.PlutusScript version (scriptToApi s))
 
-    mkDatum :: Maybe (GYDatum, GYTxOutUseInlineDatum v) -> Api.TxOutDatum Api.CtxTx Api.BabbageEra
+    mkDatum :: Maybe (GYDatum, GYTxOutUseInlineDatum v) -> Api.TxOutDatum Api.CtxTx Api.ConwayEra
     mkDatum Nothing        = Api.TxOutDatumNone
     mkDatum (Just (d, di))
-        | di'       = Api.TxOutDatumInline Api.BabbageEraOnwardsBabbage d'
-        | otherwise = Api.TxOutDatumInTx Api.AlonzoEraOnwardsBabbage d'
+        | di'       = Api.TxOutDatumInline Api.BabbageEraOnwardsConway d'
+        | otherwise = Api.TxOutDatumInTx Api.AlonzoEraOnwardsConway d'
       where
         d' = datumToApi' d
 

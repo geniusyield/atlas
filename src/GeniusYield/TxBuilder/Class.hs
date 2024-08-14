@@ -891,12 +891,8 @@ buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
     -- Obtain constant parameters to be used across several 'GYTxBody' generations.
     ss    <- systemStart
     eh    <- eraHistory
-    apiPp <- protocolParams
+    pp    <- protocolParams
     ps    <- stakePools
-
-    pp <- case Api.toLedgerPParams Api.ShelleyBasedEraBabbage apiPp of
-        Left e   -> throwError . GYBuildTxException $ GYBuildTxPPConversionError e
-        Right pp -> pure pp
 
     collateral <- ownCollateral
     addrs <- ownAddresses

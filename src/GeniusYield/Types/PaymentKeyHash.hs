@@ -12,9 +12,13 @@ module GeniusYield.Types.PaymentKeyHash (
     paymentKeyHashToPlutus,
     paymentKeyHashToApi,
     paymentKeyHashFromApi,
+    paymentKeyHashFromLedger,
+    paymentKeyHashToLedger,
 ) where
 
 import qualified Cardano.Api                  as Api
+import qualified Cardano.Api.Keys.Shelley     as Api
+import qualified Cardano.Api.Ledger           as Ledger
 import           Control.Lens                 ((?~))
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.Csv                     as Csv
@@ -24,12 +28,13 @@ import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
 import           GeniusYield.Imports
 import           GeniusYield.Types.Ledger
-import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..), CanSignTx)
+import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..), CanSignTx,
+                                               pubKeyHashFromApi,
+                                               pubKeyHashToApi)
 import qualified PlutusLedgerApi.V1.Crypto    as Plutus
 import qualified PlutusTx.Builtins            as Plutus
 import qualified PlutusTx.Builtins.Internal   as Plutus
 import qualified Text.Printf                  as Printf
-import           Unsafe.Coerce                (unsafeCoerce)
 
 -- $setup
 --
@@ -44,8 +49,8 @@ newtype GYPaymentKeyHash = GYPaymentKeyHash (Api.Hash Api.PaymentKey)
     deriving newtype (Eq, Ord, IsString)
 
 instance AsPubKeyHash GYPaymentKeyHash where
-  toPubKeyHash = unsafeCoerce  -- We could have exported `GYPubKeyHash` from an internal module but `GYPubKeyHash` needs an overhaul anyways.
-  fromPubKeyHash = unsafeCoerce
+  toPubKeyHash = paymentKeyHashToApi >>> pubKeyHashFromApi
+  fromPubKeyHash = pubKeyHashToApi >>> paymentKeyHashFromApi
 
 instance CanSignTx GYPaymentKeyHash
 
@@ -92,6 +97,14 @@ paymentKeyHashToApi = coerce
 --
 paymentKeyHashFromApi :: Api.Hash Api.PaymentKey -> GYPaymentKeyHash
 paymentKeyHashFromApi = coerce
+
+-- | Convert to corresponding ledger representation.
+paymentKeyHashToLedger :: GYPaymentKeyHash -> Ledger.KeyHash Ledger.Payment Ledger.StandardCrypto
+paymentKeyHashToLedger = paymentKeyHashToApi >>> Api.unPaymentKeyHash
+
+-- | Convert from corresponding ledger representation.
+paymentKeyHashFromLedger :: Ledger.KeyHash Ledger.Payment Ledger.StandardCrypto -> GYPaymentKeyHash
+paymentKeyHashFromLedger = Api.PaymentKeyHash >>> paymentKeyHashFromApi
 
 -- |
 --

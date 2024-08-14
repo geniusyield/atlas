@@ -9,11 +9,15 @@ Stability   : develop
 -}
 module GeniusYield.Types.Era (
     GYEra (..),
+    ConwayEra,
 ) where
 
-import qualified Data.Aeson   as Aeson
-import           Data.Text    (Text)
-import           GHC.Generics (Generic)
+import qualified Cardano.Api.Shelley as Api.S
+import qualified Data.Aeson          as Aeson
+import           Data.Text           (Text)
+import           GHC.Generics        (Generic)
+
+type ConwayEra = Api.S.ShelleyLedgerEra Api.S.ConwayEra
 
 -- $setup
 --
@@ -23,25 +27,24 @@ import           GHC.Generics (Generic)
 -- | Eras at which cardano-node provider may operate.
 --
 -- We will drop the older eras when the transition to them is complete.
--- (atm, August 2022, we still need Alonzo a bit)
 --
--- >>> Aeson.encode GYAlonzo
--- "\"Alonzo\""
+-- >>> Aeson.encode GYConway
+-- "\"Conway\""
 --
 -- >>> Aeson.decode @GYEra "\"Babbage\""
 -- Just GYBabbage
 --
-data GYEra = GYAlonzo | GYBabbage
+data GYEra = GYBabbage | GYConway
   deriving (Show, Read, Eq, Ord, Generic)
 
 instance Aeson.ToJSON GYEra where
-    toJSON GYAlonzo  = Aeson.toJSON ("Alonzo" :: Text)
+    toJSON GYConway  = Aeson.toJSON ("Conway" :: Text)
     toJSON GYBabbage = Aeson.toJSON ("Babbage" :: Text)
 
-    toEncoding GYAlonzo  = Aeson.toEncoding ("Alonzo" :: Text)
+    toEncoding GYConway  = Aeson.toEncoding ("Conway" :: Text)
     toEncoding GYBabbage = Aeson.toEncoding ("Babbage" :: Text)
 
 instance Aeson.FromJSON GYEra where
-    parseJSON "Alonzo"  = pure GYAlonzo
+    parseJSON "Conway"  = pure GYConway
     parseJSON "Babbage" = pure GYBabbage
-    parseJSON _         = fail "Expected 'Alonzo' or 'Babbage'"
+    parseJSON _         = fail "Expected 'Conway' or 'Babbage'"

@@ -147,13 +147,13 @@ instance Hashable GYAddress where
 addressToApi :: GYAddress -> Api.AddressAny
 addressToApi = coerce
 
-addressToApi' :: GYAddress -> Api.AddressInEra Api.BabbageEra
-addressToApi' = coerce addrAnyToBabbageEra
+addressToApi' :: GYAddress -> Api.AddressInEra Api.ConwayEra
+addressToApi' = coerce addrAnyToConwayEra
 
 -- not exported
-addrAnyToBabbageEra :: Api.AddressAny -> Api.AddressInEra Api.BabbageEra
-addrAnyToBabbageEra (Api.AddressByron   addr) = Api.AddressInEra Api.ByronAddressInAnyEra                             addr
-addrAnyToBabbageEra (Api.AddressShelley addr) = Api.AddressInEra (Api.ShelleyAddressInEra Api.ShelleyBasedEraBabbage) addr
+addrAnyToConwayEra :: Api.AddressAny -> Api.AddressInEra Api.ConwayEra
+addrAnyToConwayEra (Api.AddressByron   addr) = Api.AddressInEra Api.ByronAddressInAnyEra                             addr
+addrAnyToConwayEra (Api.AddressShelley addr) = Api.AddressInEra (Api.ShelleyAddressInEra Api.ShelleyBasedEraConway) addr
 
 addressFromApi :: Api.AddressAny -> GYAddress
 addressFromApi = coerce

@@ -15,9 +15,15 @@ module GeniusYield.Providers.Blockfrost
 
 import qualified Blockfrost.Client                    as Blockfrost
 import qualified Cardano.Api                          as Api
+import qualified Cardano.Api.Ledger                   as Api.L
 import qualified Cardano.Api.Shelley                  as Api.S
+import qualified Cardano.Ledger.Alonzo.PParams        as Ledger
 import qualified Cardano.Ledger.BaseTypes             as Ledger
 import qualified Cardano.Ledger.Coin                  as Ledger
+import           Cardano.Ledger.Conway.PParams        (ConwayPParams (..),
+                                                       THKD (..))
+import qualified Cardano.Ledger.Core                  as Ledger
+import qualified Cardano.Ledger.Plutus                as Ledger
 import qualified Cardano.Slotting.Slot                as CSlot
 import qualified Cardano.Slotting.Time                as CTime
 import           Control.Concurrent                   (threadDelay)
@@ -28,7 +34,6 @@ import qualified Data.ByteString.Base16               as BS16
 import qualified Data.ByteString.Lazy                 as LBS
 import           Data.Either.Combinators              (maybeToRight)
 import           Data.Foldable                        (fold)
-import           Data.Int                             (Int64)
 import qualified Data.Map.Strict                      as Map
 import qualified Data.Set                             as Set
 import qualified Data.Text                            as Text
@@ -42,6 +47,8 @@ import qualified Web.HttpApiData                      as Web
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
 import           GeniusYield.Types
+import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters,
+                                                       protocolParametersFromApi)
 import           GeniusYield.Utils                    (serialiseToBech32WithPrefix)
 import           Ouroboros.Consensus.HardFork.History (EraParams (eraGenesisWin))
 
@@ -74,7 +81,7 @@ gyAddressToBlockfrost = Blockfrost.mkAddress . addressToText
 gyPaymentCredentialToBlockfrost :: GYPaymentCredential -> Blockfrost.Address
 gyPaymentCredentialToBlockfrost cred = Blockfrost.mkAddress $ case cred of
    GYPaymentCredentialByKey _ -> paymentCredentialToBech32 cred
-   GYPaymentCredentialByScript sh -> serialiseToBech32WithPrefix "addr_vkh" $ validatorHashToApi sh  -- A bug in BF.
+   GYPaymentCredentialByScript sh -> serialiseToBech32WithPrefix "addr_vkh" $ scriptHashToApi sh  -- A bug in BF.
 
 -- | Creates a 'GYValue' from a 'Blockfrost.Amount', may fail parsing blockfrost returned asset class.
 amountToValue :: Blockfrost.Amount -> Either Text GYValue
@@ -343,48 +350,68 @@ transformUtxoOutput txId (Blockfrost.UtxoOutput {..}, ms) = do
 -- Parameters
 -------------------------------------------------------------------------------
 
-blockfrostProtocolParams :: Blockfrost.Project -> IO Api.S.ProtocolParameters
+blockfrostProtocolParams :: Blockfrost.Project -> IO GYProtocolParameters
 blockfrostProtocolParams proj = do
     Blockfrost.ProtocolParams {..} <- Blockfrost.runBlockfrost proj Blockfrost.getLatestEpochProtocolParams
         >>= handleBlockfrostError "ProtocolParams"
-    let majorProtVers = fromInteger _protocolParamsProtocolMajorVer
-    pure $ Api.S.ProtocolParameters
-        { protocolParamProtocolVersion     = (majorProtVers, fromInteger _protocolParamsProtocolMinorVer)
-        , protocolParamDecentralization    = Nothing  -- Also known as `d`, got deprecated in Babbage.
-        , protocolParamExtraPraosEntropy   = Nothing  -- Also known as `extraEntropy`, got deprecated in Babbage.
-        , protocolParamMaxBlockHeaderSize  = fromInteger _protocolParamsMaxBlockHeaderSize
-        , protocolParamMaxBlockBodySize    = fromInteger _protocolParamsMaxBlockSize
-        , protocolParamMaxTxSize           = fromInteger _protocolParamsMaxTxSize
-        , protocolParamTxFeeFixed          = fromInteger _protocolParamsMinFeeB
-        , protocolParamTxFeePerByte        = fromInteger _protocolParamsMinFeeA
-        , protocolParamMinUTxOValue        = Nothing  -- Deprecated in Alonzo.
-        , protocolParamStakeAddressDeposit = Ledger.Coin $ lovelacesToInteger _protocolParamsKeyDeposit
-        , protocolParamStakePoolDeposit    = Ledger.Coin $ lovelacesToInteger _protocolParamsPoolDeposit
-        , protocolParamMinPoolCost         = Ledger.Coin $ lovelacesToInteger _protocolParamsMinPoolCost
-        , protocolParamPoolRetireMaxEpoch  = Ledger.EpochInterval $ fromInteger _protocolParamsEMax
-        , protocolParamStakePoolTargetNum  = fromInteger _protocolParamsNOpt
-        , protocolParamPoolPledgeInfluence = _protocolParamsA0
-        , protocolParamMonetaryExpansion   = _protocolParamsRho
-        , protocolParamTreasuryCut         = _protocolParamsTau
-        , protocolParamPrices              = Just $ Api.S.ExecutionUnitPrices _protocolParamsPriceStep _protocolParamsPriceMem
-        , protocolParamMaxTxExUnits        = Just $ Api.ExecutionUnits (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExSteps) (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExMem)
-        , protocolParamMaxBlockExUnits     = Just $ Api.ExecutionUnits (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExSteps) (fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExMem)
-        , protocolParamMaxValueSize        = Just . fromInteger . Blockfrost.unQuantity $ _protocolParamsMaxValSize
-        , protocolParamCollateralPercent   = Just $ fromInteger _protocolParamsCollateralPercent
-        , protocolParamMaxCollateralInputs = Just $ fromInteger _protocolParamsMaxCollateralInputs
-        , protocolParamCostModels          = toApiCostModel _protocolParamsCostModels
-        , protocolParamUTxOCostPerByte     = Just . Ledger.Coin $ lovelacesToInteger _protocolParamsCoinsPerUtxoSize
-        }
-  where
-    toApiCostModel = Map.fromList
-        . Map.foldlWithKey (\acc k x -> case k of
-            Blockfrost.PlutusV1 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV1, Api.CostModel $ fromInteger <$> Map.elems x) : acc
-            Blockfrost.PlutusV2 -> (Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2, Api.CostModel $ fromInteger <$> Map.elems x) : acc
+    pure $ protocolParametersFromApi $ Ledger.PParams $
+        -- FIXME: Rename maestro to blockfrost in messages
+        -- FIXME: Rename maestro to blockfrost in messages
+        -- FIXME: Rename maestro to blockfrost in messages
+        ConwayPParams
+        { cppMinFeeA        = THKD $ Ledger.Coin _protocolParamsMinFeeA
+        , cppMinFeeB        = THKD $ Ledger.Coin _protocolParamsMinFeeB
+        , cppMaxBBSize    = THKD $ fromIntegral _protocolParamsMaxBlockSize
+        , cppMaxTxSize           = THKD $ fromIntegral _protocolParamsMaxTxSize
+        , cppMaxBHSize  = THKD $ fromIntegral _protocolParamsMaxBlockHeaderSize
+        , cppKeyDeposit = THKD $ Ledger.Coin $ lovelacesToInteger _protocolParamsKeyDeposit
+        , cppPoolDeposit    = THKD $ Ledger.Coin $ lovelacesToInteger _protocolParamsPoolDeposit
+        , cppEMax  = THKD $ Ledger.EpochInterval . fromIntegral
+                                                $ _protocolParamsEMax
+        , cppNOpt  = THKD $ fromIntegral _protocolParamsNOpt
+        , cppA0 = THKD $ fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: pool influence received from Maestro is out of bounds")  $ Ledger.boundRational _protocolParamsA0
+        , cppRho   = THKD $ fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: monetory expansion parameter received from Maestro is out of bounds")  $ Ledger.boundRational _protocolParamsRho
+        , cppTau         = THKD $ fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: treasury expansion parameter received from Maestro is out of bounds") $ Ledger.boundRational _protocolParamsTau
+        , cppProtocolVersion     = Ledger.ProtVer {
+            Ledger.pvMajor = Ledger.mkVersion _protocolParamsProtocolMajorVer & fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: major version received from Maestro is out of bounds"),
+            Ledger.pvMinor = fromIntegral _protocolParamsProtocolMinorVer
+            }
+        , cppMinPoolCost         = THKD $ Ledger.Coin $ lovelacesToInteger _protocolParamsMinPoolCost
+        , cppCoinsPerUTxOByte     = THKD $ Api.L.CoinPerByte $ Ledger.Coin $ lovelacesToInteger _protocolParamsCoinsPerUtxoSize
+        , cppCostModels = THKD $ Ledger.mkCostModels $ Map.fromList $ Map.foldlWithKey' (\acc k x -> case k of
+            Blockfrost.PlutusV1 -> (Ledger.PlutusV1, either (error "FIXME:") id $ Ledger.mkCostModel Ledger.PlutusV1 $ fromInteger <$> Map.elems x) : acc
+            Blockfrost.PlutusV2 -> (Ledger.PlutusV2, either (error "FIXME:") id $ Ledger.mkCostModel Ledger.PlutusV2 $ fromInteger <$> Map.elems x) : acc
             -- Don't care about non plutus cost models.
             Blockfrost.Timelock -> acc
-        )
-        []
-        . Blockfrost.unCostModels
+           -- FIXME: Would need modifications once relevant updates are made into blockfrost.
+
+        ) [] $ Blockfrost.unCostModels _protocolParamsCostModels
+        , cppPrices              = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error "FIXME:") $ Ledger.boundRational _protocolParamsPriceStep, Ledger.prMem = fromMaybe (error "FIXME:") $ Ledger.boundRational _protocolParamsPriceMem}
+        , cppMaxTxExUnits        = THKD $ Ledger.OrdExUnits $ Ledger.ExUnits {
+                                            Ledger.exUnitsSteps =
+                                                fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExSteps,
+                                            Ledger.exUnitsMem =
+                                                fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExMem
+                                            }
+        , cppMaxBlockExUnits     = THKD $ Ledger.OrdExUnits $ Ledger.ExUnits {
+                                            Ledger.exUnitsSteps =
+                                                fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExSteps,
+                                            Ledger.exUnitsMem =
+                                                fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExMem
+                                            }
+        , cppMaxValSize        = THKD $ fromIntegral $ Blockfrost.unQuantity _protocolParamsMaxValSize
+        , cppCollateralPercentage   = THKD $ fromIntegral _protocolParamsCollateralPercent
+        , cppMaxCollateralInputs = THKD $ fromIntegral _protocolParamsMaxCollateralInputs
+        , cppPoolVotingThresholds = error "FIXME:"
+        , cppDRepVotingThresholds = error "FIXME:"
+        , cppCommitteeMinSize = error "FIXME:"
+        , cppCommitteeMaxTermLength = error "FIXME:"
+        , cppGovActionLifetime = error "FIXME:"
+        , cppGovActionDeposit = error "FIXME:"
+        , cppDRepDeposit = error "FIXME:"
+        , cppDRepActivity = error "FIXME:"
+        , cppMinFeeRefScriptCostPerByte = error "FIXME:"
+        }
 
 blockfrostStakePools :: Blockfrost.Project -> IO (Set Api.S.PoolId)
 blockfrostStakePools proj = do

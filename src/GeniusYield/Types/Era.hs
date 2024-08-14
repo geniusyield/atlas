@@ -8,11 +8,9 @@ Stability   : develop
 -}
 module GeniusYield.Types.Era (
     ApiEra,
-    ConwayEra,
 ) where
 
 import qualified Cardano.Api.Shelley as Api.S
 
 -- TODO: Make this module internal.
-type ConwayEra = Api.S.ShelleyLedgerEra ApiEra
 type ApiEra = Api.S.ConwayEra

@@ -101,9 +101,6 @@ instance Eq GYBalancingError where
 data GYBuildTxError
     = GYBuildTxBalancingError !GYBalancingError
     | GYBuildTxBodyErrorAutoBalance !(Api.TxBodyErrorAutoBalance ApiEra)
-    | GYBuildTxPPConversionError !Api.ProtocolParametersConversionError
-    | GYBuildTxMissingMaxExUnitsParam
-    -- ^ Missing max ex units in protocol params
     | GYBuildTxExUnitsTooBig         -- ^ Execution units required is higher than the maximum as specified by protocol params.
         (Natural, Natural)           -- ^ Tuple of maximum execution steps & memory as given by protocol parameters.
         (Natural, Natural)           -- ^ Tuple of execution steps & memory as taken by built transaction.

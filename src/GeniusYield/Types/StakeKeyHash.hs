@@ -10,20 +10,26 @@ module GeniusYield.Types.StakeKeyHash (
     GYStakeKeyHash,
     stakeKeyHashToApi,
     stakeKeyHashFromApi,
+    stakeKeyHashToLedger,
+    stakeKeyHashFromLedger,
 ) where
 
 import           Control.Lens                 ((?~))
 import           GeniusYield.Imports
 
 import qualified Cardano.Api                  as Api
+import qualified Cardano.Api.Ledger           as Ledger
+import qualified Cardano.Api.Shelley          as Api
+import qualified Cardano.Ledger.Keys          as Ledger
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.Csv                     as Csv
 import qualified Data.Swagger                 as Swagger
 import qualified Data.Swagger.Internal.Schema as Swagger
 import qualified Data.Text.Encoding           as Text
-import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..), CanSignTx)
+import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..), CanSignTx,
+                                               pubKeyHashFromLedger,
+                                               pubKeyHashToLedger)
 import qualified Text.Printf                  as Printf
-import           Unsafe.Coerce                (unsafeCoerce)
 
 -- $setup
 --
@@ -38,8 +44,8 @@ newtype GYStakeKeyHash = GYStakeKeyHash (Api.Hash Api.StakeKey)
     deriving newtype (Eq, Ord, IsString)
 
 instance AsPubKeyHash GYStakeKeyHash where
-  toPubKeyHash = unsafeCoerce
-  fromPubKeyHash = unsafeCoerce
+  toPubKeyHash = stakeKeyHashToLedger >>> Ledger.coerceKeyRole >>> pubKeyHashFromLedger
+  fromPubKeyHash = pubKeyHashToLedger >>> Ledger.coerceKeyRole >>> stakeKeyHashFromLedger
 
 instance CanSignTx GYStakeKeyHash
 
@@ -59,6 +65,14 @@ stakeKeyHashToApi = coerce
 --
 stakeKeyHashFromApi :: Api.Hash Api.StakeKey -> GYStakeKeyHash
 stakeKeyHashFromApi = coerce
+
+-- | Convert to corresponding ledger type.
+stakeKeyHashToLedger :: GYStakeKeyHash -> Ledger.KeyHash Ledger.Staking Ledger.StandardCrypto
+stakeKeyHashToLedger = stakeKeyHashToApi >>> Api.unStakeKeyHash
+
+-- | Convert from corresponding ledger type.
+stakeKeyHashFromLedger :: Ledger.KeyHash Ledger.Staking Ledger.StandardCrypto -> GYStakeKeyHash
+stakeKeyHashFromLedger = Api.StakeKeyHash >>> stakeKeyHashFromApi
 
 -- |
 --

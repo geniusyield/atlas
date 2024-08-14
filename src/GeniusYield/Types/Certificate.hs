@@ -17,7 +17,6 @@ module GeniusYield.Types.Certificate (
 
 import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.ReexposeLedger           as Ledger
-import           Cardano.Ledger.Api                   (ppKeyDepositL)
 import qualified Cardano.Ledger.Api                   as Ledger
 import           Control.Lens                         ((^.))
 import           GeniusYield.Types.Credential         (GYStakeCredential,

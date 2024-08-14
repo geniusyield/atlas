@@ -41,8 +41,6 @@ import qualified Cardano.Api                        as Api
 import qualified Cardano.Api.Shelley                as Api.S
 import           Cardano.Ledger.Alonzo.TxWits       (AlonzoTxWits,
                                                      addrAlonzoTxWitsL)
-import           Cardano.Ledger.Babbage             (Babbage)
-import qualified Cardano.Ledger.Babbage             as Babbage (BabbageEra)
 import qualified Cardano.Ledger.Binary              as CBOR
 import           Cardano.Ledger.Conway              (Conway)
 import qualified Cardano.Ledger.Conway              as Conway (ConwayEra)

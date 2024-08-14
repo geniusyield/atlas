@@ -17,44 +17,42 @@ module GeniusYield.Transaction.CoinSelection
     , selectInputs
     ) where
 
-import           Control.Monad.Random                          (MonadRandom)
-import           Control.Monad.Trans.Except                    (ExceptT (ExceptT),
-                                                                except)
-import qualified Data.ByteString                               as BS
-import           Data.Default                                  (Default (def))
-import qualified Data.Map                                      as Map
-import qualified Data.Set                                      as S
-import qualified Data.Text                                     as Text
-import           Data.Text.Class                               (ToText (toText),
-                                                                fromText)
+import           Control.Monad.Random                            (MonadRandom)
+import           Control.Monad.Trans.Except                      (ExceptT (ExceptT),
+                                                                  except)
+import qualified Data.ByteString                                 as BS
+import           Data.Default                                    (Default (def))
+import qualified Data.Map                                        as Map
+import qualified Data.Set                                        as S
+import qualified Data.Text                                       as Text
+import           Data.Text.Class                                 (ToText (toText),
+                                                                  fromText)
 
-import qualified Cardano.Api                                   as Api
-import qualified Cardano.Api.Shelley                           as Api.S
-import qualified Cardano.CoinSelection.Balance                 as CBalance
-import qualified Cardano.CoinSelection.Context                 as CCoinSelection
-import           Cardano.Ledger.Babbage                        (Babbage)
-import qualified Cardano.Ledger.Binary                         as CBOR
+import qualified Cardano.Api                                     as Api
+import qualified Cardano.Api.Shelley                             as Api.S
+import qualified Cardano.CoinSelection.Balance                   as CBalance
+import qualified Cardano.CoinSelection.Context                   as CCoinSelection
+import qualified Cardano.Ledger.Binary                           as CBOR
+import           Cardano.Ledger.Conway                           (Conway)
 
-import qualified Internal.Cardano.Write.Tx.Balance.CoinSelection as CBalanceInternal (
-  SelectionBalanceError (..),
-  WalletUTxO (..)
- )
-import qualified Cardano.Wallet.Primitive.Types.Address        as CWallet
-import qualified Cardano.Wallet.Primitive.Types.Coin           as CWallet
-import qualified Cardano.Wallet.Primitive.Types.Hash           as CWallet
-import qualified Cardano.Wallet.Primitive.Types.TokenBundle    as CTokenBundle
-import qualified Cardano.Wallet.Primitive.Types.TokenMap       as CWTokenMap
-import qualified Cardano.Wallet.Primitive.Types.TokenPolicyId  as CWallet
-import qualified Cardano.Wallet.Primitive.Types.TokenQuantity  as CWallet
-import qualified Cardano.Wallet.Primitive.Types.Tx.Constraints as CWallet
-import qualified Cardano.Wallet.Primitive.Types.Tx.TxIn        as CWallet
-import qualified Cardano.CoinSelection.Size                    as CWallet
-import qualified Cardano.CoinSelection.UTxOIndex               as CWallet
-import qualified Cardano.Wallet.Primitive.Types.AssetId        as CTokenBundle
-import qualified Cardano.Wallet.Primitive.Types.AssetName      as CWallet
-import qualified Cardano.CoinSelection.UTxOSelection           as CWallet
+import qualified Cardano.CoinSelection.Size                      as CWallet
+import qualified Cardano.CoinSelection.UTxOIndex                 as CWallet
+import qualified Cardano.CoinSelection.UTxOSelection             as CWallet
+import qualified Cardano.Wallet.Primitive.Types.Address          as CWallet
+import qualified Cardano.Wallet.Primitive.Types.AssetId          as CTokenBundle
+import qualified Cardano.Wallet.Primitive.Types.AssetName        as CWallet
+import qualified Cardano.Wallet.Primitive.Types.Coin             as CWallet
+import qualified Cardano.Wallet.Primitive.Types.Hash             as CWallet
+import qualified Cardano.Wallet.Primitive.Types.TokenBundle      as CTokenBundle
+import qualified Cardano.Wallet.Primitive.Types.TokenMap         as CWTokenMap
+import qualified Cardano.Wallet.Primitive.Types.TokenPolicyId    as CWallet
+import qualified Cardano.Wallet.Primitive.Types.TokenQuantity    as CWallet
+import qualified Cardano.Wallet.Primitive.Types.Tx.Constraints   as CWallet
+import qualified Cardano.Wallet.Primitive.Types.Tx.TxIn          as CWallet
+import qualified Internal.Cardano.Write.Tx.Balance.CoinSelection as CBalanceInternal (SelectionBalanceError (..),
+                                                                                      WalletUTxO (..))
 
-import           Cardano.Ledger.Alonzo.Core                    (eraProtVerHigh)
+import           Cardano.Ledger.Alonzo.Core                      (eraProtVerHigh)
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.Common
 import           GeniusYield.Types
@@ -247,7 +245,7 @@ selectInputs
 
 computeTokenBundleSerializedLengthBytes :: CTokenBundle.TokenBundle -> CWallet.TxSize
 computeTokenBundleSerializedLengthBytes = CWallet.TxSize . safeCast
-    . BS.length . CBOR.serialize' (eraProtVerHigh @Babbage) . Api.S.toMaryValue . toCardanoValue
+    . BS.length . CBOR.serialize' (eraProtVerHigh @Conway) . Api.S.toMaryValue . toCardanoValue
   where
     safeCast :: Int -> Natural
     safeCast = fromIntegral

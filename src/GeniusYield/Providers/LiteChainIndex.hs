@@ -67,7 +67,7 @@ newLCIClient info resumePoints = do
     return $ LCIClient a slotVar dataVar
 
 chainSyncCallback :: STM.TVar Api.SlotNo -> STM.TVar (Map (Api.Hash Api.ScriptData) Api.HashableScriptData) -> ChainSyncCallback
-chainSyncCallback slotVar dataVar (RollForward block@(Api.BlockInMode Api.BabbageEra (Api.Block (Api.BlockHeader slot _ _) _txs)) _tip) =
+chainSyncCallback slotVar dataVar (RollForward block@(Api.BlockInMode Api.ConwayEra (Api.Block (Api.BlockHeader slot _ _) _txs)) _tip) =
     STM.atomically $ do
         STM.writeTVar slotVar slot
         STM.modifyTVar' dataVar $ \m ->

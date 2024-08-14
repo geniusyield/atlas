@@ -4,9 +4,6 @@ module GeniusYield.Test.GYTxBody
     ) where
 
 import qualified Cardano.Api                          as Api
-import qualified Cardano.Api.Shelley                  as Api.S
-import qualified Cardano.Ledger.Alonzo.Core           as AlonzoCore
-import           Data.Coerce                          (coerce)
 import qualified Data.Set                             as Set (empty)
 import           Data.Time.Clock.POSIX                (posixSecondsToUTCTime)
 import           Numeric.Natural                      (Natural)

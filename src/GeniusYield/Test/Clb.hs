@@ -39,8 +39,8 @@ import qualified Cardano.Api.Shelley                            as Api.S
 import qualified Cardano.Ledger.Address                         as L
 import qualified Cardano.Ledger.Alonzo.Core                     as AlonzoCore
 import qualified Cardano.Ledger.Api                             as L
-import qualified Cardano.Ledger.Babbage.TxOut                   as L
 import qualified Cardano.Ledger.Compactible                     as L
+import qualified Cardano.Ledger.Core                            as L
 import qualified Cardano.Ledger.Plutus.TxInfo                   as L
 import qualified Cardano.Ledger.Shelley.API                     as L.S
 import qualified Cardano.Ledger.UTxO                            as L
@@ -277,10 +277,10 @@ instance GYTxQueryMonad GYTxMonadClb where
         return $ do
             o <- Map.lookup (txOutRefToPlutus ref) m
 
-            let a = addressFromApi . Api.S.fromShelleyAddrToAny . either id L.decompactAddr $ o ^. L.addrEitherBabbageTxOutL
-                v = valueFromApi . Api.S.fromMaryValue . either id L.fromCompact $ o ^. L.valueEitherBabbageTxOutL
+            let a = addressFromApi . Api.S.fromShelleyAddrToAny . either id L.decompactAddr $ o ^. L.addrEitherTxOutL
+                v = valueFromApi . Api.S.fromMaryValue . either id L.fromCompact $ o ^. L.valueEitherTxOutL
 
-            d <- case o ^. L.datumBabbageTxOutL of
+            d <- case o ^. L.datumTxOutL of
                 L.NoDatum -> pure GYOutDatumNone
                 L.DatumHash dh -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus $ L.transDataHash dh)
                 L.Datum binaryData -> pure $
@@ -292,7 +292,7 @@ instance GYTxQueryMonad GYTxMonadClb where
                     . L.binaryDataToData
                     $ binaryData
 
-            let s = case o ^. L.referenceScriptBabbageTxOutL of
+            let s = case o ^. L.referenceScriptTxOutL of
                         L.S.SJust x  -> someScriptFromReferenceApi
                                         $ Api.fromShelleyScriptToReferenceScript Api.ShelleyBasedEraConway x
                         L.S.SNothing -> Nothing

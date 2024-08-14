@@ -302,7 +302,7 @@ generateUser network = do
 
     let addr :: GYAddress
         addr = addressFromApi' $ Api.AddressInEra
-            (Api.ShelleyAddressInEra Api.ShelleyBasedEraBabbage)
+            (Api.ShelleyAddressInEra Api.ShelleyBasedEraConway)
             (Api.makeShelleyAddress
                 (networkIdToApi network)
                 (Api.PaymentCredentialByKey vkeyHash)

@@ -119,7 +119,7 @@ why one cannot trivially automate this.
 Well, unless one uses vectors, from dependent type land.
 -}
 parseEraHist :: (t -> Ouroboros.EraSummary) -> [t] -> Maybe Api.EraHistory
-parseEraHist mkEra [byronEra, shelleyEra, allegraEra, maryEra, alonzoEra, babbageEra] = Just
+parseEraHist mkEra [byronEra, shelleyEra, allegraEra, maryEra, alonzoEra, babbageEra, conwayEra] = Just
     . Api.EraHistory
     . Ouroboros.mkInterpreter
     . Ouroboros.Summary
@@ -128,8 +128,11 @@ parseEraHist mkEra [byronEra, shelleyEra, allegraEra, maryEra, alonzoEra, babbag
     . NonEmptyCons (mkEra allegraEra)
     . NonEmptyCons (mkEra maryEra)
     . NonEmptyCons (mkEra alonzoEra)
-    $ NonEmptyOne (mkEra babbageEra)
+    . NonEmptyCons (mkEra babbageEra)
+    $ NonEmptyOne (mkEra conwayEra)
 parseEraHist _ _ = Nothing
+
+-- FIXME: These hardcoded era histories have to be corrected to include conway.
 
 {- | Hardcoded era history for preprod.
 

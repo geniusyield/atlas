@@ -52,7 +52,7 @@ import qualified Cardano.Wallet.Primitive.Types.Tx.TxIn          as CWallet
 import qualified Internal.Cardano.Write.Tx.Balance.CoinSelection as CBalanceInternal (SelectionBalanceError (..),
                                                                                       WalletUTxO (..))
 
-import           Cardano.Ledger.Alonzo.Core                      (eraProtVerHigh)
+import           Cardano.Ledger.Conway.Core                      (eraProtVerHigh)
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.Common
 import           GeniusYield.Types

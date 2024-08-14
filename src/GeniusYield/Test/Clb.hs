@@ -37,9 +37,9 @@ import qualified Cardano.Api                                    as Api
 import qualified Cardano.Api.Script                             as Api
 import qualified Cardano.Api.Shelley                            as Api.S
 import qualified Cardano.Ledger.Address                         as L
-import qualified Cardano.Ledger.Alonzo.Core                     as AlonzoCore
 import qualified Cardano.Ledger.Api                             as L
 import qualified Cardano.Ledger.Compactible                     as L
+import qualified Cardano.Ledger.Conway.Core                     as ConwayCore
 import qualified Cardano.Ledger.Core                            as L
 import qualified Cardano.Ledger.Plutus.TxInfo                   as L
 import qualified Cardano.Ledger.Shelley.API                     as L.S
@@ -415,7 +415,7 @@ slotConfig' = liftClb $ do
         zero = posixSecondsToUTCTime $ timeToPOSIX $ timeFromPlutus $ scSlotZeroTime sc
     return (zero, len)
 
-protocolParameters :: GYTxMonadClb (AlonzoCore.PParams (Api.S.ShelleyLedgerEra ApiEra))
+protocolParameters :: GYTxMonadClb (ConwayCore.PParams (Api.S.ShelleyLedgerEra ApiEra))
 protocolParameters = do
     pparams <- liftClb $ gets $ mockConfigProtocol . mockConfig
     pure $ coerce pparams

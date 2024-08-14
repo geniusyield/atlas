@@ -13,20 +13,14 @@ Stability   : develop
 module GeniusYield.Test.Privnet.Examples.Gift (tests) where
 
 import qualified Cardano.Api                              as Api
-import qualified Cardano.Api.Shelley                      as Api.S
+import           Cardano.Ledger.Alonzo.PParams            (ppCollateralPercentageL)
 import           Control.Applicative                      ((<|>))
 import           Control.Concurrent                       (threadDelay)
 import           Control.Lens                             ((.~), (^.))
-import           Test.Tasty                               (TestTree, testGroup)
-import           Test.Tasty.HUnit                         (testCaseSteps)
-
 import           Data.Default                             (Default (def))
 import           Data.Maybe                               (fromJust)
 import           Data.Ratio                               ((%))
 import qualified Data.Set                                 as Set
-
-import           Cardano.Ledger.Alonzo.PParams            (AlonzoEraPParams (hkdCollateralPercentageL),
-                                                           ppCollateralPercentageL)
 import           GeniusYield.Examples.Gift
 import           GeniusYield.Examples.Treat
 import           GeniusYield.Imports
@@ -38,6 +32,8 @@ import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 import           GeniusYield.Types.ProtocolParameters     (protocolParametersToApi)
+import           Test.Tasty                               (TestTree, testGroup)
+import           Test.Tasty.HUnit                         (testCaseSteps)
 
 pattern InsufficientFundsException :: GYTxMonadException
 pattern InsufficientFundsException <- GYBuildTxException (GYBuildTxBalancingError (GYBalancingErrorInsufficientFunds _))

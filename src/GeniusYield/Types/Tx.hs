@@ -307,5 +307,5 @@ txWitToLedger = coerce
 -- Just [ShelleyKeyWitness ShelleyBasedEraBabbage (WitVKeyInternal {wvkKey = VKey (VerKeyEd25519DSIGN "6400a17ee58ce12a54c6edb7b964f0eb217e00dac75f2a47eccb6eedd02809a4"), wvkSig = SignedDSIGN (SigEd25519DSIGN "48bfa2dbf21514cafd1425b0072c67dd09cce82f5688169cff4761ca47e6557371ecc1ccbadde231dee179cf17d9dac29a61ac64ff9ef2dbd94968ec26301801"), wvkKeyHash = KeyHash "f24712bd05f058c6dca5df794f6afbffa8392076e7cb9fda9f508d7a", wvkBytes = "\130X d\NUL\161~\229\140\225*T\198\237\183\185d\240\235!~\NUL\218\199_*G\236\203n\237\208(\t\164X@H\191\162\219\242\NAK\DC4\202\253\DC4%\176\a,g\221\t\204\232/V\136\SYN\156\255Ga\202G\230Usq\236\193\204\186\221\226\&1\222\225y\207\ETB\217\218\194\154a\172d\255\158\242\219\217Ih\236&0\CAN\SOH"})]
 
 -- | Obtain `vkeywitness` as cddl calls it to make our unsigned transaction, signed (see `makeSignedTransaction` method).
-txWitToKeyWitnessApi :: GYTxWitness -> [Api.S.KeyWitness Api.S.ConwayEra]
+txWitToKeyWitnessApi :: GYTxWitness -> [Api.S.KeyWitness ApiEra]
 txWitToKeyWitnessApi = fmap (Api.S.ShelleyKeyWitness Api.ShelleyBasedEraConway) . Set.toList . view addrAlonzoTxWitsL . txWitToLedger

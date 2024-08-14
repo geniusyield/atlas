@@ -378,7 +378,7 @@ gyMintingScriptWitnessToApiPlutusSW
   :: GYMintScript u
   -> Api.S.ScriptRedeemer
   -> Api.S.ExecutionUnits
-  -> Api.S.ScriptWitness Api.S.WitCtxMint Api.S.ConwayEra
+  -> Api.S.ScriptWitness Api.S.WitCtxMint ApiEra
 gyMintingScriptWitnessToApiPlutusSW (GYMintScript p) = mintingPolicyToApiPlutusScriptWitness p
 gyMintingScriptWitnessToApiPlutusSW (GYMintReference r s) =
     referenceScriptToApiPlutusScriptWitness r s
@@ -551,7 +551,7 @@ gyStakeValScriptWitnessToApiPlutusSW
   :: GYStakeValScript u
   -> Api.S.ScriptRedeemer
   -> Api.S.ExecutionUnits
-  -> Api.S.ScriptWitness Api.S.WitCtxStake Api.S.ConwayEra
+  -> Api.S.ScriptWitness Api.S.WitCtxStake ApiEra
 gyStakeValScriptWitnessToApiPlutusSW (GYStakeValScript p) = stakeValidatorToApiPlutusScriptWitness p
 gyStakeValScriptWitnessToApiPlutusSW (GYStakeValReference r s) =
     referenceScriptToApiPlutusScriptWitness r s
@@ -685,7 +685,7 @@ scriptToApi (GYScript _ api _) = api
 scriptToApiScript :: GYScript v -> Api.Script (PlutusVersionToApi v)
 scriptToApiScript (GYScript v api _) = Api.PlutusScript (singPlutusVersionToApi v) api
 
-scriptToApiScriptInEra :: GYScript v -> Api.ScriptInEra Api.S.ConwayEra
+scriptToApiScriptInEra :: GYScript v -> Api.ScriptInEra ApiEra
 scriptToApiScriptInEra s@(GYScript v _ _) = Api.ScriptInEra scriptInLanguageEra (scriptToApiScript s)
   where
     scriptInLanguageEra = case singPlutusVersionToApi v of
@@ -694,7 +694,7 @@ scriptToApiScriptInEra s@(GYScript v _ _) = Api.ScriptInEra scriptInLanguageEra 
       Api.PlutusScriptV3 -> Api.PlutusScriptV3InConway
 
 -- FIXME: Should we use Conway here?
-someScriptToReferenceApi :: Some GYScript -> Api.S.ReferenceScript Api.S.ConwayEra
+someScriptToReferenceApi :: Some GYScript -> Api.S.ReferenceScript ApiEra
 someScriptToReferenceApi (Some (GYScript v apiScript _)) =
     Api.S.ReferenceScript
       Api.S.BabbageEraOnwardsConway $
@@ -799,7 +799,7 @@ referenceScriptToApiPlutusScriptWitness
   -> Api.S.ScriptDatum witctx
   -> Api.S.ScriptRedeemer
   -> Api.S.ExecutionUnits
-  -> Api.S.ScriptWitness witctx Api.S.ConwayEra
+  -> Api.S.ScriptWitness witctx ApiEra
 referenceScriptToApiPlutusScriptWitness r s =
     Api.PlutusScriptWitness
     Api.PlutusScriptV2InConway

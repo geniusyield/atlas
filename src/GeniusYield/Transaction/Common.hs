@@ -19,11 +19,11 @@ module GeniusYield.Transaction.Common (
 ) where
 
 import qualified Cardano.Api                          as Api
-import qualified Cardano.Api.Shelley                  as Api.S
 import qualified Cardano.Ledger.Coin                  as Ledger
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Types.Address
+import           GeniusYield.Types.Era
 import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters,
                                                        protocolParametersToApi)
 import           GeniusYield.Types.PubKeyHash
@@ -100,7 +100,7 @@ instance Eq GYBalancingError where
 -- Insufficient funds and similar are considered trivial transaction building errors.
 data GYBuildTxError
     = GYBuildTxBalancingError !GYBalancingError
-    | GYBuildTxBodyErrorAutoBalance !(Api.TxBodyErrorAutoBalance Api.S.ConwayEra)
+    | GYBuildTxBodyErrorAutoBalance !(Api.TxBodyErrorAutoBalance ApiEra)
     | GYBuildTxPPConversionError !Api.ProtocolParametersConversionError
     | GYBuildTxMissingMaxExUnitsParam
     -- ^ Missing max ex units in protocol params

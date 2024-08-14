@@ -4,11 +4,12 @@ module GeniusYield.Types.ProtocolParameters (
     protocolParametersToApi,
   ) where
 
-import qualified Cardano.Api.Ledger  as Api.L
-import qualified Cardano.Api.Shelley as Api.S
-import           GeniusYield.Imports (coerce)
+import qualified Cardano.Api.Ledger    as Api.L
+import qualified Cardano.Api.Shelley   as Api.S
+import           GeniusYield.Imports   (coerce)
+import           GeniusYield.Types.Era
 
-type ApiProtocolParameters = Api.L.PParams (Api.S.ShelleyLedgerEra Api.S.ConwayEra)
+type ApiProtocolParameters = Api.L.PParams (Api.S.ShelleyLedgerEra ApiEra)
 
 newtype GYProtocolParameters = GYProtocolParameters ApiProtocolParameters
   deriving newtype (Eq, Ord, Show)

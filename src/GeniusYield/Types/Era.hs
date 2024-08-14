@@ -14,5 +14,5 @@ module GeniusYield.Types.Era (
 import qualified Cardano.Api.Shelley as Api.S
 
 -- TODO: Make this module internal.
-type ConwayEra = Api.S.ShelleyLedgerEra Api.S.ConwayEra
+type ConwayEra = Api.S.ShelleyLedgerEra ApiEra
 type ApiEra = Api.S.ConwayEra

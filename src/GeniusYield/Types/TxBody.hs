@@ -101,7 +101,7 @@ makeSignedTransaction :: GYTxWitness -> GYTxBody -> GYTx
 makeSignedTransaction txWit txBody = makeSignedTransaction' (txWitToKeyWitnessApi txWit) $ txBodyToApi txBody
 
 -- | Make a signed transaction given the transaction body & list of key witnesses.
-makeSignedTransaction' :: [Api.S.KeyWitness Api.S.ConwayEra] -> Api.TxBody ApiEra -> GYTx
+makeSignedTransaction' :: [Api.S.KeyWitness ApiEra] -> Api.TxBody ApiEra -> GYTx
 makeSignedTransaction' = fmap txFromApi <$> Api.makeSignedTransaction
 
 -- | Add a key witness(s) to a transaction, represented in `GYTxWitness`, which might already have previous key witnesses.
@@ -109,7 +109,7 @@ appendWitnessGYTx :: GYTxWitness -> GYTx -> GYTx
 appendWitnessGYTx = appendWitnessGYTx' . txWitToKeyWitnessApi
 
 -- | Add a key witness(s) to a transaction, which might already have previous key witnesses.
-appendWitnessGYTx' :: [Api.S.KeyWitness Api.S.ConwayEra] -> GYTx -> GYTx
+appendWitnessGYTx' :: [Api.S.KeyWitness ApiEra] -> GYTx -> GYTx
 appendWitnessGYTx' appendKeyWitnessList previousTx =
   let (txBody, previousKeyWitnessesList) = Api.S.getTxBodyAndWitnesses $ txToApi previousTx
   in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody

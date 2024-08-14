@@ -67,7 +67,6 @@ module GeniusYield.Types.Providers
     ) where
 
 import qualified Cardano.Api                          as Api
-import qualified Cardano.Api.Ledger                   as Api.L
 import qualified Cardano.Api.Shelley                  as Api.S
 import           Cardano.Slotting.Time                (SystemStart)
 import           Control.Concurrent                   (MVar, modifyMVar,

@@ -26,16 +26,16 @@ module GeniusYield.Test.Utils
     , module X
     ) where
 
-import           Control.Monad.Except             (ExceptT, runExceptT)
+import           Control.Monad.Except        (ExceptT, runExceptT)
 import           Control.Monad.Random
-import qualified Data.Map.Strict                  as Map
-import qualified Data.Text                        as T
+import qualified Data.Map.Strict             as Map
+import qualified Data.Text                   as T
 
-import qualified PlutusLedgerApi.V1.Value         as Plutus
+import qualified PlutusLedgerApi.V1.Value    as Plutus
 
-import qualified Test.Tasty                       as Tasty
-import qualified Test.Tasty.QuickCheck            as Tasty
-import qualified Test.Tasty.Runners               as Tasty
+import qualified Test.Tasty                  as Tasty
+import qualified Test.Tasty.QuickCheck       as Tasty
+import qualified Test.Tasty.Runners          as Tasty
 
 import           GeniusYield.HTTP.Errors
 import           GeniusYield.Imports
@@ -43,7 +43,7 @@ import           GeniusYield.Test.FakeCoin
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
-import           GeniusYield.Test.FeeTracker      as X
+import           GeniusYield.Test.FeeTracker as X
 
 -------------------------------------------------------------------------------
 -- tasty tools
@@ -156,19 +156,19 @@ findLockedUtxosInBody addr tx =
     findAllMatches (0, os, [])
 
 -- | Find reference scripts at given address.
-getRefInfos :: GYTxQueryMonad m => GYAddress -> m (Map (Some GYScript) GYTxOutRef)
+getRefInfos :: GYTxQueryMonad m => GYAddress -> m (Map GYAnyScript GYTxOutRef)
 getRefInfos addr = do
     utxo <- utxosAtAddress addr Nothing
     return $ utxoToRefMap utxo
 
-utxoToRefMap :: GYUTxOs ->  Map (Some GYScript) GYTxOutRef
+utxoToRefMap :: GYUTxOs ->  Map GYAnyScript GYTxOutRef
 utxoToRefMap utxo = Map.fromList
     [ (sc, ref)
     | GYUTxO { utxoRef = ref, utxoRefScript = Just sc} <- utxosToList utxo
     ]
 
 -- | Find reference scripts in transaction body.
-findRefScriptsInBody :: GYTxBody -> Map (Some GYScript) GYTxOutRef
+findRefScriptsInBody :: GYTxBody -> Map GYAnyScript GYTxOutRef
 findRefScriptsInBody body = do
     let utxo = txBodyUTxOs body
     utxoToRefMap utxo
@@ -179,7 +179,7 @@ addRefScript :: forall m. GYTxMonad m => GYAddress -> GYScript 'PlutusV2 -> m GY
 addRefScript addr sc = throwAppError absurdError `runEagerT` do
     existingUtxos <- lift $ utxosAtAddress addr Nothing
     let refs = utxoToRefMap existingUtxos
-    maybeToEager $ Map.lookup (Some sc) refs
+    maybeToEager $ Map.lookup (GYPlutusScript sc) refs
     txBody <- lift $ buildTxBody
         $ mustHaveOutput GYTxOut
             { gyTxOutAddress     = addr
@@ -188,7 +188,7 @@ addRefScript addr sc = throwAppError absurdError `runEagerT` do
             , gyTxOutRefS        = Just $ GYPlutusScript sc
             }
     lift $ signAndSubmitConfirmed_ txBody
-    maybeToEager . Map.lookup (Some sc) $ findRefScriptsInBody txBody
+    maybeToEager . Map.lookup (GYPlutusScript sc) $ findRefScriptsInBody txBody
   where
     absurdError = someBackendError "Shouldn't happen: no ref in body"
 
@@ -213,9 +213,9 @@ addRefInput toInline addr dat = throwAppError absurdError `runEagerT` do
         . find
             (\GYUTxO {utxoOutDatum} ->
                 case utxoOutDatum of
-                    GYOutDatumHash dh       -> hashDatum dat == dh
+                    GYOutDatumHash dh     -> hashDatum dat == dh
                     GYOutDatumInline dat' -> dat == dat'
-                    _                       -> False
+                    _                     -> False
             )
         $ utxosToList utxos
     absurdError = someBackendError "Shouldn't happen: no output with expected datum in body"

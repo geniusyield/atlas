@@ -10,7 +10,6 @@ import           Data.Map.Strict                   as Map (difference,
 import           Data.Maybe                        (fromJust)
 import qualified Data.Set                          as Set (difference, fromList,
                                                            isSubsetOf)
-import           Data.Some                         (mkSome)
 import qualified Data.Text                         as Text (Text, unpack)
 import           Test.Tasty
 import           Test.Tasty.Golden.Advanced        (goldenTest)
@@ -20,7 +19,8 @@ import           GeniusYield.Types.Address         (GYAddress,
                                                     unsafeAddressFromText)
 import           GeniusYield.Types.Datum           (datumFromApi',
                                                     datumHashFromHex)
-import           GeniusYield.Types.Script          (mintingPolicyIdToText,
+import           GeniusYield.Types.Script          (GYAnyScript (..),
+                                                    mintingPolicyIdToText,
                                                     scriptFromCBOR)
 import           GeniusYield.Types.TxOutRef        (GYTxOutRef)
 import           GeniusYield.Types.UTxO            (GYOutDatum (..),
@@ -145,7 +145,7 @@ maestroTests token netId =
                                         , utxoAddress   = mockAddress
                                         , utxoValue     = valueFromList []
                                         , utxoOutDatum  = GYOutDatumNone
-                                        , utxoRefScript = mkSome <$> scriptFromCBOR  @'PlutusV2 mockScriptCBOR
+                                        , utxoRefScript = GYPlutusScript <$> scriptFromCBOR  @'PlutusV2 mockScriptCBOR
                                         }
                 res = utxoFromMaestro $ mockMaestroUtxo [] Nothing (Just mockMaestroScript)
             res @?= expected

@@ -18,9 +18,16 @@ module GeniusYield.Types.Script.SimpleScript (
   getTotalKeysInSimpleScript,
   hashSimpleScript,
   hashSimpleScript',
+  simpleScriptFromCBOR,
+  simpleScriptFromCBOR',
+  simpleScriptFromJSON,
 ) where
 
 import qualified Cardano.Api                         as Api
+import qualified Data.Aeson                          as Aeson
+import qualified Data.Aeson.Types                    as Aeson
+import           Data.ByteString                     (ByteString)
+import qualified Data.ByteString.Base16              as BS16
 import           Data.Foldable                       (foldMap')
 import qualified Data.Set                            as Set
 import           GeniusYield.Imports
@@ -48,7 +55,7 @@ data GYSimpleScript
   | RequireAllOf ![GYSimpleScript]
   | RequireAnyOf ![GYSimpleScript]
   | RequireMOf !Int ![GYSimpleScript]
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 simpleScriptToApi :: GYSimpleScript -> Api.SimpleScript
 simpleScriptToApi s = case s of
@@ -105,3 +112,17 @@ hashSimpleScript = scriptHashFromApi . hashSimpleScript'
 
 hashSimpleScript' :: GYSimpleScript -> Api.ScriptHash
 hashSimpleScript' = Api.hashScript . Api.SimpleScript . simpleScriptToApi
+
+-- FIXME: Need to test this.
+simpleScriptFromCBOR :: Text -> Maybe GYSimpleScript
+simpleScriptFromCBOR = simpleScriptFromCBOR' . encodeUtf8
+
+-- FIXME: Need to test this.
+simpleScriptFromCBOR' :: ByteString -> Maybe GYSimpleScript
+simpleScriptFromCBOR' b = do
+    bs <- rightToMaybe (BS16.decode b)
+    Api.SimpleScript s <- rightToMaybe $ Api.deserialiseFromCBOR (Api.AsScript Api.AsSimpleScript) bs
+    Just $ simpleScriptFromApi s
+
+simpleScriptFromJSON :: Aeson.Value -> Maybe GYSimpleScript
+simpleScriptFromJSON = Aeson.parseMaybe parseJSON

@@ -290,7 +290,7 @@ tests setup = testGroup "gift"
         -- mUtxo <- gyQueryUtxoAtTxOutRef' (ctxQueryUtxos ctx) ref  -- another way
         mUtxo <- ctxRunQuery ctx $ utxoAtTxOutRef ref
         case mUtxo of
-          Just utxo -> maybe (assertFailure "No Reference Script exists in the added UTxO.") (\s -> if s == Some (validatorToScript giftValidatorV2) then info "Script matched, able to read reference script from UTxO." else assertFailure "Mismatch.") (utxoRefScript utxo)
+          Just utxo -> maybe (assertFailure "No Reference Script exists in the added UTxO.") (\s -> if s == GYPlutusScript (validatorToScript giftValidatorV2) then info "Script matched, able to read reference script from UTxO." else assertFailure "Mismatch.") (utxoRefScript utxo)
           Nothing -> assertFailure "Couldn't find the UTxO containing added Reference Script."
 
     , testCaseSteps "refscript" $ \info -> withSetup info setup $ \ctx -> do

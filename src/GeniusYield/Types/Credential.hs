@@ -42,7 +42,6 @@ import           GeniusYield.Types.PaymentKeyHash (GYPaymentKeyHash,
 import           GeniusYield.Types.PubKeyHash     (AsPubKeyHash (fromPubKeyHash, toPubKeyHash))
 import           GeniusYield.Types.Script         (GYScriptHash,
                                                    GYStakeValidatorHash,
-                                                   GYValidatorHash,
                                                    scriptHashFromApi,
                                                    scriptHashFromLedger,
                                                    scriptHashToApi,
@@ -50,10 +49,7 @@ import           GeniusYield.Types.Script         (GYScriptHash,
                                                    scriptHashToPlutus,
                                                    stakeValidatorHashFromApi,
                                                    stakeValidatorHashToApi,
-                                                   stakeValidatorHashToPlutus,
-                                                   validatorHashFromApi,
-                                                   validatorHashToApi,
-                                                   validatorHashToPlutus)
+                                                   stakeValidatorHashToPlutus)
 import           GeniusYield.Types.StakeKeyHash   (GYStakeKeyHash,
                                                    stakeKeyHashFromApi,
                                                    stakeKeyHashToApi)

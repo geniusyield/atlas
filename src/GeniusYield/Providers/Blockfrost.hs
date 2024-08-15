@@ -198,7 +198,7 @@ blockfrostQueryUtxo proj = GYQueryUTxO
     , gyQueryUtxosAtPaymentCredsWithDatums' = Nothing  -- Will use the default implementation.
     }
 
-transformUtxo :: (Blockfrost.AddressUtxo, Maybe (Some GYScript)) -> Either SomeDeserializeError GYUTxO
+transformUtxo :: (Blockfrost.AddressUtxo, Maybe GYAnyScript) -> Either SomeDeserializeError GYUTxO
 transformUtxo (Blockfrost.AddressUtxo {..}, ms) = do
     val  <- bimap DeserializeErrorAssetClass fold $ traverse amountToValue _addressUtxoAmount
     addr <- maybeToRight DeserializeErrorAddress $ addressFromTextMaybe $ Blockfrost.unAddress _addressUtxoAddress
@@ -325,15 +325,15 @@ blockfrostUtxosAtTxOutRefs proj refs = do
   where
     locationIndent = "TxUtxos"
 
-    f :: Map Api.S.TxId [(Blockfrost.UtxoOutput, Maybe (Some GYScript))]
+    f :: Map Api.S.TxId [(Blockfrost.UtxoOutput, Maybe GYAnyScript)]
       -> (Api.S.TxId, [Blockfrost.UtxoOutput])
-      -> IO (Map Api.S.TxId [(Blockfrost.UtxoOutput, Maybe (Some GYScript))])
+      -> IO (Map Api.S.TxId [(Blockfrost.UtxoOutput, Maybe GYAnyScript)])
     f m (tid, os) = do
         xs <- forM os $ \o -> lookupScriptHashIO proj (Blockfrost._utxoOutputReferenceScriptHash o) >>= \ms -> return (o, ms)
         return $ Map.insert tid xs m
 
 -- | Helper to transform a 'Blockfrost.UtxoOutput' into a 'GYUTxO'.
-transformUtxoOutput :: Api.S.TxId -> (Blockfrost.UtxoOutput, Maybe (Some GYScript)) -> Either SomeDeserializeError GYUTxO
+transformUtxoOutput :: Api.S.TxId -> (Blockfrost.UtxoOutput, Maybe GYAnyScript) -> Either SomeDeserializeError GYUTxO
 transformUtxoOutput txId (Blockfrost.UtxoOutput {..}, ms) = do
     val  <- bimap DeserializeErrorAssetClass fold $ traverse amountToValue _utxoOutputAmount
     addr <- maybeToRight DeserializeErrorAddress . addressFromTextMaybe $ Blockfrost.unAddress _utxoOutputAddress
@@ -538,21 +538,25 @@ outDatumFromBlockfrost mdh mind = do
         (Nothing , Just h ) -> GYOutDatumHash h
         (Nothing , Nothing) -> GYOutDatumNone
 
-lookupScriptHash :: Blockfrost.ScriptHash -> Blockfrost.BlockfrostClient (Maybe (Some GYScript))
+lookupScriptHash :: Blockfrost.ScriptHash -> Blockfrost.BlockfrostClient (Maybe GYAnyScript)
 lookupScriptHash h = do
     t <- Blockfrost._scriptType <$> Blockfrost.getScript h
     case t of
-        Blockfrost.Timelock -> return Nothing
+        Blockfrost.Timelock -> do
+            mjson <- Blockfrost._scriptJsonJson <$> Blockfrost.getScriptJSON h
+            case mjson of
+                Nothing   -> return Nothing
+                Just json -> return $ GYSimpleScript <$> simpleScriptFromJSON json
         _                   -> do
             mcbor <- Blockfrost._scriptCborCbor <$> Blockfrost.getScriptCBOR h
             case mcbor of
                 Nothing   -> return Nothing
                 Just cbor -> return $
                     if t == Blockfrost.PlutusV1
-                        then Some <$> scriptFromCBOR @'PlutusV1 cbor
-                        else Some <$> scriptFromCBOR @'PlutusV2 cbor
+                        then GYPlutusScript <$> scriptFromCBOR @'PlutusV1 cbor
+                        else GYPlutusScript <$> scriptFromCBOR @'PlutusV2 cbor
 
-lookupScriptHashIO :: Blockfrost.Project -> Maybe Blockfrost.ScriptHash -> IO (Maybe (Some GYScript))
+lookupScriptHashIO :: Blockfrost.Project -> Maybe Blockfrost.ScriptHash -> IO (Maybe GYAnyScript)
 lookupScriptHashIO _ Nothing  = return Nothing
 lookupScriptHashIO p (Just h) = do
     e <- Blockfrost.runBlockfrost p $ lookupScriptHash h

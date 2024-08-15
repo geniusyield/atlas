@@ -202,15 +202,17 @@ valueFromMaestro Maestro.Asset {..} = do
   pure $ valueSingleton asc $ toInteger assetAmount
 
 -- | Convert Maestro's script to our GY type.
-scriptFromMaestro :: Maestro.Script -> Either SomeDeserializeError (Maybe (Some GYScript))
+scriptFromMaestro :: Maestro.Script -> Either SomeDeserializeError (Maybe GYAnyScript)
 scriptFromMaestro Maestro.Script {..} = case scriptType of
-  Maestro.Native   -> pure Nothing
+  Maestro.Native   -> case scriptJson of
+    Nothing -> Left $ DeserializeErrorImpossibleBranch "UTxO has native script but no script JSON is present"
+    Just sj -> pure $ GYSimpleScript <$> simpleScriptFromJSON sj
   Maestro.PlutusV1 -> case scriptBytes of
     Nothing -> Left $ DeserializeErrorImpossibleBranch "UTxO has PlutusV1 script but still no script bytes are present"
-    Just sb -> pure $ Some <$> scriptFromCBOR  @'PlutusV1 sb
+    Just sb -> pure $ GYPlutusScript <$> scriptFromCBOR  @'PlutusV1 sb
   Maestro.PlutusV2 -> case scriptBytes of
     Nothing -> Left $ DeserializeErrorImpossibleBranch "UTxO has PlutusV2 script but still no script bytes are present"
-    Just sb -> pure $ Some <$> scriptFromCBOR  @'PlutusV2 sb
+    Just sb -> pure $ GYPlutusScript <$> scriptFromCBOR  @'PlutusV2 sb
 
 -- | Convert Maestro's UTxO to our GY type.
 utxoFromMaestro :: Maestro.IsUtxo a => a -> Either SomeDeserializeError GYUTxO

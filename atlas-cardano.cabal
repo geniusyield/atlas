@@ -317,7 +317,6 @@ test-suite atlas-tests
     , plutus-ledger-api
     , plutus-tx
     , plutus-tx-plugin
-    , some
     , tasty
     , tasty-hunit
     , tasty-quickcheck

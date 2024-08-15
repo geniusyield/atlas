@@ -99,24 +99,24 @@ module GeniusYield.TxBuilder.Class
     , wt
     ) where
 
-import qualified Cardano.Api                  as Api
-import           Control.Monad.Except         (MonadError (..), liftEither)
-import qualified Control.Monad.State.Strict   as Strict
-import qualified Control.Monad.State.Lazy     as Lazy
-import qualified Control.Monad.Writer.CPS     as CPS
-import qualified Control.Monad.Writer.Strict  as Strict
-import qualified Control.Monad.Writer.Lazy    as Lazy
-import           Control.Monad.IO.Class       (MonadIO (..))
-import           Control.Monad.Random         (MonadRandom (..), RandT, lift)
-import           Control.Monad.Reader         (ReaderT)
-import           Data.Default                 (def, Default)
-import qualified Data.List.NonEmpty           as NE
-import qualified Data.Map.Strict              as Map
-import           Data.Maybe                   (maybeToList)
-import qualified Data.Set                     as Set
-import qualified Data.Text                    as Txt
-import           Data.Time                    (diffUTCTime, getCurrentTime)
-import           Data.Word                    (Word64)
+import           Control.Monad.Except              (MonadError (..), liftEither)
+import           Control.Monad.IO.Class            (MonadIO (..))
+import           Control.Monad.Random              (MonadRandom (..), RandT,
+                                                    lift)
+import           Control.Monad.Reader              (ReaderT)
+import qualified Control.Monad.State.Lazy          as Lazy
+import qualified Control.Monad.State.Strict        as Strict
+import qualified Control.Monad.Writer.CPS          as CPS
+import qualified Control.Monad.Writer.Lazy         as Lazy
+import qualified Control.Monad.Writer.Strict       as Strict
+import           Data.Default                      (Default, def)
+import qualified Data.List.NonEmpty                as NE
+import qualified Data.Map.Strict                   as Map
+import           Data.Maybe                        (maybeToList)
+import qualified Data.Set                          as Set
+import qualified Data.Text                         as Txt
+import           Data.Time                         (diffUTCTime, getCurrentTime)
+import           Data.Word                         (Word64)
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder.Common
@@ -124,13 +124,15 @@ import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.Query.Class
 import           GeniusYield.TxBuilder.User
 import           GeniusYield.Types
-import           GeniusYield.Types.Key.Class  (ToShelleyWitnessSigningKey)
-import           GHC.Stack                    (withFrozenCallStack)
-import qualified PlutusLedgerApi.V1           as Plutus (Address, DatumHash,
-                                                         FromData (..),
-                                                         PubKeyHash, TokenName,
-                                                         TxOutRef, Value)
-import qualified PlutusLedgerApi.V1.Value     as Plutus (AssetClass)
+import           GeniusYield.Types.Key.Class       (ToShelleyWitnessSigningKey)
+import           GHC.Stack                         (withFrozenCallStack)
+import qualified PlutusLedgerApi.V1                as Plutus (Address,
+                                                              DatumHash,
+                                                              FromData (..),
+                                                              PubKeyHash,
+                                                              TokenName,
+                                                              TxOutRef, Value)
+import qualified PlutusLedgerApi.V1.Value          as Plutus (AssetClass)
 
 -- NOTE: The 'Default (TxBuilderStrategy m)' constraint is not necessary, but it is usually desired everytime
 -- someone is building transactions with the below machinery.

@@ -15,10 +15,11 @@ module GeniusYield.TxBuilder.IO.Builder (
 ) where
 
 
-import           Control.Monad.Reader            (ReaderT(ReaderT), MonadReader, asks)
-import           Control.Monad.IO.Class          (MonadIO (..))
-import           Control.Monad.Trans.Maybe       (MaybeT (runMaybeT))
-import qualified Data.Set                        as Set
+import           Control.Monad.IO.Class         (MonadIO (..))
+import           Control.Monad.Reader           (MonadReader, ReaderT (ReaderT),
+                                                 asks)
+import           Control.Monad.Trans.Maybe      (MaybeT (runMaybeT))
+import qualified Data.Set                       as Set
 
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Class
@@ -84,14 +85,17 @@ instance GYTxUserQueryMonad GYTxBuilderMonadIO where
         addrs           <- ownAddresses
         utxosToConsider <- availableUTxOs
         case lang of
-          PlutusV2 ->
-            case someTxOutRef utxosToConsider  of
-                Just (oref, _) -> return oref
-                Nothing        -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs
+          PlutusV3 -> ifNotV1 utxosToConsider addrs
+          PlutusV2 -> ifNotV1 utxosToConsider addrs
           PlutusV1 ->
             case find utxoTranslatableToV1 $ utxosToList utxosToConsider of
               Just u  -> return $ utxoRef u
               Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
+      where
+          ifNotV1 utxosToConsider addrs =
+            case someTxOutRef utxosToConsider  of
+                Just (oref, _) -> return oref
+                Nothing        -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs
 
 runGYTxBuilderMonadIO
     :: GYNetworkId                      -- ^ Network ID.

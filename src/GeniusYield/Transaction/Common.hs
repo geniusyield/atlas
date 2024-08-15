@@ -65,7 +65,7 @@ data GYTxInDetailed v = GYTxInDetailed
     , gyTxInDetAddress   :: !GYAddress
     , gyTxInDetValue     :: !GYValue
     , gyTxInDetDatum     :: !GYOutDatum
-    , gyTxInDetScriptRef :: !(Maybe (Some GYScript))
+    , gyTxInDetScriptRef :: !(Maybe GYAnyScript)
     }
   deriving (Eq, Show)
 

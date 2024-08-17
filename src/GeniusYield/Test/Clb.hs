@@ -151,17 +151,16 @@ mkTestFor :: String -> (TestInfo -> GYTxMonadClb a) -> Tasty.TestTree
 mkTestFor name action =
     testNoErrorsTraceClb v w Clb.defaultConway name $ do
       asClb pureGen (w1 testWallets) nextWalletInt
-        $ action TestInfo { testGoldAsset = fakeGold, testIronAsset = fakeIron, testWallets }
+        $ action TestInfo { testGoldAsset = fakeCoin fakeGold, testIronAsset = fakeCoin fakeIron, testWallets }
   where
-    v = valueFromLovelace 1_000_000_000_000_000 <>
-        fakeGold                  1_000_000_000 <>
-        fakeIron                  1_000_000_000
+    v = valueFromLovelace  1_000_000_000_000_000 <>
+        fakeValue fakeGold         1_000_000_000 <>
+        fakeValue fakeIron         1_000_000_000
 
     w = valueFromLovelace 1_000_000_000_000 <>
-        fakeGold                  1_000_000 <>
-        fakeIron                  1_000_000
+        fakeValue fakeGold        1_000_000 <>
+        fakeValue fakeIron        1_000_000
 
-    -- TODO (simplify-genesis):: Remove creation of wallets. Only create one (or more) genesis/funder wallet and pass it on.
     testWallets :: Wallets
     testWallets = Wallets
                       (mkSimpleWallet (Clb.intToKeyPair 1))

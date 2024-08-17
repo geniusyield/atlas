@@ -18,7 +18,7 @@ module GeniusYield.Test.Utils
     , findRefScriptsInBody
     , addRefScript
     , addRefInput
-    , fakeCoin, fakeGold, fakeIron
+    , fakeValue, fakeCoin, fakeGold, fakeIron, fakePolicy
     , afterAllSucceed
     , feesFromLovelace
     , withMaxQCTests
@@ -30,8 +30,6 @@ import           Control.Monad.Except        (ExceptT, runExceptT)
 import           Control.Monad.Random
 import qualified Data.Map.Strict             as Map
 import qualified Data.Text                   as T
-
-import qualified PlutusLedgerApi.V1.Value    as Plutus
 
 import qualified Test.Tasty                  as Tasty
 import qualified Test.Tasty.QuickCheck       as Tasty
@@ -75,24 +73,13 @@ withMaxQCTests n = Tasty.adjustOption f where
 -- test assets
 -------------------------------------------------------------------------------
 
-class    FromFakeCoin a                 where fromFakeCoin :: FakeCoin -> a
-instance FromFakeCoin FakeCoin          where fromFakeCoin = id
-instance FromFakeCoin GYAssetClass      where fromFakeCoin = fromRight (error "invalid asset class") . assetClassFromPlutus . fakeCoin
-instance FromFakeCoin Plutus.AssetClass where fromFakeCoin = fakeCoin
-
--- | This allows to write e.g. @'fakeGold' 1000 :: GYValue@.
-instance (a ~ Integer, b ~ GYValue) => FromFakeCoin (a -> b) where
-    fromFakeCoin c = fromRight (error "invalid value") . valueFromPlutus . fakeValue c
-
 -- | Fake \"Gold\" coin to use during tests.
--- Can represent a 'GYAssetClass' or a Plutus 'Plutus.AssetClass'
-fakeGold :: FromFakeCoin a => a
-fakeGold = fromFakeCoin $ FakeCoin "Gold"
+fakeGold :: FakeCoin
+fakeGold = FakeCoin "Gold"
 
 -- | Fake \"Iron\" coin to use during tests
--- Can represent a 'GYAssetClass' or a Plutus 'Plutus.AssetClass'
-fakeIron :: FromFakeCoin a => a
-fakeIron = fromFakeCoin $ FakeCoin "Iron"
+fakeIron :: FakeCoin
+fakeIron = FakeCoin "Iron"
 
 -------------------------------------------------------------------------------
 -- helpers

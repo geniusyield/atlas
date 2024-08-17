@@ -39,7 +39,7 @@ fakeMintingPolicyPlutus mintParam =
 {-# INLINEABLE fakeMintingPolicyContract #-}
 fakeMintingPolicyContract :: TokenName -> () -> ScriptContext -> Bool
 fakeMintingPolicyContract tag _ ctx =
-  PlutusValue.valueOf (txInfoMint (scriptContextTxInfo ctx)) (ownCurrencySymbol ctx) tag > 0
+  PlutusValue.valueOf (txInfoMint (scriptContextTxInfo ctx)) (ownCurrencySymbol ctx) tag /= 0
 
 -- | See `fakeMintingPolicyContract`.
 {-# INLINEABLE fakeMintingPolicyUntypedContract #-}

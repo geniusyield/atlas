@@ -153,6 +153,7 @@ mkTestFor name action =
       asClb pureGen (w1 testWallets) nextWalletInt
         $ action TestInfo { testGoldAsset = fakeCoin fakeGold, testIronAsset = fakeCoin fakeIron, testWallets }
   where
+    -- TODO (simplify-genesis): Remove generation of non ada funds.
     v = valueFromLovelace  1_000_000_000_000_000 <>
         fakeValue fakeGold         1_000_000_000 <>
         fakeValue fakeIron         1_000_000_000
@@ -161,6 +162,7 @@ mkTestFor name action =
         fakeValue fakeGold        1_000_000 <>
         fakeValue fakeIron        1_000_000
 
+    -- TODO (simplify-genesis):: Remove creation of wallets. Only create one (or more) genesis/funder wallet and pass it on.
     testWallets :: Wallets
     testWallets = Wallets
                       (mkSimpleWallet (Clb.intToKeyPair 1))

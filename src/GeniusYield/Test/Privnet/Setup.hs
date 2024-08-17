@@ -348,6 +348,7 @@ withPrivnet testnetOpts setupUser = do
 -- Generating users
 -------------------------------------------------------------------------------
 
+-- TODO (simplify-genesis): Remove this. See note 'simplify-genesis'.
 generateUser :: GYNetworkId -> IO User
 generateUser network = do
     -- generate new key
@@ -374,12 +375,14 @@ generateUser network = do
 -- Balance
 -------------------------------------------------------------------------------
 
+-- TODO (simplify-genesis): Remove this once 'generateUser' and similar have been removed. Use 'createUserWithLovelace' instead.
 giveAda :: Ctx -> GYAddress -> IO ()
 giveAda ctx addr = ctxRun ctx (ctxUserF ctx) $ do
     txBody <- buildTxBody $ mconcat $ replicate 5 $
         mustHaveOutput $ mkGYTxOutNoDatum addr (valueFromLovelace 1_000_000_000)
     signAndSubmitConfirmed_ txBody
 
+-- TODO (simplify-genesis): Remove this once 'generateUser' and similar have been removed. Use 'createUserWithAssets' instead.
 giveTokens :: Ctx -> GYAddress -> IO ()
 giveTokens ctx addr = ctxRun ctx (ctxUserF ctx) $ do
     txBody <- buildTxBody $
@@ -391,6 +394,7 @@ giveTokens ctx addr = ctxRun ctx (ctxUserF ctx) $ do
 -- minting tokens
 -------------------------------------------------------------------------------
 
+-- TODO (simplify-genesis): Remove this once 'generateUser' and similar have been removed.
 mintTestTokens :: Ctx -> String -> IO GYAssetClass
 mintTestTokens ctx tn' = do
     ctxRun ctx (ctxUserF ctx) $ do

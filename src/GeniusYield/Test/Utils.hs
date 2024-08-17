@@ -11,6 +11,9 @@ Stability   : develop
 module GeniusYield.Test.Utils
     ( TestInfo (..)
     , Wallets (..)
+    , createUserWithLovelace
+    , createUserWithAssets
+    , createUserFull
     , withBalance
     , withWalletBalancesCheck
     , findLockedUtxosInBody
@@ -18,6 +21,8 @@ module GeniusYield.Test.Utils
     , findRefScriptsInBody
     , addRefScript
     , addRefInput
+    , mintTestAssets
+    , generateCollateral
     , fakeValue, fakeCoin, fakeGold, fakeIron, fakePolicy
     , afterAllSucceed
     , feesFromLovelace
@@ -85,9 +90,26 @@ fakeIron = FakeCoin "Iron"
 -- helpers
 -------------------------------------------------------------------------------
 
+{- Note [simplify-genesis]
+
+Currently, both our testing providers (privnet and CLB) generate users during test setup. Previously,
+this was necessary since there was no obvious way to generate new users with funds etc. However, with the
+addition of unified machinery to create new users and fund them, it should be left to the tests to create their
+own users and fund them however they like.
+
+This will vastly simplify the genesis code and remove problematically dynamic (yet static) types like 'Wallets', 'TestInfo'
+and the user fields in "GeniusYield.Test.Privnet.Ctx".
+
+TL;DR: Remove all user creation code from test setups and point Atlas users to use functions like 'createUser', 'createUserWithAssets',
+'createUserFull' etc.
+-}
+
+-- TODO (simplify-genesis): Remove 'TestInfo'. The only thing test setup should do is to make one or more genesis/funder user(s)
+-- and pass that 'User' onto the tests.
 -- | General information about the test environment to help in running polymorphic tests.
 data TestInfo = TestInfo { testGoldAsset :: !GYAssetClass, testIronAsset :: !GYAssetClass, testWallets :: !Wallets }
 
+-- TODO (simplify-genesis): Remove this type once user creation logic is removed from test setup.
 -- | Available wallets.
 data Wallets = Wallets
     { w1 :: !User
@@ -100,6 +122,61 @@ data Wallets = Wallets
     , w8 :: !User
     , w9 :: !User
     } deriving (Show, Eq, Ord)
+
+-- | Create an user and fund them with the given amount of lovelace provided by the given funder user.
+createUserWithLovelace :: GYTxGameMonad m => User -> Natural -> m User
+createUserWithLovelace funder lovelace = do
+    u <- createUser
+    asUser funder $ do
+        -- Fragment the lovelace amount into at least 5 utxos.
+        let utxosCount = 5
+            eachUtxo = toInteger $ lovelace `quot` utxosCount
+            extraUtxo = toInteger $ lovelace `rem` utxosCount
+            mustHaveLovelace 0 = mempty
+            mustHaveLovelace l = mustHaveOutput $ mkGYTxOutNoDatum (userChangeAddress u) (valueFromLovelace l)
+        txBody <- buildTxBody $ mconcat $ mustHaveLovelace extraUtxo : replicate 5 (mustHaveLovelace eachUtxo)
+        signAndSubmitConfirmed_ txBody
+    pure u
+
+{- | `createUserWithAssets funder lovelaces tokens` is equivalent to
+  `createUserWithLovelace funder lovelace', followed by 'mintTestAssets tokens'
+  as the newly created user.
+
+  Note: This will obviously require the user to have enough lovelace to cover the fees
+  and min ada deposits for the mints.
+-}
+createUserWithAssets :: GYTxGameMonad m => User -> Natural -> [(FakeCoin, Natural)] -> m User
+createUserWithAssets funder lovelace tokens = do
+    user <- createUserWithLovelace funder lovelace
+    asUser user $ mintTestAssets tokens
+    pure user
+
+-- | Create a collateral utxo out of the existing ada within a user wallet. Returns the collateral reference.
+generateCollateral :: GYTxMonad m => m GYTxOutRef
+generateCollateral = do
+    addr <- ownChangeAddress
+    txBody <- buildTxBody $ mustHaveOutput (mkGYTxOutNoDatum addr collateralValue)
+    txId <- signAndSubmitConfirmed txBody
+    pure $ txOutRefFromTuple (txId, 0)
+
+-- | This is a combination of 'createUserWithAssets' and 'generateCollateral'.
+-- It creates a user with ada, non-ada assets, and a collateral.
+-- Thereby making a user ready to participate in smart contracts.
+createUserFull :: GYTxGameMonad m => User -> Natural -> [(FakeCoin, Natural)] -> m User
+createUserFull funder lovelace tokens = do
+    user <- createUserWithAssets funder lovelace tokens
+    userCollateralRef <- asUser user generateCollateral
+    pure user { userCollateral = Just UserCollateral { userCollateralRef, userCollateralCheck = True } }
+
+-- | Mint given amount of test tokens.
+mintTestAssets :: GYTxMonad m => [(FakeCoin, Natural)] -> m ()
+mintTestAssets tokens = do
+    txBody <- buildTxBody @PlutusV2 $ foldMap
+        (\(tk, amt) ->
+            mustMint (GYMintScript $ fakePolicy tk) unitRedeemer (fakeCoinName tk) $ toInteger amt
+        )
+        tokens
+    signAndSubmitConfirmed_ txBody
 
 {- | Computes a `GYTx*Monad` action and returns the result and how this action
      changed the balance of some "Address".

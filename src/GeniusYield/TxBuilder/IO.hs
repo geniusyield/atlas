@@ -137,6 +137,20 @@ ioToTxGameMonad ioAct = GYTxGameMonadIO . const $ ioToQueryMonad ioAct
 instance GYTxGameMonad GYTxGameMonadIO where
     type TxMonadOf GYTxGameMonadIO = GYTxMonadIO
 
+    createUser = do
+        nid <- networkId
+        paymentSKey <- ioToTxGameMonad generatePaymentSigningKey
+        stakeSKey <- Just <$> ioToTxGameMonad generateStakeSigningKey
+        let paymentVKey = paymentVerificationKey paymentSKey
+            stakeVKey = stakeVerificationKey <$> stakeSKey
+            pkh = paymentKeyHash paymentVKey
+            skh = stakeKeyHash <$> stakeVKey
+            newAddr = addressFromCredential
+                nid
+                (GYPaymentCredentialByKey pkh)
+                (GYStakeCredentialByKey <$> skh)
+        pure $ User' {userPaymentSKey' = paymentSKey, userAddr = newAddr, userStakeSKey' = stakeSKey}
+
     asUser u@User{..} act = do
         nid <- asks envGameNid
         providers <- asks envGameProviders

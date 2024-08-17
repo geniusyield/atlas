@@ -174,6 +174,7 @@ ftgLift act = FeeTrackerGame $ \s -> (, s) <$> act
 
 instance GYTxGameMonad m => GYTxGameMonad (FeeTrackerGame m) where
     type TxMonadOf (FeeTrackerGame m) = FeeTracker (TxMonadOf m)
+    createUser = ftgLift createUser
     asUser u (FeeTracker act) = FeeTrackerGame $ asUser u . act
 
 {- Note [Proper GYTxMonad overriding with FeeTracker]

@@ -26,12 +26,11 @@ test-show-details: direct
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
 
--- FIXME: Push these changes to main repo.
 source-repository-package
   type: git
-  location: https://github.com/sourabhxyz/haskell-sdk
-  tag: 2c93a3e65da99f3b46a2031d5279c08e96d1809c
-  --sha256: FIXME:
+  location: https://github.com/maestro-org/haskell-sdk
+  tag: v1.7.0
+  --sha256: sha256-i0rRBxFHC2/cJoYjDP6sZHaI+e2hbU1jYeHe8EmJ1RE=
 
 source-repository-package
   type: git

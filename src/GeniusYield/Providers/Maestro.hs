@@ -41,6 +41,7 @@ import           Control.Exception                              (try)
 import           Control.Monad                                  ((<=<))
 import qualified Data.Aeson                                     as Aeson
 import           Data.Either.Combinators                        (maybeToRight)
+import           Data.Int                                       (Int64)
 import qualified Data.Map.Strict                                as M
 import           Data.Maybe                                     (fromJust)
 import qualified Data.Set                                       as Set
@@ -450,48 +451,48 @@ maestroProtocolParams env = do
   pure $ protocolParametersFromApi $ Ledger.PParams $
     ConwayPParams
       { cppMinFeeA        = THKD $ Ledger.Coin $ toInteger protocolParametersMinFeeCoefficient
-      , cppMinFeeB        = THKD $ Ledger.Coin $ toInteger protocolParametersMinFeeConstant
-      , cppMaxBBSize    = THKD $ fromIntegral protocolParametersMaxBlockBodySize  -- FIXME: Modify maestro to return word32 in first place.
-      , cppMaxTxSize           = THKD $ fromIntegral protocolParametersMaxTxSize  -- FIXME: same as above
-      , cppMaxBHSize  = THKD $ fromIntegral protocolParametersMaxBlockHeaderSize  -- FIXME: same...
-      , cppKeyDeposit = THKD $ Ledger.Coin $ toInteger protocolParametersStakeKeyDeposit
-      , cppPoolDeposit    = THKD $ Ledger.Coin $ toInteger protocolParametersPoolDeposit
+      , cppMinFeeB        = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinFeeConstant
+      , cppMaxBBSize    = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxBlockBodySize
+      , cppMaxTxSize           = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxTransactionSize
+      , cppMaxBHSize  = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxBlockHeaderSize
+      , cppKeyDeposit = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersStakeCredentialDeposit
+      , cppPoolDeposit    = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersStakePoolDeposit
       , cppEMax  = THKD $ Ledger.EpochInterval . fromIntegral
-                                              $ Maestro.unEpochNo protocolParametersPoolRetirementEpochBound
-      , cppNOpt  = THKD $ fromIntegral protocolParametersDesiredNumberOfPools  -- FIXME: ...
-      , cppA0 = THKD $ fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: pool influence received from Maestro is out of bounds")  $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersPoolInfluence
-      , cppRho   = THKD $ fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: monetory expansion parameter received from Maestro is out of bounds")  $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersMonetaryExpansion
-      , cppTau         = THKD $ fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: treasury expansion parameter received from Maestro is out of bounds") $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersTreasuryExpansion
+                                              $ Maestro.unEpochNo protocolParametersStakePoolRetirementEpochBound
+      , cppNOpt  = THKD $ fromIntegral protocolParametersDesiredNumberOfStakePools
+      , cppA0 = THKD $ fromMaybe (error (errPath <> "Pool influence received from Maestro is out of bounds"))  $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersStakePoolPledgeInfluence
+      , cppRho   = THKD $ fromMaybe (error (errPath <> "Monetory expansion parameter received from Maestro is out of bounds"))  $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersMonetaryExpansion
+      , cppTau         = THKD $ fromMaybe (error (errPath <> "Treasury expansion parameter received from Maestro is out of bounds")) $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersTreasuryExpansion
       , cppProtocolVersion     = Ledger.ProtVer {
-          Ledger.pvMajor = Ledger.mkVersion (Maestro.protocolVersionMajor protocolParametersProtocolVersion) & fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: major version received from Maestro is out of bounds"),
-          Ledger.pvMinor = Maestro.protocolVersionMinor protocolParametersProtocolVersion
+          Ledger.pvMajor = Ledger.mkVersion (Maestro.protocolVersionMajor protocolParametersVersion) & fromMaybe (error (errPath <> "Major version received from Maestro is out of bounds")),
+          Ledger.pvMinor = Maestro.protocolVersionMinor protocolParametersVersion
         }
-      , cppMinPoolCost         = THKD $ Ledger.Coin $ toInteger protocolParametersMinPoolCost
-      , cppCoinsPerUTxOByte     = THKD $ Api.L.CoinPerByte $ Ledger.Coin $ toInteger protocolParametersCoinsPerUtxoByte
+      , cppMinPoolCost         = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinStakePoolCost
+      , cppCoinsPerUTxOByte     = THKD $ Api.L.CoinPerByte $ Ledger.Coin $ toInteger protocolParametersMinUtxoDepositCoefficient
       , cppCostModels = THKD $ Ledger.mkCostModels $ M.fromList
                                               [ ( Ledger.PlutusV1
-                                                , either (error "FIXME:") id $ Ledger.mkCostModel Ledger.PlutusV1 $ fromInteger <$> M.elems (coerce $ Maestro.costModelsPlutusV1 protocolParametersCostModels)
+                                                , either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ coerce @_ @[Int64] (Maestro.costModelsPlutusV1 protocolParametersPlutusCostModels)
                                                 )
                                               , ( Ledger.PlutusV2
-                                                , either (error "FIXME:") id $ Ledger.mkCostModel Ledger.PlutusV2 $ fromInteger <$> M.elems (coerce $ Maestro.costModelsPlutusV2 protocolParametersCostModels)
+                                                , either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ coerce @_ @[Int64] (Maestro.costModelsPlutusV2 protocolParametersPlutusCostModels)
                                                 )
                                               ]  -- FIXME: Add PlutusV3
-      , cppPrices              = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error "FIXME:") $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryStepsWithSteps protocolParametersPrices, Ledger.prMem = fromMaybe (error "FIXME:") $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryStepsWithMemory protocolParametersPrices}
+      , cppPrices              = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Maestro's cpu steps")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithCpu protocolParametersScriptExecutionPrices, Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Maestro's memory units")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithMemory protocolParametersScriptExecutionPrices}
       , cppMaxTxExUnits        = THKD $ Ledger.OrdExUnits $ Ledger.ExUnits {
                                           Ledger.exUnitsSteps =
-                                              Maestro.memoryStepsWithSteps protocolParametersMaxExecutionUnitsPerTransaction,
+                                              Maestro.memoryCpuWithCpu protocolParametersMaxExecutionUnitsPerTransaction,
                                           Ledger.exUnitsMem =
-                                              Maestro.memoryStepsWithMemory protocolParametersMaxExecutionUnitsPerTransaction
+                                              Maestro.memoryCpuWithMemory protocolParametersMaxExecutionUnitsPerTransaction
                                         }
       , cppMaxBlockExUnits     = THKD $ Ledger.OrdExUnits $ Ledger.ExUnits {
                                           Ledger.exUnitsSteps =
-                                              Maestro.memoryStepsWithSteps protocolParametersMaxExecutionUnitsPerBlock,
+                                              Maestro.memoryCpuWithCpu protocolParametersMaxExecutionUnitsPerBlock,
                                           Ledger.exUnitsMem =
-                                              Maestro.memoryStepsWithMemory protocolParametersMaxExecutionUnitsPerBlock
+                                              Maestro.memoryCpuWithMemory protocolParametersMaxExecutionUnitsPerBlock
                                         }
-      , cppMaxValSize        = THKD $ fromIntegral protocolParametersMaxValueSize  -- FIXME: Get rid of fromintegral
-      , cppCollateralPercentage   = THKD $ fromIntegral protocolParametersCollateralPercentage  -- FIXME:...
-      , cppMaxCollateralInputs = THKD $ fromIntegral protocolParametersMaxCollateralInputs  -- FIXME:...
+      , cppMaxValSize        = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxValueSize
+      , cppCollateralPercentage   = THKD $ fromIntegral protocolParametersCollateralPercentage
+      , cppMaxCollateralInputs = THKD $ fromIntegral protocolParametersMaxCollateralInputs
       , cppPoolVotingThresholds = error "FIXME:"
       , cppDRepVotingThresholds = error "FIXME:"
       , cppCommitteeMinSize = error "FIXME:"
@@ -502,6 +503,8 @@ maestroProtocolParams env = do
       , cppDRepActivity = error "FIXME:"
       , cppMinFeeRefScriptCostPerByte = error "FIXME:"
       }
+  where
+    errPath = "GeniusYield.Providers.Maestro.maestroProtocolParams: "
 
 -- | Returns a set of all Stake Pool's 'Api.S.PoolId'.
 maestroStakePools :: Maestro.MaestroEnv 'Maestro.V1 -> IO (Set Api.S.PoolId)
@@ -531,13 +534,13 @@ maestroEraHistory env = do
   maybe (throwIO $ MspvIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms
   where
     mkBound Maestro.EraBound {eraBoundEpoch, eraBoundSlot, eraBoundTime} = Ouroboros.Bound
-        { boundTime = CTime.RelativeTime eraBoundTime
+        { boundTime = CTime.RelativeTime $ Maestro.eraBoundTimeSeconds eraBoundTime
         , boundSlot = CSlot.SlotNo $ fromIntegral eraBoundSlot
         , boundEpoch = CSlot.EpochNo $ fromIntegral eraBoundEpoch
         }
     mkEraParams Maestro.EraParameters {eraParametersEpochLength, eraParametersSlotLength, eraParametersSafeZone} = Ouroboros.EraParams
         { eraEpochSize = CSlot.EpochSize $ fromIntegral eraParametersEpochLength
-        , eraSlotLength = CTime.mkSlotLength eraParametersSlotLength
+        , eraSlotLength = CTime.mkSlotLength $ Maestro.epochSlotLengthMilliseconds eraParametersSlotLength / 1000
         , eraSafeZone = Ouroboros.StandardSafeZone $ fromJust eraParametersSafeZone
         , eraGenesisWin = 0
         }

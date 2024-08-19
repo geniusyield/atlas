@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-|
 Module      : GeniusYield.Providers.Common
 Copyright   : (c) 2023 GYELD GMBH

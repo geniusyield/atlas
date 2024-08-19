@@ -207,7 +207,6 @@ valueFromApiTxOutValue (Api.TxOutValueByron (Ledger.Coin x)) = valueFromLovelace
 valueFromApiTxOutValue (Api.TxOutValueShelleyBased e v) =
   valueFromApi $ Api.fromLedgerValue e v
 
--- FIXME: should we use Conway?
 valueToApiTxOutValue :: GYValue -> Api.TxOutValue ApiEra
 valueToApiTxOutValue v =
   Api.TxOutValueShelleyBased

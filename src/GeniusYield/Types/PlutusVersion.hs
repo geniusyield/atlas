@@ -83,40 +83,16 @@ type family CmpPlutusVersion (v :: PlutusVersion) (u :: PlutusVersion) :: Orderi
   CmpPlutusVersion 'PlutusV1 _ = 'LT
   CmpPlutusVersion 'PlutusV2 'PlutusV1 = 'GT
   CmpPlutusVersion 'PlutusV2 'PlutusV2 = 'EQ
-  CmpPlutusVersion 'PlutusV2 'PlutusV3 = 'LT
+  CmpPlutusVersion 'PlutusV2 _ = 'LT
   CmpPlutusVersion 'PlutusV3 'PlutusV1 = 'GT
   CmpPlutusVersion 'PlutusV3 'PlutusV2 = 'GT
   CmpPlutusVersion 'PlutusV3 'PlutusV3 = 'EQ
-
--- FIXME: To check the below logic... whether it actually throws type-error when compiling...
 
 -- | Constraint that @v >= u@.
 --
 -- If transaction is making use of V2 features (such as reference inputs) then as these cannot be represented in script context of V1 scripts, we need to ensure that the involved script version is at least V2. Likewise for other versions.
 class VersionIsGreaterOrEqual (v :: PlutusVersion) (u :: PlutusVersion)
 instance (If ((v `CmpPlutusVersion` u) == 'LT) (TypeError ('Text "Given version " ':<>: ShowType v ':<>: 'Text ", is not greater or equal to " ':<>: ShowType u)) (() :: Constraint)) => VersionIsGreaterOrEqual v u
-
-{-
--- FIXME: Delete this!
-
--- | Any version is greater or equal to 'PlutusV1'
-instance VersionIsGreaterOrEqual 'PlutusV1 'PlutusV1
-
--- | Any version is greater or equal to 'PlutusV1'
-instance VersionIsGreaterOrEqual 'PlutusV2 'PlutusV1
-
--- | Only 'PlutusV2' is greater or equal to itself at the moment.
-instance VersionIsGreaterOrEqual 'PlutusV2 'PlutusV2
-
-instance VersionIsGreaterOrEqual 'PlutusV3 'PlutusV1
-instance VersionIsGreaterOrEqual 'PlutusV3 'PlutusV2
-instance VersionIsGreaterOrEqual 'PlutusV3 'PlutusV3
-
--- | Explicitly ruled out instance.
-instance TypeError ('Text "V1 is not >= V2") => VersionIsGreaterOrEqual 'PlutusV1 'PlutusV2
-instance TypeError ('Text "V1 is not >= V3") => VersionIsGreaterOrEqual 'PlutusV1 'PlutusV3
-instance TypeError ('Text "V2 is not >= V3") => VersionIsGreaterOrEqual 'PlutusV2 'PlutusV3
--}
 
 -- | Constraint that @v > u@.
 class VersionIsGreater (v :: PlutusVersion) (u :: PlutusVersion)

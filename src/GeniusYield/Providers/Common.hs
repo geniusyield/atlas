@@ -97,7 +97,7 @@ populateMissingProtocolParameters nid pp =
   pp {
       cppPoolVotingThresholds = THKD $ Ledger.PoolVotingThresholds {
         pvtPPSecurityGroup = commonPoolVotingThreshold, pvtMotionNoConfidence = commonPoolVotingThreshold, pvtHardForkInitiation = commonPoolVotingThreshold, pvtCommitteeNormal = commonPoolVotingThreshold, pvtCommitteeNoConfidence = commonPoolVotingThreshold}
-    , cppDRepVotingThresholds = THKD $ Ledger.DRepVotingThresholds {dvtUpdateToConstitution = unsafeBoundRational (75 % 100), dvtTreasuryWithdrawal = unsafeBoundRational (67 % 100), dvtPPTechnicalGroup = unsafeBoundRational (67 % 100), dvtPPNetworkGroup = unsafeBoundRational (67 % 100), dvtPPGovGroup = unsafeBoundRational (75 % 100), dvtPPEconomicGroup = unsafeBoundRational (67 % 100), dvtMotionNoConfidence = unsafeBoundRational (67 % 100), dvtHardForkInitiation = unsafeBoundRational (6 % 10), dvtCommitteeNormal = unsafeBoundRational (67 % 100), dvtCommitteeNoConfidence = unsafeBoundRational (67 % 100)}
+    , cppDRepVotingThresholds = THKD $ Ledger.DRepVotingThresholds {dvtUpdateToConstitution = unsafeBoundRational (75 % 100), dvtTreasuryWithdrawal = unsafeBoundRational (67 % 100), dvtPPTechnicalGroup = unsafeBoundRational (67 % 100), dvtPPNetworkGroup = unsafeBoundRational (67 % 100), dvtPPGovGroup = unsafeBoundRational (75 % 100), dvtPPEconomicGroup = unsafeBoundRational (67 % 100), dvtMotionNoConfidence = unsafeBoundRational (67 % 100), dvtHardForkInitiation = unsafeBoundRational (6 % 10), dvtCommitteeNormal = unsafeBoundRational (67 % 100), dvtCommitteeNoConfidence = unsafeBoundRational (6 % 10)}
     , cppCommitteeMinSize = THKD $ case nid of
         GYMainnet        -> 7
         GYTestnetPreprod -> 7

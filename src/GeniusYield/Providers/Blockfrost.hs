@@ -44,6 +44,7 @@ import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
 import qualified PlutusTx.Builtins                    as Plutus
 import qualified Web.HttpApiData                      as Web
 
+import           Data.Default                         (def)
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
 import           GeniusYield.Types
@@ -399,15 +400,15 @@ blockfrostProtocolParams nid proj = do
         , cppCollateralPercentage   = THKD $ fromIntegral _protocolParamsCollateralPercent
         , cppMaxCollateralInputs = THKD $ fromIntegral _protocolParamsMaxCollateralInputs
         -- FIXME: Fetch these from provider.
-        , cppPoolVotingThresholds = undefined
-        , cppDRepVotingThresholds = undefined
-        , cppCommitteeMinSize = undefined
-        , cppCommitteeMaxTermLength = undefined
-        , cppGovActionLifetime = undefined
-        , cppGovActionDeposit = undefined
-        , cppDRepDeposit = undefined
-        , cppDRepActivity = undefined
-        , cppMinFeeRefScriptCostPerByte = undefined
+        , cppPoolVotingThresholds = THKD def
+        , cppDRepVotingThresholds = THKD def
+        , cppCommitteeMinSize = THKD 0
+        , cppCommitteeMaxTermLength = THKD (Ledger.EpochInterval 0)
+        , cppGovActionLifetime = THKD (Ledger.EpochInterval 0)
+        , cppGovActionDeposit = THKD $ Ledger.Coin 0
+        , cppDRepDeposit = THKD $ Ledger.Coin 0
+        , cppDRepActivity = THKD (Ledger.EpochInterval 0)
+        , cppMinFeeRefScriptCostPerByte = THKD minBound
         }
   where
     errPath = "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: "

@@ -38,6 +38,7 @@ import           Control.Concurrent                             (threadDelay)
 import           Control.Exception                              (try)
 import           Control.Monad                                  ((<=<))
 import qualified Data.Aeson                                     as Aeson
+import           Data.Default                                   (def)
 import           Data.Either.Combinators                        (maybeToRight)
 import           Data.Int                                       (Int64)
 import qualified Data.Map.Strict                                as M
@@ -493,15 +494,15 @@ maestroProtocolParams nid env = do
       , cppCollateralPercentage   = THKD $ fromIntegral protocolParametersCollateralPercentage
       , cppMaxCollateralInputs = THKD $ fromIntegral protocolParametersMaxCollateralInputs
       -- FIXME: Fetch these from provider.
-      , cppPoolVotingThresholds = undefined
-      , cppDRepVotingThresholds = undefined
-      , cppCommitteeMinSize = undefined
-      , cppCommitteeMaxTermLength = undefined
-      , cppGovActionLifetime = undefined
-      , cppGovActionDeposit = undefined
-      , cppDRepDeposit = undefined
-      , cppDRepActivity = undefined
-      , cppMinFeeRefScriptCostPerByte = undefined
+      , cppPoolVotingThresholds = THKD def
+      , cppDRepVotingThresholds = THKD def
+      , cppCommitteeMinSize = THKD 0
+      , cppCommitteeMaxTermLength = THKD (Ledger.EpochInterval 0)
+      , cppGovActionLifetime = THKD (Ledger.EpochInterval 0)
+      , cppGovActionDeposit = THKD $ Ledger.Coin 0
+      , cppDRepDeposit = THKD $ Ledger.Coin 0
+      , cppDRepActivity = THKD (Ledger.EpochInterval 0)
+      , cppMinFeeRefScriptCostPerByte = THKD minBound
       }
   where
     errPath = "GeniusYield.Providers.Maestro.maestroProtocolParams: "

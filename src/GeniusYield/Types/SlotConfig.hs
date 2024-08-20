@@ -57,7 +57,7 @@ The slot <-> conversion operations also mimic (but consolidate) the behavior of 
 'Ouroboros.wallClockToSlot' query interpretations.
 
 The rationale behind this is simply that 'Api.EraHistory' (which contains the interpreter) is much too overcomplicated
-for this simple task. The design simplifaction here should allow easy construction of "simple" slot configs for testing
+for this simple task. The design simplification here should allow easy construction of "simple" slot configs for testing
 and similar.
 
 == IMPORTANT ==

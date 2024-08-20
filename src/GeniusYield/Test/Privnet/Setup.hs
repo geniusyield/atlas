@@ -221,8 +221,7 @@ withPrivnet testnetOpts setupUser = do
             let localQueryUtxo :: GYQueryUTxO
                 localQueryUtxo = nodeQueryUTxO info
 
-            let localGetParams :: GYGetParameters
-                localGetParams = nodeGetParameters info
+            localGetParams <- nodeGetParameters info
 
             -- context used for tests
             --

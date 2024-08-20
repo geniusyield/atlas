@@ -160,8 +160,9 @@ withCfgProviders
           let info = nodeConnectInfo path cfgNetworkId
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
           nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetSlotOfCurrentBlock info
+          nodeGetParams <- Node.nodeGetParameters info
           pure
-            ( Node.nodeGetParameters info
+            ( nodeGetParams
             , nodeSlotActions
             , KupoApi.kupoQueryUtxo kEnv
             , KupoApi.kupoLookupDatum kEnv
@@ -171,13 +172,12 @@ withCfgProviders
             )
         GYMaestro (Confidential apiToken) turboSubmit -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
+          maestroSlotActions <- makeSlotActions slotCachingTime $ MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv
           maestroGetParams <- makeGetParameters
-            (MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv)
             (MaestroApi.maestroProtocolParams maestroApiEnv)
             (MaestroApi.maestroSystemStart maestroApiEnv)
             (MaestroApi.maestroEraHistory maestroApiEnv)
             (MaestroApi.maestroStakePools maestroApiEnv)
-          maestroSlotActions <- makeSlotActions slotCachingTime $ MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv
           pure
             ( maestroGetParams
             , maestroSlotActions
@@ -189,13 +189,12 @@ withCfgProviders
             )
         GYBlockfrost (Confidential key) -> do
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
+          blockfrostSlotActions <- makeSlotActions slotCachingTime $ Blockfrost.blockfrostGetSlotOfCurrentBlock proj
           blockfrostGetParams <- makeGetParameters
-            (Blockfrost.blockfrostGetSlotOfCurrentBlock proj)
             (Blockfrost.blockfrostProtocolParams proj)
             (Blockfrost.blockfrostSystemStart proj)
             (Blockfrost.blockfrostEraHistory proj)
             (Blockfrost.blockfrostStakePools proj)
-          blockfrostSlotActions <- makeSlotActions slotCachingTime $ Blockfrost.blockfrostGetSlotOfCurrentBlock proj
           pure
             ( blockfrostGetParams
             , blockfrostSlotActions
@@ -244,7 +243,7 @@ logTiming providers@GYProviders {..} = GYProviders
   where
     wrap :: String -> IO a -> IO a
     wrap msg m = do
-        (a, t) <- duration m
+        (!a, !t) <- duration m
         gyLog providers "" GYDebug $ msg <> " took " <> show t
         pure a
 

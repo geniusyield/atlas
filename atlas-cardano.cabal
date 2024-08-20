@@ -167,6 +167,7 @@ library
     , async                
     , aeson                
     , attoparsec           
+    , auto-update
     , base                 
     , base16-bytestring    
     , blockfrost-client    
@@ -203,6 +204,7 @@ library
     , some                 
     , sop-extras           
     , stm                  
+    , strict-mvar
     , string-conv          
     , swagger2             
     , tasty                

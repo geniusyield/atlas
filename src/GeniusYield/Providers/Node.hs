@@ -28,7 +28,6 @@ import qualified Data.Set                                          as Set
 import qualified Data.Text                                         as Txt
 import           GeniusYield.CardanoApi.Query
 import           GeniusYield.Providers.Common                      (SubmitTxException (SubmitTxException))
-import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
 import           GeniusYield.Types.ProtocolParameters              (GYProtocolParameters,
                                                                     protocolParametersFromApi)
@@ -68,17 +67,8 @@ nodeSlotActions info = GYSlotActions
 -- Parameters
 -------------------------------------------------------------------------------
 
-nodeGetParameters :: Api.LocalNodeConnectInfo -> GYGetParameters
-nodeGetParameters info = GYGetParameters
-    { gyGetProtocolParameters' = nodeGetProtocolParameters info
-    , gyGetStakePools'         = stakePools info
-    , gyGetSystemStart'        = systemStart info
-    , gyGetEraHistory'         = eraHistory info
-    , gyGetSlotConfig'         = either
-                                    (throwIO . GYConversionException . GYEraSummariesToSlotConfigError . Txt.pack)
-                                    pure
-                                    =<< (makeSlotConfig <$> systemStart info <*> eraHistory info)
-    }
+nodeGetParameters :: Api.LocalNodeConnectInfo -> IO GYGetParameters
+nodeGetParameters info = makeGetParameters (nodeGetProtocolParameters info) (systemStart info) (eraHistory info) (stakePools info)
 
 nodeGetProtocolParameters :: Api.LocalNodeConnectInfo -> IO GYProtocolParameters
 nodeGetProtocolParameters info = protocolParametersFromApi <$> queryConwayEra info Api.QueryProtocolParameters

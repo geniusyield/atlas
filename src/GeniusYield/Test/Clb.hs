@@ -433,6 +433,7 @@ instance GYTxGameMonad GYTxMonadClb where
         st <- get
         let i = clbNextWalletInt st
             user = mkSimpleWallet $ Clb.intToKeyPair i
+        gyLogDebug' "createUser" . T.unpack $ "Created simple user with address: " <> addressToText (userAddr user)
         put st { clbNextWalletInt = i + 1 }
         pure user
     asUser u act = do

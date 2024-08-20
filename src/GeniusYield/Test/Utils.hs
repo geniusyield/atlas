@@ -134,6 +134,12 @@ createUserWithLovelace funder lovelace = do
             extraUtxo = toInteger $ lovelace `rem` utxosCount
             mustHaveLovelace 0 = mempty
             mustHaveLovelace l = mustHaveOutput $ mkGYTxOutNoDatum (userChangeAddress u) (valueFromLovelace l)
+        gyLogDebug' "createUserWithLovelace" . T.unpack
+            $  "Funding user at address: " <> addressToText (userChangeAddress u) <> "\n"
+            <> "  number of new utxos (except extra): " <> T.pack (show utxosCount) <> "\n"
+            <> "  lovelaces in each utxo: " <> T.pack (show eachUtxo) <> "\n"
+            <> "  extra utxo: " <> T.pack (show extraUtxo)
+
         txBody <- buildTxBody $ mconcat $ mustHaveLovelace extraUtxo : replicate 5 (mustHaveLovelace eachUtxo)
         signAndSubmitConfirmed_ txBody
     pure u
@@ -155,6 +161,9 @@ createUserWithAssets funder lovelace tokens = do
 generateCollateral :: GYTxMonad m => m GYTxOutRef
 generateCollateral = do
     addr <- ownChangeAddress
+    gyLogDebug' "mintTestAssets" . T.unpack
+            $  "Generating collateral for: " <> addressToText addr <> "\n"
+            <> "  collateral value: " <> T.pack (show collateralValue)
     txBody <- buildTxBody $ mustHaveOutput (mkGYTxOutNoDatum addr collateralValue)
     txId <- signAndSubmitConfirmed txBody
     pure $ txOutRefFromTuple (txId, 0)
@@ -171,12 +180,21 @@ createUserFull funder lovelace tokens = do
 -- | Mint given amount of test tokens.
 mintTestAssets :: GYTxMonad m => [(FakeCoin, Natural)] -> m ()
 mintTestAssets tokens = do
+    addr <- ownChangeAddress
+    let readableTkNames = map
+            (\(tk, amt) -> T.pack (show amt) <> " " <> readableTk tk) tokens
+    gyLogDebug' "mintTestAssets" . T.unpack
+            $  "Minting test assets for: " <> addressToText addr <> "\n"
+            <> "The test assets and their amounts are as following:-\n"
+            <> T.unlines (map ("  " <>) readableTkNames)
     txBody <- buildTxBody @PlutusV2 $ foldMap
         (\(tk, amt) ->
             mustMint (GYMintScript $ fakePolicy tk) unitRedeemer (fakeCoinName tk) $ toInteger amt
         )
         tokens
     signAndSubmitConfirmed_ txBody
+  where
+    readableTk tk = mintingPolicyIdToText (mintingPolicyId $ fakePolicy tk) <> "." <> T.pack (show $ fakeCoinName tk)
 
 {- | Computes a `GYTx*Monad` action and returns the result and how this action
      changed the balance of some "Address".

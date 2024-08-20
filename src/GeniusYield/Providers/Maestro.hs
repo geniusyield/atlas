@@ -26,13 +26,11 @@ module GeniusYield.Providers.Maestro
 
 import qualified Cardano.Api                                    as Api
 import qualified Cardano.Api.Ledger                             as Api.L
+import qualified Cardano.Api.Ledger                             as Ledger
 import qualified Cardano.Api.Shelley                            as Api.S
 import qualified Cardano.Ledger.Alonzo.PParams                  as Ledger
-import qualified Cardano.Ledger.BaseTypes                       as Ledger
-import qualified Cardano.Ledger.Coin                            as Ledger
 import           Cardano.Ledger.Conway.PParams                  (ConwayPParams (..),
                                                                  THKD (..))
-import qualified Cardano.Ledger.Core                            as Ledger
 import qualified Cardano.Ledger.Plutus                          as Ledger
 import qualified Cardano.Slotting.Slot                          as CSlot
 import qualified Cardano.Slotting.Time                          as CTime
@@ -445,10 +443,10 @@ maestroQueryUtxo env = GYQueryUTxO
 -------------------------------------------------------------------------------
 
 -- | Returns the 'GYProtocolParameters' queried from Maestro.
-maestroProtocolParams :: Maestro.MaestroEnv 'Maestro.V1 -> IO GYProtocolParameters
-maestroProtocolParams env = do
+maestroProtocolParams :: GYNetworkId -> Maestro.MaestroEnv 'Maestro.V1 -> IO GYProtocolParameters
+maestroProtocolParams nid env = do
   Maestro.ProtocolParameters {..} <- handleMaestroError "ProtocolParams" <=< try $ Maestro.getTimestampedData <$> Maestro.getProtocolParameters env
-  pure $ protocolParametersFromApi $ Ledger.PParams $
+  pure $ protocolParametersFromApi $ Ledger.PParams $ populateMissingProtocolParameters nid $
     ConwayPParams
       { cppMinFeeA        = THKD $ Ledger.Coin $ toInteger protocolParametersMinFeeCoefficient
       , cppMinFeeB        = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinFeeConstant
@@ -476,7 +474,8 @@ maestroProtocolParams env = do
                                               , ( Ledger.PlutusV2
                                                 , either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ coerce @_ @[Int64] (Maestro.costModelsPlutusV2 protocolParametersPlutusCostModels)
                                                 )
-                                              ]  -- FIXME: Add PlutusV3
+                                              , plutusV3CostModels errPath
+                                              ]
       , cppPrices              = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Maestro's cpu steps")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithCpu protocolParametersScriptExecutionPrices, Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Maestro's memory units")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithMemory protocolParametersScriptExecutionPrices}
       , cppMaxTxExUnits        = THKD $ Ledger.OrdExUnits $ Ledger.ExUnits {
                                           Ledger.exUnitsSteps =
@@ -493,15 +492,16 @@ maestroProtocolParams env = do
       , cppMaxValSize        = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxValueSize
       , cppCollateralPercentage   = THKD $ fromIntegral protocolParametersCollateralPercentage
       , cppMaxCollateralInputs = THKD $ fromIntegral protocolParametersMaxCollateralInputs
-      , cppPoolVotingThresholds = error "FIXME:"
-      , cppDRepVotingThresholds = error "FIXME:"
-      , cppCommitteeMinSize = error "FIXME:"
-      , cppCommitteeMaxTermLength = error "FIXME:"
-      , cppGovActionLifetime = error "FIXME:"
-      , cppGovActionDeposit = error "FIXME:"
-      , cppDRepDeposit = error "FIXME:"
-      , cppDRepActivity = error "FIXME:"
-      , cppMinFeeRefScriptCostPerByte = error "FIXME:"
+      -- FIXME: Fetch these from provider.
+      , cppPoolVotingThresholds = undefined
+      , cppDRepVotingThresholds = undefined
+      , cppCommitteeMinSize = undefined
+      , cppCommitteeMaxTermLength = undefined
+      , cppGovActionLifetime = undefined
+      , cppGovActionDeposit = undefined
+      , cppDRepDeposit = undefined
+      , cppDRepActivity = undefined
+      , cppMinFeeRefScriptCostPerByte = undefined
       }
   where
     errPath = "GeniusYield.Providers.Maestro.maestroProtocolParams: "

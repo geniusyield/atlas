@@ -10,6 +10,8 @@ Stability   : develop
 module GeniusYield.Providers.Common (
       SomeDeserializeError (..)
     , SubmitTxException (..)
+    , plutusV3CostModels
+    , populateMissingProtocolParameters
     , datumFromCBOR
     , newServantClientEnv
     , fromJson
@@ -37,14 +39,22 @@ import qualified Servant.Client                                 as Servant
 import qualified Servant.Client.Core                            as Servant
 
 import qualified Cardano.Api                                    as Api
+import qualified Cardano.Api.Ledger                             as Ledger
 import qualified Cardano.Api.Shelley                            as Api
+import           Cardano.Ledger.Conway.PParams                  (ConwayPParams (..),
+                                                                 THKD (..))
+import qualified Cardano.Ledger.Conway.PParams                  as Ledger
+import qualified Cardano.Ledger.Plutus                          as Ledger
 import           Cardano.Slotting.Slot                          (EpochNo (..),
                                                                  EpochSize (..))
 import           Cardano.Slotting.Time                          (RelativeTime (RelativeTime),
                                                                  mkSlotLength)
 import           Control.Exception                              (Exception)
 import           Data.Bifunctor                                 (first)
+import           Data.Ratio                                     ((%))
 import           Data.SOP.NonEmpty                              (NonEmpty (NonEmptyCons, NonEmptyOne))
+import           GeniusYield.Imports                            (Identity)
+import           GeniusYield.Types                              (GYNetworkId (..))
 import           GeniusYield.Types.Datum                        (GYDatum,
                                                                  datumFromApi')
 import           GeniusYield.Types.Script                       (mintingPolicyIdToText)
@@ -53,6 +63,7 @@ import           GeniusYield.Types.Value                        (GYAssetClass (.
 import qualified Ouroboros.Consensus.Cardano.Block              as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History           as Ouroboros
 import           Ouroboros.Consensus.HardFork.History.EraParams (EraParams (eraGenesisWin))
+import           Test.Cardano.Ledger.Core.Rational              (unsafeBoundRational)
 
 deriving newtype instance Num EpochSize
 deriving newtype instance Num EpochNo
@@ -72,6 +83,43 @@ data SomeDeserializeError
 newtype SubmitTxException = SubmitTxException Text
   deriving stock    (Show)
   deriving anyclass (Exception)
+
+-- FIXME: Temporary, until remote providers us with it.
+plutusV3CostModels :: [Char] -> (Ledger.Language, Ledger.CostModel)
+plutusV3CostModels errPath =
+    ( Ledger.PlutusV3
+    , either (error (errPath <> "Couldn't build PlutusV3 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV3 [100788, 420, 1, 1, 1000, 173, 0, 1, 1000, 59957, 4, 1, 11183, 32, 201305, 8356, 4, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 100, 100, 16000, 100, 94375, 32, 132994, 32, 61462, 4, 72010, 178, 0, 1, 22151, 32, 91189, 769, 4, 2, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1, 1000, 42921, 4, 2, 24548, 29498, 38, 1, 898148, 27279, 1, 51775, 558, 1, 39184, 1000, 60594, 1, 141895, 32, 83150, 32, 15299, 32, 76049, 1, 13169, 4, 22100, 10, 28999, 74, 1, 28999, 74, 1, 43285, 552, 1, 44749, 541, 1, 33852, 32, 68246, 32, 72362, 32, 7243, 32, 7391, 32, 11546, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 90434, 519, 0, 1, 74433, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 955506, 213312, 0, 2, 270652, 22588, 4, 1457325, 64566, 4, 20467, 1, 4, 0, 141992, 32, 100788, 420, 1, 1, 81663, 32, 59498, 32, 20142, 32, 24588, 32, 20744, 32, 25933, 32, 24623, 32, 43053543, 10, 53384111, 14333, 10, 43574283, 26308, 10, 16000, 100, 16000, 100, 962335, 18, 2780678, 6, 442008, 1, 52538055, 3756, 18, 267929, 18, 76433006, 8868, 18, 52948122, 18, 1995836, 36, 3227919, 12, 901022, 1, 166917843, 4307, 36, 284546, 36, 158221314, 26549, 36, 74698472, 36, 333849714, 1, 254006273, 72, 2174038, 72, 2261318, 64571, 4, 207616, 8310, 4, 1293828, 28716, 63, 0, 1, 1006041, 43623, 251, 0, 1])
+
+
+-- FIXME: Temporary, until remote providers us with it.
+populateMissingProtocolParameters :: GYNetworkId -> Ledger.ConwayPParams Identity era -> Ledger.ConwayPParams Identity era
+populateMissingProtocolParameters nid pp =
+  pp {
+      cppPoolVotingThresholds = THKD $ Ledger.PoolVotingThresholds {
+        pvtPPSecurityGroup = commonPoolVotingThreshold, pvtMotionNoConfidence = commonPoolVotingThreshold, pvtHardForkInitiation = commonPoolVotingThreshold, pvtCommitteeNormal = commonPoolVotingThreshold, pvtCommitteeNoConfidence = commonPoolVotingThreshold}
+    , cppDRepVotingThresholds = THKD $ Ledger.DRepVotingThresholds {dvtUpdateToConstitution = unsafeBoundRational (75 % 100), dvtTreasuryWithdrawal = unsafeBoundRational (67 % 100), dvtPPTechnicalGroup = unsafeBoundRational (67 % 100), dvtPPNetworkGroup = unsafeBoundRational (67 % 100), dvtPPGovGroup = unsafeBoundRational (75 % 100), dvtPPEconomicGroup = unsafeBoundRational (67 % 100), dvtMotionNoConfidence = unsafeBoundRational (67 % 100), dvtHardForkInitiation = unsafeBoundRational (6 % 10), dvtCommitteeNormal = unsafeBoundRational (67 % 100), dvtCommitteeNoConfidence = unsafeBoundRational (67 % 100)}
+    , cppCommitteeMinSize = THKD $ case nid of
+        GYMainnet        -> 7
+        GYTestnetPreprod -> 7
+        GYTestnetPreview -> 0
+        _anyOther        -> error "cppCommitteeMinSize: unsupported network id"
+    , cppCommitteeMaxTermLength = THKD $ Ledger.EpochInterval $ case nid of
+        GYMainnet -> 146
+        GYTestnetPreprod -> 146
+        GYTestnetPreview -> 365
+        _anyOther -> error "cppCommitteeMaxTermLength: unsupported network id"
+    , cppGovActionLifetime = THKD $ Ledger.EpochInterval $ case nid of
+        GYMainnet        -> 6
+        GYTestnetPreprod -> 6
+        GYTestnetPreview -> 30
+        _anyOther        -> error "cppGovActionLifetime: unsupported network id"
+    , cppGovActionDeposit = THKD $ Ledger.Coin 100000000000
+    , cppDRepDeposit = THKD $ Ledger.Coin 500000000
+    , cppDRepActivity = THKD $ Ledger.EpochInterval 20
+    , cppMinFeeRefScriptCostPerByte = THKD $ unsafeBoundRational 15
+    }
+  where
+    commonPoolVotingThreshold = unsafeBoundRational (51 % 100)
 
 -- | Get datum from bytes.
 datumFromCBOR :: Text -> Either SomeDeserializeError GYDatum

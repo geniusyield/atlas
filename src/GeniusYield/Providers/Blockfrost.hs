@@ -350,14 +350,11 @@ transformUtxoOutput txId (Blockfrost.UtxoOutput {..}, ms) = do
 -- Parameters
 -------------------------------------------------------------------------------
 
-blockfrostProtocolParams :: Blockfrost.Project -> IO GYProtocolParameters
-blockfrostProtocolParams proj = do
+blockfrostProtocolParams :: GYNetworkId -> Blockfrost.Project -> IO GYProtocolParameters
+blockfrostProtocolParams nid proj = do
     Blockfrost.ProtocolParams {..} <- Blockfrost.runBlockfrost proj Blockfrost.getLatestEpochProtocolParams
         >>= handleBlockfrostError "ProtocolParams"
-    pure $ protocolParametersFromApi $ Ledger.PParams $
-        -- FIXME: Rename maestro to blockfrost in messages
-        -- FIXME: Rename maestro to blockfrost in messages
-        -- FIXME: Rename maestro to blockfrost in messages
+    pure $ protocolParametersFromApi $ Ledger.PParams $ populateMissingProtocolParameters nid $
         ConwayPParams
         { cppMinFeeA        = THKD $ Ledger.Coin _protocolParamsMinFeeA
         , cppMinFeeB        = THKD $ Ledger.Coin _protocolParamsMinFeeB
@@ -378,15 +375,14 @@ blockfrostProtocolParams proj = do
             }
         , cppMinPoolCost         = THKD $ Ledger.Coin $ lovelacesToInteger _protocolParamsMinPoolCost
         , cppCoinsPerUTxOByte     = THKD $ Api.L.CoinPerByte $ Ledger.Coin $ lovelacesToInteger _protocolParamsCoinsPerUtxoSize
-        , cppCostModels = THKD $ Ledger.mkCostModels $ Map.fromList $ Map.foldlWithKey' (\acc k x -> case k of
-            Blockfrost.PlutusV1 -> (Ledger.PlutusV1, either (error "FIXME:") id $ Ledger.mkCostModel Ledger.PlutusV1 $ fromInteger <$> Map.elems x) : acc
-            Blockfrost.PlutusV2 -> (Ledger.PlutusV2, either (error "FIXME:") id $ Ledger.mkCostModel Ledger.PlutusV2 $ fromInteger <$> Map.elems x) : acc
+        , cppCostModels = THKD $ Ledger.mkCostModels $ Map.fromList $ plutusV3CostModels errPath : Map.foldlWithKey' (\acc k x -> case k of
+            Blockfrost.PlutusV1 -> (Ledger.PlutusV1, either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ fromInteger <$> Map.elems x) : acc
+            Blockfrost.PlutusV2 -> (Ledger.PlutusV2, either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ fromInteger <$> Map.elems x) : acc
             -- Don't care about non plutus cost models.
             Blockfrost.Timelock -> acc
-           -- FIXME: Would need modifications once relevant updates are made into blockfrost.
 
-        ) [] $ Blockfrost.unCostModels _protocolParamsCostModels
-        , cppPrices              = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error "FIXME:") $ Ledger.boundRational _protocolParamsPriceStep, Ledger.prMem = fromMaybe (error "FIXME:") $ Ledger.boundRational _protocolParamsPriceMem}
+        ) [] (Blockfrost.unCostModels _protocolParamsCostModels)
+        , cppPrices              = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's cpu steps")) $ Ledger.boundRational _protocolParamsPriceStep, Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's memory units")) $ Ledger.boundRational _protocolParamsPriceMem}
         , cppMaxTxExUnits        = THKD $ Ledger.OrdExUnits $ Ledger.ExUnits {
                                             Ledger.exUnitsSteps =
                                                 fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExSteps,
@@ -402,16 +398,19 @@ blockfrostProtocolParams proj = do
         , cppMaxValSize        = THKD $ fromIntegral $ Blockfrost.unQuantity _protocolParamsMaxValSize
         , cppCollateralPercentage   = THKD $ fromIntegral _protocolParamsCollateralPercent
         , cppMaxCollateralInputs = THKD $ fromIntegral _protocolParamsMaxCollateralInputs
-        , cppPoolVotingThresholds = error "FIXME:"
-        , cppDRepVotingThresholds = error "FIXME:"
-        , cppCommitteeMinSize = error "FIXME:"
-        , cppCommitteeMaxTermLength = error "FIXME:"
-        , cppGovActionLifetime = error "FIXME:"
-        , cppGovActionDeposit = error "FIXME:"
-        , cppDRepDeposit = error "FIXME:"
-        , cppDRepActivity = error "FIXME:"
-        , cppMinFeeRefScriptCostPerByte = error "FIXME:"
+        -- FIXME: Fetch these from provider.
+        , cppPoolVotingThresholds = undefined
+        , cppDRepVotingThresholds = undefined
+        , cppCommitteeMinSize = undefined
+        , cppCommitteeMaxTermLength = undefined
+        , cppGovActionLifetime = undefined
+        , cppGovActionDeposit = undefined
+        , cppDRepDeposit = undefined
+        , cppDRepActivity = undefined
+        , cppMinFeeRefScriptCostPerByte = undefined
         }
+  where
+    errPath = "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: "
 
 blockfrostStakePools :: Blockfrost.Project -> IO (Set Api.S.PoolId)
 blockfrostStakePools proj = do

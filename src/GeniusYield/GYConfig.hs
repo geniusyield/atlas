@@ -174,7 +174,7 @@ withCfgProviders
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
           maestroSlotActions <- makeSlotActions slotCachingTime $ MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv
           maestroGetParams <- makeGetParameters
-            (MaestroApi.maestroProtocolParams maestroApiEnv)
+            (MaestroApi.maestroProtocolParams cfgNetworkId maestroApiEnv)
             (MaestroApi.maestroSystemStart maestroApiEnv)
             (MaestroApi.maestroEraHistory maestroApiEnv)
             (MaestroApi.maestroStakePools maestroApiEnv)
@@ -191,7 +191,7 @@ withCfgProviders
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
           blockfrostSlotActions <- makeSlotActions slotCachingTime $ Blockfrost.blockfrostGetSlotOfCurrentBlock proj
           blockfrostGetParams <- makeGetParameters
-            (Blockfrost.blockfrostProtocolParams proj)
+            (Blockfrost.blockfrostProtocolParams cfgNetworkId proj)
             (Blockfrost.blockfrostSystemStart proj)
             (Blockfrost.blockfrostEraHistory proj)
             (Blockfrost.blockfrostStakePools proj)

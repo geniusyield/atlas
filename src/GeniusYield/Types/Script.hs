@@ -196,6 +196,8 @@ deriving newtype instance GCompare GYValidator
 instance GShow GYValidator where
   gshowsPrec = showsPrec
 
+-- FIXME: Seeing inclusion of CIP-69, we should likely get rid of all these different types of scripts and just have one type of script.
+-- To make it use BuiltinUnit.
 validatorFromPlutus :: forall v. SingPlutusVersionI v => PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ()) -> GYValidator v
 validatorFromPlutus = coerce (scriptFromPlutus @v)
 

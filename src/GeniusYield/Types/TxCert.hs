@@ -16,12 +16,14 @@ module GeniusYield.Types.TxCert (
 ) where
 
 import           GeniusYield.Types.Certificate
-import           GeniusYield.Types.Credential      (GYStakeCredential)
+import           GeniusYield.Types.Credential      (GYStakeCredential (..))
 import           GeniusYield.Types.Delegatee       (GYDelegatee)
 import           GeniusYield.Types.TxCert.Internal
 
-mkStakeAddressRegistrationCertificate :: GYStakeCredential -> GYTxCert v
-mkStakeAddressRegistrationCertificate sc = GYTxCert (GYStakeAddressRegistrationCertificatePB sc) Nothing
+{-| Post conway, newer stake address registration certificate also require a witness.
+-}
+mkStakeAddressRegistrationCertificate :: GYStakeCredential -> GYTxCertWitness v -> GYTxCert v
+mkStakeAddressRegistrationCertificate sc wit = GYTxCert (GYStakeAddressRegistrationCertificatePB sc) (Just wit)
 
 {-| Note that deregistration certificate requires following preconditions:
 

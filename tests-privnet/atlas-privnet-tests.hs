@@ -10,8 +10,8 @@ module Main (main) where
 
 import           GeniusYield.Imports
 
-import           Test.Tasty                        (defaultMain, testGroup)
-import           Test.Tasty.HUnit                  (testCaseSteps)
+import           Test.Tasty                             (defaultMain, testGroup)
+import           Test.Tasty.HUnit                       (testCaseSteps)
 
 import           GeniusYield.CardanoApi.EraHistory
 import           GeniusYield.Types
@@ -19,13 +19,13 @@ import           GeniusYield.Types
 import           GeniusYield.Test.Privnet.Ctx
 import qualified GeniusYield.Test.Privnet.Examples
 import           GeniusYield.Test.Privnet.Setup
-import qualified GeniusYield.Test.Privnet.Stake
 import qualified GeniusYield.Test.Privnet.SimpleScripts
+import qualified GeniusYield.Test.Privnet.Stake
 import           GeniusYield.TxBuilder
 
 main :: IO ()
 main = do
-    withPrivnet cardanoDefaultTestnetOptions $ \setup ->
+    withPrivnet cardanoDefaultTestnetOptionsConway $ \setup ->
         defaultMain $ testGroup "atlas-privnet-tests"
           [ testCaseSteps "Balances" $ \info -> withSetup info setup $ \ctx -> do
               forM_ (zip [(1 :: Integer) ..] (ctxUserF ctx : ctxUsers ctx))

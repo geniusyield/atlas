@@ -543,7 +543,7 @@ maestroEraHistory env = do
         { eraEpochSize = CSlot.EpochSize $ fromIntegral eraParametersEpochLength
         , eraSlotLength = CTime.mkSlotLength $ Maestro.epochSlotLengthMilliseconds eraParametersSlotLength / 1000
         , eraSafeZone = Ouroboros.StandardSafeZone $ fromJust eraParametersSafeZone
-        , eraGenesisWin = 0
+        , eraGenesisWin = 0  -- We don't make use of it.
         }
     mkEra Maestro.EraSummary {eraSummaryStart, eraSummaryEnd, eraSummaryParameters} = Ouroboros.EraSummary
         { eraStart = mkBound eraSummaryStart

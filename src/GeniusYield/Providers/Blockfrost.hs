@@ -449,7 +449,7 @@ blockfrostEraHistory proj = do
         { eraEpochSize = CSlot.EpochSize $ fromIntegral _parametersEpochLength
         , eraSlotLength = CTime.mkSlotLength _parametersSlotLength
         , eraSafeZone = Ouroboros.StandardSafeZone _parametersSafeZone
-        , eraGenesisWin = 0
+        , eraGenesisWin = 0  -- We don't make use of it.
         }
     mkEra Blockfrost.NetworkEraSummary {_networkEraStart, _networkEraEnd, _networkEraParameters} = Ouroboros.EraSummary
         { eraStart = mkBound _networkEraStart

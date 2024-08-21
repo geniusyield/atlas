@@ -72,9 +72,9 @@ registerStakeCredentialSteps strat user mstakeValHash info ctx = do
     pp <- ctxGetParams ctx & gyGetProtocolParameters'
     info $ "-- Protocol parameters --\n" <> show pp <> "\n-- x --\n"
     txBodyReg <- ctxRun ctx user $ do
-      buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressRegistrationCertificate (resolveStakeCredential user mstakeValHash))
+      buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressRegistrationCertificate (resolveStakeCredential user mstakeValHash) (resolveCertWitness (isJust mstakeValHash)))
     info $ "-- Registration tx body --\n" <> show txBodyReg <> "\n-- x --\n"
-    ctxRun ctx user $ signAndSubmitConfirmed_ txBodyReg
+    ctxRun ctx user $ submitTxBodyConfirmed_ txBodyReg $ resolveSigningRequirement user mstakeValHash
 
 delegateStakeCredentialSteps :: GYCoinSelectionStrategy -> User -> Maybe GYStakeValidatorHash -> GYStakePoolId -> (String -> IO ()) -> Ctx -> IO ()
 delegateStakeCredentialSteps strat user mstakeValHash spId info ctx = do

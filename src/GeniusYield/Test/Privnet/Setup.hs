@@ -16,6 +16,7 @@ module GeniusYield.Test.Privnet.Setup (
     mkPrivnetTestFor',
     -- * "Cardano.Testnet" re-exports
     cardanoDefaultTestnetOptions,
+    cardanoDefaultTestnetOptionsConway,
     cardanoDefaultTestnetNodeOptions,
     CardanoTestnetOptions (..),
     TestnetNodeOptions (..),
@@ -65,6 +66,8 @@ import           Testnet.Types
 -- The first argument is the log severity filter. Only logs of this severity or higher will be passed on to the second argument, which is a logging action.
 newtype Setup = Setup (GYLogSeverity -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ())
 
+cardanoDefaultTestnetOptionsConway :: CardanoTestnetOptions
+cardanoDefaultTestnetOptionsConway = cardanoDefaultTestnetOptions {cardanoNodeEra = Api.AnyCardanoEra Api.ConwayEra}
 data PrivnetRuntime = PrivnetRuntime
   { runtimeNodeSocket  :: !FilePath
   , runtimeNetworkInfo :: !GYNetworkInfo

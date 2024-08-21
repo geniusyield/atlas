@@ -167,6 +167,10 @@ jobs:
       run: cabal build --only-dependencies --enable-tests --enable-benchmarks
     - name: Build all targets (cabal)
       run: cabal build --enable-tests --enable-benchmarks all
+    - name: Symlink cardano-node binaries
+      run: cabal install --package-env=$(pwd) --overwrite-policy=always cardano-cli cardano-node
+    - name: Run privnet tests
+      run: cabal run atlas-privnet-tests -- -j1 --hide-successes
     - name: Run all tests (cabal)
       run: cabal run atlas-tests -- -j1 --hide-successes
     - name: Run doctest (docspec)
@@ -182,10 +186,6 @@ jobs:
         echo "===========================[ RUN DOCSPEC ]==========================="
         ./cabal-docspec -q --ignore-trailing-space
         echo " ============================[ FINISHED ]============================"
-    - name: Symlink cardano-node binaries
-      run: cabal install --package-env=$(pwd) --overwrite-policy=always cardano-cli cardano-node
-    - name: Run privnet tests
-      run: cabal run atlas-privnet-tests -- -j1 --hide-successes
     - name: Run checks (cabal)
       run: cabal check
     - name: Create source distribution file (cabal)

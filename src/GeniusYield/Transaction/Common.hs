@@ -20,6 +20,7 @@ module GeniusYield.Transaction.Common (
 
 import qualified Cardano.Api                          as Api
 import qualified Cardano.Ledger.Coin                  as Ledger
+import           GeniusYield.HTTP.Errors              (IsGYApiError)
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Types.Address
@@ -116,6 +117,7 @@ data GYBuildTxError
     | GYBuildTxCborSimplificationError !CborSimplificationError
     | GYBuildTxCollapseExtraOutError !Api.TxBodyError
   deriving stock Show
+  deriving anyclass (Exception, IsGYApiError)
 
 -------------------------------------------------------------------------------
 -- Transaction Utilities

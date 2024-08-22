@@ -18,6 +18,7 @@ module GeniusYield.Test.Clb
     , dumpUtxoState
     , mustFail
     , mustFailWith
+    , sendSkeleton
     ) where
 
 import           Control.Lens                                   ((^.))
@@ -510,3 +511,6 @@ dumpUtxoState = liftClb Clb.dumpUtxoState
 pureGen :: StdGen
 pureGen = mkStdGen 42
 
+-- | This is simply defined as @buildTxBody skeleton >>= signAndSubmitConfirmed@.
+sendSkeleton :: GYTxMonad m => GYTxSkeleton v -> m GYTxId
+sendSkeleton skeleton = buildTxBody skeleton >>= signAndSubmitConfirmed

@@ -83,7 +83,7 @@ simplSpendingTxTrace Wallets{w1} = do
 -- Pretend off-chain code written in 'GYTxUserQueryMonad m'
 mkTrivialTx :: GYTxUserQueryMonad m => m (GYTxSkeleton 'PlutusV2)
 mkTrivialTx = do
-  addr <- fmap (!! 0) ownAddresses -- FIXME:
+  addr <- ownChangeAddress
   gyLogDebug' "" $ printf "ownAddr: %s" (show addr)
   pkh <- addressToPubKeyHash' addr
   let targetAddr = unsafeAddressFromText "addr_test1qr2vfntpz92f9pawk8gs0fdmhtfe32pqcx0s8fuztxaw3p5pjay24kygaj4g8uevf89ewxzvsdc60wln8spzm2al059q8a9w3x"
@@ -158,7 +158,7 @@ computeParamsAndAddRefScript betUntil' betReveal' betStep Wallets{..} = do
 -- | Run to call the `placeBet` operation.
 placeBetRun :: GYTxMonad m => GYTxOutRef -> BetRefParams -> OracleAnswerDatum -> GYValue -> Maybe GYTxOutRef -> m GYTxId
 placeBetRun refScript brp guess bet mPreviousBetsUtxoRef = do
-  addr <- (!! 0) <$> ownAddresses
+  addr <- ownChangeAddress
   gyLogDebug' "" $ printf "bet: %s" (show bet)
   skeleton <- placeBet refScript brp guess bet addr mPreviousBetsUtxoRef
   gyLogDebug' "" $ printf "place bet tx skeleton: %s" (show skeleton)

@@ -68,7 +68,7 @@ takeBetPotTests setup = testGroup "Take bet pot"
 -- | Run to call the `takeBets` operation.
 takeBetsRun :: GYTxMonad m => GYTxOutRef -> BetRefParams -> GYTxOutRef -> GYTxOutRef -> m GYTxId
 takeBetsRun refScript brp toConsume refInput = do
-  addr <- fmap (!! 0) ownAddresses -- FIXME:
+  addr <- ownChangeAddress
   skeleton <- takeBets refScript brp toConsume addr refInput
   buildTxBody skeleton >>= signAndSubmitConfirmed
 

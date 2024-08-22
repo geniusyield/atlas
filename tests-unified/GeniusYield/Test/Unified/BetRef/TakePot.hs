@@ -3,11 +3,12 @@ module GeniusYield.Test.Unified.BetRef.TakePot
     ) where
 
 import           Control.Monad.Except                             (handleError)
-import           Test.Tasty                                       (TestTree, testGroup)
+import           Test.Tasty                                       (TestTree,
+                                                                   testGroup)
 
 import           GeniusYield.Test.Unified.BetRef.Operations
-import           GeniusYield.Test.Unified.OnChain.BetRef.Compiled
 import           GeniusYield.Test.Unified.BetRef.PlaceBet
+import           GeniusYield.Test.Unified.OnChain.BetRef.Compiled
 
 import           GeniusYield.Imports
 import           GeniusYield.Test.Clb

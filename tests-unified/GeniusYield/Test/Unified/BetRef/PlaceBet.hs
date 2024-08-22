@@ -7,14 +7,15 @@ module GeniusYield.Test.Unified.BetRef.PlaceBet
 import           Control.Monad.Except                             (handleError)
 import qualified Data.Set                                         as Set
 import qualified Data.Text                                        as T
-import           Test.Tasty                                       (TestTree, testGroup)
+import           Test.Tasty                                       (TestTree,
+                                                                   testGroup)
 
 
 import           GeniusYield.Test.Unified.BetRef.Operations
 import           GeniusYield.Test.Unified.OnChain.BetRef.Compiled
 
-import           GeniusYield.Imports
 import           GeniusYield.HTTP.Errors
+import           GeniusYield.Imports
 import           GeniusYield.Test.Clb
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.Test.Utils
@@ -79,8 +80,8 @@ simplSpendingTxTrace Wallets{w1} = do
     txId <- buildTxBody skeleton >>= signAndSubmitConfirmed
     gyLogDebug' "" $ printf "tx submitted, txId: %s" txId
 
--- Pretend off-chain code written in 'GYTxMonad m'
-mkTrivialTx :: GYTxMonad m => m (GYTxSkeleton 'PlutusV2)
+-- Pretend off-chain code written in 'GYTxUserQueryMonad m'
+mkTrivialTx :: GYTxUserQueryMonad m => m (GYTxSkeleton 'PlutusV2)
 mkTrivialTx = do
   addr <- fmap (!! 0) ownAddresses -- FIXME:
   gyLogDebug' "" $ printf "ownAddr: %s" (show addr)

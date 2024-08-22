@@ -452,7 +452,7 @@ tests setup = testGroup "gift"
         threadDelay 1_000_000
 
         {-
-        let addNewGiftV2 :: GYTxMonad m => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
+        let addNewGiftV2 :: GYTxUserQueryMonad m => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
             addNewGiftV2 skeleton = do
                 addr <- scriptAddress giftValidatorV2
                 return $ skeleton <> mustHaveOutput GYTxOut
@@ -493,7 +493,7 @@ tests setup = testGroup "gift"
         -- TODO: NonOutputSupplimentaryDatums is thrown by other tests when this test is run.
         -- They fail to consume utxos with (inline) datums.
         -- We need to fix utxosDatums to also return whether the datum was inline.
-        let addNewGiftV2 :: GYTxMonad m => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
+        let addNewGiftV2 :: GYTxUserQueryMonad m => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
             addNewGiftV2 skeleton = do
                 addr <- scriptAddress giftValidatorV2
                 return $ skeleton <> mustHaveOutput GYTxOut

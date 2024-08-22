@@ -14,7 +14,7 @@ import           GeniusYield.Scripts.TestToken
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
-mintTestTokens :: GYTxMonad m
+mintTestTokens :: GYTxUserQueryMonad m
                => GYTokenName
                -> Natural
                -> m (GYAssetClass, GYTxSkeleton 'PlutusV2)

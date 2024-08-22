@@ -10,7 +10,7 @@ module GeniusYield.TxBuilder.Query.Class (GYTxQueryMonad (..), GYTxSpecialQueryM
 
 import qualified Cardano.Api                          as Api
 import qualified Cardano.Api.Shelley                  as Api.S
-import           Control.Monad.Except                 (MonadError (..))
+import           Control.Monad.Except                 (ExceptT, MonadError (..))
 import           Control.Monad.Random                 (RandT, lift)
 import           Control.Monad.Reader                 (ReaderT)
 import qualified Control.Monad.State.Lazy             as Lazy
@@ -414,6 +414,39 @@ instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (Lazy.WriterT w 
     someUTxO = lift . someUTxO
 
 instance (GYTxSpecialQueryMonad m, Monoid w) => GYTxSpecialQueryMonad (Lazy.WriterT w m) where
+    systemStart = lift systemStart
+    eraHistory = lift eraHistory
+    protocolParams = lift protocolParams
+    stakePools = lift stakePools
+
+instance GYTxQueryMonad m => GYTxQueryMonad (ExceptT GYTxMonadException m) where
+    networkId = lift networkId
+    lookupDatum = lift . lookupDatum
+    utxoAtTxOutRef = lift . utxoAtTxOutRef
+    utxosAtTxOutRefs = lift . utxosAtTxOutRefs
+    utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
+    utxosAtAddress addr = lift . utxosAtAddress addr
+    utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
+    utxosAtAddresses = lift . utxosAtAddresses
+    utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
+    utxoRefsAtAddress = lift . utxoRefsAtAddress
+    utxosAtPaymentCredential pc = lift . utxosAtPaymentCredential pc
+    utxosAtPaymentCredentialWithDatums pc = lift . utxosAtPaymentCredentialWithDatums pc
+    utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
+    utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
+    stakeAddressInfo = lift . stakeAddressInfo
+    slotConfig = lift slotConfig
+    slotOfCurrentBlock = lift slotOfCurrentBlock
+    logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+
+instance GYTxUserQueryMonad m => GYTxUserQueryMonad (ExceptT GYTxMonadException m) where
+    ownAddresses = lift ownAddresses
+    ownChangeAddress = lift ownChangeAddress
+    ownCollateral = lift ownCollateral
+    availableUTxOs = lift availableUTxOs
+    someUTxO = lift . someUTxO
+
+instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (ExceptT GYTxMonadException m) where
     systemStart = lift systemStart
     eraHistory = lift eraHistory
     protocolParams = lift protocolParams

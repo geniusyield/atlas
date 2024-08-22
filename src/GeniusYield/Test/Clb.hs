@@ -19,6 +19,7 @@ module GeniusYield.Test.Clb
     , mustFail
     , mustFailWith
     , sendSkeleton
+    , logInfoS
     ) where
 
 import           Control.Lens                                   ((^.))
@@ -514,3 +515,7 @@ pureGen = mkStdGen 42
 -- | This is simply defined as @buildTxBody skeleton >>= signAndSubmitConfirmed@.
 sendSkeleton :: GYTxMonad m => GYTxSkeleton v -> m GYTxId
 sendSkeleton skeleton = buildTxBody skeleton >>= signAndSubmitConfirmed
+
+-- | Variant of `logInfo` from @Clb@ that logs a string with @Info@ severity.
+logInfoS :: Monad m => String -> ClbT ApiEra m ()
+logInfoS s = Clb.logInfo $ Clb.LogEntry Clb.Info s

@@ -472,7 +472,7 @@ utxoAtTxOutRefWithDatum' ref = utxoAtTxOutRefWithDatum ref
         pure
 
 -- | Returns some UTxO present in wallet which doesn't have reference script.
-someUTxOWithoutRefScript :: GYTxMonad m => m GYTxOutRef
+someUTxOWithoutRefScript :: GYTxUserQueryMonad m => m GYTxOutRef
 someUTxOWithoutRefScript = do
   utxosToConsider <- utxosRemoveRefScripts <$> availableUTxOs
   addrs           <- ownAddresses

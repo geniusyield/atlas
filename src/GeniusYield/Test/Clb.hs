@@ -514,7 +514,10 @@ pureGen = mkStdGen 42
 
 -- | This is simply defined as @buildTxBody skeleton >>= signAndSubmitConfirmed@.
 sendSkeleton :: GYTxMonad m => GYTxSkeleton v -> m GYTxId
-sendSkeleton skeleton = buildTxBody skeleton >>= signAndSubmitConfirmed
+sendSkeleton skeleton = snd <$> sendSkeleton' skeleton
+
+sendSkeleton' :: GYTxMonad m => GYTxSkeleton v -> m (GYTxBody, GYTxId)
+sendSkeleton' skeleton = buildTxBody skeleton >>= \tx -> signAndSubmitConfirmed tx >>= \txId -> pure (tx, txId)
 
 -- | Variant of `logInfo` from @Clb@ that logs a string with @Info@ severity.
 logInfoS :: Monad m => String -> ClbT ApiEra m ()

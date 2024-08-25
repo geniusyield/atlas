@@ -1,18 +1,19 @@
 module GeniusYield.Test.Unified.BetRef.PlaceBet
     ( placeBetTests
-    , computeParamsAndAddRefScript
-    , multipleBetsTraceCore
+    , placeBetTestsClb
+    , runDeployScript
+    , runMultipleBets
     ) where
 
-import           Control.Monad.Except                             (handleError)
-import qualified Data.Set                                         as Set
-import qualified Data.Text                                        as T
-import           Test.Tasty                                       (TestTree, testGroup)
-
+import           Control.Monad.Except               (handleError)
+import           Control.Monad.Extra                (maybeM)
+import           Data.Maybe                         (listToMaybe)
+import qualified Data.Set                           as Set
+import           Test.Tasty                         (TestTree, testGroup)
+import qualified Data.Text                          as T
 
 import           GeniusYield.Test.Unified.BetRef.Operations
 import           GeniusYield.Test.Unified.OnChain.BetRef.Compiled
-
 import           GeniusYield.Imports
 import           GeniusYield.HTTP.Errors
 import           GeniusYield.Test.Clb
@@ -21,17 +22,30 @@ import           GeniusYield.Test.Utils
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
--- | Our unit tests for placing bet operation
+
+-- | Test environment 'WalletInfo' among other things provides nine wallets that
+-- be used in tests. For convinience we assign some meaningful names to them.
+admin, oracle, holder :: Wallets -> User
+admin  = w1 -- Runs some administrative action, e.g. deplys the script
+oracle = w8 -- A user that is going to reveal the answer
+holder = w9 -- A user to store the reference script
+
+-- | Test suite for the emulator
+placeBetTestsClb :: TestTree
+placeBetTestsClb = testGroup "Place bet"
+    [ mkTestFor "Simple tx" $ simpleTxTest
+    , mkTestFor "Placing first bet" firstBetTest'
+    , mkTestFor "Multiple bets" multipleBetsTest
+    , mkTestFor "Multiple bets - to small step" $ mustFail . failingMultipleBetsTest
+    ]
+
+-- | Test suite for a private testnet
 placeBetTests :: Setup -> TestTree
-placeBetTests setup = testGroup "Place Bet"
-    [ mkTestFor "Simple spending tx" $ simplSpendingTxTrace . testWallets
-    , mkPrivnetTestFor_ "Simple spending tx - privnet" $ simplSpendingTxTrace . testWallets
-    , mkTestFor "Balance checks after placing first bet" firstBetTest
-    , mkPrivnetTestFor_ "Balance checks after placing first bet - privnet" firstBetTest
-    , mkTestFor "Balance checks with multiple bets" multipleBetsTest
-    , mkPrivnetTestFor_ "Balance checks with multiple bets - privnet" multipleBetsTest
-    , mkTestFor "Not adding atleast bet step amount should fail" $ mustFail . failingMultipleBetsTest
-    , mkPrivnetTestFor' "Not adding atleast bet step amount should fail - privnet" GYDebug setup $
+placeBetTests setup = testGroup "Place bet"
+    [ mkPrivnetTestFor_ "Simple tx" $ simpleTxTest
+    , mkPrivnetTestFor_ "Placing first bet" firstBetTest'
+    , mkPrivnetTestFor_ "Multiple bets" multipleBetsTest
+    , mkPrivnetTestFor' "Multiple bets - too small step" GYDebug setup $
         handleError
           (\case
               GYBuildTxException GYBuildTxBodyErrorAutoBalance {} -> pure ()
@@ -41,52 +55,30 @@ placeBetTests setup = testGroup "Place Bet"
     ]
   where
     mkPrivnetTestFor_ = flip mkPrivnetTestFor setup
-    firstBetTest :: GYTxGameMonad m => TestInfo -> m ()
-    firstBetTest = firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000) . testWallets
-    multipleBetsTest :: GYTxGameMonad m => TestInfo -> m ()
-    multipleBetsTest TestInfo{..} = multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
-      [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
-      , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
-      , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
-      , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
-      , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> valueSingleton testGoldAsset 1_000)
-      ]
-      testWallets
-    failingMultipleBetsTest :: GYTxGameMonad m => TestInfo -> m ()
-    failingMultipleBetsTest TestInfo{..} = multipleBetsTraceWrapper 400 1_000 (valueFromLovelace 10_000_000)
-      [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
-      , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
-      , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
-      , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
-      , (w4, OracleAnswerDatum 5, valueFromLovelace 55_000_000 <> valueSingleton testGoldAsset 1_000)
-      ]
-      testWallets
 
 -- -----------------------------------------------------------------------------
--- Super-trivial example
+-- Simple tx
 -- -----------------------------------------------------------------------------
 
--- | Trace for a super-simple spending transaction.
-simplSpendingTxTrace :: GYTxGameMonad m => Wallets -> m ()
-simplSpendingTxTrace Wallets{w1} = do
-  gyLogDebug' "" "Hey there!"
-  -- balance assetion check
-  withWalletBalancesCheckSimple [w1 := valueFromLovelace (-100_000_000)] . asUser w1 $ do -- TODO: w1 is the wallets that gets all funds for now
+-- | Trace for a super-simple spending transaction. This function combines
+-- the  runner and the test for simplicity's sake.
+simpleTxTest :: GYTxGameMonad m => TestInfo -> m ()
+simpleTxTest (testWallets -> Wallets{w1}) = do
+  withWalletBalancesCheckSimple [w1 := valueFromLovelace (-100_000_000)] .
+   asUser w1 $ do
     skeleton <- mkTrivialTx
     gyLogDebug' "" $ printf "tx skeleton: %s" (show skeleton)
-
-    -- test itself
     txId <- buildTxBody skeleton >>= signAndSubmitConfirmed
     gyLogDebug' "" $ printf "tx submitted, txId: %s" txId
 
 -- Pretend off-chain code written in 'GYTxMonad m'
 mkTrivialTx :: GYTxMonad m => m (GYTxSkeleton 'PlutusV2)
 mkTrivialTx = do
-  addr <- fmap (!! 0) ownAddresses -- FIXME:
+  addr <- maybeM (throwAppError $ someBackendError "No own addresses")
+    pure  $ listToMaybe <$> ownAddresses
   gyLogDebug' "" $ printf "ownAddr: %s" (show addr)
   pkh <- addressToPubKeyHash' addr
   let targetAddr = unsafeAddressFromText "addr_test1qr2vfntpz92f9pawk8gs0fdmhtfe32pqcx0s8fuztxaw3p5pjay24kygaj4g8uevf89ewxzvsdc60wln8spzm2al059q8a9w3x"
-  -- let targetAddr = unsafeAddressFromText "addr1q82vfntpz92f9pawk8gs0fdmhtfe32pqcx0s8fuztxaw3p5pjay24kygaj4g8uevf89ewxzvsdc60wln8spzm2al059qytcwae"
   return $
     mustHaveOutput
       (GYTxOut
@@ -97,150 +89,154 @@ mkTrivialTx = do
         })
       <> mustBeSignedBy pkh
 
-{-
-
-Test code levels:
-
-Level 1. Test assertion $ test action (express the test)
-Level 2. Runner $ test action (injects wallets)
-Level 3. The action (Off-chain code)
-
--}
-
 -- -----------------------------------------------------------------------------
--- First-bet trace example
+-- First bet
 -- -----------------------------------------------------------------------------
-
--- | Trace for placing the first bet.
-firstBetTrace :: GYTxGameMonad m
-              => OracleAnswerDatum  -- ^ Guess
-              -> GYValue            -- ^ Bet
-              -> Wallets -> m ()  -- Our continuation function
-firstBetTrace dat bet ws@Wallets{w1} = do
-  currSlot <- slotToInteger <$> slotOfCurrentBlock
-  let betUntil = currSlot + 40
-      betReveal = currSlot + 100
-  -- First step: Get the required parameters for initializing our parameterized script,
-  -- claculate the script, and post it to the blockchain as a reference script.
-  (brp, refScript) <- computeParamsAndAddRefScript betUntil betReveal (valueFromLovelace 200_000_000) ws
-  withWalletBalancesCheckSimple [w1 := valueNegate bet] . asUser w1 $ do  -- following operations are ran by first wallet, `w1`
-    -- Second step: Perform the actual run.
-    void $ placeBetRun refScript brp dat bet Nothing
-
--- | Function to compute the parameters for the contract and add the corresponding refernce script.
-computeParamsAndAddRefScript
-  :: GYTxGameMonad m
-  => Integer                                    -- ^ Bet Until slot
-  -> Integer                                    -- ^ Bet Reveal slot
-  -> GYValue                                    -- ^ Bet step value
-  -> Wallets -> m (BetRefParams, GYTxOutRef)  -- Our continuation
-computeParamsAndAddRefScript betUntil' betReveal' betStep Wallets{..} = do
-  let betUntil = slotFromApi (fromInteger betUntil')
-      betReveal = slotFromApi (fromInteger betReveal')
-  asUser w1 $ do
-    betUntilTime <- slotToBeginTime betUntil
-    betRevealTime <- slotToBeginTime betReveal
-
-    let brp = BetRefParams
-          (pubKeyHashToPlutus $ userPkh w8) -- let oracle be wallet `w8`
-          (timeToPlutus betUntilTime)
-          (timeToPlutus betRevealTime)
-          (valueToPlutus betStep)
-
-    -- let store scripts in `w9`
-    let w9addr = userAddr w9
-    gyLogDebug' "" $ "Wallet 9 addr: " <> show w9addr
-    refScript <- addRefScript w9addr . validatorToScript $ betRefValidator' brp
-    gyLogDebug' "" $ printf "reference script output: %s" (show refScript)
-    pure (brp, refScript)
 
 -- | Run to call the `placeBet` operation.
-placeBetRun :: GYTxMonad m => GYTxOutRef -> BetRefParams -> OracleAnswerDatum -> GYValue -> Maybe GYTxOutRef -> m GYTxId
-placeBetRun refScript brp guess bet mPreviousBetsUtxoRef = do
-  addr <- (!! 0) <$> ownAddresses
-  gyLogDebug' "" $ printf "bet: %s" (show bet)
-  skeleton <- placeBet refScript brp guess bet addr mPreviousBetsUtxoRef
-  gyLogDebug' "" $ printf "place bet tx skeleton: %s" (show skeleton)
-  buildTxBody skeleton >>= signAndSubmitConfirmed
-  -- txId <- sendSkeleton skeleton
-  -- dumpUtxoState
-  -- pure txId
+runPlaceBet
+  :: GYTxGameMonad m
+  => GYTxOutRef                        -- ^ Script output reference
+  -> BetRefParams                      -- ^ Parameters
+  -> OracleAnswerDatum                 -- ^ Bet guess
+  -> GYValue                           -- ^ Bet value
+  -> Maybe GYTxOutRef                  -- ^ Ref output with existing bets
+  -> User                              -- ^ User that plays bet
+  -> m GYTxId
+runPlaceBet refScript brp guess bet mPrevBets user = do
+  gyLogDebug' ""
+    $ printf "placing a bet with guess %s and value %s"
+      (show guess) (show bet)
+  asUser user $ do
+    addr <- maybeM (throwAppError $ someBackendError "No own addresses")
+      pure  $ listToMaybe <$> ownAddresses
+    -- Call the operation
+    skeleton <- placeBet refScript brp guess bet addr mPrevBets
+    buildTxBody skeleton >>= signAndSubmitConfirmed
+
+firstBetTest' :: GYTxGameMonad m => TestInfo -> m ()
+firstBetTest' = firstBetTest
+  40
+  100
+  (valueFromLovelace 200_000_000)
+  (OracleAnswerDatum 3)
+  (valueFromLovelace 20_000_000)
+
+-- | Test for placing the first bet.
+firstBetTest
+  :: GYTxGameMonad m
+  => Integer
+  -> Integer
+  -> GYValue
+  -> OracleAnswerDatum
+  -> GYValue
+  -> TestInfo
+  -> m ()
+firstBetTest betUntil betReveal betStep dat bet (testWallets -> ws@Wallets{w1}) = do
+  (brp, refScript) <- runDeployScript betUntil betReveal betStep ws
+  withWalletBalancesCheckSimple [w1 := valueNegate bet] $ do
+    void $ runPlaceBet refScript brp dat bet Nothing w1
 
 -- -----------------------------------------------------------------------------
--- Multiple bets example
+-- Multiple bets
 -- -----------------------------------------------------------------------------
 
--- | Trace which allows for multiple bets.
-multipleBetsTraceWrapper
+-- This is an alias for fields of `Wallet` datatype
+type Wallet = Wallets -> User
+
+-- This type represent a bet made by a wallet
+type Bet = (Wallet, OracleAnswerDatum, GYValue)
+
+multipleBetsTest :: GYTxGameMonad m => TestInfo -> m ()
+multipleBetsTest TestInfo{..} = mkMultipleBetsTest
+  400 1_000 (valueFromLovelace 10_000_000)
+  [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
+  , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
+  , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
+  , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
+  , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000
+                                <> valueSingleton testGoldAsset 1_000)
+  ]
+  testWallets
+
+failingMultipleBetsTest :: GYTxGameMonad m => TestInfo -> m ()
+failingMultipleBetsTest TestInfo{..} = mkMultipleBetsTest
+  400 1_000 (valueFromLovelace 10_000_000)
+  [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
+  , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
+  , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
+  , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
+  , (w4, OracleAnswerDatum 5, valueFromLovelace 55_000_000
+                                <> valueSingleton testGoldAsset 1_000)
+  ]
+  testWallets
+
+-- | Makes a test case for placing multiple bets.
+mkMultipleBetsTest
   :: GYTxGameMonad m
-  => Integer                                            -- ^ slot for betUntil
-  -> Integer                                            -- ^ slot for betReveal
-  -> GYValue                                            -- ^ bet step
-  -> [(Wallets -> User, OracleAnswerDatum, GYValue)]  -- ^ List denoting the bets
-  -> Wallets -> m ()                         -- Our continuation function
-multipleBetsTraceWrapper betUntil' betReveal' betStep walletBets ws = do
-  currSlot <- slotToInteger <$> slotOfCurrentBlock
-  let betUntil = currSlot + betUntil'
-      betReveal = currSlot + betReveal'
-  -- First step: Get the required parameters for initializing our parameterized script and add the corresponding reference script
-  (brp, refScript) <- computeParamsAndAddRefScript betUntil betReveal betStep ws
-  -- Second step: Perform the actual bet operations
-  multipleBetsTraceCore brp refScript walletBets ws
-
--- | Trace which allows for multiple bets.
-multipleBetsTraceCore
-  :: GYTxGameMonad m
-  => BetRefParams
-  -> GYTxOutRef                                         -- ^ Reference script
-  -> [(Wallets -> User, OracleAnswerDatum, GYValue)]  -- ^ List denoting the bets
-  -> Wallets -> m ()                         -- Our continuation function
-multipleBetsTraceCore brp refScript walletBets ws@Wallets{..} = do
-  let
-      -- | Perform the actual bet operation by the corresponding wallet.
-      performBetOperations [] _ = return ()
-      performBetOperations ((getWallet, dat, bet) : remWalletBets) isFirst = do
-        if isFirst then do
-          gyLogInfo' "" "placing the first bet"
-          asUser (getWallet ws) $ do
-            void $ placeBetRun refScript brp dat bet Nothing
-          performBetOperations remWalletBets False
-        else do
-          gyLogInfo' "" "placing a next bet"
-          -- need to get previous bet utxo
-          asUser (getWallet ws) $ do
-            betRefAddr <- betRefAddress brp
-            _scriptUtxo@GYUTxO {utxoRef} <- head . utxosToList <$> utxosAtAddress betRefAddr Nothing
-            gyLogDebug' "" $ printf "previous bet utxo: %s" utxoRef
-            void $ placeBetRun refScript brp dat bet (Just utxoRef)
-          performBetOperations remWalletBets False
-
-      -- | To sum the bet amount for the corresponding wallet.
-      sumWalletBets _wallet [] acc = acc
-      sumWalletBets wallet ((getWallet, _dat, bet) : remWalletBets) acc = sumWalletBets wallet remWalletBets (if getWallet ws == wallet then acc <> valueNegate bet else acc)
-      -- | Idea here is that for each wallet, we want to know how much has been bet. If we encounter a new wallet, i.e., wallet for whose we haven't yet computed value lost, we call `sumWalletBets` on it.
-
-      getBalanceDiff [] _set acc = acc
-      getBalanceDiff wlBets@((getWallet, _dat, _bet) : remWalletBets) set acc =
-        let wallet = getWallet ws
-            wallet'sAddr = userAddr wallet
-        in
-          if Set.member wallet'sAddr set then getBalanceDiff remWalletBets set acc
-          else
-           getBalanceDiff remWalletBets (Set.insert wallet'sAddr set) ((wallet := sumWalletBets wallet wlBets mempty) : acc)
-
-      balanceDiffWithoutFees = getBalanceDiff walletBets Set.empty []
-
-  -- The test itself
-  balanceBeforeAllTheseOps <- asUser w1 $ traverse (\(wallet, _value) -> queryBalances $ userAddresses' wallet) balanceDiffWithoutFees
-  gyLogDebug' "" $ printf "balanceBeforeAllTheseOps: %s" (mconcat balanceBeforeAllTheseOps)
-  performBetOperations walletBets True
-  balanceAfterAllTheseOps <-  asUser w1 $ traverse (\(wallet, _value) -> queryBalances $ userAddresses' wallet) balanceDiffWithoutFees
-  gyLogDebug' "" $ printf "balanceAfterAllTheseOps: %s" (mconcat balanceAfterAllTheseOps)
+  => Integer                 -- ^ Number of slots for betting
+  -> Integer                 -- ^ Number of slots for revealing
+  -> GYValue                 -- ^ Bet step
+  -> [Bet]                   -- ^ List denoting the bets
+  -> Wallets                 -- ^ Wallets available
+  -> m ()
+mkMultipleBetsTest betUntil betReveal betStep bets ws = do
+  -- Deploy script
+  (brp, refScript) <- runDeployScript betUntil betReveal betStep ws
+  -- Get the balance
+  balanceBefore <- getBalance
+  gyLogDebug' "" $ printf "balanceBeforeAllTheseOps: %s" (mconcat balanceBefore)
+  -- Run operations
+  runMultipleBets brp refScript bets ws
+  -- Get the balance again
+  balanceAfter <- getBalance
+  gyLogDebug' "" $ printf "balanceAfterAllTheseOps: %s" (mconcat balanceAfter)
   -- Check the difference
-  asUser w1 $ verify (zip3 balanceDiffWithoutFees balanceBeforeAllTheseOps balanceAfterAllTheseOps)
+  verify $ zip3
+    walletsAndBets
+    balanceBefore
+    balanceAfter
   where
+    -- | Returns the balances for all wallets that play the game
+    getBalance :: GYTxGameMonad m => m [GYValue]
+    getBalance = traverse
+      (\(wallet, _) -> queryBalances $ userAddresses' wallet)
+      walletsAndBets
+
+    -- | Builds the list of wallets and their respective bets made.
+    -- The idea here is that if we encounter a new wallet,
+    -- i.e., wallet for whose we haven't yet computed value lost,
+    -- we calculate the total once so we can ignore other entries
+    -- for this wallet.
+    -- FIXME: very ineffective, can be simplified drastically.
+    walletsAndBets ::  [(User, GYValue)]
+    walletsAndBets = go bets Set.empty []
+      where
+        go [] _ acc = acc
+        go allBets@((getWallet, _, _) : remBets) set acc =
+          let wallet = getWallet ws
+              addr = userAddr wallet
+          in
+            if Set.member addr set
+              then go remBets set acc -- already summed
+              else go
+                    remBets
+                    (Set.insert addr set)
+                    ((wallet := totalBets wallet allBets mempty) : acc)
+
+        -- | Recursive functions that sums all bets for the corresponding wallet.
+        totalBets :: User -> [Bet] -> GYValue -> GYValue
+        totalBets _ [] acc = acc
+        totalBets wallet ((getWallet, _, bet) : remBets) acc =
+            totalBets wallet remBets $
+              if getWallet ws == wallet
+                  then acc <> valueNegate bet
+                  else acc
+
+
     -- | Function to verify that the wallet indeed lost by /roughly/ the bet amount.
     -- We say /roughly/ as fees is assumed to be within (0, 1 ada].
+    verify :: GYTxGameMonad m => [((User, GYValue), GYValue, GYValue)] -> m ()
     verify [] = return ()
     verify (((wallet, diff), vBefore, vAfter) : xs) =
       let vAfterWithoutFees = vBefore <> diff
@@ -253,5 +249,54 @@ multipleBetsTraceCore brp refScript walletBets ws@Wallets{..} = do
             && expectedAdaWithoutFees - threshold <= actualAda
         then verify xs
         else
-          throwAppError . someBackendError . T.pack $ ("For wallet " <> show (userAddr wallet) <> " expected value (without fees) " <>
-                show vAfterWithoutFees <> " but actual is " <> show vAfter)
+          throwAppError . someBackendError . T.pack $
+            printf "For wallet %s expected value (without fees) %s but actual is %s"
+              (show $ userAddr wallet)
+              (show vAfterWithoutFees)
+              (show vAfter)
+
+-- | Runner for multiple bets.
+runMultipleBets
+  :: GYTxGameMonad m
+  => BetRefParams
+  -> GYTxOutRef                 -- ^ Reference script
+  -> [Bet]
+  -> Wallets
+  -> m ()
+runMultipleBets brp refScript bets ws = go bets True
+  where
+    go [] _ = return ()
+    go ((getWallet, dat, bet) : remBets) isFirst = do
+      if isFirst then do
+        gyLogInfo' "" "placing the first bet"
+        void $ runPlaceBet refScript brp dat bet Nothing (getWallet ws)
+        go remBets False
+      else do
+        gyLogInfo' "" "placing a next bet"
+        -- need to get previous bet utxo
+        betRefAddr <- betRefAddress brp
+        GYUTxO{utxoRef} <- head . utxosToList <$> utxosAtAddress betRefAddr Nothing
+        gyLogDebug' "" $ printf "previous bet utxo: %s" utxoRef
+        void $ runPlaceBet refScript brp dat bet (Just utxoRef) (getWallet ws)
+        go remBets False
+
+-- -----------------------------------------------------------------------------
+-- Auxiliary runners
+-- -----------------------------------------------------------------------------
+
+-- | Runner to build and submit a transaction that deploys the reference script.
+runDeployScript
+  :: GYTxGameMonad m
+  => Integer                        -- ^ Bet Until slot
+  -> Integer                        -- ^ Bet Reveal slot
+  -> GYValue                        -- ^ Bet step value
+  -> Wallets
+  -> m (BetRefParams, GYTxOutRef)
+runDeployScript betUntil betReveal betStep ws = do
+  (params, script) <- mkScript betUntil betReveal (userPkh $ oracle ws) betStep
+  asUser (admin ws) $ do
+    let sAddr = userAddr (holder ws)
+    gyLogDebug' "" $ printf "Ref script storage addr: %s" (show sAddr)
+    refScript <- addRefScript sAddr script
+    gyLogDebug' "" $ printf "Ref script deployed, ref output is: %s" (show refScript)
+    pure (params, refScript)

@@ -99,7 +99,10 @@ fakeIron = fromFakeCoin $ FakeCoin "Iron"
 -------------------------------------------------------------------------------
 
 -- | General information about the test environment to help in running polymorphic tests.
-data TestInfo = TestInfo { testGoldAsset :: !GYAssetClass, testIronAsset :: !GYAssetClass, testWallets :: !Wallets }
+data TestInfo = TestInfo
+  { testGoldAsset :: !GYAssetClass
+  , testIronAsset :: !GYAssetClass
+  , testWallets :: !Wallets }
 
 -- | Available wallets.
 data Wallets = Wallets

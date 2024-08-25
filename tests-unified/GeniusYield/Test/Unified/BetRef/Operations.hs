@@ -1,5 +1,6 @@
 module GeniusYield.Test.Unified.BetRef.Operations
-  ( betRefValidator'
+  ( mkScript
+  , mkBetRefValidator
   , betRefAddress
   , placeBet
   , takeBets
@@ -11,13 +12,37 @@ import           GeniusYield.Types
 
 import           GeniusYield.Test.Unified.OnChain.BetRef.Compiled
 
+-- | Queries the cuurent slot, calculates parameters and builds
+-- a script that is ready to be deployed.
+mkScript
+  :: GYTxQueryMonad m
+  => Integer        -- ^ How many slots betting should be open
+  -> Integer        -- ^ How many slots should pass before oracle reveals answer
+  -> GYPubKeyHash   -- ^ Oracle PKH
+  -> GYValue        -- ^ Bet step value
+  -> m (BetRefParams, GYScript PlutusV2)
+mkScript betUntil betReveal oraclePkh betStep = do
+  currSlot <- slotToInteger <$> slotOfCurrentBlock
+  -- Calculate params for the script
+  let betUntil' = slotFromApi $ fromInteger $ currSlot + betUntil
+  let betReveal' = slotFromApi $ fromInteger $ currSlot + betReveal
+  betUntilTime <- slotToBeginTime betUntil'
+  betRevealTime <- slotToBeginTime betReveal'
+  let params = BetRefParams
+        (pubKeyHashToPlutus oraclePkh)
+        (timeToPlutus betUntilTime)
+        (timeToPlutus betRevealTime)
+        (valueToPlutus betStep)
+  gyLogDebug' "" $ printf "Parameters: %s" (show params)
+  pure (params, validatorToScript $ mkBetRefValidator params)
+
 -- | Validator in question, obtained after giving required parameters.
-betRefValidator' :: BetRefParams -> GYValidator 'PlutusV2
-betRefValidator' brp = validatorFromPlutus $ betRefValidator brp
+mkBetRefValidator :: BetRefParams -> GYValidator 'PlutusV2
+mkBetRefValidator brp = validatorFromPlutus $ betRefValidator brp
 
 -- | Address of the validator, given params.
 betRefAddress :: (HasCallStack, GYTxQueryMonad m) => BetRefParams -> m GYAddress
-betRefAddress brp = scriptAddress $ betRefValidator' brp
+betRefAddress brp = scriptAddress $ mkBetRefValidator brp
 
 -- | Operation to place bet.
 placeBet :: (HasCallStack, GYTxQueryMonad m)
@@ -66,7 +91,7 @@ placeBet refScript brp guess bet ownAddr mPreviousBetsUtxoRef = do
         <> mustBeSignedBy pkh
 
 -- | Operation to take UTxO corresponding to previous bets.
-takeBets :: (HasCallStack, GYTxMonad m)
+takeBets :: (HasCallStack, GYTxQueryMonad m)
               => GYTxOutRef    -- ^ Reference Script.
               -> BetRefParams  -- ^ Validator params.
               -> GYTxOutRef    -- ^ Script UTxO to consume.
@@ -89,9 +114,8 @@ input :: BetRefParams -> GYTxOutRef -> GYTxOutRef -> BetRefDatum -> BetRefAction
 input brp refScript inputRef dat red =
   mustHaveInput GYTxIn
     { gyTxInTxOutRef = inputRef
-    -- , gyTxInWitness = GYTxInWitnessKey
     , gyTxInWitness  = GYTxInWitnessScript
-        (GYInReference refScript $ validatorToScript $ betRefValidator' brp)
+        (GYInReference refScript $ validatorToScript $ mkBetRefValidator brp)
         (datumFromPlutusData dat)
         (redeemerFromPlutusData red)
     }

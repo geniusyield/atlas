@@ -373,6 +373,7 @@ test-suite atlas-unified-tests
     , atlas-cardano
     , base
     , containers
+    , extra
     , tasty
     , tasty-hunit
     , text

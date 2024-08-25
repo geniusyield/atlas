@@ -89,7 +89,7 @@ withSetup' targetSev putLog (Setup cokont) kont = do
 
 -- | Given a test name, runs the test under privnet.
 mkPrivnetTestFor :: TestName -> Setup -> (TestInfo -> GYTxGameMonadIO ()) -> TestTree
-mkPrivnetTestFor name = mkPrivnetTestFor' name GYInfo
+mkPrivnetTestFor name = mkPrivnetTestFor' name GYDebug
 
 -- | Given a test name, runs the test under privnet with target logging severity.
 mkPrivnetTestFor' :: TestName -> GYLogSeverity -> Setup -> (TestInfo -> GYTxGameMonadIO ()) -> TestTree

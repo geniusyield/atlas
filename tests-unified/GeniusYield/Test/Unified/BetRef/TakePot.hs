@@ -93,13 +93,12 @@ takeBetsTrace betUntil' betReveal' betStep walletBets answer getTaker ws@Wallets
   let betUntil = currSlot + betUntil'
       betReveal = currSlot + betReveal'
   (brp, refScript) <- runDeployScript betUntil betReveal betStep ws
---   multipleBetsTraceCore brp refScript walletBets ws
---   -- Now lets take the bet
---   refInput <- asUser w1 $ addRefInput True (userAddr w8) (datumFromPlutusData $ OracleAnswerDatum answer)
---   let taker = getTaker ws
---   betRefAddr <- betRefAddress brp
---   _scriptUtxo@GYUTxO {utxoRef, utxoValue} <- head . utxosToList <$> utxosAtAddress betRefAddr Nothing
---   waitUntilSlot_ $ slotFromApi (fromInteger betReveal)
---   withWalletBalancesCheckSimple [taker := utxoValue] . asUser taker
---     . void $ takeBetsRun refScript brp utxoRef refInput
-  undefined
+  runMultipleBets brp refScript walletBets ws
+  -- Now lets take the bet
+  refInput <- asUser w1 $ addRefInput True (userAddr w8) (datumFromPlutusData $ OracleAnswerDatum answer)
+  let taker = getTaker ws
+  betRefAddr <- betRefAddress brp
+  _scriptUtxo@GYUTxO {utxoRef, utxoValue} <- head . utxosToList <$> utxosAtAddress betRefAddr Nothing
+  waitUntilSlot_ $ slotFromApi (fromInteger betReveal)
+  withWalletBalancesCheckSimple [taker := utxoValue] . asUser taker
+    . void $ takeBetsRun refScript brp utxoRef refInput

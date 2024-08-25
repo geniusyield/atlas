@@ -26,11 +26,21 @@ test-show-details: direct
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
 
+-- Temporary, until proposed changes are in upstream (track https://github.com/maestro-org/haskell-sdk/pull/72)
 source-repository-package
   type: git
-  location: https://github.com/maestro-org/haskell-sdk
-  tag: v1.7.0
-  --sha256: sha256-i0rRBxFHC2/cJoYjDP6sZHaI+e2hbU1jYeHe8EmJ1RE=
+  location: https://github.com/sourabhxyz/haskell-sdk
+  tag: 30a100d0e7ade9492a5eca8bef0fe701950c6171
+  --sha256: FIXME:
+
+-- Temporary, until proposed changes are in upstream (track https://github.com/blockfrost/blockfrost-haskell/pull/54)
+source-repository-package
+  type: git
+  location: https://github.com/sourabhxyz/blockfrost-haskell
+  tag: 85b9af545957c6d171d1c8767039dbcc26153117
+  --sha256: FIXME:
+  subdir:
+    blockfrost-api
 
 source-repository-package
   type: git

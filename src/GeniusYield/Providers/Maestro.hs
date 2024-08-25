@@ -213,6 +213,9 @@ scriptFromMaestro Maestro.Script {..} = case scriptType of
   Maestro.PlutusV2 -> case scriptBytes of
     Nothing -> Left $ DeserializeErrorImpossibleBranch "UTxO has PlutusV2 script but still no script bytes are present"
     Just sb -> pure $ GYPlutusScript <$> scriptFromCBOR  @'PlutusV2 sb
+  Maestro.PlutusV3 -> case scriptBytes of
+    Nothing -> Left $ DeserializeErrorImpossibleBranch "UTxO has PlutusV3 script but still no script bytes are present"
+    Just sb -> pure $ GYPlutusScript <$> scriptFromCBOR  @'PlutusV3 sb
 
 -- | Convert Maestro's UTxO to our GY type.
 utxoFromMaestro :: Maestro.IsUtxo a => a -> Either SomeDeserializeError GYUTxO

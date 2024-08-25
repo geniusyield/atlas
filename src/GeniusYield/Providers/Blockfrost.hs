@@ -381,6 +381,7 @@ blockfrostProtocolParams nid proj = do
             Blockfrost.PlutusV2 -> (Ledger.PlutusV2, either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ fromInteger <$> Map.elems x) : acc
             -- Don't care about non plutus cost models.
             Blockfrost.Timelock -> acc
+            Blockfrost.PlutusV3 -> acc
 
         ) [] (Blockfrost.unCostModels _protocolParamsCostModels)
         , cppPrices              = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's cpu steps")) $ Ledger.boundRational _protocolParamsPriceStep, Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's memory units")) $ Ledger.boundRational _protocolParamsPriceMem}
@@ -551,10 +552,10 @@ lookupScriptHash h = do
             mcbor <- Blockfrost._scriptCborCbor <$> Blockfrost.getScriptCBOR h
             case mcbor of
                 Nothing   -> return Nothing
-                Just cbor -> return $
-                    if t == Blockfrost.PlutusV1
-                        then GYPlutusScript <$> scriptFromCBOR @'PlutusV1 cbor
-                        else GYPlutusScript <$> scriptFromCBOR @'PlutusV2 cbor
+                Just cbor -> return $ case t of
+                    Blockfrost.PlutusV1 -> GYPlutusScript <$> scriptFromCBOR @'PlutusV1 cbor
+                    Blockfrost.PlutusV2 -> GYPlutusScript <$> scriptFromCBOR @'PlutusV2 cbor
+                    Blockfrost.PlutusV3 -> GYPlutusScript <$> scriptFromCBOR @'PlutusV3 cbor
 
 lookupScriptHashIO :: Blockfrost.Project -> Maybe Blockfrost.ScriptHash -> IO (Maybe GYAnyScript)
 lookupScriptHashIO _ Nothing  = return Nothing

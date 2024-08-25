@@ -177,6 +177,7 @@ library
     , cborg                
     , containers           
     , data-default         
+    , data-default-class
     , deriving-aeson       
     , either               
     , hashable             

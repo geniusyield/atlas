@@ -241,13 +241,14 @@ multipleBetsTraceCore brp refScript walletBets ws@Wallets{..} = do
   asUser w1 $ verify (zip3 balanceDiffWithoutFees balanceBeforeAllTheseOps balanceAfterAllTheseOps)
   where
     -- | Function to verify that the wallet indeed lost by /roughly/ the bet amount.
-    -- We say /roughly/ as fees is assumed to be within (0, 1 ada].
+    -- We say /roughly/ as fees is assumed to be within (0, 1.5 ada].
+    -- Suppose that wallet x places bet 3 times, where for simplicity assume each tx costed 0.6 ada as fees then the threshold should be above 1.8 ada.
     verify [] = return ()
     verify (((wallet, diff), vBefore, vAfter) : xs) =
       let vAfterWithoutFees = vBefore <> diff
           (expectedAdaWithoutFees, expectedOtherAssets) = valueSplitAda vAfterWithoutFees
           (actualAda, actualOtherAssets) = valueSplitAda vAfter
-          threshold = 1_000_000  -- 1 ada
+          threshold = 1_500_000  -- 1.5 ada
       in
         if expectedOtherAssets == actualOtherAssets
             && actualAda < expectedAdaWithoutFees

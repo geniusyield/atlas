@@ -42,6 +42,7 @@ newtype GYTxBuilderMonadIO a = GYTxBuilderMonadIO (GYTxBuilderIOEnv -> GYTxQuery
            , MonadError GYTxMonadException
            , GYTxQueryMonad
            , GYTxSpecialQueryMonad
+           , MonadIO
            )
   via ReaderT GYTxBuilderIOEnv GYTxQueryMonadIO
   deriving anyclass GYTxBuilderMonad

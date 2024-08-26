@@ -3,6 +3,7 @@ module GeniusYield.Test.Unified.BetRef.PlaceBet
     , placeBetTestsClb
     , runDeployScript
     , runMultipleBets
+    , Bet
     ) where
 
 import           Control.Monad.Except               (handleError)

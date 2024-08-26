@@ -26,44 +26,46 @@ test-show-details: direct
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
 
--- Temporary, until proposed changes are in upstream (track https://github.com/maestro-org/haskell-sdk/pull/72)
+-- TODO: Temporary, until proposed changes are in upstream (track https://github.com/maestro-org/haskell-sdk/pull/72)
 source-repository-package
   type: git
   location: https://github.com/sourabhxyz/haskell-sdk
   tag: 30a100d0e7ade9492a5eca8bef0fe701950c6171
-  --sha256: FIXME:
+  --sha256: sha256-DvQmrZUDIabFVjb971Xe4jMe2LOxxSmjUV7Z49xJm5c=
 
--- Temporary, until proposed changes are in upstream (track https://github.com/blockfrost/blockfrost-haskell/pull/54)
+-- TODO: Temporary, until proposed changes are in upstream (track https://github.com/blockfrost/blockfrost-haskell/pull/54)
 source-repository-package
   type: git
   location: https://github.com/sourabhxyz/blockfrost-haskell
   tag: 85b9af545957c6d171d1c8767039dbcc26153117
-  --sha256: FIXME:
+  --sha256: sha256-s/CHdNeRg9M55rCj6GaeJPuORN34XAtlNXP8fXYeKuQ=
   subdir:
     blockfrost-api
 
+-- TODO: Temporary, until proposed changes are in upstream (track https://github.com/mlabs-haskell/clb/pull/44)
 source-repository-package
   type: git
   location: https://github.com/sourabhxyz/clb
   tag: 09414a93047b4c7f6e03e20d1730c9c0f88e1d46
-  --sha256: FIXME:
+  --sha256: sha256-y5fF8IDywt/pQ3HsRE6CpAlqK4uiU/SRuDIqSHxBED0=
 
 -- Obtaining cardano-node stuff for 9.1.0. These aren't published on CHaP yet.
 source-repository-package
   type: git
   location: https://github.com/IntersectMBO/cardano-node
   tag: 9.1.0
-  --sha256: FIXME:
+  --sha256: sha256-F5wgRA820x16f+8c/LlEEBG0rMJIA1XWw6X0ZwX5UWs=
   subdir:
     cardano-node
     cardano-testnet
     trace-dispatcher
 
+-- TODO: Make changes upstream
 source-repository-package
   type: git
   location: https://github.com/geniusyield/cardano-wallet
   tag: 3413fdf74fd25b100662abf2a49c1afc892f1b79
-  --sha256: FIXME:
+  --sha256: sha256-V5DNUzraaDJo6cXc1eeVVIJNWqC8JayQrJeNNLg/Els=
   subdir:
     lib/address-derivation-discovery
     lib/balance-tx/

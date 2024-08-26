@@ -34,7 +34,6 @@ newtype GYTxQueryMonadIO a = GYTxQueryMonadIO { runGYTxQueryMonadIO' :: GYTxQuer
            , Monad
            , MonadReader GYTxQueryIOEnv
            , MonadRandom
-           , MonadIO
            )
   via ReaderT GYTxQueryIOEnv IO
 

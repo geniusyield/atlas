@@ -155,6 +155,7 @@ library
     GeniusYield.Types.UTxO
     GeniusYield.Types.Value
     GeniusYield.Types.Wallet
+    GeniusYield.Unsafe
 
   other-modules:
     GeniusYield.Providers.LiteChainIndex

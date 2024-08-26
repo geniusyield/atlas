@@ -326,7 +326,7 @@ collateralValue = valueFromLovelace collateralLovelace
 {-# INLINABLE maximumRequiredCollateralLovelace #-}
 -- | What is the maximum possible collateral requirement as per current protocol parameters?
 maximumRequiredCollateralLovelace :: GYProtocolParameters -> Int -> Integer
-maximumRequiredCollateralLovelace pp refScriptSize = ceiling $ fromIntegral (maximumFee pp refScriptSize) * ((protocolParametersToApi pp ^. Ledger.ppCollateralPercentageL) % 100)  -- FIXME: Thoroughly review this, does it need % 100?
+maximumRequiredCollateralLovelace pp refScriptSize = ceiling $ fromIntegral (maximumFee pp refScriptSize) * ((protocolParametersToApi pp ^. Ledger.ppCollateralPercentageL) % 100)
 
 {-# INLINABLE maximumFee #-}
 -- | Compute the maximum fee possible for any transaction.

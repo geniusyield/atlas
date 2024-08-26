@@ -326,6 +326,12 @@ instance GYTxQueryMonad GYTxMonadClb where
             GYWarning -> LogEntry Warning doc
             GYError   -> LogEntry Error doc
 
+    waitUntilSlot slot = do
+        -- Silently returns if the given slot is greater than the current slot.
+        liftClb . Clb.waitSlot $ slotToApi slot
+        pure slot
+    waitForNextBlock = slotOfCurrentBlock
+
 instance GYTxUserQueryMonad GYTxMonadClb where
 
     ownAddresses = asks $ userAddresses' . runEnvWallet
@@ -409,11 +415,6 @@ instance GYTxGameMonad GYTxMonadClb where
         local
             (const $ GYTxRunEnv u)
             act
-    waitUntilSlot slot = do
-        -- Silently returns if the given slot is greater than the current slot.
-        liftClb . Clb.waitSlot $ slotToApi slot
-        pure slot
-    waitForNextBlock = slotOfCurrentBlock
 
 slotConfig' :: GYTxMonadClb (UTCTime, NominalDiffTime)
 slotConfig' = liftClb $ do

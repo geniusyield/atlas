@@ -151,14 +151,6 @@ instance GYTxGameMonad GYTxGameMonadIO where
             (userCollateralDumb u)
             act
 
-    waitUntilSlot slot = do
-        waiter <- asks (gyWaitUntilSlot . envGameProviders)
-        ioToTxGameMonad $ waiter slot
-
-    waitForNextBlock = do
-        waiter <- asks (gyWaitForNextBlock . envGameProviders)
-        ioToTxGameMonad waiter
-
 runGYTxGameMonadIO
     :: GYNetworkId                      -- ^ Network ID.
     -> GYProviders                      -- ^ Provider.

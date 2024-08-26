@@ -246,10 +246,6 @@ class (GYTxMonad (TxMonadOf m), GYTxSpecialQueryMonad m) => GYTxGameMonad m wher
     type TxMonadOf m = (r :: Type -> Type) | r -> m
     -- | Lift the supported 'GYTxMonad' instance into the game, as a participating user wallet.
     asUser :: User -> TxMonadOf m a -> m a
-    -- | Wait until the chain tip is at given slot number.
-    waitUntilSlot :: GYSlot -> m GYSlot
-    -- | Wait until the chain tip is at the next block.
-    waitForNextBlock :: m GYSlot
 
 {- Note [Higher order effects, TxMonadOf, and GYTxGameMonad]
 
@@ -272,11 +268,11 @@ will be automatically inferred.
 -}
 
 -- | > waitUntilSlot_ = void . waitUntilSlot
-waitUntilSlot_ :: GYTxGameMonad m => GYSlot -> m ()
+waitUntilSlot_ :: GYTxQueryMonad m => GYSlot -> m ()
 waitUntilSlot_ = void . waitUntilSlot
 
 -- | Wait until the chain tip has progressed by N slots.
-waitNSlots :: GYTxGameMonad m => Word64 -> m GYSlot
+waitNSlots :: GYTxQueryMonad m => Word64 -> m GYSlot
 waitNSlots (slotFromWord64 -> n) = do
     -- FIXME: Does this need to be an absolute slot getter instead?
     currentSlot <- slotOfCurrentBlock
@@ -285,7 +281,7 @@ waitNSlots (slotFromWord64 -> n) = do
     addSlots = (+) `on` slotToApi
 
 -- | > waitNSlots_ = void . waitNSlots
-waitNSlots_ :: GYTxGameMonad m => Word64 -> m ()
+waitNSlots_ :: GYTxQueryMonad m => Word64 -> m ()
 waitNSlots_ = void . waitNSlots
 
 -- | > submitTx_ = void . submitTx

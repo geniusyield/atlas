@@ -175,8 +175,6 @@ ftgLift act = FeeTrackerGame $ \s -> (, s) <$> act
 instance GYTxGameMonad m => GYTxGameMonad (FeeTrackerGame m) where
     type TxMonadOf (FeeTrackerGame m) = FeeTracker (TxMonadOf m)
     asUser u (FeeTracker act) = FeeTrackerGame $ asUser u . act
-    waitUntilSlot = ftgLift . waitUntilSlot
-    waitForNextBlock = ftgLift waitForNextBlock
 
 {- Note [Proper GYTxMonad overriding with FeeTracker]
 

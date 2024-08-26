@@ -19,6 +19,7 @@ module GeniusYield.Test.Clb
     , mustFail
     , mustFailWith
     , sendSkeleton
+    , sendSkeleton'
     , logInfoS
     ) where
 

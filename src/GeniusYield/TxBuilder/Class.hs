@@ -258,7 +258,7 @@ from its associated 'GYTxMonad' instance (such is the case for 'GYTxGameMonadIO'
 make the same data type a 'GYTxMonad' and 'GYTxGameMonad'.
 
 The former would not be possible if 'GYTxGameMonad' was subsumed into 'GYTxMonad', or if the 'TxMonadOf' type family
-was not present. Thus, both the seperation and the type family are the result of a conscious design decision.
+was not present. Thus, both the separation and the type family are the result of a conscious design decision.
 
 It's important to allow the former case since it avoids making 'asUser' a higher order effect, unconditionally. Higher
 order effects can be problematic. If, in the future, we are to use a proper effect system - we'd like to avoid having to

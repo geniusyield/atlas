@@ -163,13 +163,6 @@ conwayGenesis =
       , cgInitialDReps = mempty
       }
 
--- | This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
-cardanoTestnet' opts conf = do
-  Api.AnyCardanoEra cEra <- pure $ cardanoNodeEra cardanoDefaultTestnetOptions
-  alonzoGenesis <- getDefaultAlonzoGenesis cEra
-  (startTime, shelleyGenesis') <- getDefaultShelleyGenesis opts
-  cardanoTestnet opts conf startTime shelleyGenesis' alonzoGenesis conwayGenesis
-
 {- | Spawn a resource managed privnet and do things with it (closing it in the end).
 
 Privnet can be configured using "Cardano.Testnet.CardanoTestnetOptions". Pass 'cardanoDefaultTestnetOptions'
@@ -342,6 +335,13 @@ withPrivnet testnetOpts setupUser = do
 
             let setup = Setup $ \targetSev putLog kont -> kont $ ctx { ctxLog = simpleLogging targetSev (putLog . Txt.unpack) }
             setupUser setup
+  where
+    -- | This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
+    cardanoTestnet' opts conf = do
+        Api.AnyCardanoEra cEra <- pure $ cardanoNodeEra cardanoDefaultTestnetOptions
+        alonzoGenesis <- getDefaultAlonzoGenesis cEra
+        (startTime, shelleyGenesis') <- getDefaultShelleyGenesis opts
+        cardanoTestnet opts conf startTime shelleyGenesis' alonzoGenesis conwayGenesis
 
 -------------------------------------------------------------------------------
 -- Generating users

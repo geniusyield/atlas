@@ -34,13 +34,13 @@ newtype GYTxQueryMonadIO a = GYTxQueryMonadIO { runGYTxQueryMonadIO' :: GYTxQuer
            , Monad
            , MonadReader GYTxQueryIOEnv
            , MonadRandom
-           , MonadIO
            )
   via ReaderT GYTxQueryIOEnv IO
 
 data GYTxQueryIOEnv = GYTxQueryIOEnv { envNid :: !GYNetworkId, envProviders :: !GYProviders}
 
--- INTERNAL USAGE ONLY
+-- | INTERNAL USAGE ONLY
+--
 -- Do not expose a 'MonadIO' instance. It allows the user to do arbitrary IO within the tx monad.
 ioToQueryMonad :: IO a -> GYTxQueryMonadIO a
 ioToQueryMonad ioAct = GYTxQueryMonadIO $ const ioAct

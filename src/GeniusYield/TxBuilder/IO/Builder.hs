@@ -15,9 +15,8 @@ module GeniusYield.TxBuilder.IO.Builder (
 ) where
 
 
-import           Control.Monad.IO.Class         (MonadIO (..))
-import           Control.Monad.Reader           (MonadReader, ReaderT (ReaderT),
-                                                 asks)
+import           Control.Monad.Reader           (MonadIO (liftIO), MonadReader,
+                                                 ReaderT (ReaderT), asks)
 import           Control.Monad.Trans.Maybe      (MaybeT (runMaybeT))
 import qualified Data.Set                       as Set
 
@@ -43,7 +42,6 @@ newtype GYTxBuilderMonadIO a = GYTxBuilderMonadIO (GYTxBuilderIOEnv -> GYTxQuery
            , MonadError GYTxMonadException
            , GYTxQueryMonad
            , GYTxSpecialQueryMonad
-           , MonadIO
            )
   via ReaderT GYTxBuilderIOEnv GYTxQueryMonadIO
   deriving anyclass GYTxBuilderMonad
@@ -55,7 +53,8 @@ data GYTxBuilderIOEnv = GYTxBuilderIOEnv
     , envUsedSomeUTxOs :: !(Set GYTxOutRef)
     }
 
--- INTERNAL USAGE ONLY
+-- | INTERNAL USAGE ONLY
+--
 -- Do not expose a 'MonadIO' instance. It allows the user to do arbitrary IO within the tx monad.
 ioToTxBuilderMonad :: IO a -> GYTxBuilderMonadIO a
 ioToTxBuilderMonad ioAct = GYTxBuilderMonadIO . const $ ioToQueryMonad ioAct

@@ -49,8 +49,7 @@ import qualified Data.Time                                      as Time
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
 import           GeniusYield.Types
-import           GeniusYield.Types.ProtocolParameters           (GYProtocolParameters,
-                                                                 protocolParametersFromApi)
+import           GeniusYield.Types.ProtocolParameters           (ApiProtocolParameters)
 import           GHC.Natural                                    (wordToNatural)
 import qualified Maestro.Client.V1                              as Maestro
 import qualified Maestro.Client.V1.Accounts                     as Maestro
@@ -446,11 +445,11 @@ maestroQueryUtxo env = GYQueryUTxO
 -- Parameters
 -------------------------------------------------------------------------------
 
--- | Returns the 'GYProtocolParameters' queried from Maestro.
-maestroProtocolParams :: GYNetworkId -> Maestro.MaestroEnv 'Maestro.V1 -> IO GYProtocolParameters
+-- | Returns the 'ApiProtocolParameters' queried from Maestro.
+maestroProtocolParams :: GYNetworkId -> Maestro.MaestroEnv 'Maestro.V1 -> IO ApiProtocolParameters
 maestroProtocolParams nid env = do
   Maestro.ProtocolParameters {..} <- handleMaestroError "ProtocolParams" <=< try $ Maestro.getTimestampedData <$> Maestro.getProtocolParameters env
-  pure $ protocolParametersFromApi $ Ledger.PParams $ populateMissingProtocolParameters nid $
+  pure $ Ledger.PParams $ populateMissingProtocolParameters nid $
     ConwayPParams
       { cppMinFeeA        = THKD $ Ledger.Coin $ toInteger protocolParametersMinFeeCoefficient
       , cppMinFeeB        = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinFeeConstant

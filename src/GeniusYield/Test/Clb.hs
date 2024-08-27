@@ -93,7 +93,6 @@ import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.User
 import           GeniusYield.Types
-import           GeniusYield.Types.ProtocolParameters           (protocolParametersFromApi)
 import           Ouroboros.Consensus.HardFork.History.EraParams (EraParams (eraGenesisWin))
 
 deriving newtype instance Num EpochSize
@@ -432,7 +431,7 @@ protocolParameters = do
 instance GYTxSpecialQueryMonad GYTxMonadClb where
     systemStart = gyscSystemStart <$> slotConfig
 
-    protocolParams = protocolParametersFromApi <$> protocolParameters
+    protocolParams = protocolParameters
 
     stakePools = pure Set.empty
     -- stakePools = do

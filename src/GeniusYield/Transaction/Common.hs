@@ -24,8 +24,7 @@ import           GeniusYield.Imports
 import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Types.Address
 import           GeniusYield.Types.Era
-import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters,
-                                                       protocolParametersToApi)
+import           GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import           GeniusYield.Types.PubKeyHash
 import           GeniusYield.Types.Redeemer
 import           GeniusYield.Types.Script
@@ -121,9 +120,9 @@ data GYBuildTxError
 -- Transaction Utilities
 -------------------------------------------------------------------------------
 
-minimumUTxO :: GYProtocolParameters -> GYTxOut v -> Natural
+minimumUTxO :: ApiProtocolParameters -> GYTxOut v -> Natural
 minimumUTxO pp txOut = fromInteger $ coerce $
-  Api.calculateMinimumUTxO Api.ShelleyBasedEraConway (txOutToApi txOut) $ protocolParametersToApi pp
+  Api.calculateMinimumUTxO Api.ShelleyBasedEraConway (txOutToApi txOut) pp
 
 adjustTxOut :: (GYTxOut v -> Natural) -> GYTxOut v -> GYTxOut v
 adjustTxOut minimumUTxOF = helper

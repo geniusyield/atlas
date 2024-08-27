@@ -29,8 +29,7 @@ import qualified Data.Text                                         as Txt
 import           GeniusYield.CardanoApi.Query
 import           GeniusYield.Providers.Common                      (SubmitTxException (SubmitTxException))
 import           GeniusYield.Types
-import           GeniusYield.Types.ProtocolParameters              (GYProtocolParameters,
-                                                                    protocolParametersFromApi)
+import           GeniusYield.Types.ProtocolParameters              (ApiProtocolParameters)
 import           Ouroboros.Network.Protocol.LocalTxSubmission.Type (SubmitResult (..))
 
 -------------------------------------------------------------------------------
@@ -70,8 +69,8 @@ nodeSlotActions info = GYSlotActions
 nodeGetParameters :: Api.LocalNodeConnectInfo -> IO GYGetParameters
 nodeGetParameters info = makeGetParameters (nodeGetProtocolParameters info) (systemStart info) (eraHistory info) (stakePools info)
 
-nodeGetProtocolParameters :: Api.LocalNodeConnectInfo -> IO GYProtocolParameters
-nodeGetProtocolParameters info = protocolParametersFromApi <$> queryConwayEra info Api.QueryProtocolParameters
+nodeGetProtocolParameters :: Api.LocalNodeConnectInfo -> IO ApiProtocolParameters
+nodeGetProtocolParameters info = queryConwayEra info Api.QueryProtocolParameters
 
 stakePools :: Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)
 stakePools info = queryConwayEra  info Api.QueryStakePools

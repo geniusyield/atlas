@@ -21,7 +21,7 @@ import           GeniusYield.Imports                  ((&))
 import           GeniusYield.Types.Certificate
 import           GeniusYield.Types.Credential         (stakeCredentialToApi)
 import           GeniusYield.Types.Era
-import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters)
+import           GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import           GeniusYield.Types.Redeemer
 import           GeniusYield.Types.Script
 -- | A transaction certificate.
@@ -43,7 +43,7 @@ data GYTxCert' v = GYTxCert'
     }
   deriving (Eq, Show)
 
-finaliseTxCert :: GYProtocolParameters -> GYTxCert v -> GYTxCert' v
+finaliseTxCert :: ApiProtocolParameters -> GYTxCert v -> GYTxCert' v
 finaliseTxCert pp (GYTxCert cert wit) = GYTxCert' (finaliseCert pp cert) wit
 
 

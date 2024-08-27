@@ -97,15 +97,14 @@ import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Transaction.CoinSelection
 import           GeniusYield.Transaction.Common
 import           GeniusYield.Types
-import           GeniusYield.Types.ProtocolParameters  (GYProtocolParameters,
-                                                        protocolParametersToApi)
+import           GeniusYield.Types.ProtocolParameters  (ApiProtocolParameters)
 import           GeniusYield.Types.TxCert.Internal
 
 -- | A container for various network parameters, and user wallet information, used by balancer.
 data GYBuildTxEnv = GYBuildTxEnv
     { gyBTxEnvSystemStart    :: !SystemStart
     , gyBTxEnvEraHistory     :: !Api.EraHistory
-    , gyBTxEnvProtocolParams :: !GYProtocolParameters
+    , gyBTxEnvProtocolParams :: !ApiProtocolParameters
     , gyBTxEnvPools          :: !(Set Api.S.PoolId)
     , gyBTxEnvOwnUtxos       :: !GYUTxOs
     -- ^ own utxos available for use as _additional_ input
@@ -285,7 +284,7 @@ balanceTxStep
                         . flip valueAssetClass GYLovelace
                           . gyTxOutValue
                             . adjustTxOut (minimumUTxO pp)
-                    , maxValueSize    = protocolParametersToApi pp ^. Ledger.ppMaxValSizeL
+                    , maxValueSize    = pp ^. Ledger.ppMaxValSizeL
                     , adaSource = adaSource
                     , adaSink   = adaSink
                     }
@@ -481,7 +480,7 @@ finalizeGYBalancedTx
         Api.txMetadata = txMetadata,
         Api.txAuxScripts = Api.TxAuxScriptsNone,
         Api.txExtraKeyWits = extra,
-        Api.txProtocolParams = Api.BuildTxWith $ Just $ Api.S.LedgerProtocolParameters pp',
+        Api.txProtocolParams = Api.BuildTxWith $ Just $ Api.S.LedgerProtocolParameters pp,
         Api.txWithdrawals = wdrls',
         Api.txCertificates = certs',
         Api.txUpdateProposal = Api.TxUpdateProposalNone,
@@ -493,8 +492,6 @@ finalizeGYBalancedTx
         Api.txTreasuryDonation = Nothing
       }
 
-    pp' = protocolParametersToApi pp
-
 {- | Wraps around 'Api.makeTransactionBodyAutoBalance' just to verify the final ex units and tx size are within limits.
 
 If not checked, the returned txbody may fail during submission.
@@ -502,7 +499,7 @@ If not checked, the returned txbody may fail during submission.
 makeTransactionBodyAutoBalanceWrapper :: GYUTxOs
                                       -> SystemStart
                                       -> Api.S.EraHistory
-                                      -> GYProtocolParameters
+                                      -> ApiProtocolParameters
                                       -> Set Api.S.PoolId
                                       -> Api.S.UTxO ApiEra
                                       -> Api.S.TxBodyContent Api.S.BuildTx ApiEra
@@ -511,7 +508,7 @@ makeTransactionBodyAutoBalanceWrapper :: GYUTxOs
                                       -> Word
                                       -> Int
                                       -> Either GYBuildTxError GYTxBody
-makeTransactionBodyAutoBalanceWrapper collaterals ss eh (protocolParametersToApi -> pp) _ps utxos body changeAddr stakeDelegDeposits nkeys numSkeletonOuts = do
+makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp _ps utxos body changeAddr stakeDelegDeposits nkeys numSkeletonOuts = do
     let poolids = Set.empty -- TODO: This denotes the set of registered stake pools, that are being unregistered in this transaction.
 
     let Ledger.ExUnits

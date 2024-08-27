@@ -207,7 +207,7 @@ gyQueryUtxoAtTxOutRef = gyQueryUtxoAtTxOutRef' . gyQueryUTxO
 gyQueryUtxoRefsAtAddress :: GYProviders -> GYAddress -> IO [GYTxOutRef]
 gyQueryUtxoRefsAtAddress = gyQueryUtxoRefsAtAddress' . gyQueryUTxO
 
-gyGetProtocolParameters :: GYProviders -> IO GYProtocolParameters
+gyGetProtocolParameters :: GYProviders -> IO ApiProtocolParameters
 gyGetProtocolParameters = gyGetProtocolParameters' . gyGetParameters
 
 gyGetSystemStart :: GYProviders -> IO SystemStart
@@ -355,7 +355,7 @@ makeSlotActions t getSlotOfCurrentBlock = do
 
 -- | How to get protocol parameters? ... and other data to do balancing.
 data GYGetParameters = GYGetParameters
-    { gyGetProtocolParameters' :: !(IO GYProtocolParameters)
+    { gyGetProtocolParameters' :: !(IO ApiProtocolParameters)
     , gyGetSystemStart'        :: !(IO SystemStart)
     , gyGetEraHistory'         :: !(IO Api.EraHistory)
     , gyGetStakePools'         :: !(IO (Set Api.S.PoolId))
@@ -370,7 +370,7 @@ data GYParameterStore a = GYParameterStore !(Maybe UTCTime) !a
 This uses IO to set up some mutable references used for caching.
 -}
 makeGetParameters
-                :: IO GYProtocolParameters
+                :: IO ApiProtocolParameters
                 -- ^ Getting protocol parameters
                 -> IO SystemStart
                 -- ^ Getting system start

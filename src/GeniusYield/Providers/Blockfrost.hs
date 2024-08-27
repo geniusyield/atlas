@@ -48,8 +48,7 @@ import           Data.Default                         (def)
 import           GeniusYield.Imports
 import           GeniusYield.Providers.Common
 import           GeniusYield.Types
-import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters,
-                                                       protocolParametersFromApi)
+import           GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import           GeniusYield.Utils                    (serialiseToBech32WithPrefix)
 import           Ouroboros.Consensus.HardFork.History (EraParams (eraGenesisWin))
 
@@ -351,11 +350,11 @@ transformUtxoOutput txId (Blockfrost.UtxoOutput {..}, ms) = do
 -- Parameters
 -------------------------------------------------------------------------------
 
-blockfrostProtocolParams :: GYNetworkId -> Blockfrost.Project -> IO GYProtocolParameters
+blockfrostProtocolParams :: GYNetworkId -> Blockfrost.Project -> IO ApiProtocolParameters
 blockfrostProtocolParams nid proj = do
     Blockfrost.ProtocolParams {..} <- Blockfrost.runBlockfrost proj Blockfrost.getLatestEpochProtocolParams
         >>= handleBlockfrostError "ProtocolParams"
-    pure $ protocolParametersFromApi $ Ledger.PParams $ populateMissingProtocolParameters nid $
+    pure $ Ledger.PParams $ populateMissingProtocolParameters nid $
         ConwayPParams
         { cppMinFeeA        = THKD $ Ledger.Coin _protocolParamsMinFeeA
         , cppMinFeeB        = THKD $ Ledger.Coin _protocolParamsMinFeeB

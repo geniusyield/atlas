@@ -25,7 +25,7 @@ import           GHC.Stack                            (withFrozenCallStack)
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
-import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters)
+import           GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 
 -------------------------------------------------------------------------------
 -- Class
@@ -141,7 +141,7 @@ under the class method in question?
 class GYTxQueryMonad m => GYTxSpecialQueryMonad m where
     systemStart :: m Api.SystemStart
     eraHistory :: m Api.EraHistory
-    protocolParams :: m GYProtocolParameters
+    protocolParams :: m ApiProtocolParameters
     stakePools :: m (Set Api.S.PoolId)
 
 -- | Class of monads for querying as a user.

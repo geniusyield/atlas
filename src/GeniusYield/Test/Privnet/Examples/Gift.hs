@@ -31,7 +31,6 @@ import           GeniusYield.Test.Privnet.Examples.Common
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
-import           GeniusYield.Types.ProtocolParameters     (protocolParametersToApi)
 import           Test.Tasty                               (TestTree, testGroup)
 import           Test.Tasty.HUnit                         (testCaseSteps)
 
@@ -186,7 +185,7 @@ tests setup = testGroup "gift"
         pp <- gyGetProtocolParameters $ ctxProviders ctx
         let colls = txBodyCollateral grabGiftsTxBody'
         colls' <- ctxRunQuery ctx $ utxosAtTxOutRefs (Set.toList colls)
-        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ protocolParametersToApi pp ^. ppCollateralPercentageL)
+        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ pp ^. ppCollateralPercentageL)
         ctxRun ctx newUser $ signAndSubmitConfirmed_ grabGiftsTxBody'
 
     , testCaseSteps "Checking if collateral is reserved in case we send an exact 5 ada only UTxO as collateral (simulating browser's case) + is collateral spendable if we want?" $ \info -> withSetup info setup $ \ctx -> do

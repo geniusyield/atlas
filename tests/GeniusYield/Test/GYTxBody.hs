@@ -41,8 +41,7 @@ import           GeniusYield.Transaction              (GYBuildTxEnv (..),
                                                        balanceTxStep)
 import           GeniusYield.Transaction.Common       (GYBalancingError (..),
                                                        adjustTxOut, minimumUTxO)
-import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters,
-                                                       protocolParametersFromApi)
+import           GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 -------------------------------------------------------------------------------
 -- Tests
 -------------------------------------------------------------------------------
@@ -165,8 +164,8 @@ mockTxOutRef = "4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189
 mockAsset :: GYTokenName -> GYAssetClass
 mockAsset = GYToken "005eaf690cba88f441494e42f5edce9bd7f595c56f99687e2fa0aad4"
 
-mockProtocolParams :: GYProtocolParameters
-mockProtocolParams = protocolParametersFromApi defaultConwayParams
+mockProtocolParams :: ApiProtocolParameters
+mockProtocolParams = defaultConwayParams
 
 collateralUtxo :: GYUTxO
 collateralUtxo = GYUTxO

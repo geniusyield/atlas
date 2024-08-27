@@ -26,8 +26,7 @@ import           GeniusYield.Types.Delegatee          (GYDelegatee,
                                                        delegateeFromLedger,
                                                        delegateeToLedger)
 import           GeniusYield.Types.Era
-import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters,
-                                                       protocolParametersToApi)
+import           GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import           GHC.Natural                          (Natural)
 
 -- | Certificate state before building the transaction.
@@ -47,8 +46,8 @@ data GYCertificate =
   deriving stock (Eq, Ord, Show)
 
 -- FIXME: Unregistration should make use of deposit that was actually used when registering earlier.
-finaliseCert :: GYProtocolParameters -> GYCertificatePreBuild -> GYCertificate
-finaliseCert (protocolParametersToApi -> pp) = \case
+finaliseCert :: ApiProtocolParameters -> GYCertificatePreBuild -> GYCertificate
+finaliseCert pp = \case
   GYStakeAddressRegistrationCertificatePB sc -> GYStakeAddressRegistrationCertificate ppDep' sc
   GYStakeAddressDeregistrationCertificatePB sc -> GYStakeAddressDeregistrationCertificate ppDep' sc
   GYStakeAddressDelegationCertificatePB sc del -> GYStakeAddressDelegationCertificate sc del

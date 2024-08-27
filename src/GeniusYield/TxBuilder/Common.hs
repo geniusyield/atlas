@@ -45,8 +45,7 @@ import           GeniusYield.Transaction.Common       (minimumUTxO,
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.Query.Class
 import           GeniusYield.Types
-import           GeniusYield.Types.ProtocolParameters (GYProtocolParameters,
-                                                       protocolParametersToApi)
+import           GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 
 -------------------------------------------------------------------------------
 -- Transaction skeleton
@@ -176,7 +175,7 @@ buildTxCore
     :: forall m v. (GYTxQueryMonad m, MonadRandom m)
     => Api.SystemStart
     -> Api.EraHistory
-    -> GYProtocolParameters
+    -> ApiProtocolParameters
     -> Set Api.S.PoolId
     -> GYCoinSelectionStrategy
     -> (GYTxBody -> GYUTxOs -> GYUTxOs)
@@ -325,13 +324,13 @@ collateralValue = valueFromLovelace collateralLovelace
 
 {-# INLINABLE maximumRequiredCollateralLovelace #-}
 -- | What is the maximum possible collateral requirement as per current protocol parameters?
-maximumRequiredCollateralLovelace :: GYProtocolParameters -> Int -> Integer
-maximumRequiredCollateralLovelace pp refScriptSize = ceiling $ fromIntegral (maximumFee pp refScriptSize) * ((protocolParametersToApi pp ^. Ledger.ppCollateralPercentageL) % 100)
+maximumRequiredCollateralLovelace :: ApiProtocolParameters -> Int -> Integer
+maximumRequiredCollateralLovelace pp refScriptSize = ceiling $ fromIntegral (maximumFee pp refScriptSize) * ((pp ^. Ledger.ppCollateralPercentageL) % 100)
 
 {-# INLINABLE maximumFee #-}
 -- | Compute the maximum fee possible for any transaction.
-maximumFee :: GYProtocolParameters -> Int -> Integer
-maximumFee (protocolParametersToApi -> pp) refScriptSize =
+maximumFee :: ApiProtocolParameters -> Int -> Integer
+maximumFee pp refScriptSize =
   let txFee :: Integer
       txFee = fromIntegral $ pp ^. Ledger.ppMinFeeBL + (pp ^. Ledger.ppMinFeeAL) * fromIntegral (pp ^. Ledger.ppMaxTxSizeL)
       executionFee :: Rational
@@ -344,5 +343,5 @@ maximumFee (protocolParametersToApi -> pp) refScriptSize =
 
 {-# INLINABLE maximumRequiredCollateralValue #-}
 -- | See `maximumRequiredCollateralLovelace`.
-maximumRequiredCollateralValue :: GYProtocolParameters -> Int -> GYValue
+maximumRequiredCollateralValue :: ApiProtocolParameters -> Int -> GYValue
 maximumRequiredCollateralValue pp refScriptSize = valueFromLovelace $ maximumRequiredCollateralLovelace pp refScriptSize

@@ -165,8 +165,10 @@ conwayGenesis =
 
 {- | Spawn a resource managed privnet and do things with it (closing it in the end).
 
-Privnet can be configured using "Cardano.Testnet.CardanoTestnetOptions". Pass 'cardanoDefaultTestnetOptions'
+Privnet can be configured using "Cardano.Testnet.CardanoTestnetOptions". Pass 'cardanoDefaultTestnetOptionsConway'
 for default configuration.
+
+Note that passed @CardanoTestnetOptions@ must imply Conway era.
 
 Returns continuation on `Setup`, which is essentially a function that performs an action
 given a logging -- function and the action itself (which receives the Privnet Ctx).
@@ -201,8 +203,7 @@ withPrivnet testnetOpts setupUser = do
                         . poolRuntime
                         $ head poolNodes
                 , runtimeNetworkInfo = GYNetworkInfo
-                    { -- TODO: Conway support.
-                      gyNetworkEpochSlots = fromIntegral $ cardanoEpochLength testnetOpts
+                    { gyNetworkEpochSlots = fromIntegral $ cardanoEpochLength testnetOpts
                     , gyNetworkMagic      = fromIntegral testnetMagic
                     }
                 , runtimeWallets = wallets

@@ -108,6 +108,7 @@ library
     GeniusYield.TxBuilder.Common
     GeniusYield.TxBuilder.Errors
     GeniusYield.TxBuilder.IO
+    GeniusYield.TxBuilder.IO.Unsafe
     GeniusYield.TxBuilder.Query.Class
     GeniusYield.TxBuilder.User
     GeniusYield.Types
@@ -155,7 +156,6 @@ library
     GeniusYield.Types.UTxO
     GeniusYield.Types.Value
     GeniusYield.Types.Wallet
-    GeniusYield.Unsafe
 
   other-modules:
     GeniusYield.Providers.LiteChainIndex

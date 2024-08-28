@@ -1,12 +1,12 @@
 {-|
-Module      : GeniusYield.Unsafe
+Module      : GeniusYield.TxBuilder.IO.Unsafe
 Copyright   : (c) 2024 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
 
 -}
-module GeniusYield.Unsafe (
+module GeniusYield.TxBuilder.IO.Unsafe (
   unsafeIOToQueryMonad,
   unsafeIOToTxBuilderMonad,
 ) where

@@ -22,6 +22,7 @@ import GeniusYield.GYConfig (
 import GeniusYield.Imports
 import GeniusYield.Test.CoinSelection (coinSelectionTests)
 import GeniusYield.Test.Config (configTests)
+import GeniusYield.Test.FeeTracking (feeTrackingTests)
 import GeniusYield.Test.GYTxBody (gyTxBodyTests)
 import GeniusYield.Test.GYTxSkeleton (gyTxSkeletonTests)
 import GeniusYield.Test.Providers (providersTests)
@@ -80,6 +81,7 @@ main = do
       , configTests
       , gyTxSkeletonTests
       , refInputTests
+      , feeTrackingTests
       , stakeTests (head configs)
       , providersTests configs providerToken netId
       ]

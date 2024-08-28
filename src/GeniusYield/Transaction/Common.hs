@@ -13,6 +13,7 @@ module GeniusYield.Transaction.Common (
   GYBuildTxError (..),
   GYBalancingError (..),
   minimumUTxO,
+  minimumApiUTxO,
   adjustTxOut,
 ) where
 
@@ -126,11 +127,14 @@ data GYBuildTxError
 -- Transaction Utilities
 -------------------------------------------------------------------------------
 
-minimumUTxO :: ApiProtocolParameters -> GYTxOut v -> Natural
-minimumUTxO pp txOut =
+minimumApiUTxO :: ApiProtocolParameters -> Api.TxOut Api.CtxTx ApiEra -> Natural
+minimumApiUTxO pp txOut =
   fromInteger $
     coerce $
-      Api.calculateMinimumUTxO Api.ShelleyBasedEraConway (txOutToApi txOut) pp
+      Api.calculateMinimumUTxO Api.ShelleyBasedEraConway txOut pp
+
+minimumUTxO :: ApiProtocolParameters -> GYTxOut v -> Natural
+minimumUTxO pp = minimumApiUTxO pp . txOutToApi
 
 adjustTxOut :: (GYTxOut v -> Natural) -> GYTxOut v -> GYTxOut v
 adjustTxOut minimumUTxOF = helper

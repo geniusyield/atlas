@@ -31,6 +31,7 @@ import Data.Aeson qualified as Aeson
 
 import GeniusYield.HTTP.Errors (someBackendError)
 import GeniusYield.Imports
+import GeniusYield.Transaction.Common (minimumApiUTxO)
 import GeniusYield.TxBuilder
 import GeniusYield.Types
 
@@ -97,18 +98,28 @@ ftLift :: Functor m => m a -> FeeTracker m a
 ftLift act = FeeTracker $ \s -> (,s) <$> act
 
 -- | Override given transaction building function to track extra lovelace per transaction.
-wrapBodyBuilder :: GYTxUserQueryMonad m => ([GYTxSkeleton v] -> m GYTxBuildResult) -> [GYTxSkeleton v] -> FeeTracker m GYTxBuildResult
+wrapBodyBuilder :: (GYTxUserQueryMonad m, GYTxSpecialQueryMonad m) => ([GYTxSkeleton v] -> m GYTxBuildResult) -> [GYTxSkeleton v] -> FeeTracker m GYTxBuildResult
 wrapBodyBuilder f skeletons = do
   ownPkh <- ownChangeAddress >>= addressToPubKeyHash'
   res <- ftLift $ f skeletons
-  let helpers txBodies = forM_ (zip skeletons (NE.toList txBodies)) (helper ownPkh)
+  pp <- protocolParams
+  let helpers txBodies = forM_ (zip skeletons (NE.toList txBodies)) (helper pp ownPkh)
   case res of
     GYTxBuildSuccess txBodies -> helpers txBodies
     GYTxBuildPartialSuccess _ txBodies -> helpers txBodies
     _ -> pure ()
   pure res
  where
-  helper ownPkh (skeleton, txBody) = do
+  helper pp ownPkh (skeleton, txBody) = do
+    inUtxos <- fmap utxosToList . utxosAtTxOutRefs $ txBodyTxIns txBody
+    -- Obtain the explicitly asked for input utxos
+    -- Ignore any extra selected ones by the balancer. These all come from own wallet anyway (and go back there in case of change).
+    let explicitInRefs = S.fromList . map gyTxInTxOutRef $ gytxIns skeleton
+        ins = filter (\x -> utxoRef x `S.member` explicitInRefs) inUtxos
+        -- Amount of ada obtained through min ada deposits in inputs without the user expecting it.
+        unexpectedGain = foldMap' (unexpectedGainOf pp) ins
+        unexpectedGainExtraLovelace = stSingleton ownPkh mempty {uelMinAda = negate unexpectedGain}
+
     -- Actual outputs with their blueprints (counterpart from skeleton)
     -- NOTE: This relies on proper ordering. 'txBodyUTxOs txBody' is expected to have the same order
     -- as the outputs in the skeleton. The extra balancing outputs at the end of the list of 'txBodyUTxOs txBody'
@@ -126,7 +137,20 @@ wrapBodyBuilder f skeletons = do
                  in ownLostDeposit <> otherGainedDeposit
             )
             outsWithBlueprint
-    modify' (\prev -> prev <> feeExtraLovelace <> depositsExtraLovelace)
+    modify' (\prev -> prev <> feeExtraLovelace <> depositsExtraLovelace <> unexpectedGainExtraLovelace)
+  unexpectedGainOf pp utxo
+    -- UTxO contains exactly the minimum amount of Ada.
+    -- We assume this was added by the balancer to cover min ada and not expected as an effective "gain" by the user.
+    -- So we track it along.
+    -- TODO (chase): It is possible that the user expected a portion of this Ada.
+    -- (i.e the output was originally created with 1 Ada but the real output contains 2 Ada to cover min ada)
+    -- This case is ambiguous. So there should be a hint mechanism in place to try and help the fee tracker with this.
+    | minimumApiUTxO pp (utxoToApi utxo) == fromInteger lovelaceAmt = Sum lovelaceAmt
+    -- The only other possibility is that the Ada amount is greater than minimally required.
+    -- We assume that the user explicitly asked for this amount and therefore should expect it themselves.
+    | otherwise = mempty
+   where
+    lovelaceAmt = valueAssetClass (utxoValue utxo) GYLovelace
 
 -- | Override transaction building code of the inner monad to track extra lovelace per transaction.
 instance GYTxBuilderMonad m => GYTxBuilderMonad (FeeTracker m) where

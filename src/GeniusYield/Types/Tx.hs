@@ -176,7 +176,7 @@ writeTx file tx = do
         Right () -> pure ()
 
 data PlutusTxId (v :: PlutusVersion) where
-  PlutusTxIdBeforeV3 :: PlutusV3 `VersionIsGreater` v => PlutusV1.TxId -> PlutusTxId v
+  PlutusTxIdBeforeV3 :: (PlutusV3 `VersionIsGreater` v) => PlutusV1.TxId -> PlutusTxId v
   PlutusTxIdV3 :: PlutusV3.TxId -> PlutusTxId 'PlutusV3
 
 -- | Transaction hash/id of a particular transaction.

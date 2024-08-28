@@ -118,7 +118,7 @@ tests setup = testGroup "gift"
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV2
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-                & gyTxOutDatumL .~ GYTxOutUseInlineDatum
+                & gyTxOutDatumL .~ GYTxOutUseInlineDatum @'PlutusV2
 
             signAndSubmitConfirmed_ txBodyPlace
 
@@ -521,7 +521,7 @@ tests setup = testGroup "gift"
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress treatValidatorV2
             txBodyPlace2 <- buildTxBody . mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-                & gyTxOutDatumL .~ GYTxOutUseInlineDatum
+                & gyTxOutDatumL .~ GYTxOutUseInlineDatum @'PlutusV2
 
             signAndSubmitConfirmed_ txBodyPlace2
 

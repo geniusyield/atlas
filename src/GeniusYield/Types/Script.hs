@@ -358,7 +358,7 @@ data GYMintScript (u :: PlutusVersion) where
     GYMintScript    :: v `VersionIsGreaterOrEqual` u => GYMintingPolicy v -> GYMintScript u
 
     -- | Reference inputs can be only used in V2 transactions.
-    GYMintReference :: !GYTxOutRef -> !(GYScript 'PlutusV2) -> GYMintScript 'PlutusV2
+    GYMintReference :: (v `VersionIsGreaterOrEqual` 'PlutusV2) => !GYTxOutRef -> !(GYScript v) -> GYMintScript v
 
 deriving instance Show (GYMintScript v)
 
@@ -531,7 +531,7 @@ data GYStakeValScript (u :: PlutusVersion) where
     GYStakeValScript    :: v `VersionIsGreaterOrEqual` u => GYStakeValidator v -> GYStakeValScript u
 
     -- | Reference inputs can be only used in V2 transactions.
-    GYStakeValReference :: !GYTxOutRef -> !(GYScript 'PlutusV2) -> GYStakeValScript 'PlutusV2
+    GYStakeValReference :: v `VersionIsGreaterOrEqual` 'PlutusV2 => !GYTxOutRef -> !(GYScript v) -> GYStakeValScript v
 
 deriving instance Show (GYStakeValScript v)
 
@@ -792,16 +792,18 @@ scriptToApiPlutusScriptWitness (GYScript v api _) = case v of
         (Api.S.PScript api)
 
 referenceScriptToApiPlutusScriptWitness
-  :: GYTxOutRef
-  -> GYScript 'PlutusV2
+  :: (VersionIsGreaterOrEqual v 'PlutusV2) => GYTxOutRef
+  -> GYScript v
   -> Api.S.ScriptDatum witctx
   -> Api.S.ScriptRedeemer
   -> Api.S.ExecutionUnits
   -> Api.S.ScriptWitness witctx ApiEra
 referenceScriptToApiPlutusScriptWitness r s =
+  let apiV = singPlutusVersionToApi (scriptVersion s)
+  in
     Api.PlutusScriptWitness
-    Api.PlutusScriptV2InConway
-    Api.PlutusScriptV2
+    (case apiV of Api.PlutusScriptV1 -> Api.PlutusScriptV1InConway; Api.PlutusScriptV2 -> Api.PlutusScriptV2InConway; Api.PlutusScriptV3 -> Api.PlutusScriptV3InConway)
+    apiV
     (Api.S.PReferenceScript (txOutRefToApi r) (Just (scriptApiHash s)))
 
 scriptSize :: GYAnyScript -> Int

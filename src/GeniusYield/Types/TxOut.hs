@@ -38,7 +38,7 @@ data GYTxOut (v :: PlutusVersion) = GYTxOut
     } deriving stock (Eq, Show)
 
 data GYTxOutUseInlineDatum (v :: PlutusVersion) where
-    GYTxOutUseInlineDatum     :: GYTxOutUseInlineDatum 'PlutusV2
+    GYTxOutUseInlineDatum     :: (v `VersionIsGreaterOrEqual` 'PlutusV2) => GYTxOutUseInlineDatum v
     GYTxOutDontUseInlineDatum :: GYTxOutUseInlineDatum v
 
 deriving instance Show (GYTxOutUseInlineDatum v)

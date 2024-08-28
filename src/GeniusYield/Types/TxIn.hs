@@ -54,11 +54,13 @@ data GYInScript (u :: PlutusVersion) where
     GYInScript    :: forall u v. v `VersionIsGreaterOrEqual` u => GYValidator v -> GYInScript u
 
     -- | Reference inputs can be only used in V2 transactions.
-    GYInReference :: !GYTxOutRef -> !(GYScript 'PlutusV2) -> GYInScript 'PlutusV2
+    GYInReference :: forall v. (v `VersionIsGreaterOrEqual` 'PlutusV2) => !GYTxOutRef -> !(GYScript v) -> GYInScript v
 
 -- | Returns the 'PlutusVersion' of the given 'GYInScript'.
 inScriptVersion :: GYInScript v -> PlutusVersion
-inScriptVersion (GYInReference _ _) = PlutusV2
+inScriptVersion (GYInReference _ s) = case scriptVersion s of
+    SingPlutusV3 -> PlutusV3
+    SingPlutusV2 -> PlutusV2
 inScriptVersion (GYInScript v)      = case validatorVersion v of
     SingPlutusV3 -> PlutusV3
     SingPlutusV2 -> PlutusV2
@@ -73,7 +75,7 @@ instance Eq (GYInScript v) where
 
 data GYInSimpleScript (u :: PlutusVersion) where
     GYInSimpleScript :: !GYSimpleScript -> GYInSimpleScript u
-    GYInReferenceSimpleScript :: !GYTxOutRef -> !GYSimpleScript -> GYInSimpleScript 'PlutusV2
+    GYInReferenceSimpleScript :: (v `VersionIsGreaterOrEqual` 'PlutusV2) => !GYTxOutRef -> !GYSimpleScript -> GYInSimpleScript v
 
 deriving instance Show (GYInSimpleScript v)
 
@@ -93,15 +95,14 @@ txInToApi useInline (GYTxIn oref m) = (txOutRefToApi oref, Api.BuildTxWith $ f m
     f :: GYTxInWitness v -> Api.Witness Api.WitCtxTxIn ApiEra
     f GYTxInWitnessKey = Api.KeyWitness Api.KeyWitnessForSpending
     f (GYTxInWitnessScript v d r) =
-        Api.ScriptWitness Api.ScriptWitnessForSpending $ g v
+        Api.ScriptWitness Api.ScriptWitnessForSpending $ (case v of
+            GYInScript s        -> validatorToApiPlutusScriptWitness s
+            GYInReference ref s -> referenceScriptToApiPlutusScriptWitness ref s)
         (if useInline then Api.InlineScriptDatum else Api.ScriptDatumForTxIn $ Just $ datumToApi' d)
         (redeemerToApi r)
         (Api.ExecutionUnits 0 0)
     f (GYTxInWitnessSimpleScript v) =
         Api.ScriptWitness Api.ScriptWitnessForSpending $ Api.SimpleScriptWitness Api.SimpleScriptInConway $ h v
-
-    g (GYInScript v)        = validatorToApiPlutusScriptWitness v
-    g (GYInReference ref s) = referenceScriptToApiPlutusScriptWitness ref s
 
     h (GYInSimpleScript v) = Api.SScript $ simpleScriptToApi v
     h (GYInReferenceSimpleScript ref s) = Api.SReferenceScript (txOutRefToApi ref) $ Just $ hashSimpleScript' s

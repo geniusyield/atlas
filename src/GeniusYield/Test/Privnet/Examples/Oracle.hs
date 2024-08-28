@@ -66,7 +66,7 @@ tests setup = testGroup "oracle"
         txBodyPlaceDatum <- ctxRun ctx (ctxUserF ctx) $ do
             txBodyPlaceDatum <- buildTxBody $ mconcat
                 [ mustHaveOutput $ mkGYTxOut giftValidatorV2Addr (valueSingleton goldAC 10) (datumFromPlutusData ())
-                    & gyTxOutDatumL .~ GYTxOutUseInlineDatum
+                    & gyTxOutDatumL .~ GYTxOutUseInlineDatum @'PlutusV2
                 ]
             signAndSubmitConfirmed_ txBodyPlaceDatum
             pure txBodyPlaceDatum

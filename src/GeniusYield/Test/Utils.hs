@@ -181,7 +181,7 @@ addRefScript addr sc = throwAppError absurdError `runEagerT` do
     let refs = utxoToRefMap existingUtxos
     maybeToEager $ Map.lookup (GYPlutusScript sc) refs
     txBody <- lift $ buildTxBody
-        $ mustHaveOutput GYTxOut
+        $ mustHaveOutput @'PlutusV2 GYTxOut
             { gyTxOutAddress     = addr
             , gyTxOutValue       = mempty
             , gyTxOutDatum       = Just (unitDatum, GYTxOutUseInlineDatum)
@@ -202,7 +202,7 @@ addRefInput toInline addr dat = throwAppError absurdError `runEagerT` do
     existingUtxos <- lift $ utxosAtAddress addr Nothing
     maybeToEager $ findRefWithDatum existingUtxos
     txBody <- lift . buildTxBody .
-        mustHaveOutput
+        mustHaveOutput @'PlutusV2
             $ GYTxOut addr mempty (Just (dat, if toInline then GYTxOutUseInlineDatum else GYTxOutDontUseInlineDatum)) Nothing
 
     lift $ signAndSubmitConfirmed_ txBody

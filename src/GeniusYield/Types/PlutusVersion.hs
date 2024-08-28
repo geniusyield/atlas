@@ -18,16 +18,10 @@ module GeniusYield.Types.PlutusVersion (
     VersionIsGreater,
     CmpPlutusVersion,
 ) where
-
-import           GeniusYield.Imports
-
-import           Data.GADT.Compare
-import           GHC.TypeLits
-
 import qualified Cardano.Api         as Api
 import qualified Cardano.Api.Shelley as Api.S
-import           Data.Type.Bool      (If)
-import           Data.Type.Equality  (type (==))
+import           Data.GADT.Compare
+import           GeniusYield.Imports
 
 data PlutusVersion
     = PlutusV1
@@ -88,12 +82,15 @@ type family CmpPlutusVersion (v :: PlutusVersion) (u :: PlutusVersion) :: Orderi
   CmpPlutusVersion 'PlutusV3 'PlutusV2 = 'GT
   CmpPlutusVersion 'PlutusV3 'PlutusV3 = 'EQ
 
+type family GreaterOrEqual (v :: Ordering) :: Bool where
+  GreaterOrEqual 'GT = 'True
+  GreaterOrEqual 'EQ = 'True
+  GreaterOrEqual 'LT = 'False
+
 -- | Constraint that @v >= u@.
 --
 -- If transaction is making use of V2 features (such as reference inputs) then as these cannot be represented in script context of V1 scripts, we need to ensure that the involved script version is at least V2. Likewise for other versions.
-class VersionIsGreaterOrEqual (v :: PlutusVersion) (u :: PlutusVersion)
-instance (If ((v `CmpPlutusVersion` u) == 'LT) (TypeError ('Text "Given version " ':<>: ShowType v ':<>: 'Text ", is not greater or equal to " ':<>: ShowType u)) (() :: Constraint)) => VersionIsGreaterOrEqual v u
+type VersionIsGreaterOrEqual (v :: PlutusVersion) (u :: PlutusVersion) = GreaterOrEqual (v `CmpPlutusVersion` u) ~ 'True
 
 -- | Constraint that @v > u@.
-class VersionIsGreater (v :: PlutusVersion) (u :: PlutusVersion)
-instance ((v `CmpPlutusVersion` u) ~ 'GT) => VersionIsGreater v u
+type VersionIsGreater (v :: PlutusVersion) (u :: PlutusVersion) = (v `CmpPlutusVersion` u) ~ 'GT

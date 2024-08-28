@@ -14,10 +14,10 @@ packages: .
 tests: true
 
 -- repeating the index-state for hackage to work around hackage.nix parsing limitation
-index-state: 2024-06-23T23:01:13Z
+index-state: 2024-08-27T16:28:01Z
 
 index-state:
-  , hackage.haskell.org 2024-07-29T00:00:00Z
+  , hackage.haskell.org 2024-08-27T16:28:01Z
   , cardano-haskell-packages 2024-07-24T14:16:32Z
 
 -- TODO: Default value should be @direct@ in upcoming 3.10 version of cabal, omit this line then.
@@ -26,21 +26,11 @@ test-show-details: direct
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
 
--- TODO: Temporary, until proposed changes are in upstream (track https://github.com/maestro-org/haskell-sdk/pull/72)
 source-repository-package
   type: git
-  location: https://github.com/sourabhxyz/haskell-sdk
-  tag: 30a100d0e7ade9492a5eca8bef0fe701950c6171
-  --sha256: sha256-DvQmrZUDIabFVjb971Xe4jMe2LOxxSmjUV7Z49xJm5c=
-
--- TODO: Temporary, until proposed changes are in upstream (track https://github.com/blockfrost/blockfrost-haskell/pull/54)
-source-repository-package
-  type: git
-  location: https://github.com/sourabhxyz/blockfrost-haskell
-  tag: 85b9af545957c6d171d1c8767039dbcc26153117
-  --sha256: sha256-s/CHdNeRg9M55rCj6GaeJPuORN34XAtlNXP8fXYeKuQ=
-  subdir:
-    blockfrost-api
+  location: https://github.com/maestro-org/haskell-sdk
+  tag: v1.7.2
+  --sha256: sha256-nXnelHH4a+V0nguP8oUDlyEz/fLQ/i1fs/flyZTmvAc=
 
 -- TODO: Temporary, until proposed changes are in upstream (track https://github.com/mlabs-haskell/clb/pull/44)
 source-repository-package

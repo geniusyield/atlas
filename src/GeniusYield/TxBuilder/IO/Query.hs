@@ -39,7 +39,8 @@ newtype GYTxQueryMonadIO a = GYTxQueryMonadIO { runGYTxQueryMonadIO' :: GYTxQuer
 
 data GYTxQueryIOEnv = GYTxQueryIOEnv { envNid :: !GYNetworkId, envProviders :: !GYProviders}
 
--- INTERNAL USAGE ONLY
+-- | INTERNAL USAGE ONLY
+--
 -- Do not expose a 'MonadIO' instance. It allows the user to do arbitrary IO within the tx monad.
 ioToQueryMonad :: IO a -> GYTxQueryMonadIO a
 ioToQueryMonad ioAct = GYTxQueryMonadIO $ const ioAct
@@ -137,6 +138,14 @@ instance GYTxQueryMonad GYTxQueryMonadIO where
     logMsg ns s msg = do
         providers <- asks envProviders
         ioToQueryMonad $ withFrozenCallStack $ gyLog providers ns s msg
+
+    waitUntilSlot slot = do
+        providers <- asks envProviders
+        ioToQueryMonad $ gyWaitUntilSlot providers slot
+
+    waitForNextBlock = do
+        providers <- asks envProviders
+        ioToQueryMonad $ gyWaitForNextBlock providers
 
 instance GYTxSpecialQueryMonad GYTxQueryMonadIO where
     systemStart    = asks envProviders >>= ioToQueryMonad . gyGetSystemStart

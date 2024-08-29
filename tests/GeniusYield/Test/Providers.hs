@@ -10,7 +10,6 @@ import           Data.Map.Strict                   as Map (difference,
 import           Data.Maybe                        (fromJust)
 import qualified Data.Set                          as Set (difference, fromList,
                                                            isSubsetOf)
-import           Data.Some                         (mkSome)
 import qualified Data.Text                         as Text (Text, unpack)
 import           Test.Tasty
 import           Test.Tasty.Golden.Advanced        (goldenTest)
@@ -20,7 +19,8 @@ import           GeniusYield.Types.Address         (GYAddress,
                                                     unsafeAddressFromText)
 import           GeniusYield.Types.Datum           (datumFromApi',
                                                     datumHashFromHex)
-import           GeniusYield.Types.Script          (mintingPolicyIdToText,
+import           GeniusYield.Types.Script          (GYAnyScript (..),
+                                                    mintingPolicyIdToText,
                                                     scriptFromCBOR)
 import           GeniusYield.Types.TxOutRef        (GYTxOutRef)
 import           GeniusYield.Types.UTxO            (GYOutDatum (..),
@@ -46,6 +46,7 @@ import           GeniusYield.Types                 (GYNetworkId, GYQueryUTxO,
                                                     gyQueryUtxoRefsAtAddress',
                                                     gyQueryUtxosAtAddress',
                                                     gyQueryUtxosAtAddresses')
+import           GeniusYield.Types.Era
 import qualified Maestro.Types.V1                  as Maestro
 import           Web.HttpApiData                   (ToHttpApiData (..))
 
@@ -144,7 +145,7 @@ maestroTests token netId =
                                         , utxoAddress   = mockAddress
                                         , utxoValue     = valueFromList []
                                         , utxoOutDatum  = GYOutDatumNone
-                                        , utxoRefScript = mkSome <$> scriptFromCBOR  @'PlutusV2 mockScriptCBOR
+                                        , utxoRefScript = GYPlutusScript <$> scriptFromCBOR  @'PlutusV2 mockScriptCBOR
                                         }
                 res = utxoFromMaestro $ mockMaestroUtxo [] Nothing (Just mockMaestroScript)
             res @?= expected
@@ -154,19 +155,19 @@ maestroTests token netId =
     getQueryUtxo :: Text.Text -> IO GYQueryUTxO
     getQueryUtxo pToken = maestroQueryUtxo <$> networkIdToMaestroEnv pToken netId
 
-    getUTxOsAtAddress :: GYAddress -> Text.Text -> IO (Api.UTxO Api.BabbageEra)
+    getUTxOsAtAddress :: GYAddress -> Text.Text -> IO (Api.UTxO ApiEra)
     getUTxOsAtAddress addr pToken = do
         queryUtxo <- getQueryUtxo pToken
         utxos <- gyQueryUtxosAtAddress' queryUtxo addr Nothing
         return $ utxosToApi utxos
 
-    getUTxOsAtAddresses :: [GYAddress] -> Text.Text -> IO (Api.UTxO Api.BabbageEra)
+    getUTxOsAtAddresses :: [GYAddress] -> Text.Text -> IO (Api.UTxO ApiEra)
     getUTxOsAtAddresses addrs pToken = do
         queryUtxo <- getQueryUtxo pToken
         utxos <- gyQueryUtxosAtAddresses' queryUtxo addrs
         return $ utxosToApi utxos
 
-    getUTxOAtRef :: GYTxOutRef -> Text.Text -> IO (Api.UTxO Api.BabbageEra)
+    getUTxOAtRef :: GYTxOutRef -> Text.Text -> IO (Api.UTxO ApiEra)
     getUTxOAtRef ref pToken = do
         queryUtxo <- getQueryUtxo pToken
         utxo <- gyQueryUtxoAtTxOutRef' queryUtxo ref
@@ -184,13 +185,13 @@ maestroTests token netId =
             refs = utxosRefs $ utxosFromApi utxos
         return refs
 
-    getFileUTxOs :: String -> IO (Api.UTxO Api.BabbageEra)
+    getFileUTxOs :: String -> IO (Api.UTxO ApiEra)
     getFileUTxOs fileName = do
         json <- BS.readFile fileName
         let utxos = fromMaybe (utxosToApi $ utxosFromList []) (Aeson.decodeStrict (toStrict json))
         return utxos
 
-    compareUTxOs :: Api.UTxO Api.BabbageEra -> Api.UTxO Api.BabbageEra -> IO (Maybe String)
+    compareUTxOs :: Api.UTxO ApiEra -> Api.UTxO ApiEra -> IO (Maybe String)
     compareUTxOs utxosFile utxosQuery = do
         let utxosFileMap = Api.unUTxO utxosFile
             utxosQueryMap = Api.unUTxO utxosQuery
@@ -209,7 +210,7 @@ maestroTests token netId =
     updateGolden :: Show a => a -> IO ()
     updateGolden = error . show
 
-    goldenTestUtxos :: TestName -> IO (Api.UTxO Api.BabbageEra) -> IO (Api.UTxO Api.BabbageEra) -> TestTree
+    goldenTestUtxos :: TestName -> IO (Api.UTxO ApiEra) -> IO (Api.UTxO ApiEra) -> TestTree
     goldenTestUtxos name queryData getFileData =
         goldenTest name queryData getFileData compareUTxOs updateGolden
 

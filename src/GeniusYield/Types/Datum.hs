@@ -7,6 +7,9 @@ Stability   : develop
 
 -}
 module GeniusYield.Types.Datum (
+    -- * Docspec setup
+    -- $setup
+
     -- * Datum
     GYDatum,
     datumToApi',
@@ -53,6 +56,11 @@ import qualified Web.HttpApiData                      as Web
 -- $setup
 --
 -- >>> :set -XOverloadedStrings -XTypeApplications
+-- >>> import qualified Data.Aeson                 as Aeson
+-- >>> import qualified Data.ByteString.Char8      as BS8
+-- >>> import qualified Data.ByteString.Lazy       as BSL
+-- >>> import qualified Web.HttpApiData            as Web
+-- >>>
 
 -- | Datum
 --
@@ -117,8 +125,8 @@ instance Aeson.FromJSON GYDatum where
 
 -- |
 --
--- >>> BS8.putStrLn . Aeson.encode . GYDatum . PlutusTx.dataToBuiltinData $ PlutusTx.Constr 0 [ PlutusTx.I 42, PlutusTx.List [ PlutusTx.B "" ] ]
--- "{\"constructor\":0,\"fields\":[{\"int\":42},{\"list\":[{\"bytes\":\"\"}]}]}"
+-- >>> BSL.putStr . Aeson.encode . datumFromPlutus' . PlutusTx.dataToBuiltinData $ PlutusTx.Constr 0 [ PlutusTx.I 42, PlutusTx.List [ PlutusTx.B "" ] ]
+-- {"constructor":0,"fields":[{"int":42},{"list":[{"bytes":""}]}]}
 --
 instance Aeson.ToJSON GYDatum where
     toJSON = Api.scriptDataToJsonDetailedSchema . datumToApi'

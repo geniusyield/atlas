@@ -15,66 +15,82 @@ module GeniusYield.Types.PlutusVersion (
     PlutusVersionToApi,
     singPlutusVersionToApi,
     VersionIsGreaterOrEqual,
+    VersionIsGreater,
+    CmpPlutusVersion,
 ) where
-
-import           GeniusYield.Imports
-
-import           Data.GADT.Compare
-import           GHC.TypeLits
-
 import qualified Cardano.Api         as Api
 import qualified Cardano.Api.Shelley as Api.S
+import           Data.GADT.Compare
+import           GeniusYield.Imports
 
 data PlutusVersion
     = PlutusV1
     | PlutusV2
-  deriving (Eq, Show)
+    | PlutusV3
+  deriving (Eq, Ord, Show)
 
 data SingPlutusVersion (v :: PlutusVersion) where
     SingPlutusV1 :: SingPlutusVersion 'PlutusV1
     SingPlutusV2 :: SingPlutusVersion 'PlutusV2
+    SingPlutusV3 :: SingPlutusVersion 'PlutusV3
+
 
 class    SingPlutusVersionI (v :: PlutusVersion) where singPlutusVersion :: SingPlutusVersion v
 instance SingPlutusVersionI 'PlutusV1             where singPlutusVersion = SingPlutusV1
 instance SingPlutusVersionI 'PlutusV2             where singPlutusVersion = SingPlutusV2
+instance SingPlutusVersionI 'PlutusV3             where singPlutusVersion = SingPlutusV3
 
 instance GEq SingPlutusVersion where
     geq SingPlutusV1 SingPlutusV1 = Just Refl
-    geq SingPlutusV1 SingPlutusV2 = Nothing
-    geq SingPlutusV2 SingPlutusV1 = Nothing
     geq SingPlutusV2 SingPlutusV2 = Just Refl
+    geq SingPlutusV3 SingPlutusV3 = Just Refl
+    geq _ _                       = Nothing
 
 instance GCompare SingPlutusVersion where
     gcompare SingPlutusV1 SingPlutusV1 = GEQ
-    gcompare SingPlutusV1 SingPlutusV2 = GLT
+    gcompare SingPlutusV1 _            = GLT
     gcompare SingPlutusV2 SingPlutusV1 = GGT
     gcompare SingPlutusV2 SingPlutusV2 = GEQ
+    gcompare SingPlutusV2 _            = GLT
+    gcompare SingPlutusV3 SingPlutusV1 = GGT
+    gcompare SingPlutusV3 SingPlutusV2 = GGT
+    gcompare SingPlutusV3 SingPlutusV3 = GEQ
 
 type family PlutusVersionToApi (v :: PlutusVersion) :: Type where
     PlutusVersionToApi 'PlutusV1 = Api.PlutusScriptV1
     PlutusVersionToApi 'PlutusV2 = Api.PlutusScriptV2
+    PlutusVersionToApi 'PlutusV3 = Api.PlutusScriptV3
 
 singPlutusVersionToApi :: SingPlutusVersion v -> Api.S.PlutusScriptVersion (PlutusVersionToApi v)
 singPlutusVersionToApi SingPlutusV1 = Api.PlutusScriptV1
 singPlutusVersionToApi SingPlutusV2 = Api.PlutusScriptV2
+singPlutusVersionToApi SingPlutusV3 = Api.PlutusScriptV3
 
 fromSingPlutusVersion :: SingPlutusVersion v -> PlutusVersion
+fromSingPlutusVersion SingPlutusV3 = PlutusV3
 fromSingPlutusVersion SingPlutusV2 = PlutusV2
 fromSingPlutusVersion SingPlutusV1 = PlutusV1
 
+-- | Type family to compare `PlutusVersion`s
+type family CmpPlutusVersion (v :: PlutusVersion) (u :: PlutusVersion) :: Ordering where
+  CmpPlutusVersion 'PlutusV1 'PlutusV1 = 'EQ
+  CmpPlutusVersion 'PlutusV1 _ = 'LT
+  CmpPlutusVersion 'PlutusV2 'PlutusV1 = 'GT
+  CmpPlutusVersion 'PlutusV2 'PlutusV2 = 'EQ
+  CmpPlutusVersion 'PlutusV2 _ = 'LT
+  CmpPlutusVersion 'PlutusV3 'PlutusV1 = 'GT
+  CmpPlutusVersion 'PlutusV3 'PlutusV2 = 'GT
+  CmpPlutusVersion 'PlutusV3 'PlutusV3 = 'EQ
+
+type family GreaterOrEqual (v :: Ordering) :: Bool where
+  GreaterOrEqual 'GT = 'True
+  GreaterOrEqual 'EQ = 'True
+  GreaterOrEqual 'LT = 'False
+
 -- | Constraint that @v >= u@.
 --
--- Used to allow using V2 transaction features only in transactions with V2 inputs.
-class VersionIsGreaterOrEqual (v :: PlutusVersion) (u :: PlutusVersion)
+-- If transaction is making use of V2 features (such as reference inputs) then as these cannot be represented in script context of V1 scripts, we need to ensure that the involved script version is at least V2. Likewise for other versions.
+type VersionIsGreaterOrEqual (v :: PlutusVersion) (u :: PlutusVersion) = GreaterOrEqual (v `CmpPlutusVersion` u) ~ 'True
 
--- | Any version is greater or equal to 'PlutusV1'
-instance VersionIsGreaterOrEqual 'PlutusV1 'PlutusV1
-
--- | Any version is greater or equal to 'PlutusV1'
-instance VersionIsGreaterOrEqual 'PlutusV2 'PlutusV1
-
--- | Only 'PlutusV2' is greater or equal to itself at the moment.
-instance VersionIsGreaterOrEqual 'PlutusV2 'PlutusV2
-
--- | Explicitly ruled out instance.
-instance TypeError ('Text "V1 is not >= V2") => VersionIsGreaterOrEqual 'PlutusV1 'PlutusV2
+-- | Constraint that @v > u@.
+type VersionIsGreater (v :: PlutusVersion) (u :: PlutusVersion) = (v `CmpPlutusVersion` u) ~ 'GT

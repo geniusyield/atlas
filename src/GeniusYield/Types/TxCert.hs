@@ -12,16 +12,18 @@ module GeniusYield.Types.TxCert (
     txCertToApi,
     mkStakeAddressRegistrationCertificate,
     mkStakeAddressDeregistrationCertificate,
-    mkStakeAddressPoolDelegationCertificate,
+    mkStakeAddressDelegationCertificate,
 ) where
 
 import           GeniusYield.Types.Certificate
-import           GeniusYield.Types.Credential      (GYStakeCredential)
-import           GeniusYield.Types.StakePoolId
+import           GeniusYield.Types.Credential      (GYStakeCredential (..))
+import           GeniusYield.Types.Delegatee       (GYDelegatee)
 import           GeniusYield.Types.TxCert.Internal
 
-mkStakeAddressRegistrationCertificate :: GYStakeCredential -> GYTxCert v
-mkStakeAddressRegistrationCertificate sc = GYTxCert (GYStakeAddressRegistrationCertificate sc) Nothing
+{-| Post conway, newer stake address registration certificate also require a witness.
+-}
+mkStakeAddressRegistrationCertificate :: GYStakeCredential -> GYTxCertWitness v -> GYTxCert v
+mkStakeAddressRegistrationCertificate sc wit = GYTxCert (GYStakeAddressRegistrationCertificatePB sc) (Just wit)
 
 {-| Note that deregistration certificate requires following preconditions:
 
@@ -30,7 +32,7 @@ mkStakeAddressRegistrationCertificate sc = GYTxCert (GYStakeAddressRegistrationC
 2. The corresponding rewards balance is zero.
 -}
 mkStakeAddressDeregistrationCertificate :: GYStakeCredential -> GYTxCertWitness v -> GYTxCert v
-mkStakeAddressDeregistrationCertificate sc wit = GYTxCert (GYStakeAddressDeregistrationCertificate sc) (Just wit)
+mkStakeAddressDeregistrationCertificate sc wit = GYTxCert (GYStakeAddressDeregistrationCertificatePB sc) (Just wit)
 
-mkStakeAddressPoolDelegationCertificate :: GYStakeCredential -> GYStakePoolId -> GYTxCertWitness v -> GYTxCert v
-mkStakeAddressPoolDelegationCertificate sc spId wit = GYTxCert (GYStakeAddressPoolDelegationCertificate sc spId) (Just wit)
+mkStakeAddressDelegationCertificate :: GYStakeCredential -> GYDelegatee -> GYTxCertWitness v -> GYTxCert v
+mkStakeAddressDelegationCertificate sc del wit = GYTxCert (GYStakeAddressDelegationCertificatePB sc del) (Just wit)

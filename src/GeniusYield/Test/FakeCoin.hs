@@ -1,17 +1,17 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 {-# OPTIONS -fno-strictness -fno-spec-constr -fno-specialise #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:target-version=1.0.0 #-}
 
 module GeniusYield.Test.FakeCoin (FakeCoin (..), fakeValue, fakeCoin) where
 
-import qualified Cardano.Api         as Api
-import qualified Cardano.Api.Shelley as Api.S
+import qualified Cardano.Api                 as Api
+import qualified Cardano.Api.Shelley         as Api.S
+import           PlutusCore.Core             (plcVersion100)
+import qualified PlutusLedgerApi.V1.Value    as PlutusValue
 import           PlutusLedgerApi.V2
 import           PlutusLedgerApi.V2.Contexts (ownCurrencySymbol)
-import qualified PlutusLedgerApi.V1.Value as PlutusValue
-import           PlutusCore.Core     (plcVersion100)
 import qualified PlutusTx
 import           PlutusTx.Prelude
 
@@ -31,7 +31,7 @@ fakeCoin (FakeCoin tag) = PlutusValue.assetClass sym tok
           $ Api.S.PlutusScriptSerialised $ serialiseCompiledCode $ fakeMintingPolicy tok
     tok = TokenName tag
 
-fakeMintingPolicy :: TokenName -> PlutusTx.CompiledCode (BuiltinData -> BuiltinData -> ())
+fakeMintingPolicy :: TokenName -> PlutusTx.CompiledCode (BuiltinData -> BuiltinData -> BuiltinUnit)
 fakeMintingPolicy mintParam =
   $$(PlutusTx.compile [|| fakeMintingPolicyUntypedContract ||]) `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 mintParam
 
@@ -43,6 +43,6 @@ fakeMintingPolicyContract tag _ ctx =
 
 -- | See `fakeMintingPolicyContract`.
 {-# INLINEABLE fakeMintingPolicyUntypedContract #-}
-fakeMintingPolicyUntypedContract :: TokenName -> BuiltinData -> BuiltinData -> ()
+fakeMintingPolicyUntypedContract :: TokenName -> BuiltinData -> BuiltinData -> BuiltinUnit
 fakeMintingPolicyUntypedContract tag red ctx = check
     (fakeMintingPolicyContract tag (unsafeFromBuiltinData red) (unsafeFromBuiltinData ctx))

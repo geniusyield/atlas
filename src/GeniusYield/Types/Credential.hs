@@ -11,35 +11,45 @@ module GeniusYield.Types.Credential (
     GYPaymentCredential (..)
   , paymentCredentialToApi
   , paymentCredentialFromApi
+  , paymentCredentialToLedger
+  , paymentCredentialFromLedger
   , paymentCredentialToPlutus
   , paymentCredentialToHexText
   , paymentCredentialToBech32
     -- * Stake credential.
   , GYStakeCredential (..)
-  , stakeCredentialFromApi
   , stakeCredentialToApi
+  , stakeCredentialFromApi
+  , stakeCredentialToLedger
+  , stakeCredentialFromLedger
   , stakeCredentialToPlutus
   , stakeCredentialToHexText
   ) where
 
 
 import qualified Cardano.Api                      as Api
+import qualified Cardano.Api.Ledger               as Ledger
 import qualified Cardano.Api.Shelley              as Api
 import           Data.Hashable                    (Hashable (..))
 import           Data.Text                        (Text)
+import           GeniusYield.Imports              ((>>>))
 import           GeniusYield.Types.PaymentKeyHash (GYPaymentKeyHash,
                                                    paymentKeyHashFromApi,
+                                                   paymentKeyHashFromLedger,
                                                    paymentKeyHashToApi,
+                                                   paymentKeyHashToLedger,
                                                    paymentKeyHashToPlutus)
 import           GeniusYield.Types.PubKeyHash     (AsPubKeyHash (fromPubKeyHash, toPubKeyHash))
-import           GeniusYield.Types.Script         (GYStakeValidatorHash,
-                                                   GYValidatorHash,
+import           GeniusYield.Types.Script         (GYScriptHash,
+                                                   GYStakeValidatorHash,
+                                                   scriptHashFromApi,
+                                                   scriptHashFromLedger,
+                                                   scriptHashToApi,
+                                                   scriptHashToLedger,
+                                                   scriptHashToPlutus,
                                                    stakeValidatorHashFromApi,
                                                    stakeValidatorHashToApi,
-                                                   stakeValidatorHashToPlutus,
-                                                   validatorHashFromApi,
-                                                   validatorHashToApi,
-                                                   validatorHashToPlutus)
+                                                   stakeValidatorHashToPlutus)
 import           GeniusYield.Types.StakeKeyHash   (GYStakeKeyHash,
                                                    stakeKeyHashFromApi,
                                                    stakeKeyHashToApi)
@@ -50,12 +60,12 @@ import qualified Text.Printf                      as Printf
 -- | Payment credential.
 data GYPaymentCredential
        = GYPaymentCredentialByKey !GYPaymentKeyHash
-       | GYPaymentCredentialByScript !GYValidatorHash
+       | GYPaymentCredentialByScript !GYScriptHash
     deriving (Show, Eq, Ord)
 
 instance Printf.PrintfArg GYPaymentCredential where
   formatArg (GYPaymentCredentialByKey pkh) = Printf.formatArg $ "Payment key credential: " <> Api.serialiseToRawBytesHexText (paymentKeyHashToApi pkh)
-  formatArg (GYPaymentCredentialByScript sh) = Printf.formatArg $ "Payment script credential: " <> Api.serialiseToRawBytesHexText (validatorHashToApi sh)
+  formatArg (GYPaymentCredentialByScript sh) = Printf.formatArg $ "Payment script credential: " <> Api.serialiseToRawBytesHexText (scriptHashToApi sh)
 
 instance Hashable GYPaymentCredential where
     hashWithSalt salt cred = hashWithSalt salt $ paymentCredentialToHexText cred
@@ -63,29 +73,40 @@ instance Hashable GYPaymentCredential where
 -- | Convert @GY@ type to corresponding type in @cardano-node@ library.
 paymentCredentialToApi :: GYPaymentCredential -> Api.PaymentCredential
 paymentCredentialToApi (GYPaymentCredentialByKey pkh) = Api.PaymentCredentialByKey (paymentKeyHashToApi pkh)
-paymentCredentialToApi (GYPaymentCredentialByScript sh) = Api.PaymentCredentialByScript (validatorHashToApi sh)
+paymentCredentialToApi (GYPaymentCredentialByScript sh) = Api.PaymentCredentialByScript (scriptHashToApi sh)
 
 -- | Get @GY@ type from corresponding type in @cardano-node@ library.
 paymentCredentialFromApi :: Api.PaymentCredential -> GYPaymentCredential
 paymentCredentialFromApi (Api.PaymentCredentialByKey pkh) = GYPaymentCredentialByKey (paymentKeyHashFromApi pkh)
-paymentCredentialFromApi (Api.PaymentCredentialByScript sh) = GYPaymentCredentialByScript (validatorHashFromApi sh)
+paymentCredentialFromApi (Api.PaymentCredentialByScript sh) = GYPaymentCredentialByScript (scriptHashFromApi sh)
+
+-- | Convert to corresponding ledger representation.
+paymentCredentialToLedger :: GYPaymentCredential -> Ledger.Credential Ledger.Payment Ledger.StandardCrypto
+paymentCredentialToLedger pc = case pc of
+  GYPaymentCredentialByKey kh -> Ledger.KeyHashObj $ paymentKeyHashToLedger kh
+  GYPaymentCredentialByScript sh -> Ledger.ScriptHashObj $ scriptHashToLedger sh
+
+paymentCredentialFromLedger :: Ledger.Credential Ledger.Payment Ledger.StandardCrypto -> GYPaymentCredential
+paymentCredentialFromLedger c = case c of
+  Ledger.KeyHashObj kh -> GYPaymentCredentialByKey $ paymentKeyHashFromLedger kh
+  Ledger.ScriptHashObj sh -> GYPaymentCredentialByScript $ scriptHashFromLedger sh
 
 -- | Convert @GY@ type to corresponding type in @plutus@ library.
 paymentCredentialToPlutus :: GYPaymentCredential -> Plutus.Credential
 paymentCredentialToPlutus (GYPaymentCredentialByKey pkh) = Plutus.PubKeyCredential (paymentKeyHashToPlutus pkh)
-paymentCredentialToPlutus (GYPaymentCredentialByScript sh) = Plutus.ScriptCredential (validatorHashToPlutus sh)
+paymentCredentialToPlutus (GYPaymentCredentialByScript sh) = Plutus.ScriptCredential (scriptHashToPlutus sh)
 
 -- | Get hexadecimal value of payment credential.
 paymentCredentialToHexText :: GYPaymentCredential -> Text
 paymentCredentialToHexText =
   \case
     GYPaymentCredentialByKey pkh -> Api.serialiseToRawBytesHexText (paymentKeyHashToApi pkh)
-    GYPaymentCredentialByScript sh -> Api.serialiseToRawBytesHexText (validatorHashToApi sh)
+    GYPaymentCredentialByScript sh -> Api.serialiseToRawBytesHexText (scriptHashToApi sh)
 
 -- | Get the bech32 encoding for the given credential.
 paymentCredentialToBech32 :: GYPaymentCredential -> Text
 paymentCredentialToBech32 (GYPaymentCredentialByKey pkh) = serialiseToBech32WithPrefix "addr_vkh" $ paymentKeyHashToApi pkh
-paymentCredentialToBech32 (GYPaymentCredentialByScript sh) = serialiseToBech32WithPrefix "addr_shared_vkh" $ validatorHashToApi sh
+paymentCredentialToBech32 (GYPaymentCredentialByScript sh) = serialiseToBech32WithPrefix "addr_shared_vkh" $ scriptHashToApi sh
 
 -- | Stake credential.
 data GYStakeCredential
@@ -106,6 +127,14 @@ stakeCredentialToApi (GYStakeCredentialByScript sh) = Api.StakeCredentialByScrip
 stakeCredentialFromApi :: Api.StakeCredential -> GYStakeCredential
 stakeCredentialFromApi (Api.StakeCredentialByKey skh) = GYStakeCredentialByKey (stakeKeyHashFromApi skh)
 stakeCredentialFromApi (Api.StakeCredentialByScript sh) = GYStakeCredentialByScript (stakeValidatorHashFromApi sh)
+
+-- | Convert to corresponding ledger type.
+stakeCredentialToLedger :: GYStakeCredential -> Ledger.Credential Ledger.Staking Ledger.StandardCrypto
+stakeCredentialToLedger = stakeCredentialToApi >>> Api.toShelleyStakeCredential
+
+-- | Convert from corresponding ledger type.
+stakeCredentialFromLedger :: Ledger.Credential Ledger.Staking Ledger.StandardCrypto -> GYStakeCredential
+stakeCredentialFromLedger = Api.fromShelleyStakeCredential >>> stakeCredentialFromApi
 
 -- | Convert @GY@ type to corresponding type in @plutus@ library.
 stakeCredentialToPlutus :: GYStakeCredential -> Plutus.Credential

@@ -57,7 +57,7 @@ The slot <-> conversion operations also mimic (but consolidate) the behavior of 
 'Ouroboros.wallClockToSlot' query interpretations.
 
 The rationale behind this is simply that 'Api.EraHistory' (which contains the interpreter) is much too overcomplicated
-for this simple task. The design simplifaction here should allow easy construction of "simple" slot configs for testing
+for this simple task. The design simplification here should allow easy construction of "simple" slot configs for testing
 and similar.
 
 == IMPORTANT ==
@@ -120,8 +120,8 @@ makeSlotConfig sysStart eraHist = GYSlotConfig sysStart <$!> simplifiedEraSumms
             ++ " (Era Start bound should be 0)"
     toEraSlotConf :: Ouroboros.EraSummary -> GYEraSlotConfig
     toEraSlotConf Ouroboros.EraSummary
-        { eraStart=Ouroboros.Bound {boundTime, boundSlot}
-        , eraParams=Ouroboros.EraParams {eraSlotLength}
+        { eraStart = Ouroboros.Bound {boundTime, boundSlot}
+        , eraParams = Ouroboros.EraParams {eraSlotLength}
         } = GYEraSlotConfig { gyEraSlotStart = slotFromApi boundSlot, gyEraSlotLength = eraSlotLength, gyEraSlotZeroTime = boundTime }
     toNonEmpty :: Ouroboros.NonEmpty xs a -> NonEmpty a
     toNonEmpty (Ouroboros.NonEmptyOne x)     = x :| []
@@ -129,7 +129,7 @@ makeSlotConfig sysStart eraHist = GYSlotConfig sysStart <$!> simplifiedEraSumms
 
 -- The era start bound for the very first era.
 pattern FirstEraBound :: Ouroboros.Bound
-pattern FirstEraBound <- Ouroboros.Bound (CSlot.RelativeTime 0) 0 0
+pattern FirstEraBound <- Ouroboros.Bound (CSlot.RelativeTime 0) 0 (CSlot.EpochNo 0)
 
 {- | Create a single era slot config (useful for emulator traces).
 

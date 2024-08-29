@@ -4,9 +4,6 @@ module GeniusYield.Test.GYTxBody
     ) where
 
 import qualified Cardano.Api                          as Api
-import qualified Cardano.Api.Shelley                  as Api.S
-import qualified Cardano.Ledger.Alonzo.Core           as AlonzoCore
-import           Data.Coerce                          (coerce)
 import qualified Data.Set                             as Set (empty)
 import           Data.Time.Clock.POSIX                (posixSecondsToUTCTime)
 import           Numeric.Natural                      (Natural)
@@ -14,7 +11,8 @@ import           Test.Tasty                           (TestTree, testGroup)
 import           Test.Tasty.HUnit                     (Assertion, testCase,
                                                        (@?=))
 
-import           Clb.MockConfig                       (defaultBabbageParams, defaultSlotConfig)
+import           Clb.MockConfig                       (defaultConwayParams,
+                                                       defaultSlotConfig)
 import           Clb.TimeSlot                         (SlotConfig (..))
 
 import           GeniusYield.Types.Address            (GYAddress,
@@ -43,6 +41,7 @@ import           GeniusYield.Transaction              (GYBuildTxEnv (..),
                                                        balanceTxStep)
 import           GeniusYield.Transaction.Common       (GYBalancingError (..),
                                                        adjustTxOut, minimumUTxO)
+import           GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 -------------------------------------------------------------------------------
 -- Tests
 -------------------------------------------------------------------------------
@@ -165,8 +164,8 @@ mockTxOutRef = "4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189
 mockAsset :: GYTokenName -> GYAssetClass
 mockAsset = GYToken "005eaf690cba88f441494e42f5edce9bd7f595c56f99687e2fa0aad4"
 
-mockProtocolParams :: AlonzoCore.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra)
-mockProtocolParams = coerce defaultBabbageParams
+mockProtocolParams :: ApiProtocolParameters
+mockProtocolParams = defaultConwayParams
 
 collateralUtxo :: GYUTxO
 collateralUtxo = GYUTxO

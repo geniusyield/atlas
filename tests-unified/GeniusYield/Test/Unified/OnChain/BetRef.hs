@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GeniusYield.Test.Unified.OnChain.BetRef
   ( mkBetRefValidator
@@ -19,7 +20,8 @@ import           PlutusLedgerApi.V1.Address  (toPubKeyHash)
 import           PlutusLedgerApi.V1.Interval (contains)
 import           PlutusLedgerApi.V1.Value    (geq)
 import           PlutusLedgerApi.V2
-import           PlutusLedgerApi.V2.Contexts (getContinuingOutputs, findOwnInput, findDatum)
+import           PlutusLedgerApi.V2.Contexts (findDatum, findOwnInput,
+                                              getContinuingOutputs)
 import qualified PlutusTx
 import           PlutusTx.Prelude            as PlutusTx
 import           Prelude                     (Show)
@@ -77,7 +79,7 @@ mkBetRefValidator' (BetRefParams oraclePkh betUntil betReveal betStep) (BetRefDa
         -- Why is PlutusTx still allowed to exist?
         inValue = case findOwnInput ctx of
             Nothing -> traceError "Joever!"
-            Just x -> txOutValue (txInInfoResolved x)
+            Just x  -> txOutValue (txInInfoResolved x)
         -- inValue = txOutValue sIn
         (guessesOut, betOut) = case outputToDatum sOut of
           Nothing                                -> traceError "Could not resolve for script output datum"

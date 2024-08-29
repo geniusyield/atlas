@@ -37,8 +37,8 @@ created since the tx - thus, there have been at least k confirmations.
 
 See: https://docs.cardano.org/about-cardano/learn/chain-confirmation-versus-transaction-confirmation/
 -}
-nodeAwaitTxConfirmed :: GYEra -> Api.LocalNodeConnectInfo -> GYAwaitTx
-nodeAwaitTxConfirmed era info p@GYAwaitTxParameters{..} txId = go 0
+nodeAwaitTxConfirmed :: Api.LocalNodeConnectInfo -> GYAwaitTx
+nodeAwaitTxConfirmed info p@GYAwaitTxParameters{..} txId = go 0
   where
     go attempt
       | attempt >= maxAttempts = throwIO $ GYAwaitTxException p
@@ -50,14 +50,14 @@ nodeAwaitTxConfirmed era info p@GYAwaitTxParameters{..} txId = go 0
           However, this is an extreme edge case that is unlikely to ever exist in
           privnet tests (where this module is meant to be used, exclusively).
           -}
-          utxos <- nodeUtxosFromTx era info txId
+          utxos <- nodeUtxosFromTx info txId
           -- FIXME: This doesn't actually wait for confirmations.
           unless (utxosSize utxos /= 0) $
               threadDelay checkInterval >> go (attempt + 1)
 
 -- | Obtain UTxOs created by a transaction.
-nodeUtxosFromTx :: GYEra -> Api.LocalNodeConnectInfo -> GYTxId -> IO GYUTxOs
-nodeUtxosFromTx era info txId = do
+nodeUtxosFromTx ::  Api.LocalNodeConnectInfo -> GYTxId -> IO GYUTxOs
+nodeUtxosFromTx info txId = do
     {- We don't have a way to obtain utxos produced by a TxId. As an alternative, we could
     obtain the whole UTxO set and filter from there, but there's a faster way.
 
@@ -75,7 +75,7 @@ nodeUtxosFromTx era info txId = do
     go mempty startIx uptoIx
   where
     go acc startIx uptoIx = do
-        utxos <- nodeUtxosAtTxOutRefs era info $ curry txOutRefFromTuple txId <$> [startIx .. uptoIx]
+        utxos <- nodeUtxosAtTxOutRefs info $ curry txOutRefFromTuple txId <$> [startIx .. uptoIx]
         let acc' = acc <> utxos
         if utxosSize utxos == 0
             then pure acc'

@@ -70,6 +70,7 @@ module GeniusYield.Types.Value (
     makeAssetClass
 ) where
 
+import qualified Cardano.Ledger.Coin              as Ledger
 import           Control.Lens                     ((?~))
 import           Data.Aeson                       (object, (.=))
 import qualified Data.Aeson.Key                   as K
@@ -78,7 +79,7 @@ import qualified Data.Csv                         as Csv
 import           Data.List                        (intercalate)
 import qualified Data.Scientific                  as SC
 import           GeniusYield.Imports
-import           PlutusTx.Builtins.Class          (fromBuiltin, toBuiltin)
+import           PlutusTx.Builtins                (fromBuiltin, toBuiltin)
 
 import qualified Cardano.Api                      as Api
 -- import qualified Cardano.Api.Value                as Api
@@ -102,6 +103,7 @@ import           Data.Either.Combinators          (mapLeft)
 import           Data.Foldable                    (for_)
 import           Data.Hashable                    (Hashable (..))
 import qualified GeniusYield.Types.Ada            as Ada
+import           GeniusYield.Types.Era
 import           GeniusYield.Types.Script
 
 -- $setup
@@ -201,16 +203,15 @@ valueFromApi v = valueFromList
     ]
 
 valueFromApiTxOutValue :: Api.TxOutValue era -> GYValue
-valueFromApiTxOutValue (Api.TxOutValueByron (Api.Lovelace x)) = valueFromLovelace x
+valueFromApiTxOutValue (Api.TxOutValueByron (Ledger.Coin x)) = valueFromLovelace x
 valueFromApiTxOutValue (Api.TxOutValueShelleyBased e v) =
   valueFromApi $ Api.fromLedgerValue e v
 
--- FIXME: should we use Conway?
-valueToApiTxOutValue :: GYValue -> Api.TxOutValue Api.BabbageEra
+valueToApiTxOutValue :: GYValue -> Api.TxOutValue ApiEra
 valueToApiTxOutValue v =
   Api.TxOutValueShelleyBased
-    Api.ShelleyBasedEraBabbage
-    (Api.toLedgerValue Api.MaryEraOnwardsBabbage $ valueToApi v)
+    Api.ShelleyBasedEraConway
+    (Api.toLedgerValue Api.MaryEraOnwardsConway $ valueToApi v)
 
 -- | Create 'GYValue' from a list of asset class and amount.
 -- Duplicates are merged.

@@ -8,23 +8,24 @@ Stability   : develop
 -}
 module GeniusYield.TxBuilder.Query.Class (GYTxQueryMonad (..), GYTxSpecialQueryMonad (..), GYTxUserQueryMonad (..)) where
 
-import qualified Cardano.Api                  as Api
-import qualified Cardano.Api.Shelley          as Api.S
-import           Control.Monad.Except         (MonadError (..))
-import qualified Control.Monad.State.Strict   as Strict
-import qualified Control.Monad.State.Lazy     as Lazy
-import qualified Control.Monad.Writer.CPS     as CPS
-import qualified Control.Monad.Writer.Strict  as Strict
-import qualified Control.Monad.Writer.Lazy    as Lazy
-import           Control.Monad.Random         (RandT, lift)
-import           Control.Monad.Reader         (ReaderT)
-import qualified Data.Map.Strict              as Map
-import           Data.Maybe                   (listToMaybe)
-import           GHC.Stack                    (withFrozenCallStack)
+import qualified Cardano.Api                          as Api
+import qualified Cardano.Api.Shelley                  as Api.S
+import           Control.Monad.Except                 (MonadError (..))
+import           Control.Monad.Random                 (RandT, lift)
+import           Control.Monad.Reader                 (ReaderT)
+import qualified Control.Monad.State.Lazy             as Lazy
+import qualified Control.Monad.State.Strict           as Strict
+import qualified Control.Monad.Writer.CPS             as CPS
+import qualified Control.Monad.Writer.Lazy            as Lazy
+import qualified Control.Monad.Writer.Strict          as Strict
+import qualified Data.Map.Strict                      as Map
+import           Data.Maybe                           (listToMaybe)
+import           GHC.Stack                            (withFrozenCallStack)
 
 import           GeniusYield.Imports
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.Types
+import           GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 
 -------------------------------------------------------------------------------
 -- Class
@@ -32,7 +33,7 @@ import           GeniusYield.Types
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg #-}
+    {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock #-}
 
     -- | Get the network id
     networkId :: m GYNetworkId
@@ -118,6 +119,12 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     -- | Log a message with specified namespace and severity.
     logMsg :: HasCallStack => GYLogNamespace -> GYLogSeverity -> String -> m ()
 
+    -- | Wait until the chain tip is at least the given slot number, returning it's slot.
+    waitUntilSlot :: GYSlot -> m GYSlot
+
+    -- | Wait until the chain tip is at the next block, return it's slot.
+    waitForNextBlock :: m GYSlot
+
 -- | Class of monads for querying special chain data.
 {- Note [Necessity of 'GYTxSpecialQueryMonad' and transaction building as a class method]
 
@@ -134,7 +141,7 @@ under the class method in question?
 class GYTxQueryMonad m => GYTxSpecialQueryMonad m where
     systemStart :: m Api.SystemStart
     eraHistory :: m Api.EraHistory
-    protocolParams :: m Api.S.ProtocolParameters
+    protocolParams :: m ApiProtocolParameters
     stakePools :: m (Set Api.S.PoolId)
 
 -- | Class of monads for querying as a user.
@@ -179,6 +186,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+    waitUntilSlot = lift . waitUntilSlot
+    waitForNextBlock = lift waitForNextBlock
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (RandT g m) where
     ownAddresses = lift ownAddresses
@@ -212,6 +221,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+    waitUntilSlot = lift . waitUntilSlot
+    waitForNextBlock = lift waitForNextBlock
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (ReaderT env m) where
     ownAddresses = lift ownAddresses
@@ -272,6 +283,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+    waitUntilSlot = lift . waitUntilSlot
+    waitForNextBlock = lift waitForNextBlock
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (Strict.StateT s m) where
     ownAddresses = lift ownAddresses
@@ -305,6 +318,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+    waitUntilSlot = lift . waitUntilSlot
+    waitForNextBlock = lift waitForNextBlock
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (Lazy.StateT s m) where
     ownAddresses = lift ownAddresses
@@ -338,6 +353,8 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (CPS.WriterT w m) where
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+    waitUntilSlot = lift . waitUntilSlot
+    waitForNextBlock = lift waitForNextBlock
 
 instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (CPS.WriterT w m) where
     ownAddresses = lift ownAddresses
@@ -371,6 +388,8 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Strict.WriterT w m) whe
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+    waitUntilSlot = lift . waitUntilSlot
+    waitForNextBlock = lift waitForNextBlock
 
 instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (Strict.WriterT w m) where
     ownAddresses = lift ownAddresses
@@ -404,6 +423,8 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Lazy.WriterT w m) where
     slotConfig = lift slotConfig
     slotOfCurrentBlock = lift slotOfCurrentBlock
     logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
+    waitUntilSlot = lift . waitUntilSlot
+    waitForNextBlock = lift waitForNextBlock
 
 instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (Lazy.WriterT w m) where
     ownAddresses = lift ownAddresses

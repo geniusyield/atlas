@@ -66,7 +66,7 @@ placeBet refScript brp guess bet ownAddr mPreviousBetsUtxoRef = do
         <> mustBeSignedBy pkh
 
 -- | Operation to take UTxO corresponding to previous bets.
-takeBets :: (HasCallStack, GYTxMonad m)
+takeBets :: (HasCallStack, GYTxUserQueryMonad m)
               => GYTxOutRef    -- ^ Reference Script.
               -> BetRefParams  -- ^ Validator params.
               -> GYTxOutRef    -- ^ Script UTxO to consume.

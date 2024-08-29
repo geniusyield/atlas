@@ -20,25 +20,32 @@ module GeniusYield.TxBuilder.Common
     , maximumRequiredCollateralValue
     ) where
 
-import qualified Cardano.Api                    as Api
-import qualified Cardano.Api.Shelley            as Api.S
-import qualified Cardano.Ledger.Alonzo.Core     as Ledger
-import           Control.Applicative            ((<|>))
-import           Control.Monad.Except           (MonadError (throwError))
-import           Control.Monad.Random           (MonadRandom)
-import           Data.List                      (nubBy)
-import           Data.List.NonEmpty             (NonEmpty ((:|)))
-import qualified Data.List.NonEmpty             as NE
-import qualified Data.Map.Strict                as Map
-import           Data.Ratio                     ((%))
-import qualified Data.Set                       as Set
-
+import qualified Cardano.Api                          as Api
+import           Cardano.Api.Ledger                   (unboundRational)
+import qualified Cardano.Api.Ledger                   as Ledger
+import qualified Cardano.Api.Shelley                  as Api.S
+import qualified Cardano.Ledger.Alonzo.Core           as Ledger
+import qualified Cardano.Ledger.Conway.PParams        as Ledger
+import qualified Cardano.Ledger.Conway.Tx             as Ledger
+import qualified Cardano.Ledger.Plutus                as Ledger
+import           Control.Applicative                  ((<|>))
+import           Control.Lens                         ((^.))
+import           Control.Monad.Except                 (MonadError (throwError))
+import           Control.Monad.Random                 (MonadRandom)
+import           Data.List                            (nubBy)
+import           Data.List.NonEmpty                   (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty                   as NE
+import qualified Data.Map.Strict                      as Map
+import           Data.Ratio                           ((%))
+import qualified Data.Set                             as Set
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
-import           GeniusYield.Transaction.Common (minimumUTxO)
-import           GeniusYield.TxBuilder.Query.Class
+import           GeniusYield.Transaction.Common       (minimumUTxO,
+                                                       utxoFromTxInDetailed)
 import           GeniusYield.TxBuilder.Errors
+import           GeniusYield.TxBuilder.Query.Class
 import           GeniusYield.Types
+import           GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 
 -------------------------------------------------------------------------------
 -- Transaction skeleton
@@ -168,7 +175,7 @@ buildTxCore
     :: forall m v. (GYTxQueryMonad m, MonadRandom m)
     => Api.SystemStart
     -> Api.EraHistory
-    -> Ledger.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra)
+    -> ApiProtocolParameters
     -> Set Api.S.PoolId
     -> GYCoinSelectionStrategy
     -> (GYTxBody -> GYUTxOs -> GYUTxOs)
@@ -232,12 +239,13 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
 
 
             -- This operation is `O(n)` where `n` denotes the number of UTxOs in `ownUtxos'`.
-            let mCollateralUtxo =
+            let totalRefScriptSize = foldl' (\acc GYUTxO {..} -> acc + maybe 0 scriptSize utxoRefScript) 0 $ refInsUtxos <> map utxoFromTxInDetailed gyTxInsDetailed
+                maximumRequiredCollateralValue' = maximumRequiredCollateralValue pp totalRefScriptSize
+                mCollateralUtxo =
                   reservedCollateral <|>
                     find
                       (\u ->
                         let v = utxoValue u
-                            maximumRequiredCollateralValue' = maximumRequiredCollateralValue $ Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage pp
                             -- Following depends on that we allow unsafe, i.e., negative coins count below. In future, we can take magnitude instead.
                             vWithoutMaxCollPledge = v `valueMinus` maximumRequiredCollateralValue'
                             worstCaseCollOutput = mkGYTxOutNoDatum change vWithoutMaxCollPledge
@@ -316,24 +324,24 @@ collateralValue = valueFromLovelace collateralLovelace
 
 {-# INLINABLE maximumRequiredCollateralLovelace #-}
 -- | What is the maximum possible collateral requirement as per current protocol parameters?
-maximumRequiredCollateralLovelace :: Api.S.ProtocolParameters -> Integer
-maximumRequiredCollateralLovelace pp@Api.S.ProtocolParameters {..} = ceiling $ fromIntegral (maximumFee pp) * maybe 0 (% 100) protocolParamCollateralPercent
+maximumRequiredCollateralLovelace :: ApiProtocolParameters -> Int -> Integer
+maximumRequiredCollateralLovelace pp refScriptSize = ceiling $ fromIntegral (maximumFee pp refScriptSize) * ((pp ^. Ledger.ppCollateralPercentageL) % 100)
 
 {-# INLINABLE maximumFee #-}
 -- | Compute the maximum fee possible for any transaction.
-maximumFee :: Api.S.ProtocolParameters -> Integer
-maximumFee Api.S.ProtocolParameters {..} =
+maximumFee :: ApiProtocolParameters -> Int -> Integer
+maximumFee pp refScriptSize =
   let txFee :: Integer
-      txFee = fromIntegral $ protocolParamTxFeeFixed + protocolParamTxFeePerByte * fromIntegral protocolParamMaxTxSize
+      txFee = fromIntegral $ pp ^. Ledger.ppMinFeeBL + (pp ^. Ledger.ppMinFeeAL) * fromIntegral (pp ^. Ledger.ppMaxTxSizeL)
       executionFee :: Rational
       executionFee =
-        case (protocolParamPrices, protocolParamMaxTxExUnits) of
-          (Just Api.S.ExecutionUnitPrices{..}, Just Api.S.ExecutionUnits{..}) ->
-            priceExecutionSteps * fromIntegral executionSteps + priceExecutionMemory * fromIntegral executionMemory
-          _ -> 0
-   in txFee + ceiling executionFee
+        case (pp ^. Ledger.ppPricesL, pp ^. Ledger.ppMaxTxExUnitsL) of
+          (Ledger.Prices{..}, Ledger.ExUnits {..}) ->
+            Ledger.unboundRational prSteps * fromIntegral exUnitsSteps + Ledger.unboundRational prMem * fromIntegral exUnitsMem
+      refScriptFee = Ledger.tierRefScriptFee 1.2 25_600 (unboundRational $ pp ^. Ledger.ppMinFeeRefScriptCostPerByteL) refScriptSize
+   in txFee + ceiling executionFee + Ledger.unCoin refScriptFee
 
 {-# INLINABLE maximumRequiredCollateralValue #-}
 -- | See `maximumRequiredCollateralLovelace`.
-maximumRequiredCollateralValue :: Api.S.ProtocolParameters -> GYValue
-maximumRequiredCollateralValue pp = valueFromLovelace $ maximumRequiredCollateralLovelace pp
+maximumRequiredCollateralValue :: ApiProtocolParameters -> Int -> GYValue
+maximumRequiredCollateralValue pp refScriptSize = valueFromLovelace $ maximumRequiredCollateralLovelace pp refScriptSize

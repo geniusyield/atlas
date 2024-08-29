@@ -10,6 +10,8 @@ module GeniusYield.Types.StakePoolId (
   GYStakePoolId,
   stakePoolIdToApi,
   stakePoolIdFromApi,
+  stakePoolIdToLedger,
+  stakePoolIdFromLedger,
   stakePoolIdFromTextMaybe,
   unsafeStakePoolIdFromText,
   stakePoolIdToText,
@@ -19,7 +21,9 @@ module GeniusYield.Types.StakePoolId (
 ) where
 
 import qualified Cardano.Api                  as Api
+import qualified Cardano.Api.Ledger           as Ledger
 import qualified Cardano.Api.Shelley          as Api
+import qualified Cardano.Ledger.Keys          as Ledger
 import           Control.Lens                 ((?~))
 import qualified Data.Aeson.Types             as Aeson
 import qualified Data.Csv                     as Csv
@@ -29,8 +33,8 @@ import qualified Data.Text                    as Text
 import qualified Data.Text.Encoding           as Text
 import           GeniusYield.Imports
 import           GeniusYield.Types.PubKeyHash (AsPubKeyHash (..),
-                                               pubKeyHashFromApi,
-                                               pubKeyHashToApi)
+                                               pubKeyHashFromLedger,
+                                               pubKeyHashToLedger)
 import qualified Text.Printf                  as Printf
 import qualified Web.HttpApiData              as Web
 
@@ -73,11 +77,19 @@ stakePoolIdToApi = coerce
 stakePoolIdFromApi :: Api.Hash Api.StakePoolKey -> GYStakePoolId
 stakePoolIdFromApi = coerce
 
+-- | Convert to corresponding ledger type.
+stakePoolIdToLedger :: GYStakePoolId -> Ledger.KeyHash Ledger.StakePool Ledger.StandardCrypto
+stakePoolIdToLedger = stakePoolIdToApi >>> Api.unStakePoolKeyHash
+
+-- | Convert from corresponding ledger type.
+stakePoolIdFromLedger :: Ledger.KeyHash Ledger.StakePool Ledger.StandardCrypto -> GYStakePoolId
+stakePoolIdFromLedger = Api.StakePoolKeyHash >>> stakePoolIdFromApi
+
 -- >>> fromPubKeyHash @GYStakePoolId (toPubKeyHash spId)
 -- unsafeStakePoolIdFromText "pool1cjz6kg9a8ug9uk0nc59q60a67c2628ms58rd98gq587jwa2x5qt"
 instance AsPubKeyHash GYStakePoolId where
-  toPubKeyHash = stakePoolIdToApi >>> Api.serialiseToRawBytesHex >>> Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsPaymentKey) >>> either (error "AsPubKeyHash.toPubKeyHash: Absurd (GYStakePoolId)") id >>> pubKeyHashFromApi
-  fromPubKeyHash = pubKeyHashToApi >>> Api.serialiseToRawBytesHex >>> Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsStakePoolKey) >>> either (error "AsPubKeyHash.fromPubKeyHash: Absurd (GYStakePoolId)") id >>> stakePoolIdFromApi
+  toPubKeyHash = stakePoolIdToLedger >>> Ledger.coerceKeyRole >>> pubKeyHashFromLedger
+  fromPubKeyHash = pubKeyHashToLedger >>> Ledger.coerceKeyRole >>> stakePoolIdFromLedger
 
 -- |
 --

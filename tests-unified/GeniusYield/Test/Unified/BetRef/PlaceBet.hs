@@ -7,14 +7,15 @@ module GeniusYield.Test.Unified.BetRef.PlaceBet
 import           Control.Monad.Except                             (handleError)
 import qualified Data.Set                                         as Set
 import qualified Data.Text                                        as T
-import           Test.Tasty                                       (TestTree, testGroup)
+import           Test.Tasty                                       (TestTree,
+                                                                   testGroup)
 
 
 import           GeniusYield.Test.Unified.BetRef.Operations
 import           GeniusYield.Test.Unified.OnChain.BetRef.Compiled
 
-import           GeniusYield.Imports
 import           GeniusYield.HTTP.Errors
+import           GeniusYield.Imports
 import           GeniusYield.Test.Clb
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.Test.Utils
@@ -79,10 +80,10 @@ simplSpendingTxTrace Wallets{w1} = do
     txId <- buildTxBody skeleton >>= signAndSubmitConfirmed
     gyLogDebug' "" $ printf "tx submitted, txId: %s" txId
 
--- Pretend off-chain code written in 'GYTxMonad m'
-mkTrivialTx :: GYTxMonad m => m (GYTxSkeleton 'PlutusV2)
+-- Pretend off-chain code written in 'GYTxUserQueryMonad m'
+mkTrivialTx :: GYTxUserQueryMonad m => m (GYTxSkeleton 'PlutusV2)
 mkTrivialTx = do
-  addr <- fmap (!! 0) ownAddresses -- FIXME:
+  addr <- ownChangeAddress
   gyLogDebug' "" $ printf "ownAddr: %s" (show addr)
   pkh <- addressToPubKeyHash' addr
   let targetAddr = unsafeAddressFromText "addr_test1qr2vfntpz92f9pawk8gs0fdmhtfe32pqcx0s8fuztxaw3p5pjay24kygaj4g8uevf89ewxzvsdc60wln8spzm2al059q8a9w3x"
@@ -157,7 +158,7 @@ computeParamsAndAddRefScript betUntil' betReveal' betStep Wallets{..} = do
 -- | Run to call the `placeBet` operation.
 placeBetRun :: GYTxMonad m => GYTxOutRef -> BetRefParams -> OracleAnswerDatum -> GYValue -> Maybe GYTxOutRef -> m GYTxId
 placeBetRun refScript brp guess bet mPreviousBetsUtxoRef = do
-  addr <- (!! 0) <$> ownAddresses
+  addr <- ownChangeAddress
   gyLogDebug' "" $ printf "bet: %s" (show bet)
   skeleton <- placeBet refScript brp guess bet addr mPreviousBetsUtxoRef
   gyLogDebug' "" $ printf "place bet tx skeleton: %s" (show skeleton)
@@ -240,13 +241,14 @@ multipleBetsTraceCore brp refScript walletBets ws@Wallets{..} = do
   asUser w1 $ verify (zip3 balanceDiffWithoutFees balanceBeforeAllTheseOps balanceAfterAllTheseOps)
   where
     -- | Function to verify that the wallet indeed lost by /roughly/ the bet amount.
-    -- We say /roughly/ as fees is assumed to be within (0, 1 ada].
+    -- We say /roughly/ as fees is assumed to be within (0, 1.5 ada].
+    -- Suppose that wallet x places bet 3 times, where for simplicity assume each tx costed 0.6 ada as fees then the threshold should be above 1.8 ada.
     verify [] = return ()
     verify (((wallet, diff), vBefore, vAfter) : xs) =
       let vAfterWithoutFees = vBefore <> diff
           (expectedAdaWithoutFees, expectedOtherAssets) = valueSplitAda vAfterWithoutFees
           (actualAda, actualOtherAssets) = valueSplitAda vAfter
-          threshold = 1_000_000  -- 1 ada
+          threshold = 1_500_000  -- 1.5 ada
       in
         if expectedOtherAssets == actualOtherAssets
             && actualAda < expectedAdaWithoutFees

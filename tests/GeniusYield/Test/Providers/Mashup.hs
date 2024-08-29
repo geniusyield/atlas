@@ -2,7 +2,6 @@ module GeniusYield.Test.Providers.Mashup
   ( providersMashupTests
   ) where
 
-import qualified Cardano.Api                       as Api
 import           Control.Concurrent                (threadDelay)
 import           Control.Exception                 (handle)
 import           Data.Default                      (def)
@@ -37,7 +36,7 @@ providersMashupTests configs =
            eraHist <- extractEraSummaries <$> gyGetEraHistory provider
            delayBySecond
            -- TODO: There is a bug in Maestro due to which it returns extra pools. Thus, this is ignored for now.
-           sp <- gyGetStakePools provider
+           _sp <- gyGetStakePools provider
            delayBySecond
            slotConfig' <- gyGetSlotConfig provider
            pure (pp, eraHist, ss, slotConfig')

@@ -449,7 +449,7 @@ blockfrostEraHistory proj = do
         { eraEpochSize = CSlot.EpochSize $ fromIntegral _parametersEpochLength
         , eraSlotLength = CTime.mkSlotLength _parametersSlotLength
         , eraSafeZone = Ouroboros.StandardSafeZone _parametersSafeZone
-        , eraGenesisWin = 0  -- We don't make use of it.
+        , eraGenesisWin = fromIntegral _parametersSafeZone  -- TODO: Get it from provider? It is supposed to be 3k/f where k is security parameter (at present 2160) and f is active slot coefficient. Usually ledger set the safe zone size such that it guarantees at least k blocks...
         }
     mkEra Blockfrost.NetworkEraSummary {_networkEraStart, _networkEraEnd, _networkEraParameters} = Ouroboros.EraSummary
         { eraStart = mkBound _networkEraStart

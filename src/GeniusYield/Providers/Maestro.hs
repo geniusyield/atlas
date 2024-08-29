@@ -545,7 +545,7 @@ maestroEraHistory env = do
         { eraEpochSize = CSlot.EpochSize $ fromIntegral eraParametersEpochLength
         , eraSlotLength = CTime.mkSlotLength $ Maestro.epochSlotLengthMilliseconds eraParametersSlotLength / 1000
         , eraSafeZone = Ouroboros.StandardSafeZone $ fromJust eraParametersSafeZone
-        , eraGenesisWin = 0  -- We don't make use of it.
+        , eraGenesisWin = fromIntegral $ fromJust eraParametersSafeZone  -- TODO: Get it from provider? It is supposed to be 3k/f where k is security parameter (at present 2160) and f is active slot coefficient. Usually ledger set the safe zone size such that it guarantees at least k blocks...
         }
     mkEra Maestro.EraSummary {eraSummaryStart, eraSummaryEnd, eraSummaryParameters} = Ouroboros.EraSummary
         { eraStart = mkBound eraSummaryStart

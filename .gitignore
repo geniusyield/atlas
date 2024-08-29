@@ -27,3 +27,5 @@ maestro-config.json
 blockfrost-config.json
 *.skey
 .direnv
+.vscode
+secrets

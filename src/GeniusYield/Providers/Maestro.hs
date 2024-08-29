@@ -34,6 +34,7 @@ import           Control.Exception                    (try)
 import           Control.Monad                        ((<=<))
 import qualified Data.Aeson                           as Aeson
 import           Data.Either.Combinators              (maybeToRight)
+import           Data.Int                             (Int64)
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe                           (fromJust)
 import qualified Data.Set                             as Set
@@ -437,45 +438,45 @@ maestroProtocolParams env = do
   Maestro.ProtocolParameters {..} <- handleMaestroError "ProtocolParams" <=< try $ Maestro.getTimestampedData <$> Maestro.getProtocolParameters env
   pure $
     Api.S.ProtocolParameters
-      { protocolParamProtocolVersion     = (Maestro.protocolVersionMajor protocolParametersProtocolVersion, Maestro.protocolVersionMinor protocolParametersProtocolVersion)
+      { protocolParamProtocolVersion     = (Maestro.protocolVersionMajor protocolParametersVersion, Maestro.protocolVersionMinor protocolParametersVersion)
       , protocolParamDecentralization    = Nothing -- Also known as `d`, got deprecated in Babbage.
       , protocolParamExtraPraosEntropy   = Nothing -- Also known as `extraEntropy`, got deprecated in Babbage.
-      , protocolParamMaxBlockHeaderSize  = protocolParametersMaxBlockHeaderSize
-      , protocolParamMaxBlockBodySize    = protocolParametersMaxBlockBodySize
-      , protocolParamMaxTxSize           = protocolParametersMaxTxSize
-      , protocolParamTxFeeFixed          = Api.Lovelace $ toInteger protocolParametersMinFeeConstant
+      , protocolParamMaxBlockHeaderSize  = Maestro.asBytesBytes protocolParametersMaxBlockHeaderSize
+      , protocolParamMaxBlockBodySize    = Maestro.asBytesBytes protocolParametersMaxBlockBodySize
+      , protocolParamMaxTxSize           = Maestro.asBytesBytes protocolParametersMaxTransactionSize
+      , protocolParamTxFeeFixed          = Api.Lovelace $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinFeeConstant
       , protocolParamTxFeePerByte        = Api.Lovelace $ toInteger protocolParametersMinFeeCoefficient
       , protocolParamMinUTxOValue        = Nothing -- Deprecated in Alonzo.
-      , protocolParamStakeAddressDeposit = Api.Lovelace $ toInteger protocolParametersStakeKeyDeposit
-      , protocolParamStakePoolDeposit    = Api.Lovelace $ toInteger protocolParametersPoolDeposit
-      , protocolParamMinPoolCost         = Api.Lovelace $ toInteger protocolParametersMinPoolCost
+      , protocolParamStakeAddressDeposit = Api.Lovelace $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersStakeCredentialDeposit
+      , protocolParamStakePoolDeposit    = Api.Lovelace $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersStakePoolDeposit
+      , protocolParamMinPoolCost         = Api.Lovelace $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinStakePoolCost
       , protocolParamPoolRetireMaxEpoch  = Ledger.EpochInterval . fromIntegral
-                                              $ Maestro.unEpochNo protocolParametersPoolRetirementEpochBound
-      , protocolParamStakePoolTargetNum  = protocolParametersDesiredNumberOfPools
-      , protocolParamPoolPledgeInfluence = Maestro.unMaestroRational protocolParametersPoolInfluence
+                                              $ Maestro.unEpochNo protocolParametersStakePoolRetirementEpochBound
+      , protocolParamStakePoolTargetNum  = protocolParametersDesiredNumberOfStakePools
+      , protocolParamPoolPledgeInfluence = Maestro.unMaestroRational protocolParametersStakePoolPledgeInfluence
       , protocolParamMonetaryExpansion   = Maestro.unMaestroRational protocolParametersMonetaryExpansion
       , protocolParamTreasuryCut         = Maestro.unMaestroRational protocolParametersTreasuryExpansion
       , protocolParamPrices              = Just $ Api.S.ExecutionUnitPrices
-                                              (Maestro.unMaestroRational $ Maestro.memoryStepsWithSteps protocolParametersPrices)
-                                              (Maestro.unMaestroRational $ Maestro.memoryStepsWithMemory protocolParametersPrices)
+                                              (Maestro.unMaestroRational $ Maestro.memoryCpuWithCpu protocolParametersScriptExecutionPrices)
+                                              (Maestro.unMaestroRational $ Maestro.memoryCpuWithMemory protocolParametersScriptExecutionPrices)
       , protocolParamMaxTxExUnits        = Just $ Api.ExecutionUnits
-                                              (Maestro.memoryStepsWithSteps protocolParametersMaxExecutionUnitsPerTransaction)
-                                              (Maestro.memoryStepsWithMemory protocolParametersMaxExecutionUnitsPerTransaction)
+                                              (Maestro.memoryCpuWithCpu protocolParametersMaxExecutionUnitsPerTransaction)
+                                              (Maestro.memoryCpuWithMemory protocolParametersMaxExecutionUnitsPerTransaction)
       , protocolParamMaxBlockExUnits     = Just $ Api.ExecutionUnits
-                                              (Maestro.memoryStepsWithSteps protocolParametersMaxExecutionUnitsPerBlock)
-                                              (Maestro.memoryStepsWithMemory protocolParametersMaxExecutionUnitsPerBlock)
-      , protocolParamMaxValueSize        = Just protocolParametersMaxValueSize
+                                              (Maestro.memoryCpuWithCpu protocolParametersMaxExecutionUnitsPerBlock)
+                                              (Maestro.memoryCpuWithMemory protocolParametersMaxExecutionUnitsPerBlock)
+      , protocolParamMaxValueSize        = Just $ Maestro.asBytesBytes protocolParametersMaxValueSize
       , protocolParamCollateralPercent   = Just protocolParametersCollateralPercentage
       , protocolParamMaxCollateralInputs = Just protocolParametersMaxCollateralInputs
       , protocolParamCostModels          = M.fromList
                                               [ ( Api.S.AnyPlutusScriptVersion Api.PlutusScriptV1
-                                                , Api.CostModel $ M.elems $ coerce $ Maestro.costModelsPlutusV1 protocolParametersCostModels
+                                                , Api.CostModel $ fromIntegral <$> coerce @_ @[Int64] (Maestro.costModelsPlutusV1 protocolParametersPlutusCostModels)
                                                 )
                                               , ( Api.S.AnyPlutusScriptVersion Api.PlutusScriptV2
-                                                , Api.CostModel $ M.elems $ coerce $ Maestro.costModelsPlutusV2 protocolParametersCostModels
+                                                , Api.CostModel $ fromIntegral <$> coerce @_ @[Int64] (Maestro.costModelsPlutusV2 protocolParametersPlutusCostModels)
                                                 )
                                               ]
-      , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ toInteger protocolParametersCoinsPerUtxoByte
+      , protocolParamUTxOCostPerByte     = Just . Api.Lovelace $ toInteger protocolParametersMinUtxoDepositCoefficient
       }
 
 -- | Returns a set of all Stake Pool's 'Api.S.PoolId'.
@@ -506,13 +507,13 @@ maestroEraHistory env = do
   maybe (throwIO $ MspvIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms
   where
     mkBound Maestro.EraBound {eraBoundEpoch, eraBoundSlot, eraBoundTime} = Ouroboros.Bound
-        { boundTime = CTime.RelativeTime eraBoundTime
+        { boundTime = CTime.RelativeTime $ Maestro.eraBoundTimeSeconds eraBoundTime
         , boundSlot = CSlot.SlotNo $ fromIntegral eraBoundSlot
         , boundEpoch = CSlot.EpochNo $ fromIntegral eraBoundEpoch
         }
     mkEraParams Maestro.EraParameters {eraParametersEpochLength, eraParametersSlotLength, eraParametersSafeZone} = Ouroboros.EraParams
         { eraEpochSize = CSlot.EpochSize $ fromIntegral eraParametersEpochLength
-        , eraSlotLength = CTime.mkSlotLength eraParametersSlotLength
+        , eraSlotLength = CTime.mkSlotLength $ Maestro.epochSlotLengthMilliseconds eraParametersSlotLength / 1000
         , eraSafeZone = Ouroboros.StandardSafeZone $ fromJust eraParametersSafeZone
         }
     mkEra Maestro.EraSummary {eraSummaryStart, eraSummaryEnd, eraSummaryParameters} = Ouroboros.EraSummary

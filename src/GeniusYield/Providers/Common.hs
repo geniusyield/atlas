@@ -179,16 +179,6 @@ parseEraHist mkEra [byronEra, shelleyEra, allegraEra, maryEra, alonzoEra, babbag
     . NonEmptyCons (mkEra alonzoEra)
     . NonEmptyCons (mkEra babbageEra)
     $ NonEmptyOne (mkEra conwayEra)
-parseEraHist mkEra [byronEra, shelleyEra, allegraEra, maryEra, alonzoEra, babbageEra] = Just
-    . Api.EraHistory
-    . Ouroboros.mkInterpreter
-    . Ouroboros.Summary
-    . NonEmptyCons (mkEra byronEra)
-    . NonEmptyCons (mkEra shelleyEra)
-    . NonEmptyCons (mkEra allegraEra)
-    . NonEmptyCons (mkEra maryEra)
-    . NonEmptyCons (mkEra alonzoEra)
-    $ NonEmptyOne (mkEra babbageEra)
 parseEraHist _ _ = Nothing
 
 -- FIXME: These hardcoded era histories have to be corrected to include conway.

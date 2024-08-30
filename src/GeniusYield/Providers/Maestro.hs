@@ -502,25 +502,7 @@ maestroSystemStart env = fmap (CTime.SystemStart . Time.localTimeToUTC Time.utc)
 
 -- | Returns the 'Api.EraHistory' queried from Maestro.
 maestroEraHistory :: Maestro.MaestroEnv 'Maestro.V1 -> IO Api.EraHistory
-maestroEraHistory env = do
-  eraSumms <- handleMaestroError "EraHistory" =<< try (Maestro.getTimestampedData <$> Maestro.getEraHistory env)
-  maybe (throwIO $ MspvIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms
-  where
-    mkBound Maestro.EraBound {eraBoundEpoch, eraBoundSlot, eraBoundTime} = Ouroboros.Bound
-        { boundTime = CTime.RelativeTime $ Maestro.eraBoundTimeSeconds eraBoundTime
-        , boundSlot = CSlot.SlotNo $ fromIntegral eraBoundSlot
-        , boundEpoch = CSlot.EpochNo $ fromIntegral eraBoundEpoch
-        }
-    mkEraParams Maestro.EraParameters {eraParametersEpochLength, eraParametersSlotLength, eraParametersSafeZone} = Ouroboros.EraParams
-        { eraEpochSize = CSlot.EpochSize $ fromIntegral eraParametersEpochLength
-        , eraSlotLength = CTime.mkSlotLength $ Maestro.epochSlotLengthMilliseconds eraParametersSlotLength / 1000
-        , eraSafeZone = Ouroboros.StandardSafeZone $ fromJust eraParametersSafeZone
-        }
-    mkEra Maestro.EraSummary {eraSummaryStart, eraSummaryEnd, eraSummaryParameters} = Ouroboros.EraSummary
-        { eraStart = mkBound eraSummaryStart
-        , eraEnd = maybe Ouroboros.EraUnbounded (Ouroboros.EraEnd . mkBound) eraSummaryEnd
-        , eraParams = mkEraParams eraSummaryParameters
-        }
+maestroEraHistory _ = pure $ Api.EraHistory mainnetEraHist
 
 -------------------------------------------------------------------------------
 -- Datum lookup

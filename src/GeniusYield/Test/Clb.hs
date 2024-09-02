@@ -53,6 +53,7 @@ import           Cardano.Slotting.Slot                          (EpochNo (..),
 import           Cardano.Slotting.Time                          (RelativeTime (RelativeTime),
                                                                  mkSlotLength)
 import           Clb                                            (ClbState (..),
+                                                                 Clb,
                                                                  ClbT,
                                                                  EmulatedLedgerState (..),
                                                                  Log (Log),
@@ -74,6 +75,7 @@ import qualified Clb
 import           Control.Monad.Trans.Maybe                      (runMaybeT)
 import qualified Ouroboros.Consensus.Cardano.Block              as Ouroboros
 import qualified Ouroboros.Consensus.HardFork.History           as Ouroboros
+import           Ouroboros.Consensus.HardFork.History.EraParams (EraParams (eraGenesisWin))
 import qualified PlutusLedgerApi.V2                             as Plutus
 import           Prettyprinter                                  (PageWidth (AvailablePerLine),
                                                                  defaultLayoutOptions,
@@ -93,19 +95,26 @@ import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.User
 import           GeniusYield.Types
-import           Ouroboros.Consensus.HardFork.History.EraParams (EraParams (eraGenesisWin))
 
 deriving newtype instance Num EpochSize
 deriving newtype instance Num EpochNo
 
-type Clb = ClbT ApiEra Identity
+type AtlasClb = Clb ApiEra
 
-newtype GYTxRunEnv = GYTxRunEnv { runEnvWallet :: User }
+newtype GYTxClbEnv = GYTxClbEnv
+    { clbEnvWallet :: User
+    -- ^ The actor for a GYTxMonadClb action.
+    }
+
+newtype GYTxClbState = GYTxClbState
+    { clbNextWalletInt :: Integer
+    -- ^ Next integer to use with 'Clb.intToKeyPair' call in order to generate a new user.
+    }
 
 newtype GYTxMonadClb a = GYTxMonadClb
-    { unGYTxMonadClb :: ReaderT GYTxRunEnv (ExceptT GYTxMonadException (RandT StdGen Clb)) a
+    { unGYTxMonadClb :: ReaderT GYTxClbEnv (StateT GYTxClbState (ExceptT GYTxMonadException (RandT StdGen AtlasClb))) a
     }
-    deriving newtype (Functor, Applicative, Monad, MonadReader GYTxRunEnv)
+    deriving newtype (Functor, Applicative, Monad, MonadReader GYTxClbEnv, MonadState GYTxClbState)
     deriving anyclass GYTxBuilderMonad
 
 instance MonadRandom GYTxMonadClb where
@@ -115,23 +124,25 @@ instance MonadRandom GYTxMonadClb where
     getRandoms  = GYTxMonadClb getRandoms
 
 asRandClb :: User
+          -> Integer
           -> GYTxMonadClb a
-          -> RandT StdGen Clb (Maybe a)
-asRandClb w m = do
-    e <- runExceptT $ unGYTxMonadClb m `runReaderT` GYTxRunEnv w
+          -> RandT StdGen AtlasClb (Maybe a)
+asRandClb w i m = do
+    e <- runExceptT $ (unGYTxMonadClb m `runReaderT` GYTxClbEnv w) `runStateT` GYTxClbState { clbNextWalletInt = i }
     case e of
         Left (GYApplicationException (toApiError -> GYApiError {gaeMsg})) -> lift (logError $ T.unpack gaeMsg) >> return Nothing
         Left err -> lift (logError $ show err) >> return Nothing
-        Right a -> return $ Just a
+        Right (a, _) -> return $ Just a
 
 asClb :: StdGen
       -> User
+      -> Integer
       -> GYTxMonadClb a
-      -> Clb (Maybe a)
-asClb g w m = evalRandT (asRandClb w m) g
+      -> AtlasClb (Maybe a)
+asClb g w i m = evalRandT (asRandClb w i m) g
 
-liftClb :: Clb a -> GYTxMonadClb a
-liftClb = GYTxMonadClb . lift . lift . lift
+liftClb :: AtlasClb a -> GYTxMonadClb a
+liftClb = GYTxMonadClb . lift . lift . lift . lift
 
 {- | Given a test name, runs the trace for every wallet, checking there weren't
      errors.
@@ -139,16 +150,19 @@ liftClb = GYTxMonadClb . lift . lift . lift
 mkTestFor :: String -> (TestInfo -> GYTxMonadClb a) -> Tasty.TestTree
 mkTestFor name action =
     testNoErrorsTraceClb v w Clb.defaultConway name $ do
-      asClb pureGen (w1 testWallets) $ action TestInfo { testGoldAsset = fakeGold, testIronAsset = fakeIron, testWallets }
+      asClb pureGen (w1 testWallets) nextWalletInt
+        $ action TestInfo { testGoldAsset = fakeCoin fakeGold, testIronAsset = fakeCoin fakeIron, testWallets }
   where
-    v = valueFromLovelace 1_000_000_000_000_000 <>
-        fakeGold                  1_000_000_000 <>
-        fakeIron                  1_000_000_000
+    -- TODO (simplify-genesis): Remove generation of non ada funds.
+    v = valueFromLovelace  1_000_000_000_000_000 <>
+        fakeValue fakeGold         1_000_000_000 <>
+        fakeValue fakeIron         1_000_000_000
 
     w = valueFromLovelace 1_000_000_000_000 <>
-        fakeGold                  1_000_000 <>
-        fakeIron                  1_000_000
+        fakeValue fakeGold        1_000_000 <>
+        fakeValue fakeIron        1_000_000
 
+    -- TODO (simplify-genesis):: Remove creation of wallets. Only create one (or more) genesis/funder wallet and pass it on.
     testWallets :: Wallets
     testWallets = Wallets
                       (mkSimpleWallet (Clb.intToKeyPair 1))
@@ -161,8 +175,12 @@ mkTestFor name action =
                       (mkSimpleWallet (Clb.intToKeyPair 8))
                       (mkSimpleWallet (Clb.intToKeyPair 9))
 
+    -- This is the next consecutive number after the highest one used above for 'Clb.intToKeyPair' calls.
+    nextWalletInt :: Integer
+    nextWalletInt = 10
+
     -- | Helper for building tests
-    testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig ApiEra -> String -> Clb a -> Tasty.TestTree
+    testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig ApiEra -> String -> AtlasClb a -> Tasty.TestTree
     testNoErrorsTraceClb funds walletFunds cfg msg act =
         testCaseInfo msg
             $ maybe (pure mockLog) assertFailure
@@ -176,15 +194,15 @@ mkTestFor name action =
             logString = renderString $ layoutPretty options logDoc
 
 
-    mkSimpleWallet :: TL.KeyPair r L.StandardCrypto -> User
-    mkSimpleWallet kp =
-        let key = paymentSigningKeyFromLedgerKeyPair kp
-        in  User'
-                { userPaymentSKey' = key
-                , userStakeSKey'   = Nothing
-                , userAddr         = addressFromPaymentKeyHash GYTestnetPreprod . paymentKeyHash $
-                    paymentVerificationKey key
-                }
+mkSimpleWallet :: TL.KeyPair r L.StandardCrypto -> User
+mkSimpleWallet kp =
+    let key = paymentSigningKeyFromLedgerKeyPair kp
+    in  User'
+            { userPaymentSKey' = key
+            , userStakeSKey'   = Nothing
+            , userAddr         = addressFromPaymentKeyHash GYTestnetPreprod . paymentKeyHash $
+                paymentVerificationKey key
+            }
 
 {- | Try to execute an action, and if it fails, restore to the current state
  while preserving logs. If the action succeeds, logs an error as we expect
@@ -334,12 +352,12 @@ instance GYTxQueryMonad GYTxMonadClb where
 
 instance GYTxUserQueryMonad GYTxMonadClb where
 
-    ownAddresses = asks $ userAddresses' . runEnvWallet
+    ownAddresses = asks $ userAddresses' . clbEnvWallet
 
-    ownChangeAddress = asks $ userChangeAddress . runEnvWallet
+    ownChangeAddress = asks $ userChangeAddress . clbEnvWallet
 
     ownCollateral = runMaybeT $ do
-        UserCollateral {userCollateralRef, userCollateralCheck} <- asks (userCollateral . runEnvWallet) >>= hoistMaybe
+        UserCollateral {userCollateralRef, userCollateralCheck} <- asks (userCollateral . clbEnvWallet) >>= hoistMaybe
         collateralUtxo <- lift $ utxoAtTxOutRef userCollateralRef
             >>= maybe (throwError . GYQueryUTxOException $ GYNoUtxoAtRef userCollateralRef) pure
         if not userCollateralCheck || (utxoValue collateralUtxo == collateralValue) then pure collateralUtxo
@@ -366,8 +384,8 @@ instance GYTxUserQueryMonad GYTxMonadClb where
                 Just (ref, _) -> return ref
 
 instance GYTxMonad GYTxMonadClb where
-    signTxBody = signTxBodyImpl . asks $ userPaymentSKey . runEnvWallet
-    signTxBodyWithStake = signTxBodyWithStakeImpl $ asks ((,) . userPaymentSKey . runEnvWallet) <*> asks (userStakeSKey . runEnvWallet)
+    signTxBody = signTxBodyImpl . asks $ userPaymentSKey . clbEnvWallet
+    signTxBodyWithStake = signTxBodyWithStakeImpl $ asks ((,) . userPaymentSKey . clbEnvWallet) <*> asks (userStakeSKey . clbEnvWallet)
     submitTx tx = do
         let txBody = getTxBody tx
         dumpBody txBody
@@ -411,9 +429,17 @@ instance GYTxMonad GYTxMonadClb where
 
 instance GYTxGameMonad GYTxMonadClb where
     type TxMonadOf GYTxMonadClb = GYTxMonadClb
+    createUser = do
+        st <- get
+        let i = clbNextWalletInt st
+            user = mkSimpleWallet $ Clb.intToKeyPair i
+        gyLogDebug' "createUser" . T.unpack $ "Created simple user with address: " <> addressToText (userAddr user)
+        put st { clbNextWalletInt = i + 1 }
+        pure user
     asUser u act = do
+        -- Overwrite the own user and perform the action.
         local
-            (const $ GYTxRunEnv u)
+            (\x -> x { clbEnvWallet = u })
             act
 
 slotConfig' :: GYTxMonadClb (UTCTime, NominalDiffTime)

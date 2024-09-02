@@ -47,6 +47,7 @@ import           GeniusYield.Types
 import           GeniusYield.Test.Utils
 import           Test.Tasty.HUnit           (assertFailure)
 
+-- TODO (simplify-genesis): Remove this once 'newTempUserCtx' has been removed.
 data CreateUserConfig =
      CreateUserConfig
        { -- | Create collateral output of 5 ada?
@@ -63,6 +64,8 @@ data Ctx = Ctx
     { ctxNetworkInfo       :: !GYNetworkInfo
     , ctxInfo              :: !Api.LocalNodeConnectInfo
     -- FIXME: There are now multiple genesis users (since cardano-testnet usage).
+    -- TODO (simplify-genesis): Remove these fields (except for funder user(s))
+    -- once user creation logic is removed from test setup.
     , ctxUserF             :: !User  -- ^ Funder. All other users begin with same status of funds.
     , ctxUser2             :: !User
     , ctxUser3             :: !User
@@ -84,11 +87,13 @@ data Ctx = Ctx
 ctxNetworkId :: Ctx -> GYNetworkId
 ctxNetworkId Ctx {ctxNetworkInfo} = GYPrivnet ctxNetworkInfo
 
+-- TODO (simplify-genesis): Remove this once user creation logic is removed from test setup.
 -- | List of context sibling users - all of which begin with same balance.
 -- FIXME: Some of these users are actually genesis users.
 ctxUsers :: Ctx -> [User]
 ctxUsers ctx = ($ ctx) <$> [ctxUser2, ctxUser3, ctxUser4, ctxUser5, ctxUser6, ctxUser7, ctxUser8, ctxUser9]
 
+-- TODO (simplify-genesis): Remove this once user creation logic is removed from test setup.
 ctxWallets :: Ctx -> Wallets
 ctxWallets Ctx{..} = Wallets
   { w1 = ctxUserF
@@ -102,6 +107,7 @@ ctxWallets Ctx{..} = Wallets
   , w9 = ctxUser9
   }
 
+-- TODO (simplify-genesis): Remove this. See note 'simplify-genesis'.
 -- | Creates a new user with the given balance. Note that the actual balance which this user get's could be more than what is provided to satisfy minimum ada requirement of a UTxO.
 newTempUserCtx:: Ctx
               -> User            -- ^ User which will fund this new user.

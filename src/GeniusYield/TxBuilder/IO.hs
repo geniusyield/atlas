@@ -24,6 +24,7 @@ module GeniusYield.TxBuilder.IO (
 import           Control.Monad.Reader             (MonadReader,
                                                    ReaderT (ReaderT), asks)
 import qualified Data.List.NonEmpty               as NE
+import qualified Data.Text                        as T
 
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Errors
@@ -136,6 +137,21 @@ ioToTxGameMonad ioAct = GYTxGameMonadIO . const $ ioToQueryMonad ioAct
 
 instance GYTxGameMonad GYTxGameMonadIO where
     type TxMonadOf GYTxGameMonadIO = GYTxMonadIO
+
+    createUser = do
+        nid <- networkId
+        paymentSKey <- ioToTxGameMonad generatePaymentSigningKey
+        stakeSKey <- Just <$> ioToTxGameMonad generateStakeSigningKey
+        let paymentVKey = paymentVerificationKey paymentSKey
+            stakeVKey = stakeVerificationKey <$> stakeSKey
+            pkh = paymentKeyHash paymentVKey
+            skh = stakeKeyHash <$> stakeVKey
+            newAddr = addressFromCredential
+                nid
+                (GYPaymentCredentialByKey pkh)
+                (GYStakeCredentialByKey <$> skh)
+        gyLogDebug' "createUser" . T.unpack $ "Created user with address: " <> addressToText newAddr
+        pure $ User' {userPaymentSKey' = paymentSKey, userAddr = newAddr, userStakeSKey' = stakeSKey}
 
     asUser u@User{..} act = do
         nid <- asks envGameNid

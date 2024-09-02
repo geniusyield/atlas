@@ -244,6 +244,14 @@ signTxBodyWithStakeImpl kM txBody = (\(pKey, sKey) -> signGYTxBody txBody $ GYSo
 class (GYTxMonad (TxMonadOf m), GYTxSpecialQueryMonad m) => GYTxGameMonad m where
     -- | Type of the supported 'GYTxMonad' instance that can participate within the "game".
     type TxMonadOf m = (r :: Type -> Type) | r -> m
+    -- TODO: Maybe introduce a user generation config type that this function can take?
+    {- | Create a new user within the chain. This does not fund the user. See "GeniusYield.Test.Utils.createUserWithLovelace"
+      or "GeniusYield.Test.Utils.createUserWithAssets".
+
+      This _must not_ fund the user.
+      Note: The generated user may be arbitrarily complex. i.e may have zero or more stake keys (and thus one or more addresses).
+    -}
+    createUser :: m User
     -- | Lift the supported 'GYTxMonad' instance into the game, as a participating user wallet.
     asUser :: User -> TxMonadOf m a -> m a
 

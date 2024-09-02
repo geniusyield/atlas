@@ -4,10 +4,8 @@
 {-# OPTIONS -fno-strictness -fno-spec-constr -fno-specialise #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:target-version=1.0.0 #-}
 
-module GeniusYield.Test.FakeCoin (FakeCoin (..), fakeValue, fakeCoin) where
+module GeniusYield.Test.FakeCoin (FakeCoin (..), fakeValue, fakeCoin, fakePolicy) where
 
-import qualified Cardano.Api                 as Api
-import qualified Cardano.Api.Shelley         as Api.S
 import           PlutusCore.Core             (plcVersion100)
 import qualified PlutusLedgerApi.V1.Value    as PlutusValue
 import           PlutusLedgerApi.V2
@@ -15,34 +13,37 @@ import           PlutusLedgerApi.V2.Contexts (ownCurrencySymbol)
 import qualified PlutusTx
 import           PlutusTx.Prelude
 
--- | Test assets.
-newtype FakeCoin = FakeCoin { fakeCoin'tag :: BuiltinByteString }
+import           GeniusYield.Types
 
-fakeValue :: FakeCoin -> Integer -> Value
-fakeValue tag = PlutusValue.assetClassValue (fakeCoin tag)
+-- | Test assets.
+newtype FakeCoin = FakeCoin { fakeCoinName :: GYTokenName }
+
+fakePolicy :: FakeCoin -> GYMintingPolicy PlutusV2
+fakePolicy = fakeMintingPolicy . fakeCoinName
+
+fakeValue :: FakeCoin -> Integer -> GYValue
+fakeValue tag = valueSingleton (fakeCoin tag)
 
 -- | Fake coin class generated from fixed tag.
-fakeCoin :: FakeCoin -> PlutusValue.AssetClass
-fakeCoin (FakeCoin tag) = PlutusValue.assetClass sym tok
-  where
-    sym =
-      CurrencySymbol $ toBuiltin $
-        Api.serialiseToRawBytes $ Api.hashScript $ Api.PlutusScript Api.PlutusScriptV2
-          $ Api.S.PlutusScriptSerialised $ serialiseCompiledCode $ fakeMintingPolicy tok
-    tok = TokenName tag
+fakeCoin :: FakeCoin -> GYAssetClass
+fakeCoin (FakeCoin tag) = mintingPolicyId (fakeMintingPolicy tag) `GYToken` tag
 
-fakeMintingPolicy :: TokenName -> PlutusTx.CompiledCode (BuiltinData -> BuiltinData -> BuiltinUnit)
-fakeMintingPolicy mintParam =
+fakeMintingPolicy :: GYTokenName -> GYMintingPolicy PlutusV2
+fakeMintingPolicy = mintingPolicyFromPlutus . fakeMintingPolicyPlutus . tokenNameToPlutus
+
+fakeMintingPolicyPlutus :: TokenName -> PlutusTx.CompiledCode (BuiltinData -> BuiltinData -> ())
+fakeMintingPolicyPlutus mintParam =
   $$(PlutusTx.compile [|| fakeMintingPolicyUntypedContract ||]) `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 mintParam
 
 -- | Can mint new coins if token name equals to fixed tag.
 {-# INLINEABLE fakeMintingPolicyContract #-}
 fakeMintingPolicyContract :: TokenName -> () -> ScriptContext -> Bool
 fakeMintingPolicyContract tag _ ctx =
-  PlutusValue.valueOf (txInfoMint (scriptContextTxInfo ctx)) (ownCurrencySymbol ctx) tag > 0
+  PlutusValue.valueOf (txInfoMint (scriptContextTxInfo ctx)) (ownCurrencySymbol ctx) tag /= 0
 
 -- | See `fakeMintingPolicyContract`.
 {-# INLINEABLE fakeMintingPolicyUntypedContract #-}
-fakeMintingPolicyUntypedContract :: TokenName -> BuiltinData -> BuiltinData -> BuiltinUnit
-fakeMintingPolicyUntypedContract tag red ctx = check
-    (fakeMintingPolicyContract tag (unsafeFromBuiltinData red) (unsafeFromBuiltinData ctx))
+fakeMintingPolicyUntypedContract :: TokenName -> BuiltinData -> BuiltinData -> ()
+fakeMintingPolicyUntypedContract tag red ctx
+  | fakeMintingPolicyContract tag (unsafeFromBuiltinData red) (unsafeFromBuiltinData ctx) = ()
+  | otherwise = error ()

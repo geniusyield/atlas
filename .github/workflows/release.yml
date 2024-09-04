@@ -18,12 +18,12 @@ jobs:
     steps:
     - name: Checkout source code
       uses: actions/checkout@v3
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4.1.7
       name: Download source distribution file artifact
       with:
         name: source-distribution-file
         path: ./artifacts
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4.1.7
       name: Download haddock artifact
       with:
         name: github-pages

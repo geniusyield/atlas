@@ -2,7 +2,8 @@ module Main
     ( main
     ) where
 
-import           Test.Tasty                               (defaultMain, testGroup)
+import           Test.Tasty                               (defaultMain,
+                                                           testGroup)
 
 import           GeniusYield.Test.Privnet.Setup
 
@@ -16,7 +17,7 @@ main = do
     [ placeBetTestsClb
     , takeBetPotTestsClb
     ]
-  withPrivnet cardanoDefaultTestnetOptions $ \setup ->
+  withPrivnet cardanoDefaultTestnetOptionsConway $ \setup ->
     defaultMain $ testGroup "Privnet"
       [ placeBetTests setup
       , takeBetPotTests setup

@@ -20,16 +20,16 @@ module GeniusYield.Test.FeeTracker (
 import           Control.Monad.Except
 import           Control.Monad.Random
 import           Control.Monad.State.Strict
-import           Data.Foldable (foldMap')
+import           Data.Foldable              (foldMap')
 import qualified Data.List.NonEmpty         as NE
 import qualified Data.Map.Strict            as M
 import           Data.Monoid
 import qualified Data.Set                   as S
 import qualified Data.Text                  as T
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Encoding as LTE
+import qualified Data.Text.Lazy             as LT
+import qualified Data.Text.Lazy.Encoding    as LTE
 
-import qualified Data.Aeson as Aeson
+import qualified Data.Aeson                 as Aeson
 
 import           GeniusYield.HTTP.Errors    (someBackendError)
 import           GeniusYield.Imports
@@ -56,9 +56,9 @@ instance Monoid UserExtraLovelace where
     mempty = UserExtraLovelace mempty mempty
 
 -- | Track extra lovelace per user.
--- Note: This does the tracking during tranasaction building.
+-- Note: This does the tracking during transaction building.
 -- If you do not wish to submit said transaction, you should not have it tracked.
--- Use 'ignoreFeeTracking . buildTxBody' etc in those cases.
+-- Use 'withoutFeeTracking' etc in those cases.
 newtype FeeTrackerState = FeeTrackerState { feesPerUser :: Map GYPubKeyHash UserExtraLovelace }
   deriving stock (Eq, Ord, Show)
 
@@ -104,7 +104,7 @@ wrapBodyBuilder f skeletons = do
     case res of
         GYTxBuildSuccess          txBodies -> helpers txBodies
         GYTxBuildPartialSuccess _ txBodies -> helpers txBodies
-        _ -> pure ()
+        _                                  -> pure ()
     pure res
   where
     helper ownPkh (skeleton, txBody) = do
@@ -174,9 +174,8 @@ ftgLift act = FeeTrackerGame $ \s -> (, s) <$> act
 
 instance GYTxGameMonad m => GYTxGameMonad (FeeTrackerGame m) where
     type TxMonadOf (FeeTrackerGame m) = FeeTracker (TxMonadOf m)
+    createUser = ftgLift createUser
     asUser u (FeeTracker act) = FeeTrackerGame $ asUser u . act
-    waitUntilSlot = ftgLift . waitUntilSlot
-    waitForNextBlock = ftgLift waitForNextBlock
 
 {- Note [Proper GYTxMonad overriding with FeeTracker]
 

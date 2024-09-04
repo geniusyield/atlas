@@ -21,13 +21,15 @@ module GeniusYield.TxBuilder.IO (
 ) where
 
 
-import           Control.Monad.Reader            (ReaderT(ReaderT), MonadReader, asks)
-import qualified Data.List.NonEmpty              as NE
+import           Control.Monad.Reader             (MonadReader,
+                                                   ReaderT (ReaderT), asks)
+import qualified Data.List.NonEmpty               as NE
+import qualified Data.Text                        as T
 
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Errors
-import           GeniusYield.TxBuilder.IO.Query
 import           GeniusYield.TxBuilder.IO.Builder
+import           GeniusYield.TxBuilder.IO.Query
 import           GeniusYield.TxBuilder.User
 import           GeniusYield.Types
 
@@ -127,13 +129,29 @@ data GYTxGameIOEnv = GYTxGameIOEnv
     , envGameProviders :: !GYProviders
     }
 
--- INTERNAL USAGE ONLY
+-- | INTERNAL USAGE ONLY
+--
 -- Do not expose a 'MonadIO' instance. It allows the user to do arbitrary IO within the tx monad.
 ioToTxGameMonad :: IO a -> GYTxGameMonadIO a
 ioToTxGameMonad ioAct = GYTxGameMonadIO . const $ ioToQueryMonad ioAct
 
 instance GYTxGameMonad GYTxGameMonadIO where
     type TxMonadOf GYTxGameMonadIO = GYTxMonadIO
+
+    createUser = do
+        nid <- networkId
+        paymentSKey <- ioToTxGameMonad generatePaymentSigningKey
+        stakeSKey <- Just <$> ioToTxGameMonad generateStakeSigningKey
+        let paymentVKey = paymentVerificationKey paymentSKey
+            stakeVKey = stakeVerificationKey <$> stakeSKey
+            pkh = paymentKeyHash paymentVKey
+            skh = stakeKeyHash <$> stakeVKey
+            newAddr = addressFromCredential
+                nid
+                (GYPaymentCredentialByKey pkh)
+                (GYStakeCredentialByKey <$> skh)
+        gyLogDebug' "createUser" . T.unpack $ "Created user with address: " <> addressToText newAddr
+        pure $ User' {userPaymentSKey' = paymentSKey, userAddr = newAddr, userStakeSKey' = stakeSKey}
 
     asUser u@User{..} act = do
         nid <- asks envGameNid
@@ -148,14 +166,6 @@ instance GYTxGameMonad GYTxGameMonadIO where
             userChangeAddress
             (userCollateralDumb u)
             act
-
-    waitUntilSlot slot = do
-        waiter <- asks (gyWaitUntilSlot . envGameProviders)
-        ioToTxGameMonad $ waiter slot
-
-    waitForNextBlock = do
-        waiter <- asks (gyWaitForNextBlock . envGameProviders)
-        ioToTxGameMonad waiter
 
 runGYTxGameMonadIO
     :: GYNetworkId                      -- ^ Network ID.

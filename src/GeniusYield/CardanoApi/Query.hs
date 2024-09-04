@@ -9,14 +9,14 @@ Stability   : develop
 module GeniusYield.CardanoApi.Query (
     -- * Low-level query runners
     queryCardanoMode,
-    queryAlonzoEra,
-    queryBabbageEra,
+    queryConwayEra,
     queryUTxO,
     -- * Exception
     CardanoQueryException (..),
 ) where
 
-import           Control.Exception                               (Exception, throwIO)
+import           Control.Exception                               (Exception,
+                                                                  throwIO)
 
 import qualified Cardano.Api                                     as Api
 import qualified Cardano.Api.Shelley                             as Api.S
@@ -38,26 +38,17 @@ newtype CardanoQueryException = CardanoQueryException String
 
 queryCardanoMode :: Api.LocalNodeConnectInfo -> Api.QueryInMode a -> IO a
 queryCardanoMode info q = do
-    e <- Api.queryNodeLocalState info Ouroboros.VolatileTip q
+    e <- Api.runExceptT $ Api.queryNodeLocalState info Ouroboros.VolatileTip q
     case e of
         Left err -> throwIO $ CardanoQueryException $ show err
         Right x  -> return x
 
-queryAlonzoEra :: Api.LocalNodeConnectInfo -> Api.QueryInShelleyBasedEra Api.AlonzoEra a -> IO a
-queryAlonzoEra info q = do
-    e <- queryCardanoMode info $ Api.QueryInEra $ Api.QueryInShelleyBasedEra Api.ShelleyBasedEraAlonzo q
+queryConwayEra :: Api.LocalNodeConnectInfo -> Api.QueryInShelleyBasedEra ApiEra a -> IO a
+queryConwayEra info q = do
+    e <- queryCardanoMode info $ Api.QueryInEra $ Api.QueryInShelleyBasedEra Api.ShelleyBasedEraConway q
     case e of
         Left err -> throwIO $ CardanoQueryException $ show err
         Right x  -> return x
 
-queryBabbageEra :: Api.LocalNodeConnectInfo -> Api.QueryInShelleyBasedEra Api.BabbageEra a -> IO a
-queryBabbageEra info q = do
-    e <- queryCardanoMode info $ Api.QueryInEra $ Api.QueryInShelleyBasedEra Api.ShelleyBasedEraBabbage q
-    case e of
-        Left err -> throwIO $ CardanoQueryException $ show err
-        Right x  -> return x
-
-
-queryUTxO :: GYEra -> Api.S.LocalNodeConnectInfo -> Api.QueryUTxOFilter -> IO GYUTxOs
-queryUTxO GYAlonzo  info q = fmap utxosFromApi $ queryAlonzoEra  info $ Api.QueryUTxO q
-queryUTxO GYBabbage info q = fmap utxosFromApi $ queryBabbageEra info $ Api.QueryUTxO q
+queryUTxO :: Api.S.LocalNodeConnectInfo -> Api.QueryUTxOFilter -> IO GYUTxOs
+queryUTxO info q = fmap utxosFromApi $ queryConwayEra info $ Api.QueryUTxO q

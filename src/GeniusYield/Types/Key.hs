@@ -36,6 +36,7 @@ module GeniusYield.Types.Key
     , stakeVerificationKeyFromApi
     , stakeVerificationKeyToApi
     , stakeKeyHash
+    , stakeVerificationKeyToLedger
     -- * Stake signing key
     , GYStakeSigningKey
     , GYExtendedStakeSigningKey
@@ -43,6 +44,9 @@ module GeniusYield.Types.Key
     , extendedStakeSigningKeyFromApi
     , stakeSigningKeyToApi
     , extendedStakeSigningKeyToApi
+    , stakeSigningKeyToLedger
+    , stakeSigningKeyToLedgerKeyPair
+    , stakeSigningKeyFromLedgerKeyPair
     , readStakeSigningKey
     , readExtendedStakeSigningKey
     , writeStakeSigningKey
@@ -233,7 +237,6 @@ paymentSigningKeyToLedgerKeyPair skey = TLedger.KeyPair
 paymentSigningKeyFromLedgerKeyPair :: TLedger.KeyPair r Ledger.StandardCrypto -> GYPaymentSigningKey
 paymentSigningKeyFromLedgerKeyPair = coerce . TLedger.sKey
 
-
 -- | Reads a payment signing key from a file.
 --
 readPaymentSigningKey :: FilePath -> IO GYPaymentSigningKey
@@ -360,6 +363,9 @@ stakeVerificationKeyFromApi = coerce
 stakeVerificationKeyToApi :: GYStakeVerificationKey -> Api.VerificationKey Api.StakeKey
 stakeVerificationKeyToApi = coerce
 
+stakeVerificationKeyToLedger :: GYStakeVerificationKey -> Ledger.VKey r Ledger.StandardCrypto
+stakeVerificationKeyToLedger = coerce
+
 stakeKeyHash :: GYStakeVerificationKey -> GYStakeKeyHash
 stakeKeyHash = stakeKeyHashFromApi . Api.verificationKeyHash . stakeVerificationKeyToApi
 
@@ -455,6 +461,18 @@ stakeSigningKeyToApi = coerce
 
 extendedStakeSigningKeyToApi :: GYExtendedStakeSigningKey -> Api.SigningKey Api.StakeExtendedKey
 extendedStakeSigningKeyToApi = coerce
+
+stakeSigningKeyToLedger :: GYStakeSigningKey -> Ledger.SignKeyDSIGN Ledger.StandardCrypto
+stakeSigningKeyToLedger = coerce
+
+stakeSigningKeyToLedgerKeyPair :: GYStakeSigningKey -> TLedger.KeyPair r Ledger.StandardCrypto
+stakeSigningKeyToLedgerKeyPair skey = TLedger.KeyPair
+    { TLedger.vKey = stakeVerificationKeyToLedger $ stakeVerificationKey skey
+    , TLedger.sKey = stakeSigningKeyToLedger skey
+    }
+
+stakeSigningKeyFromLedgerKeyPair :: TLedger.KeyPair r Ledger.StandardCrypto -> GYStakeSigningKey
+stakeSigningKeyFromLedgerKeyPair = coerce . TLedger.sKey
 
 -- | Reads a stake signing key from a file.
 --

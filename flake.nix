@@ -42,7 +42,7 @@
                 shell.buildInputs = with pkgs; [
                   nixpkgs-fmt
                 ];
-                inputMap = { "https://input-output-hk.github.io/cardano-haskell-packages" = CHaP; };
+                inputMap = { "https://chap.intersectmbo.org/" = CHaP; };
               };
           })
           overlay

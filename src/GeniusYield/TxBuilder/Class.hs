@@ -99,24 +99,24 @@ module GeniusYield.TxBuilder.Class
     , wt
     ) where
 
-import qualified Cardano.Api                  as Api
-import           Control.Monad.Except         (MonadError (..), liftEither)
-import qualified Control.Monad.State.Strict   as Strict
-import qualified Control.Monad.State.Lazy     as Lazy
-import qualified Control.Monad.Writer.CPS     as CPS
-import qualified Control.Monad.Writer.Strict  as Strict
-import qualified Control.Monad.Writer.Lazy    as Lazy
-import           Control.Monad.IO.Class       (MonadIO (..))
-import           Control.Monad.Random         (MonadRandom (..), RandT, lift)
-import           Control.Monad.Reader         (ReaderT)
-import           Data.Default                 (def, Default)
-import qualified Data.List.NonEmpty           as NE
-import qualified Data.Map.Strict              as Map
-import           Data.Maybe                   (maybeToList)
-import qualified Data.Set                     as Set
-import qualified Data.Text                    as Txt
-import           Data.Time                    (diffUTCTime, getCurrentTime)
-import           Data.Word                    (Word64)
+import           Control.Monad.Except              (MonadError (..), liftEither)
+import           Control.Monad.IO.Class            (MonadIO (..))
+import           Control.Monad.Random              (MonadRandom (..), RandT,
+                                                    lift)
+import           Control.Monad.Reader              (ReaderT)
+import qualified Control.Monad.State.Lazy          as Lazy
+import qualified Control.Monad.State.Strict        as Strict
+import qualified Control.Monad.Writer.CPS          as CPS
+import qualified Control.Monad.Writer.Lazy         as Lazy
+import qualified Control.Monad.Writer.Strict       as Strict
+import           Data.Default                      (Default, def)
+import qualified Data.List.NonEmpty                as NE
+import qualified Data.Map.Strict                   as Map
+import           Data.Maybe                        (maybeToList)
+import qualified Data.Set                          as Set
+import qualified Data.Text                         as Txt
+import           Data.Time                         (diffUTCTime, getCurrentTime)
+import           Data.Word                         (Word64)
 import           GeniusYield.Imports
 import           GeniusYield.Transaction
 import           GeniusYield.TxBuilder.Common
@@ -124,13 +124,15 @@ import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.Query.Class
 import           GeniusYield.TxBuilder.User
 import           GeniusYield.Types
-import           GeniusYield.Types.Key.Class  (ToShelleyWitnessSigningKey)
-import           GHC.Stack                    (withFrozenCallStack)
-import qualified PlutusLedgerApi.V1           as Plutus (Address, DatumHash,
-                                                         FromData (..),
-                                                         PubKeyHash, TokenName,
-                                                         TxOutRef, Value)
-import qualified PlutusLedgerApi.V1.Value     as Plutus (AssetClass)
+import           GeniusYield.Types.Key.Class       (ToShelleyWitnessSigningKey)
+import           GHC.Stack                         (withFrozenCallStack)
+import qualified PlutusLedgerApi.V1                as Plutus (Address,
+                                                              DatumHash,
+                                                              FromData (..),
+                                                              PubKeyHash,
+                                                              TokenName,
+                                                              TxOutRef, Value)
+import qualified PlutusLedgerApi.V1.Value          as Plutus (AssetClass)
 
 -- NOTE: The 'Default (TxBuilderStrategy m)' constraint is not necessary, but it is usually desired everytime
 -- someone is building transactions with the below machinery.
@@ -242,12 +244,16 @@ signTxBodyWithStakeImpl kM txBody = (\(pKey, sKey) -> signGYTxBody txBody $ GYSo
 class (GYTxMonad (TxMonadOf m), GYTxSpecialQueryMonad m) => GYTxGameMonad m where
     -- | Type of the supported 'GYTxMonad' instance that can participate within the "game".
     type TxMonadOf m = (r :: Type -> Type) | r -> m
+    -- TODO: Maybe introduce a user generation config type that this function can take?
+    {- | Create a new user within the chain. This does not fund the user. See "GeniusYield.Test.Utils.createUserWithLovelace"
+      or "GeniusYield.Test.Utils.createUserWithAssets".
+
+      This _must not_ fund the user.
+      Note: The generated user may be arbitrarily complex. i.e may have zero or more stake keys (and thus one or more addresses).
+    -}
+    createUser :: m User
     -- | Lift the supported 'GYTxMonad' instance into the game, as a participating user wallet.
     asUser :: User -> TxMonadOf m a -> m a
-    -- | Wait until the chain tip is at given slot number.
-    waitUntilSlot :: GYSlot -> m GYSlot
-    -- | Wait until the chain tip is at the next block.
-    waitForNextBlock :: m GYSlot
 
 {- Note [Higher order effects, TxMonadOf, and GYTxGameMonad]
 
@@ -256,7 +262,7 @@ from its associated 'GYTxMonad' instance (such is the case for 'GYTxGameMonadIO'
 make the same data type a 'GYTxMonad' and 'GYTxGameMonad'.
 
 The former would not be possible if 'GYTxGameMonad' was subsumed into 'GYTxMonad', or if the 'TxMonadOf' type family
-was not present. Thus, both the seperation and the type family are the result of a conscious design decision.
+was not present. Thus, both the separation and the type family are the result of a conscious design decision.
 
 It's important to allow the former case since it avoids making 'asUser' a higher order effect, unconditionally. Higher
 order effects can be problematic. If, in the future, we are to use a proper effect system - we'd like to avoid having to
@@ -270,11 +276,11 @@ will be automatically inferred.
 -}
 
 -- | > waitUntilSlot_ = void . waitUntilSlot
-waitUntilSlot_ :: GYTxGameMonad m => GYSlot -> m ()
+waitUntilSlot_ :: GYTxQueryMonad m => GYSlot -> m ()
 waitUntilSlot_ = void . waitUntilSlot
 
 -- | Wait until the chain tip has progressed by N slots.
-waitNSlots :: GYTxGameMonad m => Word64 -> m GYSlot
+waitNSlots :: GYTxQueryMonad m => Word64 -> m GYSlot
 waitNSlots (slotFromWord64 -> n) = do
     -- FIXME: Does this need to be an absolute slot getter instead?
     currentSlot <- slotOfCurrentBlock
@@ -283,7 +289,7 @@ waitNSlots (slotFromWord64 -> n) = do
     addSlots = (+) `on` slotToApi
 
 -- | > waitNSlots_ = void . waitNSlots
-waitNSlots_ :: GYTxGameMonad m => Word64 -> m ()
+waitNSlots_ :: GYTxQueryMonad m => Word64 -> m ()
 waitNSlots_ = void . waitNSlots
 
 -- | > submitTx_ = void . submitTx
@@ -470,7 +476,7 @@ utxoAtTxOutRefWithDatum' ref = utxoAtTxOutRefWithDatum ref
         pure
 
 -- | Returns some UTxO present in wallet which doesn't have reference script.
-someUTxOWithoutRefScript :: GYTxMonad m => m GYTxOutRef
+someUTxOWithoutRefScript :: GYTxUserQueryMonad m => m GYTxOutRef
 someUTxOWithoutRefScript = do
   utxosToConsider <- utxosRemoveRefScripts <$> availableUTxOs
   addrs           <- ownAddresses
@@ -891,12 +897,8 @@ buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
     -- Obtain constant parameters to be used across several 'GYTxBody' generations.
     ss    <- systemStart
     eh    <- eraHistory
-    apiPp <- protocolParams
+    pp    <- protocolParams
     ps    <- stakePools
-
-    pp <- case Api.toLedgerPParams Api.ShelleyBasedEraBabbage apiPp of
-        Left e   -> throwError . GYBuildTxException $ GYBuildTxPPConversionError e
-        Right pp -> pure pp
 
     collateral <- ownCollateral
     addrs <- ownAddresses

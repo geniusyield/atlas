@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 {-|
 Module      : GeniusYield.Test.Clb
@@ -17,73 +18,103 @@ module GeniusYield.Test.Clb
     , dumpUtxoState
     , mustFail
     , mustFailWith
+    , sendSkeleton
+    , sendSkeleton'
+    , logInfoS
     ) where
 
-import           Control.Lens                              ((^.))
+import           Control.Lens                                   ((^.))
 import           Control.Monad.Except
 import           Control.Monad.Random
 import           Control.Monad.Reader
 import           Control.Monad.State
-import qualified Data.Map.Strict                           as Map
-import qualified Data.Sequence                             as Seq
-import qualified Data.Set                                  as Set
-import           Data.SOP.NonEmpty                         (NonEmpty (NonEmptyCons, NonEmptyOne))
-import           Data.Time.Clock                           (NominalDiffTime,
-                                                            UTCTime)
-import           Data.Time.Clock.POSIX                     (posixSecondsToUTCTime)
-import qualified Data.Text                                 as T
+import qualified Data.Map.Strict                                as Map
+import qualified Data.Sequence                                  as Seq
+import qualified Data.Set                                       as Set
+import           Data.SOP.NonEmpty                              (NonEmpty (NonEmptyCons, NonEmptyOne))
+import qualified Data.Text                                      as T
+import           Data.Time.Clock                                (NominalDiffTime,
+                                                                 UTCTime)
+import           Data.Time.Clock.POSIX                          (posixSecondsToUTCTime)
 
-import qualified Cardano.Api                               as Api
-import qualified Cardano.Api.Script                        as Api
-import qualified Cardano.Api.Shelley                       as Api.S
-import qualified Cardano.Ledger.Address                    as L
-import qualified Cardano.Ledger.Alonzo.Core                as AlonzoCore
-import qualified Cardano.Ledger.Api                        as L
-import qualified Cardano.Ledger.Babbage.TxOut              as L
-import qualified Cardano.Ledger.Compactible                as L
-import qualified Cardano.Ledger.Plutus.TxInfo              as L
-import qualified Cardano.Ledger.Shelley.API                as L.S
-import qualified Cardano.Ledger.UTxO                       as L
-import           Cardano.Slotting.Time                     (RelativeTime (RelativeTime),
-                                                            mkSlotLength)
-import           Clb                                       (ClbState (..), ClbT, EmulatedLedgerState (..),
-                                                            Log (Log), LogEntry (LogEntry), LogLevel (..),
-                                                            MockConfig(..), SlotConfig(..),
-                                                            ValidationResult (..), getCurrentSlot, txOutRefAt,
-                                                            txOutRefAtPaymentCred, sendTx, unLog, getFails,
-                                                            logInfo, logError, waitSlot)
+import qualified Cardano.Api                                    as Api
+import qualified Cardano.Api.Script                             as Api
+import qualified Cardano.Api.Shelley                            as Api.S
+import qualified Cardano.Ledger.Address                         as L
+import qualified Cardano.Ledger.Api                             as L
+import qualified Cardano.Ledger.Compactible                     as L
+import qualified Cardano.Ledger.Conway.Core                     as ConwayCore
+import qualified Cardano.Ledger.Core                            as L
+import qualified Cardano.Ledger.Plutus.TxInfo                   as L
+import qualified Cardano.Ledger.Shelley.API                     as L.S
+import qualified Cardano.Ledger.UTxO                            as L
+import           Cardano.Slotting.Slot                          (EpochNo (..),
+                                                                 EpochSize (..))
+import           Cardano.Slotting.Time                          (RelativeTime (RelativeTime),
+                                                                 mkSlotLength)
+import           Clb                                            (ClbState (..),
+                                                                 Clb,
+                                                                 ClbT,
+                                                                 EmulatedLedgerState (..),
+                                                                 Log (Log),
+                                                                 LogEntry (LogEntry),
+                                                                 LogLevel (..),
+                                                                 MockConfig (..),
+                                                                 SlotConfig (..),
+                                                                 ValidationResult (..),
+                                                                 getCurrentSlot,
+                                                                 getFails,
+                                                                 logError,
+                                                                 logInfo,
+                                                                 sendTx,
+                                                                 txOutRefAt,
+                                                                 txOutRefAtPaymentCred,
+                                                                 unLog,
+                                                                 waitSlot)
 import qualified Clb
-import           Control.Monad.Trans.Maybe                 (runMaybeT)
-import qualified Ouroboros.Consensus.Cardano.Block         as Ouroboros
-import qualified Ouroboros.Consensus.HardFork.History      as Ouroboros
-import qualified PlutusLedgerApi.V2                        as Plutus
-import           Prettyprinter                             (PageWidth (AvailablePerLine),
-                                                            defaultLayoutOptions,
-                                                            layoutPageWidth,
-                                                            layoutPretty)
-import           Prettyprinter.Render.String               (renderString)
-import qualified Test.Cardano.Ledger.Core.KeyPair          as TL
-import qualified Test.Tasty                                as Tasty
-import           Test.Tasty.HUnit                          (assertFailure, testCaseInfo)
+import           Control.Monad.Trans.Maybe                      (runMaybeT)
+import qualified Ouroboros.Consensus.Cardano.Block              as Ouroboros
+import qualified Ouroboros.Consensus.HardFork.History           as Ouroboros
+import           Ouroboros.Consensus.HardFork.History.EraParams (EraParams (eraGenesisWin))
+import qualified PlutusLedgerApi.V2                             as Plutus
+import           Prettyprinter                                  (PageWidth (AvailablePerLine),
+                                                                 defaultLayoutOptions,
+                                                                 layoutPageWidth,
+                                                                 layoutPretty)
+import           Prettyprinter.Render.String                    (renderString)
+import qualified Test.Cardano.Ledger.Core.KeyPair               as TL
+import qualified Test.Tasty                                     as Tasty
+import           Test.Tasty.HUnit                               (assertFailure,
+                                                                 testCaseInfo)
 
 import           GeniusYield.HTTP.Errors
 import           GeniusYield.Imports
+import           GeniusYield.Test.Utils
 import           GeniusYield.TxBuilder.Class
 import           GeniusYield.TxBuilder.Common
 import           GeniusYield.TxBuilder.Errors
 import           GeniusYield.TxBuilder.User
 import           GeniusYield.Types
-import           GeniusYield.Test.Utils
 
--- FIXME: Fix this type synonym upstream.
-type Clb = ClbT Identity
+deriving newtype instance Num EpochSize
+deriving newtype instance Num EpochNo
 
-newtype GYTxRunEnv = GYTxRunEnv { runEnvWallet :: User }
+type AtlasClb = Clb ApiEra
+
+newtype GYTxClbEnv = GYTxClbEnv
+    { clbEnvWallet :: User
+    -- ^ The actor for a GYTxMonadClb action.
+    }
+
+newtype GYTxClbState = GYTxClbState
+    { clbNextWalletInt :: Integer
+    -- ^ Next integer to use with 'Clb.intToKeyPair' call in order to generate a new user.
+    }
 
 newtype GYTxMonadClb a = GYTxMonadClb
-    { unGYTxMonadClb :: ReaderT GYTxRunEnv (ExceptT GYTxMonadException (RandT StdGen Clb)) a
+    { unGYTxMonadClb :: ReaderT GYTxClbEnv (StateT GYTxClbState (ExceptT GYTxMonadException (RandT StdGen AtlasClb))) a
     }
-    deriving newtype (Functor, Applicative, Monad, MonadReader GYTxRunEnv)
+    deriving newtype (Functor, Applicative, Monad, MonadReader GYTxClbEnv, MonadState GYTxClbState)
     deriving anyclass GYTxBuilderMonad
 
 instance MonadRandom GYTxMonadClb where
@@ -93,40 +124,45 @@ instance MonadRandom GYTxMonadClb where
     getRandoms  = GYTxMonadClb getRandoms
 
 asRandClb :: User
+          -> Integer
           -> GYTxMonadClb a
-          -> RandT StdGen Clb (Maybe a)
-asRandClb w m = do
-    e <- runExceptT $ unGYTxMonadClb m `runReaderT` GYTxRunEnv w
+          -> RandT StdGen AtlasClb (Maybe a)
+asRandClb w i m = do
+    e <- runExceptT $ (unGYTxMonadClb m `runReaderT` GYTxClbEnv w) `runStateT` GYTxClbState { clbNextWalletInt = i }
     case e of
         Left (GYApplicationException (toApiError -> GYApiError {gaeMsg})) -> lift (logError $ T.unpack gaeMsg) >> return Nothing
         Left err -> lift (logError $ show err) >> return Nothing
-        Right a -> return $ Just a
+        Right (a, _) -> return $ Just a
 
 asClb :: StdGen
       -> User
+      -> Integer
       -> GYTxMonadClb a
-      -> Clb (Maybe a)
-asClb g w m = evalRandT (asRandClb w m) g
+      -> AtlasClb (Maybe a)
+asClb g w i m = evalRandT (asRandClb w i m) g
 
-liftClb :: Clb a -> GYTxMonadClb a
-liftClb = GYTxMonadClb . lift . lift . lift
+liftClb :: AtlasClb a -> GYTxMonadClb a
+liftClb = GYTxMonadClb . lift . lift . lift . lift
 
 {- | Given a test name, runs the trace for every wallet, checking there weren't
      errors.
 -}
 mkTestFor :: String -> (TestInfo -> GYTxMonadClb a) -> Tasty.TestTree
 mkTestFor name action =
-    testNoErrorsTraceClb v w Clb.defaultBabbage name $ do
-      asClb pureGen (w1 testWallets) $ action TestInfo { testGoldAsset = fakeGold, testIronAsset = fakeIron, testWallets }
+    testNoErrorsTraceClb v w Clb.defaultConway name $ do
+      asClb pureGen (w1 testWallets) nextWalletInt
+        $ action TestInfo { testGoldAsset = fakeCoin fakeGold, testIronAsset = fakeCoin fakeIron, testWallets }
   where
-    v = valueFromLovelace 1_000_000_000_000_000 <>
-        fakeGold                  1_000_000_000 <>
-        fakeIron                  1_000_000_000
+    -- TODO (simplify-genesis): Remove generation of non ada funds.
+    v = valueFromLovelace  1_000_000_000_000_000 <>
+        fakeValue fakeGold         1_000_000_000 <>
+        fakeValue fakeIron         1_000_000_000
 
     w = valueFromLovelace 1_000_000_000_000 <>
-        fakeGold                  1_000_000 <>
-        fakeIron                  1_000_000
+        fakeValue fakeGold        1_000_000 <>
+        fakeValue fakeIron        1_000_000
 
+    -- TODO (simplify-genesis):: Remove creation of wallets. Only create one (or more) genesis/funder wallet and pass it on.
     testWallets :: Wallets
     testWallets = Wallets
                       (mkSimpleWallet (Clb.intToKeyPair 1))
@@ -139,8 +175,12 @@ mkTestFor name action =
                       (mkSimpleWallet (Clb.intToKeyPair 8))
                       (mkSimpleWallet (Clb.intToKeyPair 9))
 
+    -- This is the next consecutive number after the highest one used above for 'Clb.intToKeyPair' calls.
+    nextWalletInt :: Integer
+    nextWalletInt = 10
+
     -- | Helper for building tests
-    testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig -> String -> Clb a -> Tasty.TestTree
+    testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig ApiEra -> String -> AtlasClb a -> Tasty.TestTree
     testNoErrorsTraceClb funds walletFunds cfg msg act =
         testCaseInfo msg
             $ maybe (pure mockLog) assertFailure
@@ -154,15 +194,15 @@ mkTestFor name action =
             logString = renderString $ layoutPretty options logDoc
 
 
-    mkSimpleWallet :: TL.KeyPair r L.StandardCrypto -> User
-    mkSimpleWallet kp =
-        let key = paymentSigningKeyFromLedgerKeyPair kp
-        in  User'
-                { userPaymentSKey' = key
-                , userStakeSKey'   = Nothing
-                , userAddr         = addressFromPaymentKeyHash GYTestnetPreprod . paymentKeyHash $
-                    paymentVerificationKey key
-                }
+mkSimpleWallet :: TL.KeyPair r L.StandardCrypto -> User
+mkSimpleWallet kp =
+    let key = paymentSigningKeyFromLedgerKeyPair kp
+    in  User'
+            { userPaymentSKey' = key
+            , userStakeSKey'   = Nothing
+            , userAddr         = addressFromPaymentKeyHash GYTestnetPreprod . paymentKeyHash $
+                paymentVerificationKey key
+            }
 
 {- | Try to execute an action, and if it fails, restore to the current state
  while preserving logs. If the action succeeds, logs an error as we expect
@@ -210,7 +250,6 @@ instance GYTxQueryMonad GYTxMonadClb where
         pure . GYPrivnet $ GYNetworkInfo
             { gyNetworkMagic = Api.S.unNetworkMagic $ Api.S.toNetworkMagic magic
             , gyNetworkEpochSlots = 500
-            , gyNetworkEra = GYBabbage
             }
 
     lookupDatum :: GYDatumHash -> GYTxMonadClb (Maybe GYDatum)
@@ -260,10 +299,10 @@ instance GYTxQueryMonad GYTxMonadClb where
         return $ do
             o <- Map.lookup (txOutRefToPlutus ref) m
 
-            let a = addressFromApi . Api.S.fromShelleyAddrToAny . either id L.decompactAddr $ o ^. L.addrEitherBabbageTxOutL
-                v = valueFromApi . Api.S.fromMaryValue . either id L.fromCompact $ o ^. L.valueEitherBabbageTxOutL
+            let a = addressFromApi . Api.S.fromShelleyAddrToAny . either id L.decompactAddr $ o ^. L.addrEitherTxOutL
+                v = valueFromApi . Api.S.fromMaryValue . either id L.fromCompact $ o ^. L.valueEitherTxOutL
 
-            d <- case o ^. L.datumBabbageTxOutL of
+            d <- case o ^. L.datumTxOutL of
                 L.NoDatum -> pure GYOutDatumNone
                 L.DatumHash dh -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus $ L.transDataHash dh)
                 L.Datum binaryData -> pure $
@@ -275,9 +314,9 @@ instance GYTxQueryMonad GYTxMonadClb where
                     . L.binaryDataToData
                     $ binaryData
 
-            let s = case o ^. L.referenceScriptBabbageTxOutL of
+            let s = case o ^. L.referenceScriptTxOutL of
                         L.S.SJust x  -> someScriptFromReferenceApi
-                                        $ Api.fromShelleyScriptToReferenceScript Api.ShelleyBasedEraBabbage x
+                                        $ Api.fromShelleyScriptToReferenceScript Api.ShelleyBasedEraConway x
                         L.S.SNothing -> Nothing
 
             return GYUTxO
@@ -305,14 +344,20 @@ instance GYTxQueryMonad GYTxMonadClb where
             GYWarning -> LogEntry Warning doc
             GYError   -> LogEntry Error doc
 
+    waitUntilSlot slot = do
+        -- Silently returns if the given slot is greater than the current slot.
+        liftClb . Clb.waitSlot $ slotToApi slot
+        pure slot
+    waitForNextBlock = slotOfCurrentBlock
+
 instance GYTxUserQueryMonad GYTxMonadClb where
 
-    ownAddresses = asks $ userAddresses' . runEnvWallet
+    ownAddresses = asks $ userAddresses' . clbEnvWallet
 
-    ownChangeAddress = asks $ userChangeAddress . runEnvWallet
+    ownChangeAddress = asks $ userChangeAddress . clbEnvWallet
 
     ownCollateral = runMaybeT $ do
-        UserCollateral {userCollateralRef, userCollateralCheck} <- asks (userCollateral . runEnvWallet) >>= hoistMaybe
+        UserCollateral {userCollateralRef, userCollateralCheck} <- asks (userCollateral . clbEnvWallet) >>= hoistMaybe
         collateralUtxo <- lift $ utxoAtTxOutRef userCollateralRef
             >>= maybe (throwError . GYQueryUTxOException $ GYNoUtxoAtRef userCollateralRef) pure
         if not userCollateralCheck || (utxoValue collateralUtxo == collateralValue) then pure collateralUtxo
@@ -326,18 +371,21 @@ instance GYTxUserQueryMonad GYTxMonadClb where
         addrs <- ownAddresses
         utxos <- availableUTxOs
         case lang of
-          PlutusV2 ->
-            case someTxOutRef utxos of
-                Nothing       -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress addrs
-                Just (ref, _) -> return ref
+          PlutusV3 -> ifNotV1 utxos addrs
+          PlutusV2 -> ifNotV1 utxos addrs
           PlutusV1 ->
             case find utxoTranslatableToV1 $ utxosToList utxos of
               Just u  -> return $ utxoRef u
               Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs  -- TODO: Better error message here?
+        where
+          ifNotV1 utxos addrs =
+            case someTxOutRef utxos of
+                Nothing       -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress addrs
+                Just (ref, _) -> return ref
 
 instance GYTxMonad GYTxMonadClb where
-    signTxBody = signTxBodyImpl . asks $ userPaymentSKey . runEnvWallet
-    signTxBodyWithStake = signTxBodyWithStakeImpl $ asks ((,) . userPaymentSKey . runEnvWallet) <*> asks (userStakeSKey . runEnvWallet)
+    signTxBody = signTxBodyImpl . asks $ userPaymentSKey . clbEnvWallet
+    signTxBodyWithStake = signTxBodyWithStakeImpl $ asks ((,) . userPaymentSKey . clbEnvWallet) <*> asks (userStakeSKey . clbEnvWallet)
     submitTx tx = do
         let txBody = getTxBody tx
         dumpBody txBody
@@ -381,15 +429,18 @@ instance GYTxMonad GYTxMonadClb where
 
 instance GYTxGameMonad GYTxMonadClb where
     type TxMonadOf GYTxMonadClb = GYTxMonadClb
+    createUser = do
+        st <- get
+        let i = clbNextWalletInt st
+            user = mkSimpleWallet $ Clb.intToKeyPair i
+        gyLogDebug' "createUser" . T.unpack $ "Created simple user with address: " <> addressToText (userAddr user)
+        put st { clbNextWalletInt = i + 1 }
+        pure user
     asUser u act = do
+        -- Overwrite the own user and perform the action.
         local
-            (const $ GYTxRunEnv u)
+            (\x -> x { clbEnvWallet = u })
             act
-    waitUntilSlot slot = do
-        -- Silently returns if the given slot is greater than the current slot.
-        liftClb . Clb.waitSlot $ slotToApi slot
-        pure slot
-    waitForNextBlock = slotOfCurrentBlock
 
 slotConfig' :: GYTxMonadClb (UTCTime, NominalDiffTime)
 slotConfig' = liftClb $ do
@@ -398,7 +449,7 @@ slotConfig' = liftClb $ do
         zero = posixSecondsToUTCTime $ timeToPOSIX $ timeFromPlutus $ scSlotZeroTime sc
     return (zero, len)
 
-protocolParameters :: GYTxMonadClb (AlonzoCore.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra))
+protocolParameters :: GYTxMonadClb (ConwayCore.PParams (Api.S.ShelleyLedgerEra ApiEra))
 protocolParameters = do
     pparams <- liftClb $ gets $ mockConfigProtocol . mockConfig
     pure $ coerce pparams
@@ -406,7 +457,7 @@ protocolParameters = do
 instance GYTxSpecialQueryMonad GYTxMonadClb where
     systemStart = gyscSystemStart <$> slotConfig
 
-    protocolParams = Api.S.fromLedgerPParams Api.ShelleyBasedEraBabbage <$> protocolParameters
+    protocolParams = protocolParameters
 
     stakePools = pure Set.empty
     -- stakePools = do
@@ -432,43 +483,50 @@ instance GYTxSpecialQueryMonad GYTxMonadClb where
                     . NonEmptyCons allegraEra
                     . NonEmptyCons maryEra
                     . NonEmptyCons alonzoEra
-                    . NonEmptyOne . babbageEra
+                    . NonEmptyCons babbageEra
+                    . NonEmptyOne . conwayEra
 
         byronEra =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864, eraGenesisWin = 0}
                 }
         shelleyEra =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
                 }
         allegraEra =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
                 }
         maryEra =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
                 }
         alonzoEra =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
                 }
-        babbageEra len =
+        babbageEra =
+            Ouroboros.EraSummary
+                { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+                , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+                }
+        conwayEra len =
             Ouroboros.EraSummary
                 { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
                 , eraEnd = Ouroboros.EraUnbounded
-                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920}
+                , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
                 }
 
 dumpUtxoState :: GYTxMonadClb ()
@@ -481,3 +539,13 @@ dumpUtxoState = liftClb Clb.dumpUtxoState
 pureGen :: StdGen
 pureGen = mkStdGen 42
 
+-- | This is simply defined as @buildTxBody skeleton >>= signAndSubmitConfirmed@.
+sendSkeleton :: GYTxMonad m => GYTxSkeleton v -> m GYTxId
+sendSkeleton skeleton = snd <$> sendSkeleton' skeleton
+
+sendSkeleton' :: GYTxMonad m => GYTxSkeleton v -> m (GYTxBody, GYTxId)
+sendSkeleton' skeleton = buildTxBody skeleton >>= \tx -> signAndSubmitConfirmed tx >>= \txId -> pure (tx, txId)
+
+-- | Variant of `logInfo` from @Clb@ that logs a string with @Info@ severity.
+logInfoS :: Monad m => String -> ClbT ApiEra m ()
+logInfoS s = Clb.logInfo $ Clb.LogEntry Clb.Info s

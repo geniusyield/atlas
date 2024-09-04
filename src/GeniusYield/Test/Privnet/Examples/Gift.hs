@@ -13,18 +13,14 @@ Stability   : develop
 module GeniusYield.Test.Privnet.Examples.Gift (tests) where
 
 import qualified Cardano.Api                              as Api
-import qualified Cardano.Api.Shelley                      as Api.S
+import           Cardano.Ledger.Alonzo.PParams            (ppCollateralPercentageL)
 import           Control.Applicative                      ((<|>))
 import           Control.Concurrent                       (threadDelay)
-import           Control.Lens                             ((.~))
-import           Test.Tasty                               (TestTree, testGroup)
-import           Test.Tasty.HUnit                         (testCaseSteps)
-
+import           Control.Lens                             ((.~), (^.))
 import           Data.Default                             (Default (def))
 import           Data.Maybe                               (fromJust)
 import           Data.Ratio                               ((%))
 import qualified Data.Set                                 as Set
-
 import           GeniusYield.Examples.Gift
 import           GeniusYield.Examples.Treat
 import           GeniusYield.Imports
@@ -35,6 +31,8 @@ import           GeniusYield.Test.Privnet.Examples.Common
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
+import           Test.Tasty                               (TestTree, testGroup)
+import           Test.Tasty.HUnit                         (testCaseSteps)
 
 pattern InsufficientFundsException :: GYTxMonadException
 pattern InsufficientFundsException <- GYBuildTxException (GYBuildTxBalancingError (GYBalancingErrorInsufficientFunds _))
@@ -120,7 +118,7 @@ tests setup = testGroup "gift"
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress giftValidatorV2
             txBodyPlace <- buildTxBody $ mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-                & gyTxOutDatumL .~ GYTxOutUseInlineDatum
+                & gyTxOutDatumL .~ GYTxOutUseInlineDatum @'PlutusV2
 
             signAndSubmitConfirmed_ txBodyPlace
 
@@ -187,7 +185,7 @@ tests setup = testGroup "gift"
         pp <- gyGetProtocolParameters $ ctxProviders ctx
         let colls = txBodyCollateral grabGiftsTxBody'
         colls' <- ctxRunQuery ctx $ utxosAtTxOutRefs (Set.toList colls)
-        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ fromJust $ Api.S.protocolParamCollateralPercent pp)
+        assertBool "Collateral outputs not correctly setup" $ checkCollateral (foldMapUTxOs utxoValue colls') retCollValue (toInteger totalCollateral) (txBodyFee grabGiftsTxBody') (toInteger $ pp ^. ppCollateralPercentageL)
         ctxRun ctx newUser $ signAndSubmitConfirmed_ grabGiftsTxBody'
 
     , testCaseSteps "Checking if collateral is reserved in case we send an exact 5 ada only UTxO as collateral (simulating browser's case) + is collateral spendable if we want?" $ \info -> withSetup info setup $ \ctx -> do
@@ -208,10 +206,10 @@ tests setup = testGroup "gift"
         -- Would have thrown error if unable to build body.
         void $ ctxRunBuilder ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (newUserValue `valueMinus` valueFromLovelace 3_000_000)
 
-    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when no UTxO is greater than or equal to maximum possible total collateral" $ \info -> withSetup info setup $ \ctx -> do
+    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when no UTxO is greater than or equal to maximum possible total collateral (assuming no reference scripts)" $ \info -> withSetup info setup $ \ctx -> do
         ----------- Create a new user and fund it
         pp <- gyGetProtocolParameters (ctxProviders ctx)
-        let newUserValue = maximumRequiredCollateralValue pp `valueMinus` valueFromLovelace 1
+        let newUserValue = maximumRequiredCollateralValue pp 0 `valueMinus` valueFromLovelace 1
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue def
 
         info $ printf "UTxOs at this new user"
@@ -219,10 +217,10 @@ tests setup = testGroup "gift"
         forUTxOs_ newUserUtxos (info . show)
         assertThrown (\case (GYBuildTxException GYBuildTxNoSuitableCollateral) -> True; _anyOther -> False) $ ctxRun ctx newUser $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum (userAddr newUser) (valueFromLovelace 1_000_000)
 
-    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when UTxO is greater than or equal to maximum possible total collateral but resulting return collateral doesn't satisfy minimum ada requirement" $ \info -> withSetup info setup $ \ctx -> do
+    , testCaseSteps "Checking for 'GYBuildTxNoSuitableCollateral' error when UTxO is greater than or equal to maximum possible total collateral (assuming no reference scripts) but resulting return collateral doesn't satisfy minimum ada requirement" $ \info -> withSetup info setup $ \ctx -> do
         pp <- gyGetProtocolParameters (ctxProviders ctx)
         ----------- Create a new user and fund it
-        let newUserValue = maximumRequiredCollateralValue pp <> valueFromLovelace 0_500_000
+        let newUserValue = maximumRequiredCollateralValue pp 0 <> valueFromLovelace 0_500_000
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue def
 
         info $ printf "UTxOs at this new user"
@@ -233,7 +231,7 @@ tests setup = testGroup "gift"
     , testCaseSteps "No 'GYBuildTxNoSuitableCollateral' error is thrown when collateral input is sufficient" $ \info -> withSetup info setup $ \ctx -> do
         pp <- gyGetProtocolParameters (ctxProviders ctx)
         ----------- Create a new user and fund it
-        let newUserValue = maximumRequiredCollateralValue pp <> valueFromLovelace 1_500_000
+        let newUserValue = maximumRequiredCollateralValue pp 0 <> valueFromLovelace 1_500_000
         newUser <- newTempUserCtx ctx (ctxUserF ctx) newUserValue def
 
         info $ printf "UTxOs at this new user"
@@ -291,7 +289,7 @@ tests setup = testGroup "gift"
         -- mUtxo <- gyQueryUtxoAtTxOutRef' (ctxQueryUtxos ctx) ref  -- another way
         mUtxo <- ctxRunQuery ctx $ utxoAtTxOutRef ref
         case mUtxo of
-          Just utxo -> maybe (assertFailure "No Reference Script exists in the added UTxO.") (\s -> if s == Some (validatorToScript giftValidatorV2) then info "Script matched, able to read reference script from UTxO." else assertFailure "Mismatch.") (utxoRefScript utxo)
+          Just utxo -> maybe (assertFailure "No Reference Script exists in the added UTxO.") (\s -> if s == GYPlutusScript (validatorToScript giftValidatorV2) then info "Script matched, able to read reference script from UTxO." else assertFailure "Mismatch.") (utxoRefScript utxo)
           Nothing -> assertFailure "Couldn't find the UTxO containing added Reference Script."
 
     , testCaseSteps "refscript" $ \info -> withSetup info setup $ \ctx -> do
@@ -453,7 +451,7 @@ tests setup = testGroup "gift"
         threadDelay 1_000_000
 
         {-
-        let addNewGiftV2 :: GYTxMonad m => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
+        let addNewGiftV2 :: GYTxUserQueryMonad m => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
             addNewGiftV2 skeleton = do
                 addr <- scriptAddress giftValidatorV2
                 return $ skeleton <> mustHaveOutput GYTxOut
@@ -494,7 +492,7 @@ tests setup = testGroup "gift"
         -- TODO: NonOutputSupplimentaryDatums is thrown by other tests when this test is run.
         -- They fail to consume utxos with (inline) datums.
         -- We need to fix utxosDatums to also return whether the datum was inline.
-        let addNewGiftV2 :: GYTxMonad m => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
+        let addNewGiftV2 :: GYTxUserQueryMonad m => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
             addNewGiftV2 skeleton = do
                 addr <- scriptAddress giftValidatorV2
                 return $ skeleton <> mustHaveOutput GYTxOut
@@ -523,7 +521,7 @@ tests setup = testGroup "gift"
         ctxRun ctx (ctxUserF ctx) $ do
             addr <- scriptAddress treatValidatorV2
             txBodyPlace2 <- buildTxBody . mustHaveOutput $ mkGYTxOut addr (valueSingleton ironAC 10) (datumFromPlutusData ())
-                & gyTxOutDatumL .~ GYTxOutUseInlineDatum
+                & gyTxOutDatumL .~ GYTxOutUseInlineDatum @'PlutusV2
 
             signAndSubmitConfirmed_ txBodyPlace2
 

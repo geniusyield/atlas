@@ -10,12 +10,21 @@ module GeniusYield.Types.Script.ScriptHash (
     GYScriptHash,
     scriptHashFromApi,
     scriptHashToApi,
+    scriptHashToLedger,
+    scriptHashFromLedger,
+    apiHashToPlutus,
+    scriptHashToPlutus,
 ) where
 
-import qualified Cardano.Api         as Api
+import qualified Cardano.Api           as Api
+import qualified Cardano.Api.Ledger    as Ledger
+import qualified Cardano.Api.Script    as Api
+import qualified Cardano.Ledger.Hashes as Ledger
 import           GeniusYield.Imports
-import qualified Text.Printf         as Printf
-import qualified Web.HttpApiData     as Web
+import qualified PlutusLedgerApi.V1    as PlutusV1
+import qualified PlutusTx.Builtins     as PlutusTx
+import qualified Text.Printf           as Printf
+import qualified Web.HttpApiData       as Web
 
 -- $setup
 --
@@ -52,3 +61,17 @@ scriptHashToApi = coerce
 
 scriptHashFromApi :: Api.ScriptHash -> GYScriptHash
 scriptHashFromApi = coerce
+
+-- | Convert to corresponding ledger representation.
+scriptHashToLedger :: GYScriptHash -> Ledger.ScriptHash Ledger.StandardCrypto
+scriptHashToLedger = scriptHashToApi >>> Api.toShelleyScriptHash
+
+-- | Convert from corresponding ledger representation.
+scriptHashFromLedger :: Ledger.ScriptHash Ledger.StandardCrypto -> GYScriptHash
+scriptHashFromLedger = Api.fromShelleyScriptHash >>> scriptHashFromApi
+
+apiHashToPlutus :: Api.ScriptHash -> PlutusV1.ScriptHash
+apiHashToPlutus h = PlutusV1.ScriptHash $ PlutusTx.toBuiltin $ Api.serialiseToRawBytes h
+
+scriptHashToPlutus :: GYScriptHash -> PlutusV1.ScriptHash
+scriptHashToPlutus = scriptHashToApi >>> apiHashToPlutus

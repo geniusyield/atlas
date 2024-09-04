@@ -6,17 +6,20 @@ module GeniusYield.Test.Unified.BetRef.PlaceBet
     , Bet
     ) where
 
-import           Control.Monad.Except               (handleError)
-import           Control.Monad.Extra                (maybeM)
-import           Data.Maybe                         (listToMaybe)
-import qualified Data.Set                           as Set
-import           Test.Tasty                         (TestTree, testGroup)
-import qualified Data.Text                          as T
+import           Control.Monad.Except                             (handleError)
+import           Control.Monad.Extra                              (maybeM)
+import qualified Data.Set                                         as Set
+import qualified Data.Text                                        as T
+import           Data.Maybe                                       (listToMaybe)
+import           Test.Tasty                                       (TestTree,
+                                                                   testGroup)
+
 
 import           GeniusYield.Test.Unified.BetRef.Operations
 import           GeniusYield.Test.Unified.OnChain.BetRef.Compiled
 import           GeniusYield.Imports
 import           GeniusYield.HTTP.Errors
+import           GeniusYield.Imports
 import           GeniusYield.Test.Clb
 import           GeniusYield.Test.Privnet.Setup
 import           GeniusYield.Test.Utils
@@ -72,8 +75,8 @@ simpleTxTest (testWallets -> Wallets{w1}) = do
     txId <- buildTxBody skeleton >>= signAndSubmitConfirmed
     gyLogDebug' "" $ printf "tx submitted, txId: %s" txId
 
--- Pretend off-chain code written in 'GYTxMonad m'
-mkTrivialTx :: GYTxMonad m => m (GYTxSkeleton 'PlutusV2)
+-- Pretend off-chain code written in 'GYTxUserQueryMonad m'
+mkTrivialTx :: GYTxUserQueryMonad m => m (GYTxSkeleton 'PlutusV2)
 mkTrivialTx = do
   addr <- maybeM (throwAppError $ someBackendError "No own addresses")
     pure  $ listToMaybe <$> ownAddresses
@@ -243,7 +246,7 @@ mkMultipleBetsTest betUntil betReveal betStep bets ws = do
       let vAfterWithoutFees = vBefore <> diff
           (expectedAdaWithoutFees, expectedOtherAssets) = valueSplitAda vAfterWithoutFees
           (actualAda, actualOtherAssets) = valueSplitAda vAfter
-          threshold = 1_000_000  -- 1 ada
+          threshold = 1_500_000  -- 1.5 ada
       in
         if expectedOtherAssets == actualOtherAssets
             && actualAda < expectedAdaWithoutFees

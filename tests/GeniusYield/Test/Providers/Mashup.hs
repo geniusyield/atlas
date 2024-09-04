@@ -2,21 +2,22 @@ module GeniusYield.Test.Providers.Mashup
   ( providersMashupTests
   ) where
 
-import qualified Cardano.Api                  as Api
-import           Control.Concurrent           (threadDelay)
-import           Control.Exception            (handle)
-import           Data.Default                 (def)
-import           Data.List                    (isInfixOf)
-import           Data.Maybe                   (fromJust)
-import qualified Data.Set                     as Set (difference, fromList)
+import           Control.Concurrent                (threadDelay)
+import           Control.Exception                 (handle)
+import           Data.Default                      (def)
+import           Data.List                         (isInfixOf)
+import           Data.Maybe                        (fromJust)
+import qualified Data.Set                          as Set (difference, fromList)
+import           GeniusYield.CardanoApi.EraHistory (extractEraSummaries)
 import           GeniusYield.GYConfig
 import           GeniusYield.Imports
-import           GeniusYield.Providers.Common (SubmitTxException, datumFromCBOR)
+import           GeniusYield.Providers.Common      (SubmitTxException,
+                                                    datumFromCBOR)
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
-import           Test.Tasty                   (TestTree, testGroup)
-import           Test.Tasty.HUnit             (assertBool, assertFailure,
-                                               testCase)
+import           Test.Tasty                        (TestTree, testGroup)
+import           Test.Tasty.HUnit                  (assertBool, assertFailure,
+                                                    testCase)
 
 providersMashupTests :: [GYCoreConfig] -> TestTree
 providersMashupTests configs =
@@ -32,12 +33,13 @@ providersMashupTests configs =
            delayBySecond
            ss <- gyGetSystemStart provider
            delayBySecond
-           Api.EraHistory interpreter <- gyGetEraHistory provider
+           eraHist <- extractEraSummaries <$> gyGetEraHistory provider
            delayBySecond
-           sp <- gyGetStakePools provider
+           -- TODO: There is a bug in Maestro due to which it returns extra pools. Thus, this is ignored for now.
+           _sp <- gyGetStakePools provider
            delayBySecond
            slotConfig' <- gyGetSlotConfig provider
-           pure (pp, ss, interpreter, sp, slotConfig')
+           pure (pp, eraHist, ss, slotConfig')
         assertBool "Parameters are not all equal" $ allEqual paramsList
     , testCase "Stake address info" $ do
         saInfos <- forM configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> do

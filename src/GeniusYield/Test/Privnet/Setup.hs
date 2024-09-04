@@ -16,6 +16,7 @@ module GeniusYield.Test.Privnet.Setup (
     mkPrivnetTestFor',
     -- * "Cardano.Testnet" re-exports
     cardanoDefaultTestnetOptions,
+    cardanoDefaultTestnetOptionsConway,
     cardanoDefaultTestnetNodeOptions,
     CardanoTestnetOptions (..),
     TestnetNodeOptions (..),
@@ -23,26 +24,21 @@ module GeniusYield.Test.Privnet.Setup (
     NodeConfigurationYaml (..)
 ) where
 
-import           Control.Concurrent                   (ThreadId, threadDelay, killThread)
+import qualified Cardano.Api                          as Api
+import           Cardano.Api.Ledger
+import qualified Cardano.Ledger.Plutus                as Ledger
+import           Cardano.Testnet
+import           Control.Concurrent                   (ThreadId, killThread,
+                                                       threadDelay)
 import qualified Control.Concurrent.STM               as STM
 import           Control.Exception                    (finally)
 import           Control.Monad                        (forever)
 import           Control.Monad.IO.Class               (liftIO)
-import           Control.Monad.Trans.Resource         (resourceForkIO, MonadResource (liftResourceT))
+import           Control.Monad.Trans.Resource         (MonadResource (liftResourceT),
+                                                       resourceForkIO)
+import qualified Data.Default.Class                   as DefaultClass
 import qualified Data.Text                            as Txt
 import qualified Data.Vector                          as V
-
-import qualified Hedgehog                             as H
-import qualified Hedgehog.Extras.Stock                as H'
-import           Test.Tasty                           (TestName, TestTree)
-import           Test.Tasty.HUnit                     (testCaseSteps)
-
-import qualified Cardano.Api                          as Api
-import           Cardano.Testnet
-import           Testnet.Runtime
-import           Testnet.Property.Utils
-
-
 import qualified GeniusYield.Api.TestTokens           as GY.TestTokens
 import           GeniusYield.Imports
 import           GeniusYield.Providers.LiteChainIndex
@@ -54,6 +50,13 @@ import           GeniusYield.Test.Privnet.Utils
 import           GeniusYield.Test.Utils
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
+import qualified Hedgehog                             as H
+import qualified Hedgehog.Extras.Stock                as H'
+import           Test.Cardano.Ledger.Core.Rational    ((%!))
+import           Test.Tasty                           (TestName, TestTree)
+import           Test.Tasty.HUnit                     (testCaseSteps)
+import           Testnet.Property.Util
+import           Testnet.Types
 
 
 -------------------------------------------------------------------------------
@@ -67,6 +70,8 @@ import           GeniusYield.Types
 -- The first argument is the log severity filter. Only logs of this severity or higher will be passed on to the second argument, which is a logging action.
 newtype Setup = Setup (GYLogSeverity -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ())
 
+cardanoDefaultTestnetOptionsConway :: CardanoTestnetOptions
+cardanoDefaultTestnetOptionsConway = cardanoDefaultTestnetOptions {cardanoNodeEra = Api.AnyCardanoEra Api.ConwayEra}
 data PrivnetRuntime = PrivnetRuntime
   { runtimeNodeSocket  :: !FilePath
   , runtimeNetworkInfo :: !GYNetworkInfo
@@ -115,10 +120,55 @@ debug :: String -> IO ()
 -- debug = putStrLn
 debug _ = return ()
 
+conwayGenesis :: ConwayGenesis StandardCrypto
+conwayGenesis =
+  let upPParams :: UpgradeConwayPParams Identity
+      upPParams = UpgradeConwayPParams
+                    { ucppPoolVotingThresholds = poolVotingThresholds
+                    , ucppDRepVotingThresholds = drepVotingThresholds
+                    , ucppCommitteeMinSize = 0
+                    , ucppCommitteeMaxTermLength = EpochInterval 200
+                    , ucppGovActionLifetime = EpochInterval 1 -- One Epoch
+                    , ucppGovActionDeposit = Coin 1_000_000
+                    , ucppDRepDeposit = Coin 1_000_000
+                    , ucppDRepActivity = EpochInterval 100
+                    , ucppMinFeeRefScriptCostPerByte = 15 %! 1
+                    , ucppPlutusV3CostModel = either (error "Couldn't build PlutusV3 cost models") id $ Ledger.mkCostModel Ledger.PlutusV3 [100788, 420, 1, 1, 1000, 173, 0, 1, 1000, 59957, 4, 1, 11183, 32, 201305, 8356, 4, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 100, 100, 16000, 100, 94375, 32, 132994, 32, 61462, 4, 72010, 178, 0, 1, 22151, 32, 91189, 769, 4, 2, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1, 1000, 42921, 4, 2, 24548, 29498, 38, 1, 898148, 27279, 1, 51775, 558, 1, 39184, 1000, 60594, 1, 141895, 32, 83150, 32, 15299, 32, 76049, 1, 13169, 4, 22100, 10, 28999, 74, 1, 28999, 74, 1, 43285, 552, 1, 44749, 541, 1, 33852, 32, 68246, 32, 72362, 32, 7243, 32, 7391, 32, 11546, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 90434, 519, 0, 1, 74433, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 955506, 213312, 0, 2, 270652, 22588, 4, 1457325, 64566, 4, 20467, 1, 4, 0, 141992, 32, 100788, 420, 1, 1, 81663, 32, 59498, 32, 20142, 32, 24588, 32, 20744, 32, 25933, 32, 24623, 32, 43053543, 10, 53384111, 14333, 10, 43574283, 26308, 10, 16000, 100, 16000, 100, 962335, 18, 2780678, 6, 442008, 1, 52538055, 3756, 18, 267929, 18, 76433006, 8868, 18, 52948122, 18, 1995836, 36, 3227919, 12, 901022, 1, 166917843, 4307, 36, 284546, 36, 158221314, 26549, 36, 74698472, 36, 333849714, 1, 254006273, 72, 2174038, 72, 2261318, 64571, 4, 207616, 8310, 4, 1293828, 28716, 63, 0, 1, 1006041, 43623, 251, 0, 1]
+                    }
+      drepVotingThresholds = DRepVotingThresholds
+        { dvtMotionNoConfidence = 67 %! 100
+        , dvtCommitteeNormal = 67 %! 100
+        , dvtCommitteeNoConfidence = 6 %! 10
+        , dvtUpdateToConstitution = 75 %! 100
+        , dvtHardForkInitiation = 6 %! 10
+        , dvtPPNetworkGroup = 67 %! 100
+        , dvtPPEconomicGroup = 67 %! 100
+        , dvtPPTechnicalGroup = 67 %! 100
+        , dvtPPGovGroup = 75 %! 100
+        , dvtTreasuryWithdrawal = 67 %! 100
+        }
+      poolVotingThresholds = PoolVotingThresholds
+         { pvtMotionNoConfidence = commonPoolVotingThreshold
+         , pvtCommitteeNormal = commonPoolVotingThreshold
+         , pvtCommitteeNoConfidence = commonPoolVotingThreshold
+         , pvtHardForkInitiation = commonPoolVotingThreshold
+         , pvtPPSecurityGroup = commonPoolVotingThreshold
+         }
+      commonPoolVotingThreshold = 51 %! 100
+  in ConwayGenesis
+      { cgUpgradePParams = upPParams
+      , cgConstitution = DefaultClass.def
+      , cgCommittee = DefaultClass.def
+      , cgDelegs = mempty
+      , cgInitialDReps = mempty
+      }
+
 {- | Spawn a resource managed privnet and do things with it (closing it in the end).
 
-Privnet can be configured using "Cardano.Testnet.CardanoTestnetOptions". Pass 'cardanoDefaultTestnetOptions'
+Privnet can be configured using "Cardano.Testnet.CardanoTestnetOptions". Pass 'cardanoDefaultTestnetOptionsConway'
 for default configuration.
+
+Note that passed @CardanoTestnetOptions@ must imply Conway era.
 
 Returns continuation on `Setup`, which is essentially a function that performs an action
 given a logging -- function and the action itself (which receives the Privnet Ctx).
@@ -141,12 +191,8 @@ withPrivnet testnetOpts setupUser = do
             { wallets
             , poolNodes
             , testnetMagic
-            } <- cardanoTestnetDefault testnetOpts conf
+            } <- cardanoTestnet' testnetOpts conf
 
-        era <- case cardanoNodeEra testnetOpts of
-            Api.AnyCardanoEra Api.AlonzoEra -> pure GYAlonzo
-            Api.AnyCardanoEra Api.BabbageEra -> pure GYBabbage
-            Api.AnyCardanoEra x -> liftIO . die $ printf "Unsupported era: %s" (show x)
         liftIO . STM.atomically
             $ STM.writeTMVar tmvRuntime PrivnetRuntime
                 -- TODO: Consider obtaining everything here from shelleyGenesis rather than testnetOpts.
@@ -157,9 +203,7 @@ withPrivnet testnetOpts setupUser = do
                         . poolRuntime
                         $ head poolNodes
                 , runtimeNetworkInfo = GYNetworkInfo
-                    { gyNetworkEra        = era
-                        -- TODO: Conway support.
-                    , gyNetworkEpochSlots = fromIntegral $ cardanoEpochLength testnetOpts
+                    { gyNetworkEpochSlots = fromIntegral $ cardanoEpochLength testnetOpts
                     , gyNetworkMagic      = fromIntegral testnetMagic
                     }
                 , runtimeWallets = wallets
@@ -191,7 +235,7 @@ withPrivnet testnetOpts setupUser = do
                 debug $ printf "userF = %s\n" (show idx)
                 userAddr <- addressFromBech32 <$> urlPieceFromText paymentKeyInfoAddr
                 debug $ printf "userF addr = %s\n" userAddr
-                userPaymentSKey' <- readPaymentSigningKey $ paymentSKey paymentKeyInfoPair
+                userPaymentSKey' <- readPaymentSigningKey $ Api.unFile $ signingKey paymentKeyInfoPair
                 debug $ printf "userF skey = %s\n" userPaymentSKey'
                 pure User' {userPaymentSKey', userStakeSKey'=Nothing, userAddr}
 
@@ -219,19 +263,16 @@ withPrivnet testnetOpts setupUser = do
         debug $ printf "slotOfCurrentBlock = %s\n" slot
 
         withLCIClient info [] $ \lci -> do
-            let era = gyNetworkEra runtimeNetworkInfo
-
             let localLookupDatum :: GYLookupDatum
                 localLookupDatum = lciLookupDatum lci
 
             let localAwaitTxConfirmed :: GYAwaitTx
-                localAwaitTxConfirmed = nodeAwaitTxConfirmed era info
+                localAwaitTxConfirmed = nodeAwaitTxConfirmed info
 
             let localQueryUtxo :: GYQueryUTxO
-                localQueryUtxo = nodeQueryUTxO era info
+                localQueryUtxo = nodeQueryUTxO info
 
-            let localGetParams :: GYGetParameters
-                localGetParams = nodeGetParameters era info
+            localGetParams <- nodeGetParameters info
 
             -- context used for tests
             --
@@ -295,11 +336,19 @@ withPrivnet testnetOpts setupUser = do
 
             let setup = Setup $ \targetSev putLog kont -> kont $ ctx { ctxLog = simpleLogging targetSev (putLog . Txt.unpack) }
             setupUser setup
+  where
+    -- | This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
+    cardanoTestnet' opts conf = do
+        Api.AnyCardanoEra cEra <- pure $ cardanoNodeEra cardanoDefaultTestnetOptions
+        alonzoGenesis <- getDefaultAlonzoGenesis cEra
+        (startTime, shelleyGenesis') <- getDefaultShelleyGenesis opts
+        cardanoTestnet opts conf startTime shelleyGenesis' alonzoGenesis conwayGenesis
 
 -------------------------------------------------------------------------------
 -- Generating users
 -------------------------------------------------------------------------------
 
+-- TODO (simplify-genesis): Remove this. See note 'simplify-genesis'.
 generateUser :: GYNetworkId -> IO User
 generateUser network = do
     -- generate new key
@@ -311,7 +360,7 @@ generateUser network = do
 
     let addr :: GYAddress
         addr = addressFromApi' $ Api.AddressInEra
-            (Api.ShelleyAddressInEra Api.ShelleyBasedEraBabbage)
+            (Api.ShelleyAddressInEra Api.ShelleyBasedEraConway)
             (Api.makeShelleyAddress
                 (networkIdToApi network)
                 (Api.PaymentCredentialByKey vkeyHash)
@@ -326,12 +375,14 @@ generateUser network = do
 -- Balance
 -------------------------------------------------------------------------------
 
+-- TODO (simplify-genesis): Remove this once 'generateUser' and similar have been removed. Use 'createUserWithLovelace' instead.
 giveAda :: Ctx -> GYAddress -> IO ()
 giveAda ctx addr = ctxRun ctx (ctxUserF ctx) $ do
     txBody <- buildTxBody $ mconcat $ replicate 5 $
         mustHaveOutput $ mkGYTxOutNoDatum addr (valueFromLovelace 1_000_000_000)
     signAndSubmitConfirmed_ txBody
 
+-- TODO (simplify-genesis): Remove this once 'generateUser' and similar have been removed. Use 'createUserWithAssets' instead.
 giveTokens :: Ctx -> GYAddress -> IO ()
 giveTokens ctx addr = ctxRun ctx (ctxUserF ctx) $ do
     txBody <- buildTxBody $
@@ -343,6 +394,7 @@ giveTokens ctx addr = ctxRun ctx (ctxUserF ctx) $ do
 -- minting tokens
 -------------------------------------------------------------------------------
 
+-- TODO (simplify-genesis): Remove this once 'generateUser' and similar have been removed.
 mintTestTokens :: Ctx -> String -> IO GYAssetClass
 mintTestTokens ctx tn' = do
     ctxRun ctx (ctxUserF ctx) $ do

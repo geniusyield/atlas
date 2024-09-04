@@ -36,9 +36,9 @@ import           GeniusYield.Types            (GYAddress, GYAddressBech32,
                                                GYLookupDatum,
                                                GYOutDatum (GYOutDatumHash, GYOutDatumInline, GYOutDatumNone),
                                                GYPaymentCredential,
-                                               GYQueryUTxO (..), GYScript,
-                                               GYScriptHash, GYTxId, GYTxOutRef,
-                                               GYUTxO (..), GYUTxOs, GYValue,
+                                               GYQueryUTxO (..), GYScriptHash,
+                                               GYTxId, GYTxOutRef, GYUTxO (..),
+                                               GYUTxOs, GYValue,
                                                addressFromBech32, addressToText,
                                                gyQueryUtxoAtAddressesDefault,
                                                gyQueryUtxoAtPaymentCredentialsDefault,
@@ -46,11 +46,13 @@ import           GeniusYield.Types            (GYAddress, GYAddressBech32,
                                                gyQueryUtxosAtTxOutRefsDefault,
                                                parseValueKM,
                                                paymentCredentialToHexText,
-                                               scriptFromCBOR, txIdToApi,
+                                               scriptFromCBOR,
+                                               simpleScriptFromCBOR, txIdToApi,
                                                txOutRefFromApiTxIdIx,
                                                txOutRefToTuple', utxosFromList,
                                                valueFromLovelace)
 import qualified GeniusYield.Types            as GYTypes (PlutusVersion (..))
+import           GeniusYield.Types.Script     (GYAnyScript (..))
 import           Servant.API                  (Capture, Get, Header,
                                                Headers (getResponse), JSON,
                                                QueryFlag, QueryParam,
@@ -123,11 +125,11 @@ instance FromJSON KupoDatum where
               Right d -> pure $ KupoDatum (Just d)
         ) v
 
-data KupoScriptLanguage = Native | PlutusV1 | PlutusV2
+data KupoScriptLanguage = Native | PlutusV1 | PlutusV2 | PlutusV3
   deriving stock (Eq, Ord, Show, Generic)
-  deriving (FromJSON) via CustomJSON '[ConstructorTagModifier '[Rename "Native" "native", Rename "PlutusV1" "plutus:v1", Rename "PlutusV2" "plutus:v2"]] KupoScriptLanguage
+  deriving (FromJSON) via CustomJSON '[ConstructorTagModifier '[Rename "Native" "native", Rename "PlutusV1" "plutus:v1", Rename "PlutusV2" "plutus:v2", Rename "PlutusV3" "plutus:v3"]] KupoScriptLanguage
 
-newtype KupoScript = KupoScript (Maybe (Some GYScript))
+newtype KupoScript = KupoScript (Maybe GYAnyScript)
   deriving stock (Eq, Show, Generic)
 
 -- >>> Aeson.eitherDecode @KupoScript "null"
@@ -148,9 +150,10 @@ instance FromJSON KupoScript where
             scriptHex <- scriptObject .: "script"
             scriptLanguage <- scriptObject .: "language"
             case scriptLanguage of
-              Native -> pure $ KupoScript Nothing  -- native scripts are not supported.
-              PlutusV1 -> pure $ KupoScript $ Some <$> scriptFromCBOR @'GYTypes.PlutusV1 scriptHex
-              PlutusV2 -> pure $ KupoScript $ Some <$> scriptFromCBOR @'GYTypes.PlutusV2 scriptHex
+              Native -> pure $ KupoScript $ GYSimpleScript <$> simpleScriptFromCBOR scriptHex
+              PlutusV1 -> pure $ KupoScript $ GYPlutusScript <$> scriptFromCBOR @'GYTypes.PlutusV1 scriptHex
+              PlutusV2 -> pure $ KupoScript $ GYPlutusScript <$> scriptFromCBOR @'GYTypes.PlutusV2 scriptHex
+              PlutusV3 -> pure $ KupoScript $ GYPlutusScript <$> scriptFromCBOR @'GYTypes.PlutusV3 scriptHex
         ) v
 
 data KupoValue = KupoValue
@@ -229,7 +232,7 @@ kupoLookupDatum env dh = do
   pure md
 
 -- | Given a 'GYScriptHash' returns the corresponding 'GYScript' if found.
-kupoLookupScript :: KupoApiEnv -> GYScriptHash -> IO (Maybe (Some GYScript))
+kupoLookupScript :: KupoApiEnv -> GYScriptHash -> IO (Maybe GYAnyScript)
 kupoLookupScript env sh = do
   KupoScript ms <-
     handleKupoError "LookupScript"

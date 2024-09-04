@@ -1,6 +1,6 @@
 cabal-version:      3.8
 name:               atlas-cardano
-version:            0.5.0
+version:            0.6.0
 synopsis:           Application backend for Plutus smart contracts on Cardano
 description:
   Atlas is an all-in-one, Haskell-native application backend for writing off-chain code for on-chain Plutus smart contracts.
@@ -108,6 +108,7 @@ library
     GeniusYield.TxBuilder.Common
     GeniusYield.TxBuilder.Errors
     GeniusYield.TxBuilder.IO
+    GeniusYield.TxBuilder.IO.Unsafe
     GeniusYield.TxBuilder.Query.Class
     GeniusYield.TxBuilder.User
     GeniusYield.Types
@@ -116,6 +117,8 @@ library
     GeniusYield.Types.Certificate
     GeniusYield.Types.Credential
     GeniusYield.Types.Datum
+    GeniusYield.Types.Delegatee
+    GeniusYield.Types.DRep
     GeniusYield.Types.Era
     GeniusYield.Types.Key
     GeniusYield.Types.Key.Class
@@ -126,6 +129,7 @@ library
     GeniusYield.Types.OpenApi
     GeniusYield.Types.PaymentKeyHash
     GeniusYield.Types.PlutusVersion
+    GeniusYield.Types.ProtocolParameters
     GeniusYield.Types.Providers
     GeniusYield.Types.PubKeyHash
     GeniusYield.Types.Rational
@@ -161,94 +165,95 @@ library
     GeniusYield.TxBuilder.IO.Builder
     GeniusYield.Utils
   build-depends:
-    , async                 ^>=2.2.5
-    , aeson                 ^>=2.2.1.0
-    , attoparsec            ^>=0.14.4
-    , base                  ^>=4.18.2.0
-    , base16-bytestring     ^>=1.0.2.0
-    , blockfrost-client     ^>=0.8.0.1
-    , bytestring            ^>=0.11.4.0
-    , cache                 ^>=0.1.3.0
-    , cassava               ^>=0.5.3.0
-    , cborg                 ^>=0.2.9.0
-    , containers            ^>=0.6.5.1
-    , data-default          ^>=0.7.1.1
-    , deriving-aeson        ^>=0.2.9
-    , directory             ^>=1.3.6.2
-    , either                ^>=5.0.2
-    , filepath              ^>=1.4.2.2
-    , hashable              ^>=1.4.2.0
-    , hedgehog              ^>=1.4
-    , hedgehog-extras       ^>=0.6.1.0
-    , http-api-data         ^>=0.6
-    , http-client           ^>=0.7.13.1
-    , http-client-tls       ^>=0.3.6.1
-    , http-types            ^>=0.12.3
-    , indexed-traversable   ^>=0.1.2.1
-    , katip                 ^>=0.8.7.4
-    , lens                  ^>=5.2.3
-    , MonadRandom           ^>=0.6
-    , mtl                   ^>=2.3.1
-    , network-uri           ^>=2.6.4.2
-    , postgresql-simple     ^>=0.7.0.0
-    , prettyprinter         ^>=1.7.1
-    , raven-haskell         ^>=0.1.4.1
-    , resourcet             ^>=1.3.0
-    , safe-money            ^>=0.9.1
-    , scientific            ^>=0.3.7.0
-    , servant               ^>=0.20.1
-    , servant-client        ^>=0.20
-    , servant-client-core   ^>=0.20
-    , some                  ^>=1.0.5
-    , sop-extras            ^>=0.1.0.0
-    , stm                   ^>=2.5.1.0
-    , string-conv           ^>=0.2.0
-    , swagger2              ^>=2.8.7
-    , tasty                 ^>=1.5
-    , tasty-hunit           ^>=0.10.0.3
-    , tasty-quickcheck      ^>=0.10.2
-    , template-haskell      ^>=2.20.0.0
-    , text                  ^>=2.0.2
-    , time                  ^>=1.12.2
-    , transformers          ^>=0.6.1.0
-    , unordered-containers  ^>=0.2.19.1
-    , vector                ^>=0.13.1.0
-    , witherable            ^>=0.4.2
+    async ^>=2.2.5,
+    aeson ^>=2.2.3,
+    attoparsec ^>=0.14.4,
+    auto-update ^>=0.2.1,
+    base ^>=4.18.2,
+    base16-bytestring ^>=1.0.2,
+    blockfrost-client ^>=0.8.0,
+    bytestring ^>=0.11.5,
+    cache ^>=0.1.3,
+    cassava ^>=0.5.3,
+    cborg ^>=0.2.10,
+    containers ^>=0.6.7,
+    data-default ^>=0.7.1,
+    data-default-class ^>=0.1.2,
+    deriving-aeson ^>=0.2.9,
+    either ^>=5.0.2,
+    hashable ^>=1.4.7,
+    hedgehog ^>=1.4,
+    hedgehog-extras ^>=0.6.5,
+    http-api-data ^>=0.6.1,
+    http-client ^>=0.7.17,
+    http-client-tls ^>=0.3.6,
+    http-types ^>=0.12.4,
+    indexed-traversable ^>=0.1.4,
+    katip ^>=0.8.8,
+    lens ^>=5.2.3,
+    MonadRandom ^>=0.6,
+    mtl ^>=2.3.1,
+    network-uri ^>=2.6.4,
+    postgresql-simple ^>=0.7.0,
+    prettyprinter ^>=1.7.1,
+    raven-haskell ^>=0.1.4.1,
+    resourcet ^>=1.3.0,
+    safe-money ^>=0.9.1,
+    scientific ^>=0.3.8,
+    servant ^>=0.20.1,
+    servant-client ^>=0.20,
+    servant-client-core ^>=0.20,
+    some ^>=1.0.6,
+    sop-extras ^>=0.2.0,
+    stm ^>=2.5.1,
+    strict-mvar ^>=1.5.0,
+    string-conv ^>=0.2.0,
+    swagger2 ^>=2.8.9,
+    tasty ^>=1.5,
+    tasty-hunit ^>=0.10.2,
+    tasty-quickcheck ^>=0.11,
+    template-haskell ^>=2.20.0,
+    text ^>=2.0.2,
+    time ^>=1.12.2,
+    transformers ^>=0.6.1,
+    unordered-containers ^>=0.2.20,
+    vector ^>=0.13.1,
+    witherable ^>=0.5
 
   -- Dependencies whose version is fixed/constrained by @cabal.project@ file.
   build-depends:
-    , bech32
-    , maestro-sdk
-    , clb
-    , openapi3
+    bech32,
+    maestro-sdk,
+    clb,
+    openapi3
 
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file or derived from other related dependencies.
   build-depends:
-    , cardano-addresses
-    , cardano-api
-    , cardano-api:{internal}
-    , cardano-balance-tx:{internal}
-    , cardano-coin-selection
-    , cardano-crypto-class
-    , cardano-ledger-api
-    , cardano-ledger-core:{cardano-ledger-core, testlib}
-    , cardano-ledger-byron
-    , cardano-ledger-shelley
-    , cardano-ledger-alonzo
-    , cardano-ledger-babbage
-    , cardano-ledger-binary
-    , cardano-ledger-shelley
-    , cardano-slotting
-    , cardano-strict-containers
-    , cardano-testnet
-    , cardano-wallet-primitive
-    , ouroboros-consensus
-    , ouroboros-consensus-cardano
-    , ouroboros-network-protocols
-    , plutus-ledger-api
-    , plutus-tx
-    , plutus-tx-plugin
-    , text-class
+    cardano-addresses,
+    cardano-api,
+    cardano-api:internal,
+    cardano-balance-tx:internal,
+    cardano-coin-selection,
+    cardano-crypto-class,
+    cardano-ledger-api,
+    cardano-ledger-core:{cardano-ledger-core, testlib},
+    cardano-ledger-byron,
+    cardano-ledger-core,
+    cardano-ledger-conway,
+    cardano-ledger-shelley,
+    cardano-ledger-alonzo,
+    cardano-ledger-binary,
+    cardano-ledger-shelley,
+    cardano-slotting,
+    cardano-testnet,
+    cardano-wallet-primitive,
+    ouroboros-consensus,
+    ouroboros-consensus-cardano,
+    ouroboros-network-protocols,
+    plutus-ledger-api,
+    plutus-tx,
+    plutus-tx-plugin,
+    text-class
 
   -- needed for examples
   -- Version of @plutus-core@ is pinned in @cabal.project@ file.
@@ -266,14 +271,14 @@ library framework-onchain-plutustx
     GeniusYield.OnChain.TestToken
     GeniusYield.OnChain.TestToken.Compiled
 
-  build-depends:   base ^>= 4.18.2.0
+  build-depends:   base ^>=4.18.2
 
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
   build-depends:
-    , plutus-core
-    , plutus-ledger-api
-    , plutus-tx
-    , plutus-tx-plugin
+    plutus-core,
+    plutus-ledger-api,
+    plutus-tx,
+    plutus-tx-plugin
 
 test-suite atlas-tests
   import:         common, plutus-ghc-options
@@ -299,37 +304,35 @@ test-suite atlas-tests
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
-    , aeson
-    , atlas-cardano
-    , base
-    , bytestring
-    , cardano-api
-    , cardano-ledger-alonzo
-    , clb
-    , containers
-    , data-default
-    , directory
-    , filepath
-    , http-api-data
-    , maestro-sdk
-    , MonadRandom
-    , ouroboros-consensus
-    , plutus-ledger-api
-    , plutus-tx
-    , plutus-tx-plugin
-    , some
-    , tasty
-    , tasty-hunit
-    , tasty-quickcheck
-    , text
-    , time
-    , transformers
+    aeson,
+    atlas-cardano,
+    base,
+    bytestring,
+    cardano-api,
+    clb,
+    containers,
+    data-default,
+    directory,
+    filepath,
+    http-api-data,
+    maestro-sdk,
+    MonadRandom,
+    ouroboros-consensus,
+    plutus-ledger-api,
+    plutus-tx,
+    plutus-tx-plugin,
+    tasty,
+    tasty-hunit,
+    tasty-quickcheck,
+    text,
+    time,
+    transformers
 
   -- Additional dependencies.
   build-depends:
-    , QuickCheck            ^>=2.14
-    , quickcheck-instances  ^>=0.3
-    , tasty-golden          ^>=2.3
+    QuickCheck,
+    quickcheck-instances,
+    tasty-golden
 
 test-suite atlas-privnet-tests
   import:         common
@@ -346,12 +349,12 @@ test-suite atlas-privnet-tests
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
-    , atlas-cardano:{atlas-cardano, framework-onchain-plutustx}
-    , base
-    , containers
-    , lens
-    , tasty
-    , tasty-hunit
+    atlas-cardano:{atlas-cardano, framework-onchain-plutustx},
+    base,
+    containers,
+    lens,
+    tasty,
+    tasty-hunit
 
 test-suite atlas-unified-tests
   import:         common, plutus-ghc-options
@@ -370,16 +373,14 @@ test-suite atlas-unified-tests
     GeniusYield.Test.Unified.BetRef.TakePot
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
-    , atlas-cardano
-    , base
-    , containers
-    , extra
-    , tasty
-    , tasty-hunit
-    , text
-    , mtl
-    -- OnChain
-    , plutus-core
-    , plutus-ledger-api
-    , plutus-tx
-    , plutus-tx-plugin
+    atlas-cardano,
+    base,
+    containers,
+    extra,
+    mtl,
+    plutus-core,
+    plutus-ledger-api,
+    plutus-tx-plugin,
+    plutus-tx,
+    tasty,
+    text,

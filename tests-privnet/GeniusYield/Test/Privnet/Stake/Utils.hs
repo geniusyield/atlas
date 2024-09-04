@@ -21,6 +21,7 @@ import           GeniusYield.Test.Privnet.Ctx
 import           GeniusYield.Transaction                      (GYCoinSelectionStrategy (..))
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
+import           GeniusYield.Types.Delegatee                  (GYDelegatee (..))
 import           Test.Tasty.HUnit                             (assertBool)
 
 someAddr :: GYAddress
@@ -71,14 +72,14 @@ registerStakeCredentialSteps strat user mstakeValHash info ctx = do
     pp <- ctxGetParams ctx & gyGetProtocolParameters'
     info $ "-- Protocol parameters --\n" <> show pp <> "\n-- x --\n"
     txBodyReg <- ctxRun ctx user $ do
-      buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressRegistrationCertificate (resolveStakeCredential user mstakeValHash))
+      buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressRegistrationCertificate (resolveStakeCredential user mstakeValHash) (resolveCertWitness (isJust mstakeValHash)))
     info $ "-- Registration tx body --\n" <> show txBodyReg <> "\n-- x --\n"
-    ctxRun ctx user $ signAndSubmitConfirmed_ txBodyReg
+    ctxRun ctx user $ submitTxBodyConfirmed_ txBodyReg $ resolveSigningRequirement user mstakeValHash
 
 delegateStakeCredentialSteps :: GYCoinSelectionStrategy -> User -> Maybe GYStakeValidatorHash -> GYStakePoolId -> (String -> IO ()) -> Ctx -> IO ()
 delegateStakeCredentialSteps strat user mstakeValHash spId info ctx = do
   txBodyDel <- ctxRunBuilder ctx user $ do
-    buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressPoolDelegationCertificate (resolveStakeCredential user mstakeValHash) spId (resolveCertWitness (isJust mstakeValHash)))
+    buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressDelegationCertificate (resolveStakeCredential user mstakeValHash) (GYDelegStake spId) (resolveCertWitness (isJust mstakeValHash)))
   info $ "-- Delegation tx body --\n" <> show txBodyDel <> "\n-- x --\n"
   ctxRun ctx user . submitTxBodyConfirmed_ txBodyDel $ resolveSigningRequirement user mstakeValHash
 

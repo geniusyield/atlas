@@ -11,6 +11,9 @@ Stability   : develop
 module GeniusYield.Test.Utils
     ( TestInfo (..)
     , Wallets (..)
+    , createUserWithLovelace
+    , createUserWithAssets
+    , createUserFull
     , withBalance
     , withWalletBalancesCheck
     , findLockedUtxosInBody
@@ -18,7 +21,9 @@ module GeniusYield.Test.Utils
     , findRefScriptsInBody
     , addRefScript
     , addRefInput
-    , fakeCoin, fakeGold, fakeIron
+    , mintTestAssets
+    , generateCollateral
+    , fakeValue, fakeCoin, fakeGold, fakeIron, fakePolicy
     , afterAllSucceed
     , feesFromLovelace
     , withMaxQCTests
@@ -26,16 +31,14 @@ module GeniusYield.Test.Utils
     , module X
     ) where
 
-import           Control.Monad.Except             (ExceptT, runExceptT)
+import           Control.Monad.Except        (ExceptT, runExceptT)
 import           Control.Monad.Random
-import qualified Data.Map.Strict                  as Map
-import qualified Data.Text                        as T
+import qualified Data.Map.Strict             as Map
+import qualified Data.Text                   as T
 
-import qualified PlutusLedgerApi.V1.Value         as Plutus
-
-import qualified Test.Tasty                       as Tasty
-import qualified Test.Tasty.QuickCheck            as Tasty
-import qualified Test.Tasty.Runners               as Tasty
+import qualified Test.Tasty                  as Tasty
+import qualified Test.Tasty.QuickCheck       as Tasty
+import qualified Test.Tasty.Runners          as Tasty
 
 import           GeniusYield.HTTP.Errors
 import           GeniusYield.Imports
@@ -43,7 +46,7 @@ import           GeniusYield.Test.FakeCoin
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
-import           GeniusYield.Test.FeeTracker      as X
+import           GeniusYield.Test.FeeTracker as X
 
 -------------------------------------------------------------------------------
 -- tasty tools
@@ -75,35 +78,41 @@ withMaxQCTests n = Tasty.adjustOption f where
 -- test assets
 -------------------------------------------------------------------------------
 
-class    FromFakeCoin a                 where fromFakeCoin :: FakeCoin -> a
-instance FromFakeCoin FakeCoin          where fromFakeCoin = id
-instance FromFakeCoin GYAssetClass      where fromFakeCoin = fromRight (error "invalid asset class") . assetClassFromPlutus . fakeCoin
-instance FromFakeCoin Plutus.AssetClass where fromFakeCoin = fakeCoin
-
--- | This allows to write e.g. @'fakeGold' 1000 :: GYValue@.
-instance (a ~ Integer, b ~ GYValue) => FromFakeCoin (a -> b) where
-    fromFakeCoin c = fromRight (error "invalid value") . valueFromPlutus . fakeValue c
-
 -- | Fake \"Gold\" coin to use during tests.
--- Can represent a 'GYAssetClass' or a Plutus 'Plutus.AssetClass'
-fakeGold :: FromFakeCoin a => a
-fakeGold = fromFakeCoin $ FakeCoin "Gold"
+fakeGold :: FakeCoin
+fakeGold = FakeCoin "Gold"
 
 -- | Fake \"Iron\" coin to use during tests
--- Can represent a 'GYAssetClass' or a Plutus 'Plutus.AssetClass'
-fakeIron :: FromFakeCoin a => a
-fakeIron = fromFakeCoin $ FakeCoin "Iron"
+fakeIron :: FakeCoin
+fakeIron = FakeCoin "Iron"
 
 -------------------------------------------------------------------------------
 -- helpers
 -------------------------------------------------------------------------------
 
+{- Note [simplify-genesis]
+
+Currently, both our testing providers (privnet and CLB) generate users during test setup. Previously,
+this was necessary since there was no obvious way to generate new users with funds etc. However, with the
+addition of unified machinery to create new users and fund them, it should be left to the tests to create their
+own users and fund them however they like.
+
+This will vastly simplify the genesis code and remove problematically dynamic (yet static) types like 'Wallets', 'TestInfo'
+and the user fields in "GeniusYield.Test.Privnet.Ctx".
+
+TL;DR: Remove all user creation code from test setups and point Atlas users to use functions like 'createUser', 'createUserWithAssets',
+'createUserFull' etc.
+-}
+
+-- TODO (simplify-genesis): Remove 'TestInfo'. The only thing test setup should do is to make one or more genesis/funder user(s)
+-- and pass that 'User' onto the tests.
 -- | General information about the test environment to help in running polymorphic tests.
 data TestInfo = TestInfo
   { testGoldAsset :: !GYAssetClass
   , testIronAsset :: !GYAssetClass
   , testWallets :: !Wallets }
 
+-- TODO (simplify-genesis): Remove this type once user creation logic is removed from test setup.
 -- | Available wallets.
 data Wallets = Wallets
     { w1 :: !User
@@ -116,6 +125,79 @@ data Wallets = Wallets
     , w8 :: !User
     , w9 :: !User
     } deriving (Show, Eq, Ord)
+
+-- | Create an user and fund them with the given amount of lovelace provided by the given funder user.
+createUserWithLovelace :: GYTxGameMonad m => User -> Natural -> m User
+createUserWithLovelace funder lovelace = do
+    u <- createUser
+    asUser funder $ do
+        -- Fragment the lovelace amount into at least 5 utxos.
+        let utxosCount = 5
+            eachUtxo = toInteger $ lovelace `quot` utxosCount
+            extraUtxo = toInteger $ lovelace `rem` utxosCount
+            mustHaveLovelace 0 = mempty
+            mustHaveLovelace l = mustHaveOutput $ mkGYTxOutNoDatum (userChangeAddress u) (valueFromLovelace l)
+        gyLogDebug' "createUserWithLovelace" . T.unpack
+            $  "Funding user at address: " <> addressToText (userChangeAddress u) <> "\n"
+            <> "  number of new utxos (except extra): " <> T.pack (show utxosCount) <> "\n"
+            <> "  lovelaces in each utxo: " <> T.pack (show eachUtxo) <> "\n"
+            <> "  extra utxo: " <> T.pack (show extraUtxo)
+
+        txBody <- buildTxBody $ mconcat $ mustHaveLovelace extraUtxo : replicate 5 (mustHaveLovelace eachUtxo)
+        signAndSubmitConfirmed_ txBody
+    pure u
+
+{- | `createUserWithAssets funder lovelaces tokens` is equivalent to
+  `createUserWithLovelace funder lovelace', followed by 'mintTestAssets tokens'
+  as the newly created user.
+
+  Note: This will obviously require the user to have enough lovelace to cover the fees
+  and min ada deposits for the mints.
+-}
+createUserWithAssets :: GYTxGameMonad m => User -> Natural -> [(FakeCoin, Natural)] -> m User
+createUserWithAssets funder lovelace tokens = do
+    user <- createUserWithLovelace funder lovelace
+    asUser user $ mintTestAssets tokens
+    pure user
+
+-- | Create a collateral utxo out of the existing ada within a user wallet. Returns the collateral reference.
+generateCollateral :: GYTxMonad m => m GYTxOutRef
+generateCollateral = do
+    addr <- ownChangeAddress
+    gyLogDebug' "mintTestAssets" . T.unpack
+            $  "Generating collateral for: " <> addressToText addr <> "\n"
+            <> "  collateral value: " <> T.pack (show collateralValue)
+    txBody <- buildTxBody $ mustHaveOutput (mkGYTxOutNoDatum addr collateralValue)
+    txId <- signAndSubmitConfirmed txBody
+    pure $ txOutRefFromTuple (txId, 0)
+
+-- | This is a combination of 'createUserWithAssets' and 'generateCollateral'.
+-- It creates a user with ada, non-ada assets, and a collateral.
+-- Thereby making a user ready to participate in smart contracts.
+createUserFull :: GYTxGameMonad m => User -> Natural -> [(FakeCoin, Natural)] -> m User
+createUserFull funder lovelace tokens = do
+    user <- createUserWithAssets funder lovelace tokens
+    userCollateralRef <- asUser user generateCollateral
+    pure user { userCollateral = Just UserCollateral { userCollateralRef, userCollateralCheck = True } }
+
+-- | Mint given amount of test tokens.
+mintTestAssets :: GYTxMonad m => [(FakeCoin, Natural)] -> m ()
+mintTestAssets tokens = do
+    addr <- ownChangeAddress
+    let readableTkNames = map
+            (\(tk, amt) -> T.pack (show amt) <> " " <> readableTk tk) tokens
+    gyLogDebug' "mintTestAssets" . T.unpack
+            $  "Minting test assets for: " <> addressToText addr <> "\n"
+            <> "The test assets and their amounts are as following:-\n"
+            <> T.unlines (map ("  " <>) readableTkNames)
+    txBody <- buildTxBody @PlutusV2 $ foldMap
+        (\(tk, amt) ->
+            mustMint (GYMintScript $ fakePolicy tk) unitRedeemer (fakeCoinName tk) $ toInteger amt
+        )
+        tokens
+    signAndSubmitConfirmed_ txBody
+  where
+    readableTk tk = mintingPolicyIdToText (mintingPolicyId $ fakePolicy tk) <> "." <> T.pack (show $ fakeCoinName tk)
 
 {- | Computes a `GYTx*Monad` action and returns the result and how this action
      changed the balance of some "Address".
@@ -159,19 +241,19 @@ findLockedUtxosInBody addr tx =
     findAllMatches (0, os, [])
 
 -- | Find reference scripts at given address.
-getRefInfos :: GYTxQueryMonad m => GYAddress -> m (Map (Some GYScript) GYTxOutRef)
+getRefInfos :: GYTxQueryMonad m => GYAddress -> m (Map GYAnyScript GYTxOutRef)
 getRefInfos addr = do
     utxo <- utxosAtAddress addr Nothing
     return $ utxoToRefMap utxo
 
-utxoToRefMap :: GYUTxOs ->  Map (Some GYScript) GYTxOutRef
+utxoToRefMap :: GYUTxOs ->  Map GYAnyScript GYTxOutRef
 utxoToRefMap utxo = Map.fromList
     [ (sc, ref)
     | GYUTxO { utxoRef = ref, utxoRefScript = Just sc} <- utxosToList utxo
     ]
 
 -- | Find reference scripts in transaction body.
-findRefScriptsInBody :: GYTxBody -> Map (Some GYScript) GYTxOutRef
+findRefScriptsInBody :: GYTxBody -> Map GYAnyScript GYTxOutRef
 findRefScriptsInBody body = do
     let utxo = txBodyUTxOs body
     utxoToRefMap utxo
@@ -182,16 +264,16 @@ addRefScript :: forall m. GYTxMonad m => GYAddress -> GYScript 'PlutusV2 -> m GY
 addRefScript addr sc = throwAppError absurdError `runEagerT` do
     existingUtxos <- lift $ utxosAtAddress addr Nothing
     let refs = utxoToRefMap existingUtxos
-    maybeToEager $ Map.lookup (Some sc) refs
+    maybeToEager $ Map.lookup (GYPlutusScript sc) refs
     txBody <- lift $ buildTxBody
-        $ mustHaveOutput GYTxOut
+        $ mustHaveOutput @'PlutusV2 GYTxOut
             { gyTxOutAddress     = addr
             , gyTxOutValue       = mempty
             , gyTxOutDatum       = Just (unitDatum, GYTxOutUseInlineDatum)
             , gyTxOutRefS        = Just $ GYPlutusScript sc
             }
     lift $ signAndSubmitConfirmed_ txBody
-    maybeToEager . Map.lookup (Some sc) $ findRefScriptsInBody txBody
+    maybeToEager . Map.lookup (GYPlutusScript sc) $ findRefScriptsInBody txBody
   where
     absurdError = someBackendError "Shouldn't happen: no ref in body"
 
@@ -205,7 +287,7 @@ addRefInput toInline addr dat = throwAppError absurdError `runEagerT` do
     existingUtxos <- lift $ utxosAtAddress addr Nothing
     maybeToEager $ findRefWithDatum existingUtxos
     txBody <- lift . buildTxBody .
-        mustHaveOutput
+        mustHaveOutput @'PlutusV2
             $ GYTxOut addr mempty (Just (dat, if toInline then GYTxOutUseInlineDatum else GYTxOutDontUseInlineDatum)) Nothing
 
     lift $ signAndSubmitConfirmed_ txBody
@@ -216,9 +298,9 @@ addRefInput toInline addr dat = throwAppError absurdError `runEagerT` do
         . find
             (\GYUTxO {utxoOutDatum} ->
                 case utxoOutDatum of
-                    GYOutDatumHash dh       -> hashDatum dat == dh
+                    GYOutDatumHash dh     -> hashDatum dat == dh
                     GYOutDatumInline dat' -> dat == dat'
-                    _                       -> False
+                    _                     -> False
             )
         $ utxosToList utxos
     absurdError = someBackendError "Shouldn't happen: no output with expected datum in body"

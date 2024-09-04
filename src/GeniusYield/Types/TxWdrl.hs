@@ -14,8 +14,10 @@ module GeniusYield.Types.TxWdrl (
 
 
 import qualified Cardano.Api                as Api
+import qualified Cardano.Ledger.Coin        as Ledger
 import           GeniusYield.Imports        (Natural)
 import           GeniusYield.Types.Address  (GYStakeAddress, stakeAddressToApi)
+import           GeniusYield.Types.Era
 import           GeniusYield.Types.Redeemer
 import           GeniusYield.Types.Script
 -- | Transaction withdrawal.
@@ -40,9 +42,9 @@ data GYTxWdrlWitness v
 
 txWdrlToApi
     :: GYTxWdrl v
-    -> (Api.StakeAddress, Api.Lovelace, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxStake Api.BabbageEra))
-txWdrlToApi (GYTxWdrl stakeAddr amt wit) = (stakeAddressToApi stakeAddr, fromIntegral amt, Api.BuildTxWith $ f wit) where
-    f :: GYTxWdrlWitness v -> Api.Witness Api.WitCtxStake Api.BabbageEra
+    -> (Api.StakeAddress, Ledger.Coin, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxStake ApiEra))
+txWdrlToApi (GYTxWdrl stakeAddr amt wit) = (stakeAddressToApi stakeAddr, Ledger.Coin (toInteger amt), Api.BuildTxWith $ f wit) where
+    f :: GYTxWdrlWitness v -> Api.Witness Api.WitCtxStake ApiEra
     f GYTxWdrlWitnessKey = Api.KeyWitness Api.KeyWitnessForStakeAddr
     f (GYTxWdrlWitnessScript v r) =
         Api.ScriptWitness Api.ScriptWitnessForStakeAddr $

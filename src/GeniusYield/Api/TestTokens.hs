@@ -1,3 +1,5 @@
+-- TODO (simplify-genesis): Remove this module once user creation has been removed from test setup.
+-- See note: 'simplify-genesis'.
 {-|
 Module      : GeniusYield.Api.TestTokens
 Copyright   : (c) 2023 GYELD GMBH
@@ -14,7 +16,7 @@ import           GeniusYield.Scripts.TestToken
 import           GeniusYield.TxBuilder
 import           GeniusYield.Types
 
-mintTestTokens :: GYTxMonad m
+mintTestTokens :: GYTxUserQueryMonad m
                => GYTokenName
                -> Natural
                -> m (GYAssetClass, GYTxSkeleton 'PlutusV2)

@@ -11,33 +11,32 @@ Stability   : develop
 module GeniusYield.Transaction.Common (
     GYBalancedTx (..),
     GYTxInDetailed (..),
+    utxoFromTxInDetailed,
     GYBuildTxError (..),
     GYBalancingError (..),
     minimumUTxO,
     adjustTxOut
 ) where
 
-import qualified Cardano.Api         as Api
-import qualified Cardano.Api.Shelley as Api.S
-
-import qualified Cardano.Ledger.Alonzo.Core as Ledger
-
-import qualified Text.Printf         as Printf
-
+import qualified Cardano.Api                          as Api
+import qualified Cardano.Ledger.Coin                  as Ledger
 import           GeniusYield.Imports
 import           GeniusYield.Transaction.CBOR
 import           GeniusYield.Types.Address
-import           GeniusYield.Types.TxOut
+import           GeniusYield.Types.Era
+import           GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import           GeniusYield.Types.PubKeyHash
 import           GeniusYield.Types.Redeemer
 import           GeniusYield.Types.Script
 import           GeniusYield.Types.Slot
-import           GeniusYield.Types.TxCert
+import           GeniusYield.Types.TxCert.Internal
 import           GeniusYield.Types.TxIn
 import           GeniusYield.Types.TxMetadata
+import           GeniusYield.Types.TxOut
 import           GeniusYield.Types.TxWdrl
 import           GeniusYield.Types.UTxO
 import           GeniusYield.Types.Value
+import qualified Text.Printf                          as Printf
 
 
 {- | An *almost* finalized Tx.
@@ -51,7 +50,7 @@ data GYBalancedTx v = GYBalancedTx
     , gybtxOuts          :: ![GYTxOut v]
     , gybtxMint          :: !(Maybe (GYValue, [(GYMintScript v, GYRedeemer)]))
     , gybtxWdrls         :: ![GYTxWdrl v]
-    , gybtxCerts         :: ![GYTxCert v]
+    , gybtxCerts         :: ![GYTxCert' v]
     , gybtxInvalidBefore :: !(Maybe GYSlot)
     , gybtxInvalidAfter  :: !(Maybe GYSlot)
     , gybtxSigners       :: !(Set GYPubKeyHash)
@@ -65,9 +64,12 @@ data GYTxInDetailed v = GYTxInDetailed
     , gyTxInDetAddress   :: !GYAddress
     , gyTxInDetValue     :: !GYValue
     , gyTxInDetDatum     :: !GYOutDatum
-    , gyTxInDetScriptRef :: !(Maybe (Some GYScript))
+    , gyTxInDetScriptRef :: !(Maybe GYAnyScript)
     }
   deriving (Eq, Show)
+
+utxoFromTxInDetailed :: GYTxInDetailed v -> GYUTxO
+utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref _witns) addr val d ms) = GYUTxO ref addr val d ms
 
 -------------------------------------------------------------------------------
 -- Transaction Building Errors
@@ -97,10 +99,7 @@ instance Eq GYBalancingError where
 -- Insufficient funds and similar are considered trivial transaction building errors.
 data GYBuildTxError
     = GYBuildTxBalancingError !GYBalancingError
-    | GYBuildTxBodyErrorAutoBalance !(Api.TxBodyErrorAutoBalance Api.S.BabbageEra)
-    | GYBuildTxPPConversionError !Api.ProtocolParametersConversionError
-    | GYBuildTxMissingMaxExUnitsParam
-    -- ^ Missing max ex units in protocol params
+    | GYBuildTxBodyErrorAutoBalance !(Api.TxBodyErrorAutoBalance ApiEra)
     | GYBuildTxExUnitsTooBig         -- ^ Execution units required is higher than the maximum as specified by protocol params.
         (Natural, Natural)           -- ^ Tuple of maximum execution steps & memory as given by protocol parameters.
         (Natural, Natural)           -- ^ Tuple of execution steps & memory as taken by built transaction.
@@ -121,9 +120,9 @@ data GYBuildTxError
 -- Transaction Utilities
 -------------------------------------------------------------------------------
 
-minimumUTxO :: Ledger.PParams (Api.S.ShelleyLedgerEra Api.S.BabbageEra) -> GYTxOut v -> Natural
+minimumUTxO :: ApiProtocolParameters -> GYTxOut v -> Natural
 minimumUTxO pp txOut = fromInteger $ coerce $
-  Api.calculateMinimumUTxO Api.ShelleyBasedEraBabbage (txOutToApi txOut) pp
+  Api.calculateMinimumUTxO Api.ShelleyBasedEraConway (txOutToApi txOut) pp
 
 adjustTxOut :: (GYTxOut v -> Natural) -> GYTxOut v -> GYTxOut v
 adjustTxOut minimumUTxOF = helper
@@ -140,4 +139,4 @@ adjustTxOut minimumUTxOF = helper
                 in helper txOut'
 
 extractLovelace :: Api.Value -> Natural
-extractLovelace v = case Api.selectLovelace v of Api.Lovelace n -> fromIntegral $ max 0 n
+extractLovelace v = case Api.selectLovelace v of Ledger.Coin n -> fromIntegral $ max 0 n

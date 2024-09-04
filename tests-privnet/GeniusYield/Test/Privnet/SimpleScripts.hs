@@ -38,6 +38,6 @@ exerciseASimpleScript ctx info toUseRefScript = do
   info "Now consuming from the simple script"
   let toConsume = txOutRefFromTuple (txIdFund, 0)
   txIdConsume <- ctxRun ctx fundUser $ do
-    txBodyConsume <- buildTxBody $ mustHaveInput $ GYTxIn toConsume (GYTxInWitnessSimpleScript $ if toUseRefScript then GYInReferenceSimpleScript toConsume multiSigSimpleScript else GYInSimpleScript multiSigSimpleScript)
+    txBodyConsume <- buildTxBody $ mustHaveInput @'PlutusV2 $ GYTxIn toConsume (GYTxInWitnessSimpleScript $ if toUseRefScript then GYInReferenceSimpleScript toConsume multiSigSimpleScript else GYInSimpleScript multiSigSimpleScript)
     submitTxBodyConfirmed txBodyConsume $ userPaymentSKey <$> [user1, user2, user3]
   info $ "Successfully consumed the simple script, with tx id: " <> show txIdConsume

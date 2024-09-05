@@ -1,4 +1,4 @@
-{-|
+{- |
 Module      : GeniusYield.Types.TxMetadata
 Copyright   : (c) 2024 GYELD GMBH
 License     : Apache 2.0
@@ -23,20 +23,21 @@ module GeniusYield.Types.TxMetadata (
   constructTxMetadataTextChunks,
   mergeTxMetadata,
   metadataMsg,
-  metadataMsgs
+  metadataMsgs,
 ) where
 
-import qualified Cardano.Api                           as Api
-import           Data.ByteString                       (ByteString)
-import qualified Data.ByteString                       as BS
-import qualified Data.Map.Strict                       as Map
-import qualified Data.Text.Encoding                    as TE
-import           Data.Word                             (Word64)
-import           GeniusYield.Imports                   (Text)
-import           GeniusYield.Types.TxMetadata.Internal (GYTxMetadataValue (..),
-                                                        txMetadataValueFromApi,
-                                                        txMetadataValueToApi)
-
+import Cardano.Api qualified as Api
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as BS
+import Data.Map.Strict qualified as Map
+import Data.Text.Encoding qualified as TE
+import Data.Word (Word64)
+import GeniusYield.Imports (Text)
+import GeniusYield.Types.TxMetadata.Internal (
+  GYTxMetadataValue (..),
+  txMetadataValueFromApi,
+  txMetadataValueToApi,
+ )
 
 newtype GYTxMetadata = GYTxMetadata (Map.Map Word64 GYTxMetadataValue)
   deriving newtype (Eq, Semigroup, Show)
@@ -58,26 +59,26 @@ constructTxMetadataList = GYTxMetaList
 -- | Construct a 'GYTxMetadataValue' from an 'Integer'. Returning 'Nothing' if the given 'Integer' is not in the range @-(2^64-1) .. 2^64-1@.
 constructTxMetadataNumber :: Integer -> Maybe GYTxMetadataValue
 constructTxMetadataNumber n =
-  let bound :: Integer = fromIntegral (maxBound :: Word64) in
-  if n >= negate bound && n <= bound
-  then Just $ GYTxMetaNumber n
-  else Nothing
+  let bound :: Integer = fromIntegral (maxBound :: Word64)
+   in if n >= negate bound && n <= bound
+        then Just $ GYTxMetaNumber n
+        else Nothing
 
 -- | Construct a 'GYTxMetadataValue' from a 'ByteString'. Returning 'Nothing' if the given 'ByteString' is longer than 64 bytes.
 constructTxMetadataBytes :: ByteString -> Maybe GYTxMetadataValue
 constructTxMetadataBytes bs =
-  let len = BS.length bs in
-  if len <= 64
-    then Just $ GYTxMetaBytes bs
-    else Nothing
+  let len = BS.length bs
+   in if len <= 64
+        then Just $ GYTxMetaBytes bs
+        else Nothing
 
 -- | Construct a 'GYTxMetadataValue' from a 'Text'. Returning 'Nothing' if the given 'Text' is longer than 64 bytes when UTF-8 encoded.
 constructTxMetadataText :: Text -> Maybe GYTxMetadataValue
 constructTxMetadataText txt =
-  let len = BS.length $ TE.encodeUtf8 txt in
-  if len <= 64
-    then Just $ GYTxMetaText txt
-    else Nothing
+  let len = BS.length $ TE.encodeUtf8 txt
+   in if len <= 64
+        then Just $ GYTxMetaText txt
+        else Nothing
 
 -- | Construct a 'GYTxMetadataValue' from a 'ByteString' as a list of chunks (bytestrings) of acceptable sizes, splitting at 64th byte as maximum length allowed is 64 bytes.
 constructTxMetadataBytesChunks :: ByteString -> GYTxMetadataValue
@@ -90,7 +91,7 @@ constructTxMetadataTextChunks = txMetadataValueFromApi . Api.TxMetaList . constr
 constructTxMetadataTextChunks' :: Text -> [Api.TxMetadataValue]
 constructTxMetadataTextChunks' txt = case Api.metaTextChunks txt of
   Api.TxMetaList xs -> xs
-  _                 -> error "GeniusYield.Types.TxMetadata.constructTxMetadataTextChunks': Absurd, expected TxMetaList"
+  _ -> error "GeniusYield.Types.TxMetadata.constructTxMetadataTextChunks': Absurd, expected TxMetaList"
 
 -- | Merge two 'GYTxMetadata's, controlling how to handle the respective 'GYTxMetadataValue's in case of label collision.
 mergeTxMetadata :: (GYTxMetadataValue -> GYTxMetadataValue -> GYTxMetadataValue) -> GYTxMetadata -> GYTxMetadata -> GYTxMetadata
@@ -100,30 +101,31 @@ mergeTxMetadata f (GYTxMetadata m1) (GYTxMetadata m2) = GYTxMetadata $ Map.union
 -- Convenience functions for adding messages (comments/memos) following CIP 020 specification.
 ----------------------------------------------------------------------------------------------
 
--- | Adds a single message (comment/memo) as transaction metadata following CIP 020 specification.
---
--- See 'metadataMsgs' for examples.
+{- | Adds a single message (comment/memo) as transaction metadata following CIP 020 specification.
+
+See 'metadataMsgs' for examples.
+-}
 metadataMsg :: Text -> Maybe GYTxMetadata
 metadataMsg msg = metadataMsgs [msg]
 
--- | Adds multiple messages (comments/memos) as transaction metadata following CIP 020 specification.
---
--- >>> metadataMsgs ["Hello, World!", "This is a test message."]
--- Just (fromList [(674,GYTxMetaMap [(GYTxMetaText "msg",GYTxMetaList [GYTxMetaText "Hello, World!",GYTxMetaText "This is a test message."])])])
---
--- >>> metadataMsgs [""]
--- Nothing
---
--- >>> metadataMsgs []
--- Nothing
---
--- >>> metadataMsgs ["Hello, World!", "This one is a reaaaaaaaally long message, so long that it exceeds the 64 byte limit, so it will be split into multiple chunks.", "do you see that?"]
--- Just (fromList [(674,GYTxMetaMap [(GYTxMetaText "msg",GYTxMetaList [GYTxMetaText "Hello, World!",GYTxMetaText "This one is a reaaaaaaaally long message, so long that it exceed",GYTxMetaText "s the 64 byte limit, so it will be split into multiple chunks.",GYTxMetaText "do you see that?"])])])
---
+{- | Adds multiple messages (comments/memos) as transaction metadata following CIP 020 specification.
+
+>>> metadataMsgs ["Hello, World!", "This is a test message."]
+Just (fromList [(674,GYTxMetaMap [(GYTxMetaText "msg",GYTxMetaList [GYTxMetaText "Hello, World!",GYTxMetaText "This is a test message."])])])
+
+>>> metadataMsgs [""]
+Nothing
+
+>>> metadataMsgs []
+Nothing
+
+>>> metadataMsgs ["Hello, World!", "This one is a reaaaaaaaally long message, so long that it exceeds the 64 byte limit, so it will be split into multiple chunks.", "do you see that?"]
+Just (fromList [(674,GYTxMetaMap [(GYTxMetaText "msg",GYTxMetaList [GYTxMetaText "Hello, World!",GYTxMetaText "This one is a reaaaaaaaally long message, so long that it exceed",GYTxMetaText "s the 64 byte limit, so it will be split into multiple chunks.",GYTxMetaText "do you see that?"])])])
+-}
 metadataMsgs :: [Text] -> Maybe GYTxMetadata
 metadataMsgs msgs = case metaValue of
   GYTxMetaList [] -> Nothing
-  _               -> Just $ GYTxMetadata $ Map.fromList [(674, GYTxMetaMap [(GYTxMetaText "msg", metaValue)])]
+  _ -> Just $ GYTxMetadata $ Map.fromList [(674, GYTxMetaMap [(GYTxMetaText "msg", metaValue)])]
   where
     metaValue :: GYTxMetadataValue
     metaValue = txMetadataValueFromApi $ Api.TxMetaList $ concatMap constructTxMetadataTextChunks' msgs

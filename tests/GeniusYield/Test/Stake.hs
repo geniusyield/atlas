@@ -1,18 +1,19 @@
-module GeniusYield.Test.Stake
-  ( stakeTests
-  ) where
+module GeniusYield.Test.Stake (
+  stakeTests,
+) where
 
-import           Data.Foldable           (for_)
-import           GeniusYield.GYConfig
-import           GeniusYield.Transaction (GYCoinSelectionStrategy)
-import           GeniusYield.TxBuilder
-import           GeniusYield.Types
-import           Test.Tasty              (TestTree, testGroup)
-import           Test.Tasty.HUnit        (assertBool, assertFailure, testCase)
+import Data.Foldable (for_)
+import GeniusYield.GYConfig
+import GeniusYield.Transaction (GYCoinSelectionStrategy)
+import GeniusYield.TxBuilder
+import GeniusYield.Types
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (assertBool, assertFailure, testCase)
 
 stakeTests :: GYCoreConfig -> TestTree
 stakeTests config =
-  testGroup "stake"
+  testGroup
+    "stake"
     [ testCase "able to build balanced transaction involving withdrawal" $ do
         withCfgProviders config mempty $ \provider@GYProviders {..} -> do
           -- This stake credential and it's corresponding address was found from net, and in case is not valid anymore, it's easy to replace it with a valid one. This test was written as there was some trouble faced in accumulation of rewards in our private testnet.

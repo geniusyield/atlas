@@ -1,119 +1,130 @@
-{-|
+{- |
 Module      : GeniusYield.Test.Privnet.Ctx
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.Test.Privnet.Ctx (
-    -- * Context
-    Ctx (..),
-    ctxNetworkId,
-    -- * User
-    User (..),
-    CreateUserConfig (..),
-    ctxUsers,
-    ctxWallets,
-    userPkh,
-    userPaymentPkh,
-    userStakePkh,
-    userVKey,
-    userPaymentVKey,
-    userStakeVKey,
-    -- * Operations
-    ctxRunGame,
-    ctxRun,
-    ctxRunQuery,
-    ctxRunBuilder,
-    ctxRunBuilderWithCollateral,
-    ctxSlotOfCurrentBlock,
-    ctxWaitNextBlock,
-    ctxWaitUntilSlot,
-    ctxProviders,
-    ctxSlotConfig,
-    -- * Helpers
-    newTempUserCtx,
-    ctxQueryBalance,
-    findOutput,
+  -- * Context
+  Ctx (..),
+  ctxNetworkId,
+
+  -- * User
+  User (..),
+  CreateUserConfig (..),
+  ctxUsers,
+  ctxWallets,
+  userPkh,
+  userPaymentPkh,
+  userStakePkh,
+  userVKey,
+  userPaymentVKey,
+  userStakeVKey,
+
+  -- * Operations
+  ctxRunGame,
+  ctxRun,
+  ctxRunQuery,
+  ctxRunBuilder,
+  ctxRunBuilderWithCollateral,
+  ctxSlotOfCurrentBlock,
+  ctxWaitNextBlock,
+  ctxWaitUntilSlot,
+  ctxProviders,
+  ctxSlotConfig,
+
+  -- * Helpers
+  newTempUserCtx,
+  ctxQueryBalance,
+  findOutput,
 ) where
 
-import qualified Cardano.Api                as Api
-import           Data.Default               (Default (..))
-import           GeniusYield.Imports
-import           GeniusYield.Providers.Node
-import           GeniusYield.TxBuilder
-import           GeniusYield.Types
-import           GeniusYield.Test.Utils
-import           Test.Tasty.HUnit           (assertFailure)
+import Cardano.Api qualified as Api
+import Data.Default (Default (..))
+import GeniusYield.Imports
+import GeniusYield.Providers.Node
+import GeniusYield.Test.Utils
+import GeniusYield.TxBuilder
+import GeniusYield.Types
+import Test.Tasty.HUnit (assertFailure)
 
 -- TODO (simplify-genesis): Remove this once 'newTempUserCtx' has been removed.
-data CreateUserConfig =
-     CreateUserConfig
-       { -- | Create collateral output of 5 ada?
-         cucGenerateCollateral :: !Bool,
-         -- | Create a stake key for the user?
-         cucGenerateStakeKey   :: !Bool
-       }
+data CreateUserConfig
+  = CreateUserConfig
+  { cucGenerateCollateral :: !Bool
+  -- ^ Create collateral output of 5 ada?
+  , cucGenerateStakeKey :: !Bool
+  -- ^ Create a stake key for the user?
+  }
 
 instance Default CreateUserConfig where
-   def = CreateUserConfig { cucGenerateCollateral = False, cucGenerateStakeKey = False }
-
+  def = CreateUserConfig {cucGenerateCollateral = False, cucGenerateStakeKey = False}
 
 data Ctx = Ctx
-    { ctxNetworkInfo       :: !GYNetworkInfo
-    , ctxInfo              :: !Api.LocalNodeConnectInfo
-    -- FIXME: There are now multiple genesis users (since cardano-testnet usage).
+  { ctxNetworkInfo :: !GYNetworkInfo
+  , ctxInfo :: !Api.LocalNodeConnectInfo
+  , -- FIXME: There are now multiple genesis users (since cardano-testnet usage).
     -- TODO (simplify-genesis): Remove these fields (except for funder user(s))
     -- once user creation logic is removed from test setup.
-    , ctxUserF             :: !User  -- ^ Funder. All other users begin with same status of funds.
-    , ctxUser2             :: !User
-    , ctxUser3             :: !User
-    , ctxUser4             :: !User
-    , ctxUser5             :: !User
-    , ctxUser6             :: !User
-    , ctxUser7             :: !User
-    , ctxUser8             :: !User
-    , ctxUser9             :: !User
-    , ctxGold              :: !GYAssetClass  -- ^ asset used in tests
-    , ctxIron              :: !GYAssetClass  -- ^ asset used in tests
-    , ctxLog               :: !GYLogConfiguration
-    , ctxLookupDatum       :: !GYLookupDatum
-    , ctxAwaitTxConfirmed  :: !GYAwaitTx
-    , ctxQueryUtxos        :: !GYQueryUTxO
-    , ctxGetParams         :: !GYGetParameters
-    }
+    ctxUserF :: !User
+  -- ^ Funder. All other users begin with same status of funds.
+  , ctxUser2 :: !User
+  , ctxUser3 :: !User
+  , ctxUser4 :: !User
+  , ctxUser5 :: !User
+  , ctxUser6 :: !User
+  , ctxUser7 :: !User
+  , ctxUser8 :: !User
+  , ctxUser9 :: !User
+  , ctxGold :: !GYAssetClass
+  -- ^ asset used in tests
+  , ctxIron :: !GYAssetClass
+  -- ^ asset used in tests
+  , ctxLog :: !GYLogConfiguration
+  , ctxLookupDatum :: !GYLookupDatum
+  , ctxAwaitTxConfirmed :: !GYAwaitTx
+  , ctxQueryUtxos :: !GYQueryUTxO
+  , ctxGetParams :: !GYGetParameters
+  }
 
 ctxNetworkId :: Ctx -> GYNetworkId
 ctxNetworkId Ctx {ctxNetworkInfo} = GYPrivnet ctxNetworkInfo
 
 -- TODO (simplify-genesis): Remove this once user creation logic is removed from test setup.
--- | List of context sibling users - all of which begin with same balance.
--- FIXME: Some of these users are actually genesis users.
+
+{- | List of context sibling users - all of which begin with same balance.
+FIXME: Some of these users are actually genesis users.
+-}
 ctxUsers :: Ctx -> [User]
 ctxUsers ctx = ($ ctx) <$> [ctxUser2, ctxUser3, ctxUser4, ctxUser5, ctxUser6, ctxUser7, ctxUser8, ctxUser9]
 
 -- TODO (simplify-genesis): Remove this once user creation logic is removed from test setup.
 ctxWallets :: Ctx -> Wallets
-ctxWallets Ctx{..} = Wallets
-  { w1 = ctxUserF
-  , w2 = ctxUser2
-  , w3 = ctxUser3
-  , w4 = ctxUser4
-  , w5 = ctxUser5
-  , w6 = ctxUser6
-  , w7 = ctxUser7
-  , w8 = ctxUser8
-  , w9 = ctxUser9
-  }
+ctxWallets Ctx {..} =
+  Wallets
+    { w1 = ctxUserF
+    , w2 = ctxUser2
+    , w3 = ctxUser3
+    , w4 = ctxUser4
+    , w5 = ctxUser5
+    , w6 = ctxUser6
+    , w7 = ctxUser7
+    , w8 = ctxUser8
+    , w9 = ctxUser9
+    }
 
 -- TODO (simplify-genesis): Remove this. See note 'simplify-genesis'.
+
 -- | Creates a new user with the given balance. Note that the actual balance which this user get's could be more than what is provided to satisfy minimum ada requirement of a UTxO.
-newTempUserCtx:: Ctx
-              -> User            -- ^ User which will fund this new user.
-              -> GYValue         -- ^ Describes balance of new user.
-              -> CreateUserConfig
-              -> IO User
+newTempUserCtx ::
+  Ctx ->
+  -- | User which will fund this new user.
+  User ->
+  -- | Describes balance of new user.
+  GYValue ->
+  CreateUserConfig ->
+  IO User
 newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
   newPaymentSKey <- generatePaymentSigningKey
   newStakeSKey <- if cucGenerateStakeKey then Just <$> generateStakeSigningKey else pure Nothing
@@ -129,12 +140,14 @@ newTempUserCtx ctx fundUser fundValue CreateUserConfig {..} = do
   when (cucGenerateCollateral && adaInValue < collateralLovelace) $ fail "Given value for new user has less than 5 ada"
 
   ctxRun ctx fundUser $ do
-    txBody <- buildTxBody $
-      if cucGenerateCollateral then
-        mustHaveOutput (mkGYTxOutNoDatum newAddr (otherValue <> (valueFromLovelace adaInValue `valueMinus` collateralValue))) <>
-        mustHaveOutput (mkGYTxOutNoDatum newAddr collateralValue)
-      else
-        mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
+    txBody <-
+      buildTxBody $
+        if cucGenerateCollateral
+          then
+            mustHaveOutput (mkGYTxOutNoDatum newAddr (otherValue <> (valueFromLovelace adaInValue `valueMinus` collateralValue)))
+              <> mustHaveOutput (mkGYTxOutNoDatum newAddr collateralValue)
+          else
+            mustHaveOutput (mkGYTxOutNoDatum newAddr fundValue)
     signAndSubmitConfirmed_ txBody
 
   pure $ User' {userPaymentSKey' = newPaymentSKey, userAddr = newAddr, userStakeSKey' = newStakeSKey}
@@ -152,13 +165,17 @@ ctxRunBuilder :: Ctx -> User -> GYTxBuilderMonadIO a -> IO a
 ctxRunBuilder ctx User' {..} = runGYTxBuilderMonadIO (ctxNetworkId ctx) (ctxProviders ctx) [userAddr] userAddr Nothing
 
 -- | Variant of `ctxRun` where caller can also give the UTxO to be used as collateral.
-ctxRunBuilderWithCollateral :: Ctx
-                     -> User
-                     -> GYTxOutRef  -- ^ Reference to UTxO to be used as collateral.
-                     -> Bool        -- ^ To check whether this given collateral UTxO has value of exact 5 ada? If it doesn't have exact 5 ada, it would be ignored.
-                     -> GYTxBuilderMonadIO a
-                     -> IO a
-ctxRunBuilderWithCollateral ctx User' {..} coll toCheck5Ada = runGYTxBuilderMonadIO
+ctxRunBuilderWithCollateral ::
+  Ctx ->
+  User ->
+  -- | Reference to UTxO to be used as collateral.
+  GYTxOutRef ->
+  -- | To check whether this given collateral UTxO has value of exact 5 ada? If it doesn't have exact 5 ada, it would be ignored.
+  Bool ->
+  GYTxBuilderMonadIO a ->
+  IO a
+ctxRunBuilderWithCollateral ctx User' {..} coll toCheck5Ada =
+  runGYTxBuilderMonadIO
     (ctxNetworkId ctx)
     (ctxProviders ctx)
     [userAddr]
@@ -167,7 +184,7 @@ ctxRunBuilderWithCollateral ctx User' {..} coll toCheck5Ada = runGYTxBuilderMona
 
 ctxSlotOfCurrentBlock :: Ctx -> IO GYSlot
 ctxSlotOfCurrentBlock (ctxProviders -> providers) =
-    gyGetSlotOfCurrentBlock providers
+  gyGetSlotOfCurrentBlock providers
 
 ctxWaitNextBlock :: Ctx -> IO ()
 ctxWaitNextBlock (ctxProviders -> providers) = void $ gyWaitForNextBlock providers
@@ -180,23 +197,25 @@ ctxSlotConfig ctx = ctxRunQuery ctx slotConfig
 
 ctxQueryBalance :: Ctx -> User -> IO GYValue
 ctxQueryBalance ctx u = ctxRunQuery ctx $ do
-    queryBalance $ userAddr u
+  queryBalance $ userAddr u
 
 ctxProviders :: Ctx -> GYProviders
-ctxProviders ctx = GYProviders
-    { gyLookupDatum      = ctxLookupDatum ctx
-    , gySubmitTx         = nodeSubmitTx (ctxInfo ctx)
+ctxProviders ctx =
+  GYProviders
+    { gyLookupDatum = ctxLookupDatum ctx
+    , gySubmitTx = nodeSubmitTx (ctxInfo ctx)
     , gyAwaitTxConfirmed = ctxAwaitTxConfirmed ctx
-    , gySlotActions      = nodeSlotActions (ctxInfo ctx)
-    , gyGetParameters    = ctxGetParams ctx
-    , gyQueryUTxO        = ctxQueryUtxos ctx
-    , gyLog'             = ctxLog ctx
+    , gySlotActions = nodeSlotActions (ctxInfo ctx)
+    , gyGetParameters = ctxGetParams ctx
+    , gyQueryUTxO = ctxQueryUtxos ctx
+    , gyLog' = ctxLog ctx
     , gyGetStakeAddressInfo = nodeStakeAddressInfo (ctxInfo ctx)
     }
 
 -- | Function to find for the first locked output in the given `GYTxBody` at the given `GYAddress`.
 findOutput :: GYAddress -> GYTxBody -> IO GYTxOutRef
 findOutput addr txBody = do
-    let utxos = txBodyUTxOs txBody
-    maybe (assertFailure "expecting an order in utxos") return $
-        findFirst (\utxo -> if utxoAddress utxo == addr then Just (utxoRef utxo) else Nothing) $ utxosToList utxos
+  let utxos = txBodyUTxOs txBody
+  maybe (assertFailure "expecting an order in utxos") return $
+    findFirst (\utxo -> if utxoAddress utxo == addr then Just (utxoRef utxo) else Nothing) $
+      utxosToList utxos

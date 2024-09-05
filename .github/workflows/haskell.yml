@@ -18,7 +18,7 @@ on:
         value: ${{ jobs.build.outputs.ATLAS_VERSION }}
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -122,17 +122,8 @@ jobs:
     - name: Install fourmolu
       run: cabal install fourmolu --overwrite-policy=always
 
-    - name: Lint Haskell
-      run: |
-        find . -name '*.hs' -exec sh -c 'for file do fourmolu -i "$file"; done' sh {} +
-
-    - name: Auto-commit lint
-      uses: stefanzweifel/git-auto-commit-action@v4
-      with:
-        commit_message: fourmolu auto-commit
-        commit_user_name: GitHub Action
-        commit_user_email: action@github.com
-        branch: ${{ github.head_ref }}
+    - name: Run checks (fourmolu)
+      run: git ls-files -z '*.hs' | xargs -P 12 -0 fourmolu --mode check
 
     - name: Install LIBSODIUM
       run: |

@@ -1,24 +1,24 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-|
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+
+{- |
 Module      : GeniusYield.Test.OnChain.GuessRefInputDatum
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.com
 Stability   : develop
-
 -}
-module GeniusYield.Test.OnChain.GuessRefInputDatum
-    ( mkGuessRefInputDatumValidator
-    , RefInputDatum (..)
-    , Guess (..)
-    ) where
+module GeniusYield.Test.OnChain.GuessRefInputDatum (
+  mkGuessRefInputDatumValidator,
+  RefInputDatum (..),
+  Guess (..),
+) where
 
-import           PlutusLedgerApi.V2
-import           PlutusLedgerApi.V2.Contexts (findDatum)
-import qualified PlutusTx
-import           PlutusTx.Prelude          as PlutusTx
+import PlutusLedgerApi.V2
+import PlutusLedgerApi.V2.Contexts (findDatum)
+import PlutusTx qualified
+import PlutusTx.Prelude as PlutusTx
 
 newtype RefInputDatum = RefInputDatum Integer
 PlutusTx.unstableMakeIsData ''RefInputDatum
@@ -27,11 +27,11 @@ PlutusTx.unstableMakeIsData ''RefInputDatum
 newtype Guess = Guess Integer
 PlutusTx.unstableMakeIsData ''Guess
 
-{-# INLINABLE mkGuessRefInputDatumValidator #-}
+{-# INLINEABLE mkGuessRefInputDatumValidator #-}
 mkGuessRefInputDatumValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
 mkGuessRefInputDatumValidator _ red' ctx'
-    | guess == original = ()
-    | otherwise         = error ()
+  | guess == original = ()
+  | otherwise = error ()
   where
     ctx :: ScriptContext
     ctx = unsafeFromBuiltinData ctx'
@@ -43,19 +43,20 @@ mkGuessRefInputDatumValidator _ red' ctx'
 
     refIn :: TxOut
     refIn = case map txInInfoResolved (txInfoReferenceInputs info) of
-                [refIn']  -> refIn'
-                []        -> traceError "No reference input provided."
-                _anyOther -> traceError "Expected only one reference input but found more than one."
+      [refIn'] -> refIn'
+      [] -> traceError "No reference input provided."
+      _anyOther -> traceError "Expected only one reference input but found more than one."
 
-    outputToDatum :: FromData b => TxOut -> Maybe b
+    outputToDatum :: (FromData b) => TxOut -> Maybe b
     outputToDatum o = case txOutDatum o of
-      NoOutputDatum      -> Nothing
-      OutputDatum d      -> processDatum d
+      NoOutputDatum -> Nothing
+      OutputDatum d -> processDatum d
       OutputDatumHash dh -> processDatum =<< findDatum dh info
-      where processDatum = fromBuiltinData . getDatum
+      where
+        processDatum = fromBuiltinData . getDatum
 
     original :: Integer
     original =
       case outputToDatum refIn of
-        Nothing                        -> traceError "Datum not present or parsed."
+        Nothing -> traceError "Datum not present or parsed."
         Just (RefInputDatum original') -> original'

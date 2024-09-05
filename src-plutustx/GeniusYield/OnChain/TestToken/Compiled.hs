@@ -1,29 +1,32 @@
-{-# LANGUAGE DataKinds       #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-|
+
+{- |
 Module      : GeniusYield.OnChain.TestToken.Compiled
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.OnChain.TestToken.Compiled (
-    originalTestTokenPolicy,
+  originalTestTokenPolicy,
 ) where
 
-import           GeniusYield.OnChain.TestToken
-import qualified PlutusLedgerApi.V2
-import qualified PlutusTx
+import GeniusYield.OnChain.TestToken
 import PlutusCore.Version (plcVersion100)
+import PlutusLedgerApi.V2 qualified
+import PlutusTx qualified
 
-originalTestTokenPolicy
-  :: Integer                       -- ^ Count.
-  -> PlutusLedgerApi.V2.TokenName  -- ^ Token name (e.g. @GOLD@).
-  -> PlutusLedgerApi.V2.TxOutRef   -- ^ UTxO to base token on.
-  -> PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ())
+originalTestTokenPolicy ::
+  -- | Count.
+  Integer ->
+  -- | Token name (e.g. @GOLD@).
+  PlutusLedgerApi.V2.TokenName ->
+  -- | UTxO to base token on.
+  PlutusLedgerApi.V2.TxOutRef ->
+  PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ())
 originalTestTokenPolicy count tn utxo =
-    $$(PlutusTx.compile [|| mkTestTokenPolicy ||])
+  $$(PlutusTx.compile [||mkTestTokenPolicy||])
     `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 count
     `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 tn
     `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 utxo

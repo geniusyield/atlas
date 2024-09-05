@@ -1,74 +1,77 @@
-{-|
+{- |
 Module      : GeniusYield.Types.TxBody
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.Types.TxBody (
-    -- * Transaction body
-    GYTxBody,
-    -- * Conversions
-    txBodyFromApi,
-    txBodyToApi,
-    -- * Transaction creation
-    signGYTxBody,
-    signGYTxBody',
-    signTx,
-    unsignedTx,
-    makeSignedTransaction,
-    makeSignedTransaction',
-    appendWitnessGYTx,
-    signGYTx,
-    signGYTx',
-    -- * Functions
-    txBodyFromHex,
-    txBodyFromHexBS,
-    txBodyFromCBOR,
-    txBodyToHex,
-    txBodyToHexBS,
-    txBodyFee,
-    txBodyFeeValue,
-    txBodyUTxOs,
-    txBodyTxIns,
-    txBodyTxInsReference,
-    txBodyTxId,
-    txBodyToApiTxBodyContent,
-    txBodyReqSignatories,
-    txBodyMintValue,
-    txBodyValidityRange,
-    txBodyCollateral,
-    txBodyCollateralReturnOutput,
-    txBodyCollateralReturnOutputValue,
-    txBodyTotalCollateralLovelace,
-    getTxBody,
+  -- * Transaction body
+  GYTxBody,
+
+  -- * Conversions
+  txBodyFromApi,
+  txBodyToApi,
+
+  -- * Transaction creation
+  signGYTxBody,
+  signGYTxBody',
+  signTx,
+  unsignedTx,
+  makeSignedTransaction,
+  makeSignedTransaction',
+  appendWitnessGYTx,
+  signGYTx,
+  signGYTx',
+
+  -- * Functions
+  txBodyFromHex,
+  txBodyFromHexBS,
+  txBodyFromCBOR,
+  txBodyToHex,
+  txBodyToHexBS,
+  txBodyFee,
+  txBodyFeeValue,
+  txBodyUTxOs,
+  txBodyTxIns,
+  txBodyTxInsReference,
+  txBodyTxId,
+  txBodyToApiTxBodyContent,
+  txBodyReqSignatories,
+  txBodyMintValue,
+  txBodyValidityRange,
+  txBodyCollateral,
+  txBodyCollateralReturnOutput,
+  txBodyCollateralReturnOutputValue,
+  txBodyTotalCollateralLovelace,
+  getTxBody,
 ) where
 
+import Cardano.Api qualified as Api
+import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Ledger.Coin qualified as Ledger
+import Data.ByteString qualified as BS
+import Data.ByteString.Base16 qualified as BS16
+import Data.ByteString.Char8 qualified as BS8
+import Data.Set qualified as Set
 
-import qualified Cardano.Api                  as Api
-import qualified Cardano.Api.Shelley          as Api.S
-import qualified Cardano.Ledger.Coin          as Ledger
-import qualified Data.ByteString              as BS
-import qualified Data.ByteString.Base16       as BS16
-import qualified Data.ByteString.Char8        as BS8
-import qualified Data.Set                     as Set
-
-import           GeniusYield.Imports
-import           GeniusYield.Types.Era
-import           GeniusYield.Types.Key        (GYSomeSigningKey (GYSomeSigningKey))
-import           GeniusYield.Types.Key.Class  (ToShelleyWitnessSigningKey,
-                                               toShelleyWitnessSigningKey)
-import           GeniusYield.Types.PubKeyHash (GYPubKeyHash, pubKeyHashFromApi)
-import           GeniusYield.Types.Slot
-import           GeniusYield.Types.Tx
-import           GeniusYield.Types.TxOutRef
-import           GeniusYield.Types.UTxO
-import           GeniusYield.Types.Value
+import GeniusYield.Imports
+import GeniusYield.Types.Era
+import GeniusYield.Types.Key (GYSomeSigningKey (GYSomeSigningKey))
+import GeniusYield.Types.Key.Class (
+  ToShelleyWitnessSigningKey,
+  toShelleyWitnessSigningKey,
+ )
+import GeniusYield.Types.PubKeyHash (GYPubKeyHash, pubKeyHashFromApi)
+import GeniusYield.Types.Slot
+import GeniusYield.Types.Tx
+import GeniusYield.Types.TxOutRef
+import GeniusYield.Types.UTxO
+import GeniusYield.Types.Value
 
 -- | Transaction body: the part which is then signed.
 newtype GYTxBody = GYTxBody (Api.TxBody ApiEra)
-  deriving Show
+  deriving (Show)
 
 txBodyFromApi :: Api.TxBody ApiEra -> GYTxBody
 txBodyFromApi = coerce
@@ -77,24 +80,26 @@ txBodyToApi :: GYTxBody -> Api.TxBody ApiEra
 txBodyToApi = coerce
 
 -- | Sign a transaction body with (potentially) multiple keys.
-signGYTxBody :: ToShelleyWitnessSigningKey a =>  GYTxBody -> [a] -> GYTx
+signGYTxBody :: (ToShelleyWitnessSigningKey a) => GYTxBody -> [a] -> GYTx
 signGYTxBody = signTx
 
 {-# DEPRECATED signTx "Use signGYTxBody." #-}
-signTx :: ToShelleyWitnessSigningKey a =>  GYTxBody -> [a] -> GYTx
-signTx (GYTxBody txBody) skeys = txFromApi
-  $ Api.signShelleyTransaction
+signTx :: (ToShelleyWitnessSigningKey a) => GYTxBody -> [a] -> GYTx
+signTx (GYTxBody txBody) skeys =
+  txFromApi
+    $ Api.signShelleyTransaction
       Api.ShelleyBasedEraConway
       txBody
-      $ map toShelleyWitnessSigningKey skeys
+    $ map toShelleyWitnessSigningKey skeys
 
 -- | Sign a transaction body with (potentially) multiple keys of potentially different nature.
 signGYTxBody' :: GYTxBody -> [GYSomeSigningKey] -> GYTx
-signGYTxBody' (txBodyToApi -> txBody) skeys = txFromApi
-  $ Api.signShelleyTransaction
+signGYTxBody' (txBodyToApi -> txBody) skeys =
+  txFromApi
+    $ Api.signShelleyTransaction
       Api.ShelleyBasedEraConway
       txBody
-      $ map (\(GYSomeSigningKey a) -> toShelleyWitnessSigningKey a) skeys
+    $ map (\(GYSomeSigningKey a) -> toShelleyWitnessSigningKey a) skeys
 
 -- | Make a signed transaction given the transaction body & list of key witnesses, represented in `GYTxWitness`.
 makeSignedTransaction :: GYTxWitness -> GYTxBody -> GYTx
@@ -112,10 +117,10 @@ appendWitnessGYTx = appendWitnessGYTx' . txWitToKeyWitnessApi
 appendWitnessGYTx' :: [Api.S.KeyWitness ApiEra] -> GYTx -> GYTx
 appendWitnessGYTx' appendKeyWitnessList previousTx =
   let (txBody, previousKeyWitnessesList) = Api.S.getTxBodyAndWitnesses $ txToApi previousTx
-  in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
+   in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
 
 -- | Sign a transaction with (potentially) multiple keys and add your witness(s) among previous key witnesses, if any.
-signGYTx :: ToShelleyWitnessSigningKey a =>  GYTx -> [a] -> GYTx
+signGYTx :: (ToShelleyWitnessSigningKey a) => GYTx -> [a] -> GYTx
 signGYTx previousTx skeys = signGYTx'' previousTx $ map toShelleyWitnessSigningKey skeys
 
 -- | Sign a transaction with (potentially) multiple keys and add your witness(s) among previous key witnesses, if any.
@@ -126,7 +131,7 @@ signGYTx'' previousTx skeys =
   -- required here to get for `appendKeyWitnessList`.
   let (txBody, previousKeyWitnessesList) = Api.S.getTxBodyAndWitnesses $ txToApi previousTx
       appendKeyWitnessList = map (Api.makeShelleyKeyWitness Api.ShelleyBasedEraConway txBody) skeys
-  in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
+   in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
 
 -- | Sign a transaction with (potentially) multiple keys of potentially different nature and add your witness(s) among previous key witnesses, if any.
 signGYTx' :: GYTx -> [GYSomeSigningKey] -> GYTx
@@ -162,9 +167,9 @@ txBodyToCBOR = Api.serialiseToCBOR . txBodyToApi
 
 -- | Return the fees in lovelace.
 txBodyFee :: GYTxBody -> Integer
-txBodyFee (GYTxBody (Api.TxBody Api.TxBodyContent { Api.txFee = fee })) =
-    case fee of
-        Api.TxFeeExplicit _ (Ledger.Coin actual) -> actual
+txBodyFee (GYTxBody (Api.TxBody Api.TxBodyContent {Api.txFee = fee})) =
+  case fee of
+    Api.TxFeeExplicit _ (Ledger.Coin actual) -> actual
 
 -- | Return the fees as 'GYValue'.
 txBodyFeeValue :: GYTxBody -> GYValue
@@ -173,7 +178,7 @@ txBodyFeeValue = valueFromLovelace . txBodyFee
 -- | Return utxos created by tx (body).
 txBodyUTxOs :: GYTxBody -> GYUTxOs
 txBodyUTxOs (GYTxBody body@(Api.TxBody Api.TxBodyContent {txOuts})) =
-    utxosFromList $ zipWith f [0..] txOuts
+  utxosFromList $ zipWith f [0 ..] txOuts
   where
     txId = Api.getTxId body
 
@@ -187,7 +192,7 @@ txBodyTxIns (GYTxBody (Api.TxBody Api.TxBodyContent {txIns})) = map (txOutRefFro
 -- | Returns the 'GYTxOutRef' for the reference inputs present in the tx.
 txBodyTxInsReference :: GYTxBody -> [GYTxOutRef]
 txBodyTxInsReference (GYTxBody (Api.TxBody Api.TxBodyContent {txInsReference})) = case txInsReference of
-  Api.TxInsReferenceNone                                                        -> []
+  Api.TxInsReferenceNone -> []
   Api.TxInsReference Api.S.BabbageEraOnwardsConway inRefs -> map txOutRefFromApi inRefs
 
 -- | Returns the 'GYTxId' of the given 'GYTxBody'.
@@ -209,38 +214,38 @@ txBodyReqSignatories body = case Api.txExtraKeyWits $ txBodyToApiTxBodyContent b
 
 -- | Returns the mint 'GYValue' of the given 'GYTxBody'.
 txBodyMintValue :: GYTxBody -> GYValue
-txBodyMintValue body = case Api.txMintValue $ txBodyToApiTxBodyContent body  of
-    Api.TxMintNone        -> mempty
-    Api.TxMintValue _ v _ -> valueFromApi v
+txBodyMintValue body = case Api.txMintValue $ txBodyToApiTxBodyContent body of
+  Api.TxMintNone -> mempty
+  Api.TxMintValue _ v _ -> valueFromApi v
 
 -- | Returns the validity range of the given 'GYTxBody'.
 txBodyValidityRange :: GYTxBody -> (Maybe GYSlot, Maybe GYSlot)
 txBodyValidityRange body =
   let cnt = txBodyToApiTxBodyContent body
-  in case (Api.txValidityLowerBound cnt, Api.txValidityUpperBound cnt)  of
-    (lb, ub) -> (f lb, g ub)
+   in case (Api.txValidityLowerBound cnt, Api.txValidityUpperBound cnt) of
+        (lb, ub) -> (f lb, g ub)
   where
     f :: Api.TxValidityLowerBound ApiEra -> Maybe GYSlot
-    f Api.TxValidityNoLowerBound      = Nothing
+    f Api.TxValidityNoLowerBound = Nothing
     f (Api.TxValidityLowerBound _ sn) = Just $ slotFromApi sn
 
     g :: Api.TxValidityUpperBound ApiEra -> Maybe GYSlot
-    g (Api.TxValidityUpperBound _ Nothing)   = Nothing
+    g (Api.TxValidityUpperBound _ Nothing) = Nothing
     g (Api.TxValidityUpperBound _ (Just sn)) = Just $ slotFromApi sn
 
 -- | Returns the set of 'GYTxOutRef' used as collateral in the given 'GYTxBody'.
 txBodyCollateral :: GYTxBody -> Set GYTxOutRef
 txBodyCollateral body = case Api.txInsCollateral $ txBodyToApiTxBodyContent body of
-    Api.TxInsCollateralNone  -> Set.empty
-    Api.TxInsCollateral _ xs -> Set.fromList $ txOutRefFromApi <$> xs
+  Api.TxInsCollateralNone -> Set.empty
+  Api.TxInsCollateral _ xs -> Set.fromList $ txOutRefFromApi <$> xs
 
 -- | Returns the total collateral for the given transaction body.
 txBodyTotalCollateralLovelace :: GYTxBody -> Natural
 txBodyTotalCollateralLovelace body = case Api.txTotalCollateral $ txBodyToApiTxBodyContent body of
-    Api.TxTotalCollateralNone -> 0
-    Api.TxTotalCollateral _ (Ledger.Coin l)
-        | l >= 0              -> fromInteger l
-        | otherwise           -> error $ "negative total collateral: " <> show l
+  Api.TxTotalCollateralNone -> 0
+  Api.TxTotalCollateral _ (Ledger.Coin l)
+    | l >= 0 -> fromInteger l
+    | otherwise -> error $ "negative total collateral: " <> show l
 
 txBodyCollateralReturnOutput :: GYTxBody -> Api.TxReturnCollateral Api.CtxTx ApiEra
 txBodyCollateralReturnOutput body = Api.txReturnCollateral $ txBodyToApiTxBodyContent body
@@ -248,5 +253,5 @@ txBodyCollateralReturnOutput body = Api.txReturnCollateral $ txBodyToApiTxBodyCo
 txBodyCollateralReturnOutputValue :: GYTxBody -> GYValue
 txBodyCollateralReturnOutputValue body =
   case Api.txReturnCollateral $ txBodyToApiTxBodyContent body of
-    Api.TxReturnCollateralNone                   -> mempty
+    Api.TxReturnCollateralNone -> mempty
     Api.TxReturnCollateral _ (Api.TxOut _ v _ _) -> valueFromApi $ Api.txOutValueToValue v

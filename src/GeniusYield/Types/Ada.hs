@@ -1,26 +1,25 @@
-{-|
+{- |
 Module      : GeniusYield.Types.Ada
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.Types.Ada (
-  Ada (Ada)
-  , adaSymbol
-  , adaToken
-  , toLovelace
-  , toValue
-  , fromValue
-  , lovelaceOf
-  , lovelaceValueOf
+  Ada (Ada),
+  adaSymbol,
+  adaToken,
+  toLovelace,
+  toValue,
+  fromValue,
+  lovelaceOf,
+  lovelaceValueOf,
 ) where
 
-import           Data.Fixed               (Fixed (MkFixed), Micro)
+import Data.Fixed (Fixed (MkFixed), Micro)
 
-import           PlutusLedgerApi.V1.Value (Value, adaSymbol, adaToken)
-import qualified PlutusLedgerApi.V1.Value as Value
+import PlutusLedgerApi.V1.Value (Value, adaSymbol, adaToken)
+import PlutusLedgerApi.V1.Value qualified as Value
 
 -- | Ada represented with a 'Micro' value.
 newtype Ada = Ada Micro

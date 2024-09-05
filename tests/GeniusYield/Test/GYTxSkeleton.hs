@@ -1,41 +1,62 @@
-module GeniusYield.Test.GYTxSkeleton
-    ( gyTxSkeletonTests
-    ) where
+module GeniusYield.Test.GYTxSkeleton (
+  gyTxSkeletonTests,
+) where
 
-import           Data.Either                     (fromRight)
-import           Data.Map                        as Map (Map, empty, fromList,
-                                                         singleton)
-import           Data.Maybe                      (fromJust)
-import           Data.Set                        as Set (fromList, singleton)
-import           Test.Tasty                      (TestTree, testGroup)
-import           Test.Tasty.HUnit                (testCase, (@?=))
+import Data.Either (fromRight)
+import Data.Map as Map (
+  Map,
+  empty,
+  fromList,
+  singleton,
+ )
+import Data.Maybe (fromJust)
+import Data.Set as Set (fromList, singleton)
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (testCase, (@?=))
 
-import           GeniusYield.Types.Address       (GYAddress,
-                                                  unsafeAddressFromText)
-import           GeniusYield.Types.PlutusVersion (PlutusVersion (PlutusV2))
-import           GeniusYield.Types.PubKeyHash    (GYPubKeyHash,
-                                                  pubKeyHashFromPlutus)
-import           GeniusYield.Types.Redeemer      (GYRedeemer, unitRedeemer)
-import           GeniusYield.Types.Script        (GYMintScript (..),
-                                                  mintingPolicyFromApi,
-                                                  scriptFromCBOR, scriptToApi)
-import           GeniusYield.Types.Slot          (GYSlot, slotFromInteger)
-import           GeniusYield.Types.TxIn          (GYTxIn (GYTxIn, gyTxInTxOutRef, gyTxInWitness),
-                                                  GYTxInWitness (GYTxInWitnessKey))
-import           GeniusYield.Types.TxOut         (GYTxOut, mkGYTxOutNoDatum)
-import           GeniusYield.Types.TxOutRef      (GYTxOutRef)
-import           GeniusYield.Types.Value         (GYTokenName, GYValue,
-                                                  unsafeTokenNameFromHex,
-                                                  valueFromLovelace)
+import GeniusYield.Types.Address (
+  GYAddress,
+  unsafeAddressFromText,
+ )
+import GeniusYield.Types.PlutusVersion (PlutusVersion (PlutusV2))
+import GeniusYield.Types.PubKeyHash (
+  GYPubKeyHash,
+  pubKeyHashFromPlutus,
+ )
+import GeniusYield.Types.Redeemer (GYRedeemer, unitRedeemer)
+import GeniusYield.Types.Script (
+  GYMintScript (..),
+  mintingPolicyFromApi,
+  scriptFromCBOR,
+  scriptToApi,
+ )
+import GeniusYield.Types.Slot (GYSlot, slotFromInteger)
+import GeniusYield.Types.TxIn (
+  GYTxIn (GYTxIn, gyTxInTxOutRef, gyTxInWitness),
+  GYTxInWitness (GYTxInWitnessKey),
+ )
+import GeniusYield.Types.TxOut (GYTxOut, mkGYTxOutNoDatum)
+import GeniusYield.Types.TxOutRef (GYTxOutRef)
+import GeniusYield.Types.Value (
+  GYTokenName,
+  GYValue,
+  unsafeTokenNameFromHex,
+  valueFromLovelace,
+ )
 
-import           GeniusYield.TxBuilder.Class     (GYTxSkeleton (..),
-                                                  GYTxSkeletonRefIns (..),
-                                                  isInvalidAfter,
-                                                  isInvalidBefore,
-                                                  mustBeSignedBy, mustHaveInput,
-                                                  mustHaveOptionalOutput,
-                                                  mustHaveOutput,
-                                                  mustHaveRefInput, mustMint)
+import GeniusYield.TxBuilder.Class (
+  GYTxSkeleton (..),
+  GYTxSkeletonRefIns (..),
+  isInvalidAfter,
+  isInvalidBefore,
+  mustBeSignedBy,
+  mustHaveInput,
+  mustHaveOptionalOutput,
+  mustHaveOutput,
+  mustHaveRefInput,
+  mustMint,
+ )
+
 -------------------------------------------------------------------------------
 -- Tests
 -------------------------------------------------------------------------------
@@ -45,155 +66,163 @@ gyTxSkeletonTests = testGroup "GYTxSkeleton" basicTests
 
 basicTests :: [TestTree]
 basicTests =
-    [ testGroup "Constructors"
-        [ testCase "mustHaveInput" $
-            gytxIns (mustHaveInput mockTxIn) @?= [mockTxIn]
-        , testCase "mustHaveReferenceInput" $
-            gytxRefIns (mustHaveRefInput  @'PlutusV2 mockTxOutRef) @?= GYTxSkeletonRefIns (Set.singleton mockTxOutRef)
-        , testCase "mustHaveOutput" $
-            gytxOuts (mustHaveOutput mockTxOut1) @?= [mockTxOut1]
-        , testCase "mustHaveOptionalOutput (Just x)" $
-            gytxOuts (mustHaveOptionalOutput (Just mockTxOut1)) @?= [mockTxOut1]
-        , testCase "mustHaveOptionalOutput (Nothing)" $
-            gytxOuts (mustHaveOptionalOutput Nothing) @?= []
-        , testCase "mustMint" $
-            gytxMint (mustMint mockMintingPolicy unitRedeemer mockTokenName 10) @?= mockMint
-        , testCase "mustMint 0 is empty" $
-            gytxMint (mustMint mockMintingPolicy unitRedeemer mockTokenName 0) @?= Map.empty
-        , testCase "mustMint when burning" $
-            gytxMint (mustMint mockMintingPolicy unitRedeemer mockTokenName (-10)) @?= mockBurn
-        , testCase "mustBeSignedBy" $
-            gytxSigs (mustBeSignedBy mockPkh1) @?= Set.singleton mockPkh1
-        , testCase "isInvalidBefore" $
-            gytxInvalidBefore (isInvalidBefore mockSlot) @?= Just mockSlot
-        , testCase "isInvalidAfter" $
-            gytxInvalidAfter (isInvalidAfter mockSlot) @?= Just mockSlot
-        ]
-    , testGroup "SemiGroup"
-        [testGroup "Input"
-            [ testCase "Adding two inputs" $
-                let skeleton1 = mustHaveInput mockTxIn
-                    skeleton2 = mustHaveInput mockTxIn1
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxIns newSkeleton @?= [mockTxIn, mockTxIn1]
-            , testCase "Adding the same inputs" $
-                let skeleton1 = mustHaveInput mockTxIn
-                    skeleton2 = mustHaveInput mockTxIn
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxIns newSkeleton @?= [mockTxIn]
-            ]
-        , testGroup "Ref Input"
-            [ testCase "Adding two reference inputs - Just/Just" $
-                let skeleton1 = mustHaveRefInput mockTxOutRef
-                    skeleton2 = mustHaveRefInput mockTxOutRef1
-                    newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton 'PlutusV2 in
-                gytxRefIns newSkeleton @?= GYTxSkeletonRefIns (Set.fromList [mockTxOutRef, mockTxOutRef1])
-            , testCase "Adding two reference inputs - Just/Nothing" $
-                let skeleton1 = mustHaveRefInput mockTxOutRef
-                    skeleton2 = mustHaveOptionalOutput Nothing -- This won't have any refInputs
-                    newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton 'PlutusV2 in
-                gytxRefIns newSkeleton @?= GYTxSkeletonRefIns (Set.singleton mockTxOutRef)
-            , testCase "Adding two reference inputs - Nothing/Just" $
-                let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have any refInputs
-                    skeleton2 = mustHaveRefInput mockTxOutRef
-                    newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton 'PlutusV2 in
-                gytxRefIns newSkeleton @?= GYTxSkeletonRefIns (Set.singleton mockTxOutRef)
-            , testCase "Adding two reference inputs - Nothing/Nothing" $
-                let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have any refInputs
-                    newSkeleton = skeleton1 <> skeleton1 :: GYTxSkeleton 'PlutusV2 in
-                gytxRefIns newSkeleton @?= GYTxSkeletonNoRefIns
-            ]
-        , testGroup "Output"
-            [ testCase "Adding two outputs" $
-                let skeleton1 = mustHaveOutput mockTxOut1
-                    skeleton2 = mustHaveOutput mockTxOut2
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxOuts newSkeleton @?= [mockTxOut1, mockTxOut2]
-            , testCase "Adding the same outputs" $
-                let skeleton1 = mustHaveOutput mockTxOut1
-                    skeleton2 = mustHaveOutput mockTxOut1
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxOuts newSkeleton @?= [mockTxOut1, mockTxOut1]
-            ]
-        , testGroup "Mint"
-            [ testCase "Adding two mints - same token" $
-                let skeleton1 = mustMint mockMintingPolicy unitRedeemer mockTokenName 10
-                    skeleton2 = mustMint mockMintingPolicy unitRedeemer mockTokenName 20
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxMint newSkeleton @?= mockMint' 30
-            , testCase "Adding one mint and one burn" $
-                let skeleton1 = mustMint mockMintingPolicy unitRedeemer mockTokenName 10
-                    skeleton2 = mustMint mockMintingPolicy unitRedeemer mockTokenName (-20)
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxMint newSkeleton @?= mockMint' (-10)
-            , testCase "Adding two burns" $
-                let skeleton1 = mustMint mockMintingPolicy unitRedeemer mockTokenName (-10)
-                    skeleton2 = mustMint mockMintingPolicy unitRedeemer mockTokenName (-20)
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxMint newSkeleton @?= mockMint' (-30)
-            , testCase "Adding two mints - different tokens" $
-                let skeleton1 = mustMint mockMintingPolicy unitRedeemer mockTokenName 10
-                    skeleton2 = mustMint mockMintingPolicy unitRedeemer mockTokenName1 20
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxMint newSkeleton @?= mockMintSum
-            ]
-        , testGroup "Required Signers"
-            [ testCase "Adding two required signers" $
-                let skeleton1 = mustBeSignedBy mockPkh1
-                    skeleton2 = mustBeSignedBy mockPkh2
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxSigs newSkeleton @?= Set.fromList [mockPkh1, mockPkh2]
-            , testCase "Adding the same required signers" $
-                let skeleton1 = mustBeSignedBy mockPkh1
-                    skeleton2 = mustBeSignedBy mockPkh1
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxSigs newSkeleton @?= Set.singleton mockPkh1
-            ]
-        , testGroup "InvalidBefore"
-            [ testCase "Adding two invalidBefore - Just/Just" $
-                let skeleton1 = isInvalidBefore $ mockSlot' 1000
-                    skeleton2 = isInvalidBefore $ mockSlot' 2000
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxInvalidBefore newSkeleton @?= Just (mockSlot' 2000)
-            , testCase "Adding two invalidBefore - Just/Nothing" $
-                let skeleton1 = isInvalidBefore $ mockSlot' 1000
-                    skeleton2 = mustHaveOptionalOutput Nothing -- This won't have isInvalidBefore set
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxInvalidBefore newSkeleton @?= Just (mockSlot' 1000)
-            , testCase "Adding two invalidBefore - Nothing/Just" $
-                let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have isInvalidBefore set
-                    skeleton2 = isInvalidBefore $ mockSlot' 1000
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxInvalidBefore newSkeleton @?= Just (mockSlot' 1000)
-            , testCase "Adding two invalidBefore - Nothing/Nothing" $
-                let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have isInvalidBefore set
-                    newSkeleton = skeleton1 <> skeleton1 in
-                gytxInvalidBefore newSkeleton @?= Nothing
-            ]
-        , testGroup "InvalidAfter"
-            [ testCase "Adding two invalidAfter - Just/Just" $
-                let skeleton1 = isInvalidAfter $ mockSlot' 1000
-                    skeleton2 = isInvalidAfter $ mockSlot' 2000
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxInvalidAfter newSkeleton @?= Just (mockSlot' 1000)
-            , testCase "Adding two invalidAfter - Just/Nothing" $
-                let skeleton1 = isInvalidAfter $ mockSlot' 2000
-                    skeleton2 = mustHaveOptionalOutput Nothing -- This won't have isInvalidAfter set
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxInvalidAfter newSkeleton @?= Just (mockSlot' 2000)
-            , testCase "Adding two invalidAfter - Nothing/Just" $
-                let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have isInvalidAfter set
-                    skeleton2 = isInvalidAfter $ mockSlot' 2000
-                    newSkeleton = skeleton1 <> skeleton2 in
-                gytxInvalidAfter newSkeleton @?= Just (mockSlot' 2000)
-            , testCase "Adding two invalidAfter - Nothing/Nothing" $
-                let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have isInvalidAfter set
-                    newSkeleton = skeleton1 <> skeleton1 in
-                gytxInvalidAfter newSkeleton @?= Nothing
-            ]
-        ]
-    ]
-
+  [ testGroup
+      "Constructors"
+      [ testCase "mustHaveInput" $
+          gytxIns (mustHaveInput mockTxIn) @?= [mockTxIn]
+      , testCase "mustHaveReferenceInput" $
+          gytxRefIns (mustHaveRefInput @'PlutusV2 mockTxOutRef) @?= GYTxSkeletonRefIns (Set.singleton mockTxOutRef)
+      , testCase "mustHaveOutput" $
+          gytxOuts (mustHaveOutput mockTxOut1) @?= [mockTxOut1]
+      , testCase "mustHaveOptionalOutput (Just x)" $
+          gytxOuts (mustHaveOptionalOutput (Just mockTxOut1)) @?= [mockTxOut1]
+      , testCase "mustHaveOptionalOutput (Nothing)" $
+          gytxOuts (mustHaveOptionalOutput Nothing) @?= []
+      , testCase "mustMint" $
+          gytxMint (mustMint mockMintingPolicy unitRedeemer mockTokenName 10) @?= mockMint
+      , testCase "mustMint 0 is empty" $
+          gytxMint (mustMint mockMintingPolicy unitRedeemer mockTokenName 0) @?= Map.empty
+      , testCase "mustMint when burning" $
+          gytxMint (mustMint mockMintingPolicy unitRedeemer mockTokenName (-10)) @?= mockBurn
+      , testCase "mustBeSignedBy" $
+          gytxSigs (mustBeSignedBy mockPkh1) @?= Set.singleton mockPkh1
+      , testCase "isInvalidBefore" $
+          gytxInvalidBefore (isInvalidBefore mockSlot) @?= Just mockSlot
+      , testCase "isInvalidAfter" $
+          gytxInvalidAfter (isInvalidAfter mockSlot) @?= Just mockSlot
+      ]
+  , testGroup
+      "SemiGroup"
+      [ testGroup
+          "Input"
+          [ testCase "Adding two inputs" $
+              let skeleton1 = mustHaveInput mockTxIn
+                  skeleton2 = mustHaveInput mockTxIn1
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxIns newSkeleton @?= [mockTxIn, mockTxIn1]
+          , testCase "Adding the same inputs" $
+              let skeleton1 = mustHaveInput mockTxIn
+                  skeleton2 = mustHaveInput mockTxIn
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxIns newSkeleton @?= [mockTxIn]
+          ]
+      , testGroup
+          "Ref Input"
+          [ testCase "Adding two reference inputs - Just/Just" $
+              let skeleton1 = mustHaveRefInput mockTxOutRef
+                  skeleton2 = mustHaveRefInput mockTxOutRef1
+                  newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton 'PlutusV2
+               in gytxRefIns newSkeleton @?= GYTxSkeletonRefIns (Set.fromList [mockTxOutRef, mockTxOutRef1])
+          , testCase "Adding two reference inputs - Just/Nothing" $
+              let skeleton1 = mustHaveRefInput mockTxOutRef
+                  skeleton2 = mustHaveOptionalOutput Nothing -- This won't have any refInputs
+                  newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton 'PlutusV2
+               in gytxRefIns newSkeleton @?= GYTxSkeletonRefIns (Set.singleton mockTxOutRef)
+          , testCase "Adding two reference inputs - Nothing/Just" $
+              let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have any refInputs
+                  skeleton2 = mustHaveRefInput mockTxOutRef
+                  newSkeleton = skeleton1 <> skeleton2 :: GYTxSkeleton 'PlutusV2
+               in gytxRefIns newSkeleton @?= GYTxSkeletonRefIns (Set.singleton mockTxOutRef)
+          , testCase "Adding two reference inputs - Nothing/Nothing" $
+              let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have any refInputs
+                  newSkeleton = skeleton1 <> skeleton1 :: GYTxSkeleton 'PlutusV2
+               in gytxRefIns newSkeleton @?= GYTxSkeletonNoRefIns
+          ]
+      , testGroup
+          "Output"
+          [ testCase "Adding two outputs" $
+              let skeleton1 = mustHaveOutput mockTxOut1
+                  skeleton2 = mustHaveOutput mockTxOut2
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxOuts newSkeleton @?= [mockTxOut1, mockTxOut2]
+          , testCase "Adding the same outputs" $
+              let skeleton1 = mustHaveOutput mockTxOut1
+                  skeleton2 = mustHaveOutput mockTxOut1
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxOuts newSkeleton @?= [mockTxOut1, mockTxOut1]
+          ]
+      , testGroup
+          "Mint"
+          [ testCase "Adding two mints - same token" $
+              let skeleton1 = mustMint mockMintingPolicy unitRedeemer mockTokenName 10
+                  skeleton2 = mustMint mockMintingPolicy unitRedeemer mockTokenName 20
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxMint newSkeleton @?= mockMint' 30
+          , testCase "Adding one mint and one burn" $
+              let skeleton1 = mustMint mockMintingPolicy unitRedeemer mockTokenName 10
+                  skeleton2 = mustMint mockMintingPolicy unitRedeemer mockTokenName (-20)
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxMint newSkeleton @?= mockMint' (-10)
+          , testCase "Adding two burns" $
+              let skeleton1 = mustMint mockMintingPolicy unitRedeemer mockTokenName (-10)
+                  skeleton2 = mustMint mockMintingPolicy unitRedeemer mockTokenName (-20)
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxMint newSkeleton @?= mockMint' (-30)
+          , testCase "Adding two mints - different tokens" $
+              let skeleton1 = mustMint mockMintingPolicy unitRedeemer mockTokenName 10
+                  skeleton2 = mustMint mockMintingPolicy unitRedeemer mockTokenName1 20
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxMint newSkeleton @?= mockMintSum
+          ]
+      , testGroup
+          "Required Signers"
+          [ testCase "Adding two required signers" $
+              let skeleton1 = mustBeSignedBy mockPkh1
+                  skeleton2 = mustBeSignedBy mockPkh2
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxSigs newSkeleton @?= Set.fromList [mockPkh1, mockPkh2]
+          , testCase "Adding the same required signers" $
+              let skeleton1 = mustBeSignedBy mockPkh1
+                  skeleton2 = mustBeSignedBy mockPkh1
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxSigs newSkeleton @?= Set.singleton mockPkh1
+          ]
+      , testGroup
+          "InvalidBefore"
+          [ testCase "Adding two invalidBefore - Just/Just" $
+              let skeleton1 = isInvalidBefore $ mockSlot' 1000
+                  skeleton2 = isInvalidBefore $ mockSlot' 2000
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxInvalidBefore newSkeleton @?= Just (mockSlot' 2000)
+          , testCase "Adding two invalidBefore - Just/Nothing" $
+              let skeleton1 = isInvalidBefore $ mockSlot' 1000
+                  skeleton2 = mustHaveOptionalOutput Nothing -- This won't have isInvalidBefore set
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxInvalidBefore newSkeleton @?= Just (mockSlot' 1000)
+          , testCase "Adding two invalidBefore - Nothing/Just" $
+              let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have isInvalidBefore set
+                  skeleton2 = isInvalidBefore $ mockSlot' 1000
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxInvalidBefore newSkeleton @?= Just (mockSlot' 1000)
+          , testCase "Adding two invalidBefore - Nothing/Nothing" $
+              let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have isInvalidBefore set
+                  newSkeleton = skeleton1 <> skeleton1
+               in gytxInvalidBefore newSkeleton @?= Nothing
+          ]
+      , testGroup
+          "InvalidAfter"
+          [ testCase "Adding two invalidAfter - Just/Just" $
+              let skeleton1 = isInvalidAfter $ mockSlot' 1000
+                  skeleton2 = isInvalidAfter $ mockSlot' 2000
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxInvalidAfter newSkeleton @?= Just (mockSlot' 1000)
+          , testCase "Adding two invalidAfter - Just/Nothing" $
+              let skeleton1 = isInvalidAfter $ mockSlot' 2000
+                  skeleton2 = mustHaveOptionalOutput Nothing -- This won't have isInvalidAfter set
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxInvalidAfter newSkeleton @?= Just (mockSlot' 2000)
+          , testCase "Adding two invalidAfter - Nothing/Just" $
+              let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have isInvalidAfter set
+                  skeleton2 = isInvalidAfter $ mockSlot' 2000
+                  newSkeleton = skeleton1 <> skeleton2
+               in gytxInvalidAfter newSkeleton @?= Just (mockSlot' 2000)
+          , testCase "Adding two invalidAfter - Nothing/Nothing" $
+              let skeleton1 = mustHaveOptionalOutput Nothing -- This won't have isInvalidAfter set
+                  newSkeleton = skeleton1 <> skeleton1
+               in gytxInvalidAfter newSkeleton @?= Nothing
+          ]
+      ]
+  ]
 
 -------------------------------------------------------------------------------
 -- Mock Values
@@ -256,9 +285,15 @@ mockTxOutRef1 :: GYTxOutRef
 mockTxOutRef1 = "4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189#0"
 
 mockTxIn :: GYTxIn v
-mockTxIn = GYTxIn { gyTxInTxOutRef = mockTxOutRef
-                  , gyTxInWitness = GYTxInWitnessKey}
+mockTxIn =
+  GYTxIn
+    { gyTxInTxOutRef = mockTxOutRef
+    , gyTxInWitness = GYTxInWitnessKey
+    }
 
 mockTxIn1 :: GYTxIn v
-mockTxIn1 = GYTxIn { gyTxInTxOutRef = mockTxOutRef1
-                   , gyTxInWitness = GYTxInWitnessKey}
+mockTxIn1 =
+  GYTxIn
+    { gyTxInTxOutRef = mockTxOutRef1
+    , gyTxInWitness = GYTxInWitnessKey
+    }

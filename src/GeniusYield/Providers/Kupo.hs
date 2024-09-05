@@ -6,7 +6,6 @@ License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
 -}
-
 module GeniusYield.Providers.Kupo (
   KupoApiEnv,
   newKupoApiEnv,
@@ -16,55 +15,83 @@ module GeniusYield.Providers.Kupo (
   kupoAwaitTxConfirmed,
 ) where
 
-import qualified Cardano.Api                  as Api
-import           Control.Concurrent           (threadDelay)
-import           Control.Monad                ((<=<))
-import           Data.Aeson                   (Value (Null), withObject, (.:))
-import           Data.Char                    (toLower)
-import           Data.Maybe                   (listToMaybe)
-import qualified Data.Text                    as Text
-import           Data.Word                    (Word64)
-import           Deriving.Aeson
-import           GeniusYield.Imports
-import           GeniusYield.Providers.Common (datumFromCBOR, extractAssetClass,
-                                               newServantClientEnv)
-import           GeniusYield.Types            (GYAddress, GYAddressBech32,
-                                               GYAssetClass (..), GYAwaitTx,
-                                               GYAwaitTxException (GYAwaitTxException),
-                                               GYAwaitTxParameters (..),
-                                               GYDatum, GYDatumHash,
-                                               GYLookupDatum,
-                                               GYOutDatum (GYOutDatumHash, GYOutDatumInline, GYOutDatumNone),
-                                               GYPaymentCredential,
-                                               GYQueryUTxO (..), GYScriptHash,
-                                               GYTxId, GYTxOutRef, GYUTxO (..),
-                                               GYUTxOs, GYValue,
-                                               addressFromBech32, addressToText,
-                                               gyQueryUtxoAtAddressesDefault,
-                                               gyQueryUtxoAtPaymentCredentialsDefault,
-                                               gyQueryUtxoRefsAtAddressDefault,
-                                               gyQueryUtxosAtTxOutRefsDefault,
-                                               parseValueKM,
-                                               paymentCredentialToHexText,
-                                               scriptFromCBOR,
-                                               simpleScriptFromCBOR, txIdToApi,
-                                               txOutRefFromApiTxIdIx,
-                                               txOutRefToTuple', utxosFromList,
-                                               valueFromLovelace)
-import qualified GeniusYield.Types            as GYTypes (PlutusVersion (..))
-import           GeniusYield.Types.Script     (GYAnyScript (..))
-import           Servant.API                  (Capture, Get, Header,
-                                               Headers (getResponse), JSON,
-                                               QueryFlag, QueryParam,
-                                               ResponseHeader (Header),
-                                               lookupResponseHeader,
-                                               type (:<|>) (..), (:>))
-import           Servant.Client               (ClientEnv, ClientError, ClientM,
-                                               client, runClientM)
+import Cardano.Api qualified as Api
+import Control.Concurrent (threadDelay)
+import Control.Monad ((<=<))
+import Data.Aeson (Value (Null), withObject, (.:))
+import Data.Char (toLower)
+import Data.Maybe (listToMaybe)
+import Data.Text qualified as Text
+import Data.Word (Word64)
+import Deriving.Aeson
+import GeniusYield.Imports
+import GeniusYield.Providers.Common (
+  datumFromCBOR,
+  extractAssetClass,
+  newServantClientEnv,
+ )
+import GeniusYield.Types (
+  GYAddress,
+  GYAddressBech32,
+  GYAssetClass (..),
+  GYAwaitTx,
+  GYAwaitTxException (GYAwaitTxException),
+  GYAwaitTxParameters (..),
+  GYDatum,
+  GYDatumHash,
+  GYLookupDatum,
+  GYOutDatum (GYOutDatumHash, GYOutDatumInline, GYOutDatumNone),
+  GYPaymentCredential,
+  GYQueryUTxO (..),
+  GYScriptHash,
+  GYTxId,
+  GYTxOutRef,
+  GYUTxO (..),
+  GYUTxOs,
+  GYValue,
+  addressFromBech32,
+  addressToText,
+  gyQueryUtxoAtAddressesDefault,
+  gyQueryUtxoAtPaymentCredentialsDefault,
+  gyQueryUtxoRefsAtAddressDefault,
+  gyQueryUtxosAtTxOutRefsDefault,
+  parseValueKM,
+  paymentCredentialToHexText,
+  scriptFromCBOR,
+  simpleScriptFromCBOR,
+  txIdToApi,
+  txOutRefFromApiTxIdIx,
+  txOutRefToTuple',
+  utxosFromList,
+  valueFromLovelace,
+ )
+import GeniusYield.Types qualified as GYTypes (PlutusVersion (..))
+import GeniusYield.Types.Script (GYAnyScript (..))
+import Servant.API (
+  Capture,
+  Get,
+  Header,
+  Headers (getResponse),
+  JSON,
+  QueryFlag,
+  QueryParam,
+  ResponseHeader (Header),
+  lookupResponseHeader,
+  (:>),
+  type (:<|>) (..),
+ )
+import Servant.Client (
+  ClientEnv,
+  ClientError,
+  ClientM,
+  client,
+  runClientM,
+ )
 
--- $setup
--- >>> :set -XOverloadedStrings -XTypeApplications
--- >>> import qualified Data.Aeson as Aeson
+{- $setup
+>>> :set -XOverloadedStrings -XTypeApplications
+>>> import qualified Data.Aeson as Aeson
+-}
 
 -- | Kupo api env.
 newtype KupoApiEnv = KupoApiEnv ClientEnv
@@ -77,8 +104,8 @@ newKupoApiEnv baseUrl = KupoApiEnv <$> newServantClientEnv baseUrl
 data KupoProviderException
   = -- | Error from the Kupo API.
     KupoApiError !Text !ClientError
-    -- | Received an absurd response from Kupo. This shouldn't ever happen.
-  | KupoAbsurdResponse !Text
+  | -- | Received an absurd response from Kupo. This shouldn't ever happen.
+    KupoAbsurdResponse !Text
   deriving stock (Eq, Show)
   deriving anyclass (Exception)
 
@@ -100,7 +127,7 @@ type Pattern = Text
 -- Will lower the first character for your type.
 data LowerFirst
 instance StringModifier LowerFirst where
-  getStringModifier ""       = ""
+  getStringModifier "" = ""
   getStringModifier (c : cs) = toLower c : cs
 
 newtype KupoDatum = KupoDatum (Maybe GYDatum)
@@ -115,15 +142,18 @@ newtype KupoDatum = KupoDatum (Maybe GYDatum)
 instance FromJSON KupoDatum where
   parseJSON v =
     -- Kupo returns "null" (under 200 response code) if it doesn't find the preimage.
-    if v == Null then pure $ KupoDatum Nothing
-    else
-      withObject "KupoDatum"
-        (\datumObject -> do
-            datumBytes <- datumObject .: "datum"
-            case datumFromCBOR datumBytes of
-              Left e  -> fail $ show e
-              Right d -> pure $ KupoDatum (Just d)
-        ) v
+    if v == Null
+      then pure $ KupoDatum Nothing
+      else
+        withObject
+          "KupoDatum"
+          ( \datumObject -> do
+              datumBytes <- datumObject .: "datum"
+              case datumFromCBOR datumBytes of
+                Left e -> fail $ show e
+                Right d -> pure $ KupoDatum (Just d)
+          )
+          v
 
 data KupoScriptLanguage = Native | PlutusV1 | PlutusV2 | PlutusV3
   deriving stock (Eq, Ord, Show, Generic)
@@ -143,21 +173,24 @@ newtype KupoScript = KupoScript (Maybe GYAnyScript)
 instance FromJSON KupoScript where
   parseJSON v =
     -- Kupo returns "null" (under 200 response code) if it doesn't find the preimage.
-    if v == Null then pure $ KupoScript Nothing
-    else
-      withObject "KupoScript"
-        (\scriptObject -> do
-            scriptHex <- scriptObject .: "script"
-            scriptLanguage <- scriptObject .: "language"
-            case scriptLanguage of
-              Native -> pure $ KupoScript $ GYSimpleScript <$> simpleScriptFromCBOR scriptHex
-              PlutusV1 -> pure $ KupoScript $ GYPlutusScript <$> scriptFromCBOR @'GYTypes.PlutusV1 scriptHex
-              PlutusV2 -> pure $ KupoScript $ GYPlutusScript <$> scriptFromCBOR @'GYTypes.PlutusV2 scriptHex
-              PlutusV3 -> pure $ KupoScript $ GYPlutusScript <$> scriptFromCBOR @'GYTypes.PlutusV3 scriptHex
-        ) v
+    if v == Null
+      then pure $ KupoScript Nothing
+      else
+        withObject
+          "KupoScript"
+          ( \scriptObject -> do
+              scriptHex <- scriptObject .: "script"
+              scriptLanguage <- scriptObject .: "language"
+              case scriptLanguage of
+                Native -> pure $ KupoScript $ GYSimpleScript <$> simpleScriptFromCBOR scriptHex
+                PlutusV1 -> pure $ KupoScript $ GYPlutusScript <$> scriptFromCBOR @'GYTypes.PlutusV1 scriptHex
+                PlutusV2 -> pure $ KupoScript $ GYPlutusScript <$> scriptFromCBOR @'GYTypes.PlutusV2 scriptHex
+                PlutusV3 -> pure $ KupoScript $ GYPlutusScript <$> scriptFromCBOR @'GYTypes.PlutusV3 scriptHex
+          )
+          v
 
 data KupoValue = KupoValue
-  { coins  :: !Natural
+  { coins :: !Natural
   , assets :: !GYValue
   }
   deriving stock (Show, Eq, Ord, Generic)
@@ -178,27 +211,27 @@ instance FromJSON KupoValue where
     coins <- v .: "coins"
     assets' <- v .: "assets"
     assets <- parseValueKM True assets'
-    return KupoValue { coins = coins, assets = assets }
+    return KupoValue {coins = coins, assets = assets}
 
 data KupoDatumType = Hash | Inline
   deriving stock (Show, Eq, Ord, Generic)
   deriving (FromJSON) via CustomJSON '[ConstructorTagModifier '[LowerFirst]] KupoDatumType
 
 newtype KupoCreatedAt = KupoCreatedAt
-  { slotNo     :: Word64
+  { slotNo :: Word64
   }
   deriving stock (Show, Eq, Ord, Generic)
   deriving (FromJSON) via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoCreatedAt
 
 data KupoUtxo = KupoUtxo
   { transactionId :: !GYTxId
-  , outputIndex   :: !Api.TxIx
-  , address       :: !GYAddressBech32
-  , value         :: !KupoValue
-  , datumHash     :: !(Maybe GYDatumHash)
-  , datumType     :: !(Maybe KupoDatumType)
-  , scriptHash    :: !(Maybe GYScriptHash)
-  , createdAt     :: !KupoCreatedAt
+  , outputIndex :: !Api.TxIx
+  , address :: !GYAddressBech32
+  , value :: !KupoValue
+  , datumHash :: !(Maybe GYDatumHash)
+  , datumType :: !(Maybe KupoDatumType)
+  , scriptHash :: !(Maybe GYScriptHash)
+  , createdAt :: !KupoCreatedAt
   }
   deriving stock (Show, Eq, Ord, Generic)
   deriving (FromJSON) via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoUtxo
@@ -208,9 +241,9 @@ findScriptByHash :: GYScriptHash -> ClientM KupoScript
 fetchUtxosByPattern :: Pattern -> Bool -> Maybe Text -> Maybe Text -> ClientM (Headers '[Header "X-Most-Recent-Checkpoint" Word64] [KupoUtxo])
 
 type KupoApi =
-         "datums"
-      :> Capture "datumHash" GYDatumHash
-      :> Get '[JSON] KupoDatum
+  "datums"
+    :> Capture "datumHash" GYDatumHash
+    :> Get '[JSON] KupoDatum
     :<|> "scripts"
       :> Capture "scriptHash" GYScriptHash
       :> Get '[JSON] KupoScript
@@ -228,7 +261,8 @@ kupoLookupDatum :: KupoApiEnv -> GYLookupDatum
 kupoLookupDatum env dh = do
   KupoDatum md <-
     handleKupoError "LookupDatum"
-      <=< runKupoClient env $ findDatumByHash dh
+      <=< runKupoClient env
+      $ findDatumByHash dh
   pure md
 
 -- | Given a 'GYScriptHash' returns the corresponding 'GYScript' if found.
@@ -236,7 +270,8 @@ kupoLookupScript :: KupoApiEnv -> GYScriptHash -> IO (Maybe GYAnyScript)
 kupoLookupScript env sh = do
   KupoScript ms <-
     handleKupoError "LookupScript"
-      <=< runKupoClient env $ findScriptByHash sh
+      <=< runKupoClient env
+      $ findScriptByHash sh
   pure ms
 
 -- | Find UTxOs at a given address.
@@ -247,7 +282,7 @@ kupoUtxosAtAddress env addr mAssetClass = do
   addrUtxos <-
     handleKupoError locationIdent <=< runKupoClient env $
       case extractedAssetClass of
-        Nothing       -> commonRequestPart Nothing Nothing
+        Nothing -> commonRequestPart Nothing Nothing
         Just (mp, tn) -> commonRequestPart (Just mp) (Just tn)
   utxosFromList <$> traverse (transformUtxo env) (getResponse addrUtxos)
   where
@@ -260,8 +295,8 @@ kupoUtxoAtTxOutRef env oref = do
     handleKupoError locationIdent <=< runKupoClient env $
       fetchUtxosByPattern (Text.pack (show utxoIdx) <> "@" <> txId) True Nothing Nothing
   listToMaybe <$> traverse (transformUtxo env) (getResponse utxo)
- where
-  locationIdent = "UtxoByRef"
+  where
+    locationIdent = "UtxoByRef"
 
 kupoUtxosAtPaymentCredential :: KupoApiEnv -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
 kupoUtxosAtPaymentCredential env cred mAssetClass = do
@@ -270,18 +305,18 @@ kupoUtxosAtPaymentCredential env cred mAssetClass = do
   credUtxos <-
     handleKupoError locationIdent <=< runKupoClient env $
       case extractedAssetClass of
-        Nothing       -> commonRequestPart Nothing Nothing
+        Nothing -> commonRequestPart Nothing Nothing
         Just (mp, tn) -> commonRequestPart (Just mp) (Just tn)
   utxosFromList <$> traverse (transformUtxo env) (getResponse credUtxos)
- where
-  locationIdent = "PaymentCredentialUtxos"
+  where
+    locationIdent = "PaymentCredentialUtxos"
 
 transformUtxo :: KupoApiEnv -> KupoUtxo -> IO GYUTxO
 transformUtxo env KupoUtxo {..} = do
   let ref = txOutRefFromApiTxIdIx (txIdToApi transactionId) outputIndex
   dat <- case datumType of
-    Nothing     -> pure GYOutDatumNone
-    Just Hash   -> do
+    Nothing -> pure GYOutDatumNone
+    Just Hash -> do
       dh <- maybe (handleKupoAbsurdResponse locationIdent $ commonDatumHashError <> "'hash'") pure datumHash
       pure $ GYOutDatumHash dh
     Just Inline -> do
@@ -291,7 +326,8 @@ transformUtxo env KupoUtxo {..} = do
   sc <- case scriptHash of
     Nothing -> pure Nothing
     Just sh -> kupoLookupScript env sh
-  pure $ GYUTxO
+  pure $
+    GYUTxO
       { utxoRef = ref
       , utxoAddress = addressFromBech32 address
       , utxoValue = assets value <> valueFromLovelace (toInteger $ coins value)
@@ -321,21 +357,20 @@ kupoQueryUtxo env =
     }
 
 kupoAwaitTxConfirmed :: KupoApiEnv -> GYAwaitTx
-kupoAwaitTxConfirmed env p@GYAwaitTxParameters{..} txId = go 0
+kupoAwaitTxConfirmed env p@GYAwaitTxParameters {..} txId = go 0
   where
     go attempt
       | attempt >= maxAttempts = throwIO $ GYAwaitTxException p
       | otherwise = do
           utxos <-
             handleKupoError locationIdent <=< runKupoClient env $
-              fetchUtxosByPattern (Text.pack $ "*@" <> show txId) False Nothing Nothing  -- We don't require for only @unspent@. Kupo with @--prune-utxo@ option would still keep spent UTxOs until their spent record is truly immutable (see Kupo docs for more details).
+              fetchUtxosByPattern (Text.pack $ "*@" <> show txId) False Nothing Nothing -- We don't require for only @unspent@. Kupo with @--prune-utxo@ option would still keep spent UTxOs until their spent record is truly immutable (see Kupo docs for more details).
           case listToMaybe (getResponse utxos) of
             Nothing -> threadDelay checkInterval >> go (attempt + 1)
-            Just u  -> do
-              let slotsToWait = 3 * confirmations * 20  -- Ouroboros Praos guarantees that there are at least @k@ blocks in a window of @3k / f@ slots where @f@ is the active slot coefficient, which is @0.05@ for Mainnet, Preprod & Preview.
+            Just u -> do
+              let slotsToWait = 3 * confirmations * 20 -- Ouroboros Praos guarantees that there are at least @k@ blocks in a window of @3k / f@ slots where @f@ is the active slot coefficient, which is @0.05@ for Mainnet, Preprod & Preview.
               case (lookupResponseHeader utxos :: ResponseHeader "X-Most-Recent-Checkpoint" Word64) of
                 Header slotOfCurrentBlock -> unless (slotNo (createdAt u) + slotsToWait <= slotOfCurrentBlock) $ threadDelay checkInterval >> go (attempt + 1)
                 _ -> handleKupoAbsurdResponse locationIdent "Header 'X-Most-Recent-Checkpoint' isn't seen in response"
-
-          where
-            locationIdent = "AwaitTx"
+      where
+        locationIdent = "AwaitTx"

@@ -1,34 +1,33 @@
-{-|
+{- |
 Module      : GeniusYield.Test.Privnet.Examples.Misc
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
-
 module GeniusYield.Test.Privnet.Examples.Misc (tests) where
 
-import           Control.Concurrent                       (threadDelay)
-import           Test.Tasty                               (TestTree, testGroup)
-import           Test.Tasty.HUnit                         (testCaseSteps)
+import Control.Concurrent (threadDelay)
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (testCaseSteps)
 
-import           GeniusYield.Scripts.TestToken
-import           GeniusYield.Types
+import GeniusYield.Scripts.TestToken
+import GeniusYield.Types
 
-import           GeniusYield.Test.Privnet.Asserts
-import           GeniusYield.Test.Privnet.Ctx
-import           GeniusYield.Test.Privnet.Examples.Common
-import           GeniusYield.Test.Privnet.Setup
-import           GeniusYield.TxBuilder
+import GeniusYield.Test.Privnet.Asserts
+import GeniusYield.Test.Privnet.Ctx
+import GeniusYield.Test.Privnet.Examples.Common
+import GeniusYield.Test.Privnet.Setup
+import GeniusYield.TxBuilder
 
 tests :: Setup -> TestTree
-tests setup = testGroup "misc"
+tests setup =
+  testGroup
+    "misc"
     [ testCaseSteps "Reference script for minting policy" $ \info -> withSetup info setup $ \ctx -> do
-
         utxoAsParam <- ctxRun ctx (ctxUser2 ctx) $ someUTxO PlutusV1
-        let amt    = 1
-            tn     = "mintByRef"
+        let amt = 1
+            tn = "mintByRef"
             policy = testTokenPolicy amt tn utxoAsParam
             policyAsScript = mintingPolicyToScript policy
             ac = GYToken (mintingPolicyId policy) tn
@@ -40,10 +39,11 @@ tests setup = testGroup "misc"
         balance <- ctxQueryBalance ctx (ctxUser2 ctx)
 
         ctxRun ctx (ctxUser2 ctx) $ do
-            txBodyMint <- buildTxBody $
-                 mustHaveInput (GYTxIn utxoAsParam GYTxInWitnessKey)
-              <> mustMint (GYMintReference refScript policyAsScript) unitRedeemer tn amt
-            signAndSubmitConfirmed_ txBodyMint
+          txBodyMint <-
+            buildTxBody $
+              mustHaveInput (GYTxIn utxoAsParam GYTxInWitnessKey)
+                <> mustMint (GYMintReference refScript policyAsScript) unitRedeemer tn amt
+          signAndSubmitConfirmed_ txBodyMint
 
         -- wait a tiny bit.
         threadDelay 1_000_000

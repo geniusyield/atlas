@@ -1,65 +1,64 @@
-{-|
+{- |
 Module      : GeniusYield.Types.PlutusVersion
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.Types.PlutusVersion (
-    -- * Plutus version
-    PlutusVersion (..),
-    SingPlutusVersion (..),
-    SingPlutusVersionI (..),
-    fromSingPlutusVersion,
-    PlutusVersionToApi,
-    singPlutusVersionToApi,
-    VersionIsGreaterOrEqual,
-    VersionIsGreater,
-    CmpPlutusVersion,
+  -- * Plutus version
+  PlutusVersion (..),
+  SingPlutusVersion (..),
+  SingPlutusVersionI (..),
+  fromSingPlutusVersion,
+  PlutusVersionToApi,
+  singPlutusVersionToApi,
+  VersionIsGreaterOrEqual,
+  VersionIsGreater,
+  CmpPlutusVersion,
 ) where
-import qualified Cardano.Api         as Api
-import qualified Cardano.Api.Shelley as Api.S
-import           Data.GADT.Compare
-import           GeniusYield.Imports
+
+import Cardano.Api qualified as Api
+import Cardano.Api.Shelley qualified as Api.S
+import Data.GADT.Compare
+import GeniusYield.Imports
 
 data PlutusVersion
-    = PlutusV1
-    | PlutusV2
-    | PlutusV3
+  = PlutusV1
+  | PlutusV2
+  | PlutusV3
   deriving (Eq, Ord, Show)
 
 data SingPlutusVersion (v :: PlutusVersion) where
-    SingPlutusV1 :: SingPlutusVersion 'PlutusV1
-    SingPlutusV2 :: SingPlutusVersion 'PlutusV2
-    SingPlutusV3 :: SingPlutusVersion 'PlutusV3
+  SingPlutusV1 :: SingPlutusVersion 'PlutusV1
+  SingPlutusV2 :: SingPlutusVersion 'PlutusV2
+  SingPlutusV3 :: SingPlutusVersion 'PlutusV3
 
-
-class    SingPlutusVersionI (v :: PlutusVersion) where singPlutusVersion :: SingPlutusVersion v
-instance SingPlutusVersionI 'PlutusV1             where singPlutusVersion = SingPlutusV1
-instance SingPlutusVersionI 'PlutusV2             where singPlutusVersion = SingPlutusV2
-instance SingPlutusVersionI 'PlutusV3             where singPlutusVersion = SingPlutusV3
+class SingPlutusVersionI (v :: PlutusVersion) where singPlutusVersion :: SingPlutusVersion v
+instance SingPlutusVersionI 'PlutusV1 where singPlutusVersion = SingPlutusV1
+instance SingPlutusVersionI 'PlutusV2 where singPlutusVersion = SingPlutusV2
+instance SingPlutusVersionI 'PlutusV3 where singPlutusVersion = SingPlutusV3
 
 instance GEq SingPlutusVersion where
-    geq SingPlutusV1 SingPlutusV1 = Just Refl
-    geq SingPlutusV2 SingPlutusV2 = Just Refl
-    geq SingPlutusV3 SingPlutusV3 = Just Refl
-    geq _ _                       = Nothing
+  geq SingPlutusV1 SingPlutusV1 = Just Refl
+  geq SingPlutusV2 SingPlutusV2 = Just Refl
+  geq SingPlutusV3 SingPlutusV3 = Just Refl
+  geq _ _ = Nothing
 
 instance GCompare SingPlutusVersion where
-    gcompare SingPlutusV1 SingPlutusV1 = GEQ
-    gcompare SingPlutusV1 _            = GLT
-    gcompare SingPlutusV2 SingPlutusV1 = GGT
-    gcompare SingPlutusV2 SingPlutusV2 = GEQ
-    gcompare SingPlutusV2 _            = GLT
-    gcompare SingPlutusV3 SingPlutusV1 = GGT
-    gcompare SingPlutusV3 SingPlutusV2 = GGT
-    gcompare SingPlutusV3 SingPlutusV3 = GEQ
+  gcompare SingPlutusV1 SingPlutusV1 = GEQ
+  gcompare SingPlutusV1 _ = GLT
+  gcompare SingPlutusV2 SingPlutusV1 = GGT
+  gcompare SingPlutusV2 SingPlutusV2 = GEQ
+  gcompare SingPlutusV2 _ = GLT
+  gcompare SingPlutusV3 SingPlutusV1 = GGT
+  gcompare SingPlutusV3 SingPlutusV2 = GGT
+  gcompare SingPlutusV3 SingPlutusV3 = GEQ
 
 type family PlutusVersionToApi (v :: PlutusVersion) :: Type where
-    PlutusVersionToApi 'PlutusV1 = Api.PlutusScriptV1
-    PlutusVersionToApi 'PlutusV2 = Api.PlutusScriptV2
-    PlutusVersionToApi 'PlutusV3 = Api.PlutusScriptV3
+  PlutusVersionToApi 'PlutusV1 = Api.PlutusScriptV1
+  PlutusVersionToApi 'PlutusV2 = Api.PlutusScriptV2
+  PlutusVersionToApi 'PlutusV3 = Api.PlutusScriptV3
 
 singPlutusVersionToApi :: SingPlutusVersion v -> Api.S.PlutusScriptVersion (PlutusVersionToApi v)
 singPlutusVersionToApi SingPlutusV1 = Api.PlutusScriptV1
@@ -87,9 +86,10 @@ type family GreaterOrEqual (v :: Ordering) :: Bool where
   GreaterOrEqual 'EQ = 'True
   GreaterOrEqual 'LT = 'False
 
--- | Constraint that @v >= u@.
---
--- If transaction is making use of V2 features (such as reference inputs) then as these cannot be represented in script context of V1 scripts, we need to ensure that the involved script version is at least V2. Likewise for other versions.
+{- | Constraint that @v >= u@.
+
+If transaction is making use of V2 features (such as reference inputs) then as these cannot be represented in script context of V1 scripts, we need to ensure that the involved script version is at least V2. Likewise for other versions.
+-}
 type VersionIsGreaterOrEqual (v :: PlutusVersion) (u :: PlutusVersion) = GreaterOrEqual (v `CmpPlutusVersion` u) ~ 'True
 
 -- | Constraint that @v > u@.

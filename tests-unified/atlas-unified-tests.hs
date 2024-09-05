@@ -1,14 +1,16 @@
-module Main
-    ( main
-    ) where
+module Main (
+  main,
+) where
 
-import           Test.Tasty                               (defaultMain,
-                                                           testGroup)
+import Test.Tasty (
+  defaultMain,
+  testGroup,
+ )
 
-import           GeniusYield.Test.Privnet.Setup
+import GeniusYield.Test.Privnet.Setup
 
-import           GeniusYield.Test.Unified.BetRef.PlaceBet
-import           GeniusYield.Test.Unified.BetRef.TakePot
+import GeniusYield.Test.Unified.BetRef.PlaceBet
+import GeniusYield.Test.Unified.BetRef.TakePot
 
 main :: IO ()
 main = withPrivnet cardanoDefaultTestnetOptionsConway $ \setup ->

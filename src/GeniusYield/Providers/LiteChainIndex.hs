@@ -128,15 +128,15 @@ withChainSync ::
   (Async.Async () -> IO r) ->
   IO r
 withChainSync info resumePoints callback = Async.withAsync (Api.connectToLocalNode info localNodeClientProtocols)
-  where
-    localNodeClientProtocols :: Api.LocalNodeClientProtocolsInMode
-    localNodeClientProtocols =
-      Api.LocalNodeClientProtocols
-        { localChainSyncClient = Api.LocalChainSyncClient $ chainSyncClient resumePoints callback
-        , localTxSubmissionClient = Nothing
-        , localStateQueryClient = Nothing
-        , localTxMonitoringClient = Nothing
-        }
+ where
+  localNodeClientProtocols :: Api.LocalNodeClientProtocolsInMode
+  localNodeClientProtocols =
+    Api.LocalNodeClientProtocols
+      { localChainSyncClient = Api.LocalChainSyncClient $ chainSyncClient resumePoints callback
+      , localTxSubmissionClient = Nothing
+      , localStateQueryClient = Nothing
+      , localTxMonitoringClient = Nothing
+      }
 
 newChainSync ::
   Api.LocalNodeConnectInfo ->
@@ -145,15 +145,15 @@ newChainSync ::
   IO (Async.Async ())
 newChainSync info resumePoints callback =
   Async.async (Api.connectToLocalNode info localNodeClientProtocols)
-  where
-    localNodeClientProtocols :: Api.LocalNodeClientProtocolsInMode
-    localNodeClientProtocols =
-      Api.LocalNodeClientProtocols
-        { localChainSyncClient = Api.LocalChainSyncClient $ chainSyncClient resumePoints callback
-        , localTxSubmissionClient = Nothing
-        , localStateQueryClient = Nothing
-        , localTxMonitoringClient = Nothing
-        }
+ where
+  localNodeClientProtocols :: Api.LocalNodeClientProtocolsInMode
+  localNodeClientProtocols =
+    Api.LocalNodeClientProtocols
+      { localChainSyncClient = Api.LocalChainSyncClient $ chainSyncClient resumePoints callback
+      , localTxSubmissionClient = Nothing
+      , localStateQueryClient = Nothing
+      , localTxMonitoringClient = Nothing
+      }
 
 chainSyncClient ::
   [Api.ChainPoint] ->
@@ -162,29 +162,29 @@ chainSyncClient ::
 chainSyncClient [] cb = chainSyncClient [Api.ChainPointAtGenesis] cb
 chainSyncClient resumePoints cb =
   Api.ChainSyncClient $ pure initialise
-  where
-    initialise =
-      Api.Sync.SendMsgFindIntersect resumePoints $
-        Api.Sync.ClientStIntersect
-          { Api.Sync.recvMsgIntersectFound = \point _tip -> Api.ChainSyncClient $ do
-              cb (Resume point)
-              pure requestNext
-          , Api.Sync.recvMsgIntersectNotFound = \_tip ->
-              Api.ChainSyncClient $ pure requestNext
-          }
-
-    requestNext :: Api.Sync.ClientStIdle Api.BlockInMode Api.ChainPoint Api.ChainTip IO ()
-    requestNext = Api.Sync.SendMsgRequestNext (pure ()) handleNext
-
-    handleNext =
-      Api.Sync.ClientStNext
-        { Api.Sync.recvMsgRollForward = \block tip -> Api.ChainSyncClient $ do
-            cb (RollForward block tip)
+ where
+  initialise =
+    Api.Sync.SendMsgFindIntersect resumePoints $
+      Api.Sync.ClientStIntersect
+        { Api.Sync.recvMsgIntersectFound = \point _tip -> Api.ChainSyncClient $ do
+            cb (Resume point)
             pure requestNext
-        , Api.Sync.recvMsgRollBackward = \point tip -> Api.ChainSyncClient $ do
-            cb (RollBackward point tip)
-            pure requestNext
+        , Api.Sync.recvMsgIntersectNotFound = \_tip ->
+            Api.ChainSyncClient $ pure requestNext
         }
+
+  requestNext :: Api.Sync.ClientStIdle Api.BlockInMode Api.ChainPoint Api.ChainTip IO ()
+  requestNext = Api.Sync.SendMsgRequestNext (pure ()) handleNext
+
+  handleNext =
+    Api.Sync.ClientStNext
+      { Api.Sync.recvMsgRollForward = \block tip -> Api.ChainSyncClient $ do
+          cb (RollForward block tip)
+          pure requestNext
+      , Api.Sync.recvMsgRollBackward = \point tip -> Api.ChainSyncClient $ do
+          cb (RollBackward point tip)
+          pure requestNext
+      }
 
 -------------------------------------------------------------------------------
 -- Utilities
@@ -192,21 +192,21 @@ chainSyncClient resumePoints cb =
 
 blockDatums :: Api.BlockInMode -> [Api.HashableScriptData]
 blockDatums (Api.BlockInMode _ block) = goBlock block
-  where
-    goBlock :: Api.Block era -> [Api.HashableScriptData]
-    goBlock (Api.Block _header txs) = concatMap goTx txs
+ where
+  goBlock :: Api.Block era -> [Api.HashableScriptData]
+  goBlock (Api.Block _header txs) = concatMap goTx txs
 
-    goTx :: Api.Tx era -> [Api.HashableScriptData]
-    goTx (Api.Tx (Api.TxBody body) _witnesses) = goTxBody body
+  goTx :: Api.Tx era -> [Api.HashableScriptData]
+  goTx (Api.Tx (Api.TxBody body) _witnesses) = goTxBody body
 
-    goTxBody :: Api.TxBodyContent Api.ViewTx era -> [Api.HashableScriptData]
-    goTxBody body = concatMap goTxOut (Api.txOuts body)
+  goTxBody :: Api.TxBodyContent Api.ViewTx era -> [Api.HashableScriptData]
+  goTxBody body = concatMap goTxOut (Api.txOuts body)
 
-    goTxOut :: Api.TxOut Api.CtxTx era -> [Api.HashableScriptData]
-    goTxOut (Api.TxOut _addr _value datum _) = goDatum datum
+  goTxOut :: Api.TxOut Api.CtxTx era -> [Api.HashableScriptData]
+  goTxOut (Api.TxOut _addr _value datum _) = goDatum datum
 
-    goDatum :: Api.TxOutDatum Api.CtxTx era -> [Api.HashableScriptData]
-    goDatum Api.TxOutDatumNone = []
-    goDatum (Api.TxOutDatumInTx _ sd) = [sd]
-    goDatum (Api.TxOutDatumHash _ _h) = []
-    goDatum (Api.TxOutDatumInline _ sd) = [sd]
+  goDatum :: Api.TxOutDatum Api.CtxTx era -> [Api.HashableScriptData]
+  goDatum Api.TxOutDatumNone = []
+  goDatum (Api.TxOutDatumInTx _ sd) = [sd]
+  goDatum (Api.TxOutDatumHash _ _h) = []
+  goDatum (Api.TxOutDatumInline _ sd) = [sd]

@@ -71,10 +71,10 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
   , gytxInvalidAfter :: !(Maybe GYSlot)
   , gytxMetadata :: !(Maybe GYTxMetadata)
   }
-  deriving (Show)
+  deriving Show
 
 data GYTxSkeletonRefIns :: PlutusVersion -> Type where
-  GYTxSkeletonRefIns :: (VersionIsGreaterOrEqual v 'PlutusV2) => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
+  GYTxSkeletonRefIns :: VersionIsGreaterOrEqual v 'PlutusV2 => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
   GYTxSkeletonNoRefIns :: GYTxSkeletonRefIns v
 
 deriving instance Show (GYTxSkeletonRefIns v)
@@ -122,23 +122,23 @@ instance Semigroup (GYTxSkeleton v) where
       , gytxInvalidAfter = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
       , gytxMetadata = gytxMetadata x <> gytxMetadata y
       }
-    where
-      -- we keep only one input per utxo to spend
-      combineIns u v = nubBy ((==) `on` gyTxInTxOutRef) (u ++ v)
-      -- we cannot combine redeemers, so we just pick first.
-      combineMint = Map.unionWith (\(amt, r) (amt', _r) -> (Map.unionWith (+) amt amt', r))
-      -- we keep only one withdrawal per stake address
-      combineWdrls u v = nubBy ((==) `on` gyTxWdrlStakeAddress) (u ++ v)
+   where
+    -- we keep only one input per utxo to spend
+    combineIns u v = nubBy ((==) `on` gyTxInTxOutRef) (u ++ v)
+    -- we cannot combine redeemers, so we just pick first.
+    combineMint = Map.unionWith (\(amt, r) (amt', _r) -> (Map.unionWith (+) amt amt', r))
+    -- we keep only one withdrawal per stake address
+    combineWdrls u v = nubBy ((==) `on` gyTxWdrlStakeAddress) (u ++ v)
 
-      combineInvalidBefore :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
-      combineInvalidBefore m Nothing = m
-      combineInvalidBefore Nothing n = n
-      combineInvalidBefore (Just s) (Just t) = Just (max s t)
+    combineInvalidBefore :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
+    combineInvalidBefore m Nothing = m
+    combineInvalidBefore Nothing n = n
+    combineInvalidBefore (Just s) (Just t) = Just (max s t)
 
-      combineInvalidAfter :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
-      combineInvalidAfter m Nothing = m
-      combineInvalidAfter Nothing n = n
-      combineInvalidAfter (Just s) (Just t) = Just (min s t)
+    combineInvalidAfter :: Maybe GYSlot -> Maybe GYSlot -> Maybe GYSlot
+    combineInvalidAfter m Nothing = m
+    combineInvalidAfter Nothing n = n
+    combineInvalidAfter (Just s) (Just t) = Just (min s t)
 
 instance Monoid (GYTxSkeleton v) where
   mempty = emptyGYTxSkeleton
@@ -238,13 +238,13 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
                   pure $
                     GYTxInDetailed gyTxIn utxoAddress utxoValue utxoOutDatum utxoRefScript
                 else throwError $ GYDatumMismatch utxoOutDatum gyTxIn
-              where
-                checkDatumMatch _ GYTxInWitnessKey = True
-                checkDatumMatch _ GYTxInWitnessSimpleScript {} = True
-                checkDatumMatch ud (GYTxInWitnessScript _ wd _) = case ud of
-                  GYOutDatumNone -> False
-                  GYOutDatumHash h -> h == hashDatum wd
-                  GYOutDatumInline uid -> uid == wd
+             where
+              checkDatumMatch _ GYTxInWitnessKey = True
+              checkDatumMatch _ GYTxInWitnessSimpleScript {} = True
+              checkDatumMatch ud (GYTxInWitnessScript _ wd _) = case ud of
+                GYOutDatumNone -> False
+                GYOutDatumHash h -> h == hashDatum wd
+                GYOutDatumInline uid -> uid == wd
 
         -- This operation is `O(n)` where `n` denotes the number of UTxOs in `ownUtxos'`.
         let totalRefScriptSize = foldl' (\acc GYUTxO {..} -> acc + maybe 0 scriptSize utxoRefScript) 0 $ refInsUtxos <> map utxoFromTxInDetailed gyTxInsDetailed
@@ -298,31 +298,31 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
             -- Continue with an updated accumulator (set of built results).
             go ownUTxos'' (updateBuildRes (Right body) acc) rest
   go ownUtxos GYTxBuildNoInputs skeletons
-  where
-    {- This function updates 'GYTxBuildResult' based on a build outcome
+ where
+  {- This function updates 'GYTxBuildResult' based on a build outcome
 
-    In case of insufficient funds failure ('Left' argument):
-      We return either 'GYTxBuildFailure' or 'GYTxBuildPartialSuccess'
-      Depending on whether or not any previous transactions were built succesfully.
+  In case of insufficient funds failure ('Left' argument):
+    We return either 'GYTxBuildFailure' or 'GYTxBuildPartialSuccess'
+    Depending on whether or not any previous transactions were built succesfully.
 
-    In case of successful build:
-      We save the newly built tx body into the existing ones (if any)
+  In case of successful build:
+    We save the newly built tx body into the existing ones (if any)
 
-    It's impossible for the second argument to ever be 'GYTxBuildFailure' or 'GYTxBuildPartialSuccess', as
-    the outer function 'go' (see above) always exits as soon as the accumulator updates to one of these.
-    -}
-    updateBuildRes (Left v) GYTxBuildNoInputs = GYTxBuildFailure v
-    updateBuildRes (Left v) (GYTxBuildSuccess ne) = GYTxBuildPartialSuccess v ne
-    updateBuildRes (Right x) GYTxBuildNoInputs = GYTxBuildSuccess (x :| [])
-    updateBuildRes (Right x) (GYTxBuildSuccess ne) = GYTxBuildSuccess (NE.cons x ne)
-    updateBuildRes _ _ = error "buildTxCore.flippedFoldM.updateBuildRes: absurd"
+  It's impossible for the second argument to ever be 'GYTxBuildFailure' or 'GYTxBuildPartialSuccess', as
+  the outer function 'go' (see above) always exits as soon as the accumulator updates to one of these.
+  -}
+  updateBuildRes (Left v) GYTxBuildNoInputs = GYTxBuildFailure v
+  updateBuildRes (Left v) (GYTxBuildSuccess ne) = GYTxBuildPartialSuccess v ne
+  updateBuildRes (Right x) GYTxBuildNoInputs = GYTxBuildSuccess (x :| [])
+  updateBuildRes (Right x) (GYTxBuildSuccess ne) = GYTxBuildSuccess (NE.cons x ne)
+  updateBuildRes _ _ = error "buildTxCore.flippedFoldM.updateBuildRes: absurd"
 
-    -- TODO: Move to @Data.Sequence.NonEmpty@?
-    -- \| To reverse the final non-empty list built.
-    reverseResult :: GYTxBuildResult -> GYTxBuildResult
-    reverseResult (GYTxBuildSuccess ne) = GYTxBuildSuccess $ NE.reverse ne
-    reverseResult (GYTxBuildPartialSuccess v ne) = GYTxBuildPartialSuccess v $ NE.reverse ne
-    reverseResult anyOther = anyOther
+  -- TODO: Move to @Data.Sequence.NonEmpty@?
+  -- \| To reverse the final non-empty list built.
+  reverseResult :: GYTxBuildResult -> GYTxBuildResult
+  reverseResult (GYTxBuildSuccess ne) = GYTxBuildSuccess $ NE.reverse ne
+  reverseResult (GYTxBuildPartialSuccess v ne) = GYTxBuildPartialSuccess v $ NE.reverse ne
+  reverseResult anyOther = anyOther
 
 collateralLovelace :: Integer
 collateralLovelace = 5_000_000

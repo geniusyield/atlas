@@ -37,12 +37,12 @@ treatScript =
           ann
           (UPLC.Builtin ann PLC.SerialiseData)
           (UPLC.Var ann scName)
-  where
-    ann = ()
+ where
+  ann = ()
 
-    datumName = UPLC.Name "datum" (UPLC.Unique 0)
-    redeemerName = UPLC.Name "redeemer" (UPLC.Unique 1)
-    scName = UPLC.Name "sc" (UPLC.Unique 2)
+  datumName = UPLC.Name "datum" (UPLC.Unique 0)
+  redeemerName = UPLC.Name "redeemer" (UPLC.Unique 1)
+  scName = UPLC.Name "sc" (UPLC.Unique 2)
 
 treatScript' :: UPLC.Term UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
 treatScript' = toDeBruijn treatScript

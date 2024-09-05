@@ -71,7 +71,7 @@ import GeniusYield.Types.Value
 
 -- | Transaction body: the part which is then signed.
 newtype GYTxBody = GYTxBody (Api.TxBody ApiEra)
-  deriving (Show)
+  deriving Show
 
 txBodyFromApi :: Api.TxBody ApiEra -> GYTxBody
 txBodyFromApi = coerce
@@ -80,11 +80,11 @@ txBodyToApi :: GYTxBody -> Api.TxBody ApiEra
 txBodyToApi = coerce
 
 -- | Sign a transaction body with (potentially) multiple keys.
-signGYTxBody :: (ToShelleyWitnessSigningKey a) => GYTxBody -> [a] -> GYTx
+signGYTxBody :: ToShelleyWitnessSigningKey a => GYTxBody -> [a] -> GYTx
 signGYTxBody = signTx
 
 {-# DEPRECATED signTx "Use signGYTxBody." #-}
-signTx :: (ToShelleyWitnessSigningKey a) => GYTxBody -> [a] -> GYTx
+signTx :: ToShelleyWitnessSigningKey a => GYTxBody -> [a] -> GYTx
 signTx (GYTxBody txBody) skeys =
   txFromApi
     $ Api.signShelleyTransaction
@@ -120,7 +120,7 @@ appendWitnessGYTx' appendKeyWitnessList previousTx =
    in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
 
 -- | Sign a transaction with (potentially) multiple keys and add your witness(s) among previous key witnesses, if any.
-signGYTx :: (ToShelleyWitnessSigningKey a) => GYTx -> [a] -> GYTx
+signGYTx :: ToShelleyWitnessSigningKey a => GYTx -> [a] -> GYTx
 signGYTx previousTx skeys = signGYTx'' previousTx $ map toShelleyWitnessSigningKey skeys
 
 -- | Sign a transaction with (potentially) multiple keys and add your witness(s) among previous key witnesses, if any.
@@ -179,11 +179,11 @@ txBodyFeeValue = valueFromLovelace . txBodyFee
 txBodyUTxOs :: GYTxBody -> GYUTxOs
 txBodyUTxOs (GYTxBody body@(Api.TxBody Api.TxBodyContent {txOuts})) =
   utxosFromList $ zipWith f [0 ..] txOuts
-  where
-    txId = Api.getTxId body
+ where
+  txId = Api.getTxId body
 
-    f :: Word -> Api.TxOut Api.CtxTx ApiEra -> GYUTxO
-    f i = utxoFromApi (Api.TxIn txId (Api.TxIx i))
+  f :: Word -> Api.TxOut Api.CtxTx ApiEra -> GYUTxO
+  f i = utxoFromApi (Api.TxIn txId (Api.TxIx i))
 
 -- | Returns the 'GYTxOutRef' consumed by the tx.
 txBodyTxIns :: GYTxBody -> [GYTxOutRef]
@@ -224,14 +224,14 @@ txBodyValidityRange body =
   let cnt = txBodyToApiTxBodyContent body
    in case (Api.txValidityLowerBound cnt, Api.txValidityUpperBound cnt) of
         (lb, ub) -> (f lb, g ub)
-  where
-    f :: Api.TxValidityLowerBound ApiEra -> Maybe GYSlot
-    f Api.TxValidityNoLowerBound = Nothing
-    f (Api.TxValidityLowerBound _ sn) = Just $ slotFromApi sn
+ where
+  f :: Api.TxValidityLowerBound ApiEra -> Maybe GYSlot
+  f Api.TxValidityNoLowerBound = Nothing
+  f (Api.TxValidityLowerBound _ sn) = Just $ slotFromApi sn
 
-    g :: Api.TxValidityUpperBound ApiEra -> Maybe GYSlot
-    g (Api.TxValidityUpperBound _ Nothing) = Nothing
-    g (Api.TxValidityUpperBound _ (Just sn)) = Just $ slotFromApi sn
+  g :: Api.TxValidityUpperBound ApiEra -> Maybe GYSlot
+  g (Api.TxValidityUpperBound _ Nothing) = Nothing
+  g (Api.TxValidityUpperBound _ (Just sn)) = Just $ slotFromApi sn
 
 -- | Returns the set of 'GYTxOutRef' used as collateral in the given 'GYTxBody'.
 txBodyCollateral :: GYTxBody -> Set GYTxOutRef

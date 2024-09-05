@@ -76,7 +76,7 @@ data GYCoreProviderInfo
   = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text}
   | GYMaestro {cpiMaestroToken :: !(Confidential Text), cpiTurboSubmit :: !(Maybe Bool)}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
-  deriving stock (Show)
+  deriving stock Show
 
 $( deriveFromJSON
     defaultOptions
@@ -130,7 +130,7 @@ data GYCoreConfig = GYCoreConfig
   }
   -- , cfgUtxoCacheEnable :: !Bool
 
-  deriving stock (Show)
+  deriving stock Show
 
 $( deriveFromJSON
     defaultOptions
@@ -254,69 +254,69 @@ logTiming providers@GYProviders {..} =
     , gyGetStakeAddressInfo = gyGetStakeAddressInfo'
     , gyLog' = gyLog'
     }
-  where
-    wrap :: String -> IO a -> IO a
-    wrap msg m = do
-      (!a, !t) <- duration m
-      gyLog providers "" GYDebug $ msg <> " took " <> show t
-      pure a
+ where
+  wrap :: String -> IO a -> IO a
+  wrap msg m = do
+    (!a, !t) <- duration m
+    gyLog providers "" GYDebug $ msg <> " took " <> show t
+    pure a
 
-    gyLookupDatum' :: GYLookupDatum
-    gyLookupDatum' = wrap "gyLookupDatum" . gyLookupDatum
+  gyLookupDatum' :: GYLookupDatum
+  gyLookupDatum' = wrap "gyLookupDatum" . gyLookupDatum
 
-    gySubmitTx' :: GYSubmitTx
-    gySubmitTx' = wrap "gySubmitTx" . gySubmitTx
+  gySubmitTx' :: GYSubmitTx
+  gySubmitTx' = wrap "gySubmitTx" . gySubmitTx
 
-    gyAwaitTxConfirmed' :: GYAwaitTx
-    gyAwaitTxConfirmed' p = wrap "gyAwaitTxConfirmed" . gyAwaitTxConfirmed p
+  gyAwaitTxConfirmed' :: GYAwaitTx
+  gyAwaitTxConfirmed' p = wrap "gyAwaitTxConfirmed" . gyAwaitTxConfirmed p
 
-    gySlotActions' :: GYSlotActions
-    gySlotActions' =
-      GYSlotActions
-        { gyGetSlotOfCurrentBlock' = wrap "gyGetSlotOfCurrentBlock" $ gyGetSlotOfCurrentBlock providers
-        , gyWaitForNextBlock' = wrap "gyWaitForNextBlock" $ gyWaitForNextBlock providers
-        , gyWaitUntilSlot' = wrap "gyWaitUntilSlot" . gyWaitUntilSlot providers
-        }
+  gySlotActions' :: GYSlotActions
+  gySlotActions' =
+    GYSlotActions
+      { gyGetSlotOfCurrentBlock' = wrap "gyGetSlotOfCurrentBlock" $ gyGetSlotOfCurrentBlock providers
+      , gyWaitForNextBlock' = wrap "gyWaitForNextBlock" $ gyWaitForNextBlock providers
+      , gyWaitUntilSlot' = wrap "gyWaitUntilSlot" . gyWaitUntilSlot providers
+      }
 
-    gyGetParameters' :: GYGetParameters
-    gyGetParameters' =
-      GYGetParameters
-        { gyGetProtocolParameters' = wrap "gyGetProtocolParameters" $ gyGetProtocolParameters providers
-        , gyGetSystemStart' = wrap "gyGetSystemStart" $ gyGetSystemStart providers
-        , gyGetEraHistory' = wrap "gyGetEraHistory" $ gyGetEraHistory providers
-        , gyGetStakePools' = wrap "gyGetStakePools" $ gyGetStakePools providers
-        , gyGetSlotConfig' = wrap "gyGetSlotConfig" $ gyGetSlotConfig providers
-        }
+  gyGetParameters' :: GYGetParameters
+  gyGetParameters' =
+    GYGetParameters
+      { gyGetProtocolParameters' = wrap "gyGetProtocolParameters" $ gyGetProtocolParameters providers
+      , gyGetSystemStart' = wrap "gyGetSystemStart" $ gyGetSystemStart providers
+      , gyGetEraHistory' = wrap "gyGetEraHistory" $ gyGetEraHistory providers
+      , gyGetStakePools' = wrap "gyGetStakePools" $ gyGetStakePools providers
+      , gyGetSlotConfig' = wrap "gyGetSlotConfig" $ gyGetSlotConfig providers
+      }
 
-    gyQueryUTxO' :: GYQueryUTxO
-    gyQueryUTxO' =
-      GYQueryUTxO
-        { gyQueryUtxosAtTxOutRefs' = wrap "gyQueryUtxosAtTxOutRefs" . gyQueryUtxosAtTxOutRefs providers
-        , gyQueryUtxosAtTxOutRefsWithDatums' = case gyQueryUtxosAtTxOutRefsWithDatums' gyQueryUTxO of
-            Nothing -> Nothing
-            Just q -> Just $ wrap "gyQueryUtxosAtTxOutRefsWithDatums" . q
-        , gyQueryUtxoAtTxOutRef' = wrap "gyQueryUtxoAtTxOutRef" . gyQueryUtxoAtTxOutRef providers
-        , gyQueryUtxoRefsAtAddress' = wrap "gyQueryUtxoRefsAtAddress" . gyQueryUtxoRefsAtAddress providers
-        , gyQueryUtxosAtAddress' = \addr mac -> wrap "gyQueryUtxosAtAddress'" $ gyQueryUtxosAtAddress providers addr mac
-        , gyQueryUtxosAtAddressWithDatums' = case gyQueryUtxosAtAddressWithDatums' gyQueryUTxO of
-            Nothing -> Nothing
-            Just q -> Just $ \addr mac -> wrap "gyQueryUtxosAtAddressWithDatums'" $ q addr mac
-        , gyQueryUtxosAtAddresses' = wrap "gyQueryUtxosAtAddresses" . gyQueryUtxosAtAddresses providers
-        , gyQueryUtxosAtAddressesWithDatums' = case gyQueryUtxosAtAddressesWithDatums' gyQueryUTxO of
-            Nothing -> Nothing
-            Just q -> Just $ wrap "gyQueryUtxosAtAddressesWithDatums" . q
-        , gyQueryUtxosAtPaymentCredential' = \cred -> wrap "gyQueryUtxosAtPaymentCredential" . gyQueryUtxosAtPaymentCredential providers cred
-        , gyQueryUtxosAtPaymentCredWithDatums' = case gyQueryUtxosAtPaymentCredWithDatums' gyQueryUTxO of
-            Nothing -> Nothing
-            Just q -> Just $ \cred mac -> wrap "gyQueryUtxosAtPaymentCredWithDatums" $ q cred mac
-        , gyQueryUtxosAtPaymentCredentials' = wrap "gyQueryUtxosAtPaymentCredentials" . gyQueryUtxosAtPaymentCredentials providers
-        , gyQueryUtxosAtPaymentCredsWithDatums' = case gyQueryUtxosAtPaymentCredsWithDatums' gyQueryUTxO of
-            Nothing -> Nothing
-            Just q -> Just $ wrap "gyQueryUtxosAtPaymentCredsWithDatums" . q
-        }
+  gyQueryUTxO' :: GYQueryUTxO
+  gyQueryUTxO' =
+    GYQueryUTxO
+      { gyQueryUtxosAtTxOutRefs' = wrap "gyQueryUtxosAtTxOutRefs" . gyQueryUtxosAtTxOutRefs providers
+      , gyQueryUtxosAtTxOutRefsWithDatums' = case gyQueryUtxosAtTxOutRefsWithDatums' gyQueryUTxO of
+          Nothing -> Nothing
+          Just q -> Just $ wrap "gyQueryUtxosAtTxOutRefsWithDatums" . q
+      , gyQueryUtxoAtTxOutRef' = wrap "gyQueryUtxoAtTxOutRef" . gyQueryUtxoAtTxOutRef providers
+      , gyQueryUtxoRefsAtAddress' = wrap "gyQueryUtxoRefsAtAddress" . gyQueryUtxoRefsAtAddress providers
+      , gyQueryUtxosAtAddress' = \addr mac -> wrap "gyQueryUtxosAtAddress'" $ gyQueryUtxosAtAddress providers addr mac
+      , gyQueryUtxosAtAddressWithDatums' = case gyQueryUtxosAtAddressWithDatums' gyQueryUTxO of
+          Nothing -> Nothing
+          Just q -> Just $ \addr mac -> wrap "gyQueryUtxosAtAddressWithDatums'" $ q addr mac
+      , gyQueryUtxosAtAddresses' = wrap "gyQueryUtxosAtAddresses" . gyQueryUtxosAtAddresses providers
+      , gyQueryUtxosAtAddressesWithDatums' = case gyQueryUtxosAtAddressesWithDatums' gyQueryUTxO of
+          Nothing -> Nothing
+          Just q -> Just $ wrap "gyQueryUtxosAtAddressesWithDatums" . q
+      , gyQueryUtxosAtPaymentCredential' = \cred -> wrap "gyQueryUtxosAtPaymentCredential" . gyQueryUtxosAtPaymentCredential providers cred
+      , gyQueryUtxosAtPaymentCredWithDatums' = case gyQueryUtxosAtPaymentCredWithDatums' gyQueryUTxO of
+          Nothing -> Nothing
+          Just q -> Just $ \cred mac -> wrap "gyQueryUtxosAtPaymentCredWithDatums" $ q cred mac
+      , gyQueryUtxosAtPaymentCredentials' = wrap "gyQueryUtxosAtPaymentCredentials" . gyQueryUtxosAtPaymentCredentials providers
+      , gyQueryUtxosAtPaymentCredsWithDatums' = case gyQueryUtxosAtPaymentCredsWithDatums' gyQueryUTxO of
+          Nothing -> Nothing
+          Just q -> Just $ wrap "gyQueryUtxosAtPaymentCredsWithDatums" . q
+      }
 
-    gyGetStakeAddressInfo' :: GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
-    gyGetStakeAddressInfo' = wrap "gyGetStakeAddressInfo" . gyGetStakeAddressInfo
+  gyGetStakeAddressInfo' :: GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
+  gyGetStakeAddressInfo' = wrap "gyGetStakeAddressInfo" . gyGetStakeAddressInfo
 
 duration :: IO a -> IO (a, NominalDiffTime)
 duration m = do

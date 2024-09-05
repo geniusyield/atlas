@@ -141,8 +141,8 @@ data GYFromPlutusValueError
 
 -- | Value: a (total) map from asset classes ('GYAssetClass') to amount ('Integer').
 newtype GYValue = GYValue (Map.Map GYAssetClass Integer)
-  deriving (Eq)
-  deriving newtype (Ord)
+  deriving Eq
+  deriving newtype Ord
 
 {- | Check the 'GYValue' representation invariants.
 
@@ -170,9 +170,9 @@ instance Monoid GYValue where
 -- | Converts a 'GYValue' to a Plutus 'Plutus.Value'
 valueToPlutus :: GYValue -> Plutus.Value
 valueToPlutus (GYValue m) = foldMap f (Map.toList m)
-  where
-    f :: (GYAssetClass, Integer) -> Plutus.Value
-    f (assetClassToPlutus -> Plutus.AssetClass (cs, tn), n) = Plutus.singleton cs tn n
+ where
+  f :: (GYAssetClass, Integer) -> Plutus.Value
+  f (assetClassToPlutus -> Plutus.AssetClass (cs, tn), n) = Plutus.singleton cs tn n
 
 {- | Converts a Plutus 'Plutus.Value' to a 'GYValue'.
   Returns Left 'GYFromPlutusValueError' if it fails.
@@ -278,9 +278,9 @@ instance Printf.PrintfArg GYValue where
 
 showValue :: Plutus.Value -> String
 showValue = intercalate " + " . map f . Plutus.flattenValue
-  where
-    f :: (Plutus.CurrencySymbol, Plutus.TokenName, Integer) -> String
-    f (cs, tn, n) = show n ++ " " ++ showAssetClass (Plutus.AssetClass (cs, tn))
+ where
+  f :: (Plutus.CurrencySymbol, Plutus.TokenName, Integer) -> String
+  f (cs, tn, n) = show n ++ " " ++ showAssetClass (Plutus.AssetClass (cs, tn))
 
 {- |
 
@@ -300,11 +300,11 @@ instance Csv.FromField GYValue where
       Just v -> pure v
       Nothing -> fail $ "Error Parsing GYValue: " <> show value
 
-assetPairToKV :: (Aeson.KeyValue e kv) => GYAssetClass -> Integer -> kv
+assetPairToKV :: Aeson.KeyValue e kv => GYAssetClass -> Integer -> kv
 assetPairToKV ac i = K.fromText (f ac) .= i
-  where
-    f GYLovelace = "lovelace"
-    f (GYToken cs tk) = mintingPolicyIdToText cs <> T.cons '.' (tokenNameToHex tk)
+ where
+  f GYLovelace = "lovelace"
+  f (GYToken cs tk) = mintingPolicyIdToText cs <> T.cons '.' (tokenNameToHex tk)
 
 {- |
 
@@ -325,18 +325,18 @@ parseValueKM allowWithoutSep km =
   case KM.toList km of
     [] -> pure $ valueMake mempty
     xs -> valueFromList <$> traverse go xs
-  where
-    go :: (Aeson.Key, Aeson.Value) -> Aeson.Parser (GYAssetClass, Integer)
-    go (k, v) = do
-      let k' = K.toText k
-          parseWithSep = parseAssetClassWithSep '.' k'
-      ac <-
-        either fail pure $
-          either (\(Left -> e) -> if allowWithoutSep then parseAssetClassWithoutSep k' <> e else e) Right parseWithSep
-      scN <- parseJSON v
-      case SC.floatingOrInteger @Double scN of
-        Left d -> fail $ "Expected amount to be an integer; amount: " <> show d
-        Right i -> pure (ac, i)
+ where
+  go :: (Aeson.Key, Aeson.Value) -> Aeson.Parser (GYAssetClass, Integer)
+  go (k, v) = do
+    let k' = K.toText k
+        parseWithSep = parseAssetClassWithSep '.' k'
+    ac <-
+      either fail pure $
+        either (\(Left -> e) -> if allowWithoutSep then parseAssetClassWithoutSep k' <> e else e) Right parseWithSep
+    scN <- parseJSON v
+    case SC.floatingOrInteger @Double scN of
+      Left d -> fail $ "Expected amount to be an integer; amount: " <> show d
+      Right i -> pure (ac, i)
 
 instance Swagger.ToSchema GYValue where
   declareNamedSchema _ = do
@@ -409,8 +409,8 @@ valueAssetClass (GYValue m) ac = Map.findWithDefault 0 ac m
 -}
 valueSplitSign :: GYValue -> (GYValue, GYValue)
 valueSplitSign (GYValue m) = (GYValue positiveVal, GYValue $ negate <$> negativeVal)
-  where
-    (positiveVal, negativeVal) = Map.partition (> 0) m
+ where
+  (positiveVal, negativeVal) = Map.partition (> 0) m
 
 -- | Verify the value only consists of positive amounts, returning a map containing naturals as a result.
 valueVerifyNonNegative :: GYValue -> Maybe (Map GYAssetClass Natural)
@@ -656,11 +656,11 @@ parseAssetClass msep =
   case msep of
     Just sep -> parseAssetClassCore sep tnParser
     Nothing -> parseAssetClassCore' Nothing tnParser
-  where
-    tnParser tn =
-      case tokenNameFromHexBS tn of
-        Left err -> fail $ T.unpack err
-        Right x -> pure x
+ where
+  tnParser tn =
+    case tokenNameFromHexBS tn of
+      Left err -> fail $ T.unpack err
+      Right x -> pure x
 
 parseAssetClassCore :: Char -> (BS.ByteString -> Atto.Parser GYTokenName) -> Text -> Either String GYAssetClass
 parseAssetClassCore = parseAssetClassCore' . Just
@@ -669,16 +669,16 @@ parseAssetClassCore' :: Maybe Char -> (BS.ByteString -> Atto.Parser GYTokenName)
 parseAssetClassCore' _ _ "lovelace" = pure GYLovelace
 parseAssetClassCore' _ _ "" = pure GYLovelace
 parseAssetClassCore' msep tkParser t = Atto.parseOnly parser (TE.encodeUtf8 t)
-  where
-    parser :: Atto.Parser GYAssetClass
-    parser = do
-      cs <- Atto.take 56
-      case Api.deserialiseFromRawBytesHex Api.AsPolicyId cs of
-        Left x -> fail $ "Invalid currency symbol: " ++ show cs ++ "; Reason: " ++ show x
-        Right cs' -> do
-          for_ msep (void . Atto.char)
-          tn <- Atto.takeWhile isAlphaNum
-          GYToken (mintingPolicyIdFromApi cs') <$> tkParser tn
+ where
+  parser :: Atto.Parser GYAssetClass
+  parser = do
+    cs <- Atto.take 56
+    case Api.deserialiseFromRawBytesHex Api.AsPolicyId cs of
+      Left x -> fail $ "Invalid currency symbol: " ++ show cs ++ "; Reason: " ++ show x
+      Right cs' -> do
+        for_ msep (void . Atto.char)
+        tn <- Atto.takeWhile isAlphaNum
+        GYToken (mintingPolicyIdFromApi cs') <$> tkParser tn
 
 -------------------------------------------------------------------------------
 -- TokenName
@@ -706,8 +706,8 @@ instance IsString GYTokenName where
     fromMaybe
       (error $ "fromString @GYTokenName " ++ show s ++ ": token name too long")
       (tokenNameFromBS bs)
-    where
-      bs = fromString s -- TODO: utf8-encode #33 (https://github.com/geniusyield/atlas/issues/33)
+   where
+    bs = fromString s -- TODO: utf8-encode #33 (https://github.com/geniusyield/atlas/issues/33)
 
 instance Swagger.ToParamSchema GYTokenName where
   toParamSchema _ =
@@ -787,7 +787,7 @@ tokenNameToPlutus :: GYTokenName -> Plutus.TokenName
 tokenNameToPlutus (GYTokenName bs) = Plutus.TokenName (toBuiltin bs)
 
 -- | Convert Plutus 'Plutus.TokenName' to 'GYTokenName'.
-tokenNameFromPlutus :: (HasCallStack) => Plutus.TokenName -> Maybe GYTokenName
+tokenNameFromPlutus :: HasCallStack => Plutus.TokenName -> Maybe GYTokenName
 tokenNameFromPlutus (Plutus.TokenName bbs) = tokenNameFromBS (fromBuiltin bbs)
 
 tokenNameFromBS :: BS.ByteString -> Maybe GYTokenName

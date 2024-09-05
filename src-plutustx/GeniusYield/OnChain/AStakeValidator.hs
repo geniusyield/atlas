@@ -20,12 +20,12 @@ mkAStakeValidator addr _ ctx' = case scriptContextPurpose ctx of
   Certifying _ -> ()
   Rewarding _ -> if paidToAddress then () else error ()
   _ -> error ()
-  where
-    ctx :: ScriptContext
-    ctx = unsafeFromBuiltinData ctx'
+ where
+  ctx :: ScriptContext
+  ctx = unsafeFromBuiltinData ctx'
 
-    info :: TxInfo
-    info = scriptContextTxInfo ctx
+  info :: TxInfo
+  info = scriptContextTxInfo ctx
 
-    paidToAddress :: Bool
-    paidToAddress = any (\o -> txOutAddress o == addr) $ txInfoOutputs info
+  paidToAddress :: Bool
+  paidToAddress = any (\o -> txOutAddress o == addr) $ txInfoOutputs info

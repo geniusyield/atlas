@@ -58,7 +58,7 @@ data GYConversionError
     GYInvalidAssetClass !Text
   | -- | Errors caused by "GeniusYield.Types.Slot.slotFromInteger" resulting in 'Nothing'.
     GYInvalidSlot !Integer
-  deriving stock (Show)
+  deriving stock Show
 
 -- | 'GYQueryUTxOError's may be raised during utxo related queries.
 data GYQueryUTxOError
@@ -66,7 +66,7 @@ data GYQueryUTxOError
     GYNoUtxosAtAddress ![GYAddress]
   | -- | No UTxO exists at given ref.
     GYNoUtxoAtRef !GYTxOutRef
-  deriving stock (Show)
+  deriving stock Show
 
 -- | 'GYQueryDatumError' may be raised during fetching and parsing datums.
 data GYQueryDatumError
@@ -76,7 +76,7 @@ data GYQueryDatumError
     GYInvalidDatum !GYDatum
   | -- | No datum hash at utxo.
     GYNoDatumHash !GYUTxO
-  deriving stock (Show)
+  deriving stock Show
 
 {- | Exceptions raised within the 'GeniusYield.TxBuilder.Class.GYTxMonad' computation.
 

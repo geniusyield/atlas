@@ -31,7 +31,7 @@ import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 -------------------------------------------------------------------------------
 
 -- | Class of monads for querying chain data.
-class (MonadError GYTxMonadException m) => GYTxQueryMonad m where
+class MonadError GYTxMonadException m => GYTxQueryMonad m where
   {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock #-}
 
   -- | Get the network id
@@ -70,9 +70,9 @@ class (MonadError GYTxMonadException m) => GYTxQueryMonad m where
   -- | Lookup 'GYUTxOs' at zero or more 'GYAddress'.
   utxosAtAddresses :: [GYAddress] -> m GYUTxOs
   utxosAtAddresses = foldM f mempty
-    where
-      f :: GYUTxOs -> GYAddress -> m GYUTxOs
-      f utxos addr = (<> utxos) <$> utxosAtAddress addr Nothing
+   where
+    f :: GYUTxOs -> GYAddress -> m GYUTxOs
+    f utxos addr = (<> utxos) <$> utxosAtAddress addr Nothing
 
   -- | Lookup UTxOs at zero or more 'GYAddress' with their datums. This has a default implementation using `utxosAtAddresses` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
   utxosAtAddressesWithDatums :: [GYAddress] -> m [(GYUTxO, Maybe GYDatum)]
@@ -92,9 +92,9 @@ class (MonadError GYTxMonadException m) => GYTxQueryMonad m where
   -- | Lookup 'GYUTxOs' at zero or more 'GYPaymentCredential'.
   utxosAtPaymentCredentials :: [GYPaymentCredential] -> m GYUTxOs
   utxosAtPaymentCredentials = foldM f mempty
-    where
-      f :: GYUTxOs -> GYPaymentCredential -> m GYUTxOs
-      f utxos paymentCred = (<> utxos) <$> utxosAtPaymentCredential paymentCred Nothing
+   where
+    f :: GYUTxOs -> GYPaymentCredential -> m GYUTxOs
+    f utxos paymentCred = (<> utxos) <$> utxosAtPaymentCredential paymentCred Nothing
 
   -- | Lookup UTxOs at zero or more 'GYPaymentCredential' with their datums. This has a default implementation using `utxosAtPaymentCredentials` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
   utxosAtPaymentCredentialsWithDatums :: [GYPaymentCredential] -> m [(GYUTxO, Maybe GYDatum)]
@@ -114,7 +114,7 @@ class (MonadError GYTxMonadException m) => GYTxQueryMonad m where
   slotOfCurrentBlock :: m GYSlot
 
   -- | Log a message with specified namespace and severity.
-  logMsg :: (HasCallStack) => GYLogNamespace -> GYLogSeverity -> String -> m ()
+  logMsg :: HasCallStack => GYLogNamespace -> GYLogSeverity -> String -> m ()
 
   -- | Wait until the chain tip is at least the given slot number, returning it's slot.
   waitUntilSlot :: GYSlot -> m GYSlot
@@ -136,14 +136,14 @@ to decide where to draw the line regarding the interface. Our transaction buildi
 coin selection strategy, parallel transactions, chaining transactions etc. Should all this really be included
 under the class method in question?
 -}
-class (GYTxQueryMonad m) => GYTxSpecialQueryMonad m where
+class GYTxQueryMonad m => GYTxSpecialQueryMonad m where
   systemStart :: m Api.SystemStart
   eraHistory :: m Api.EraHistory
   protocolParams :: m ApiProtocolParameters
   stakePools :: m (Set Api.S.PoolId)
 
 -- | Class of monads for querying as a user.
-class (GYTxQueryMonad m) => GYTxUserQueryMonad m where
+class GYTxQueryMonad m => GYTxUserQueryMonad m where
   -- | Get your own address(es).
   ownAddresses :: m [GYAddress]
 
@@ -165,7 +165,7 @@ class (GYTxQueryMonad m) => GYTxUserQueryMonad m where
 -- Instances for useful transformers.
 -------------------------------------------------------------------------------
 
-instance (GYTxQueryMonad m) => GYTxQueryMonad (RandT g m) where
+instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
   networkId = lift networkId
   lookupDatum = lift . lookupDatum
   utxoAtTxOutRef = lift . utxoAtTxOutRef
@@ -187,20 +187,20 @@ instance (GYTxQueryMonad m) => GYTxQueryMonad (RandT g m) where
   waitUntilSlot = lift . waitUntilSlot
   waitForNextBlock = lift waitForNextBlock
 
-instance (GYTxUserQueryMonad m) => GYTxUserQueryMonad (RandT g m) where
+instance GYTxUserQueryMonad m => GYTxUserQueryMonad (RandT g m) where
   ownAddresses = lift ownAddresses
   ownChangeAddress = lift ownChangeAddress
   ownCollateral = lift ownCollateral
   availableUTxOs = lift availableUTxOs
   someUTxO = lift . someUTxO
 
-instance (GYTxSpecialQueryMonad m) => GYTxSpecialQueryMonad (RandT g m) where
+instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (RandT g m) where
   systemStart = lift systemStart
   eraHistory = lift eraHistory
   protocolParams = lift protocolParams
   stakePools = lift stakePools
 
-instance (GYTxQueryMonad m) => GYTxQueryMonad (ReaderT env m) where
+instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
   networkId = lift networkId
   lookupDatum = lift . lookupDatum
   utxoAtTxOutRef = lift . utxoAtTxOutRef
@@ -222,14 +222,14 @@ instance (GYTxQueryMonad m) => GYTxQueryMonad (ReaderT env m) where
   waitUntilSlot = lift . waitUntilSlot
   waitForNextBlock = lift waitForNextBlock
 
-instance (GYTxUserQueryMonad m) => GYTxUserQueryMonad (ReaderT env m) where
+instance GYTxUserQueryMonad m => GYTxUserQueryMonad (ReaderT env m) where
   ownAddresses = lift ownAddresses
   ownChangeAddress = lift ownChangeAddress
   ownCollateral = lift ownCollateral
   availableUTxOs = lift availableUTxOs
   someUTxO = lift . someUTxO
 
-instance (GYTxSpecialQueryMonad m) => GYTxSpecialQueryMonad (ReaderT env m) where
+instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (ReaderT env m) where
   systemStart = lift systemStart
   eraHistory = lift eraHistory
   protocolParams = lift protocolParams
@@ -261,7 +261,7 @@ system will suffice (do NOT use free(er) monad like ones). This will trivialize 
 entire problem.
 -}
 
-instance (GYTxQueryMonad m) => GYTxQueryMonad (Strict.StateT s m) where
+instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
   networkId = lift networkId
   lookupDatum = lift . lookupDatum
   utxoAtTxOutRef = lift . utxoAtTxOutRef
@@ -283,20 +283,20 @@ instance (GYTxQueryMonad m) => GYTxQueryMonad (Strict.StateT s m) where
   waitUntilSlot = lift . waitUntilSlot
   waitForNextBlock = lift waitForNextBlock
 
-instance (GYTxUserQueryMonad m) => GYTxUserQueryMonad (Strict.StateT s m) where
+instance GYTxUserQueryMonad m => GYTxUserQueryMonad (Strict.StateT s m) where
   ownAddresses = lift ownAddresses
   ownChangeAddress = lift ownChangeAddress
   ownCollateral = lift ownCollateral
   availableUTxOs = lift availableUTxOs
   someUTxO = lift . someUTxO
 
-instance (GYTxSpecialQueryMonad m) => GYTxSpecialQueryMonad (Strict.StateT s m) where
+instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (Strict.StateT s m) where
   systemStart = lift systemStart
   eraHistory = lift eraHistory
   protocolParams = lift protocolParams
   stakePools = lift stakePools
 
-instance (GYTxQueryMonad m) => GYTxQueryMonad (Lazy.StateT s m) where
+instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
   networkId = lift networkId
   lookupDatum = lift . lookupDatum
   utxoAtTxOutRef = lift . utxoAtTxOutRef
@@ -318,14 +318,14 @@ instance (GYTxQueryMonad m) => GYTxQueryMonad (Lazy.StateT s m) where
   waitUntilSlot = lift . waitUntilSlot
   waitForNextBlock = lift waitForNextBlock
 
-instance (GYTxUserQueryMonad m) => GYTxUserQueryMonad (Lazy.StateT s m) where
+instance GYTxUserQueryMonad m => GYTxUserQueryMonad (Lazy.StateT s m) where
   ownAddresses = lift ownAddresses
   ownChangeAddress = lift ownChangeAddress
   ownCollateral = lift ownCollateral
   availableUTxOs = lift availableUTxOs
   someUTxO = lift . someUTxO
 
-instance (GYTxSpecialQueryMonad m) => GYTxSpecialQueryMonad (Lazy.StateT s m) where
+instance GYTxSpecialQueryMonad m => GYTxSpecialQueryMonad (Lazy.StateT s m) where
   systemStart = lift systemStart
   eraHistory = lift eraHistory
   protocolParams = lift protocolParams

@@ -79,7 +79,7 @@ import Data.Text.Lazy.Encoding qualified as LTE
 import GHC.TypeLits (ErrorMessage (..), TypeError)
 
 -- | Use 'TODO' instead of 'undefined's
-pattern TODO :: () => (HasCallStack) => a
+pattern TODO :: () => HasCallStack => a
 pattern TODO <- (todoMatch -> ())
   where
     TODO = error "TODO"
@@ -88,15 +88,15 @@ pattern TODO <- (todoMatch -> ())
 todoMatch :: a -> ()
 todoMatch _ = ()
 
-findFirst :: (Foldable f) => (a -> Maybe b) -> f a -> Maybe b
+findFirst :: Foldable f => (a -> Maybe b) -> f a -> Maybe b
 findFirst f xs = getFirst (foldMap (coerce f) xs)
 
 -- poisonous instances
 -- (the orphan in plutus-ledger-api was removed in Feb 2022)
-instance (TypeError ('Text "Forbidden FromJSON ByteString instance")) => FromJSON ByteString where
+instance TypeError ('Text "Forbidden FromJSON ByteString instance") => FromJSON ByteString where
   parseJSON = error "FromJSON @ByteString"
 
-instance (TypeError ('Text "Forbidden ToJSON ByteString instance")) => ToJSON ByteString where
+instance TypeError ('Text "Forbidden ToJSON ByteString instance") => ToJSON ByteString where
   toJSON = error "ToJSON @ByteString"
 
 {- | Decode a lazy 'ByteString' containing UTF-8 encoded text.
@@ -119,5 +119,5 @@ hush = either (const Nothing) Just
 
 __NOTE:__ This is also defined (& exported) in @transformers-0.6.0.0@, so should be removed once we upgrade to it.
 -}
-hoistMaybe :: (Applicative m) => Maybe b -> MaybeT m b
+hoistMaybe :: Applicative m => Maybe b -> MaybeT m b
 hoistMaybe = MaybeT . pure

@@ -162,7 +162,7 @@ Just (GYTime 33.333s)
 >>> gyIso8601ParseM @Maybe "1970-01-01T00:00:33.333"
 Nothing
 -}
-gyIso8601ParseM :: (MonadFail m) => String -> m GYTime
+gyIso8601ParseM :: MonadFail m => String -> m GYTime
 gyIso8601ParseM = fmap (GYTime . Time.utcTimeToPOSIXSeconds) . Time.iso8601ParseM
 
 {- |

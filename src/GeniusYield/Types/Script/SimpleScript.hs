@@ -113,8 +113,8 @@ getTotalKeysInSimpleScript = \case
   RequireAllOf ss -> f ss
   RequireAnyOf ss -> f ss
   RequireMOf _ ss -> f ss
-  where
-    f = foldMap' getTotalKeysInSimpleScript
+ where
+  f = foldMap' getTotalKeysInSimpleScript
 
 hashSimpleScript :: GYSimpleScript -> GYScriptHash
 hashSimpleScript = scriptHashFromApi . hashSimpleScript'

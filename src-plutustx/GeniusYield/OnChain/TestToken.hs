@@ -25,14 +25,14 @@ mkTestTokenPolicy amt tn utxo _ ctx'
   | tn /= tn' = traceError "wrong token"
   | amt /= amt' = traceError "wrong amount"
   | otherwise = ()
-  where
-    ctx :: ScriptContext
-    ctx = unsafeFromBuiltinData ctx'
+ where
+  ctx :: ScriptContext
+  ctx = unsafeFromBuiltinData ctx'
 
-    info :: TxInfo
-    info = scriptContextTxInfo ctx
+  info :: TxInfo
+  info = scriptContextTxInfo ctx
 
-    [(_, tn', amt')] = flattenValue $ txInfoMint info
+  [(_, tn', amt')] = flattenValue $ txInfoMint info
 
-    hasn'tUTxO :: Bool
-    hasn'tUTxO = all (\i -> txInInfoOutRef i /= utxo) $ txInfoInputs info
+  hasn'tUTxO :: Bool
+  hasn'tUTxO = all (\i -> txInInfoOutRef i /= utxo) $ txInfoInputs info

@@ -28,7 +28,7 @@ import GeniusYield.Imports
 type IsGYApiError :: Type -> Constraint
 class IsGYApiError e where
   toApiError :: e -> GYApiError
-  default toApiError :: (Exception e) => e -> GYApiError
+  default toApiError :: Exception e => e -> GYApiError
   toApiError e = someBackendError . Txt.pack $ displayException e
 
 {- | An example error code can be: "INSUFFICIENT_BALANCE" (i.e.

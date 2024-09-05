@@ -64,10 +64,10 @@ nodeUtxosAtPaymentCredentials :: Api.LocalNodeConnectInfo -> [GYPaymentCredentia
 nodeUtxosAtPaymentCredentials info creds = do
   allUtxos <- queryUTxO info Api.QueryUTxOWhole
   pure $ filterUTxOs (\GYUTxO {utxoAddress} -> matchesCred $ addressToPaymentCredential utxoAddress) allUtxos
-  where
-    credSet = Set.fromList creds
-    matchesCred Nothing = False
-    matchesCred (Just cred) = cred `Set.member` credSet
+ where
+  credSet = Set.fromList creds
+  matchesCred Nothing = False
+  matchesCred (Just cred) = cred `Set.member` credSet
 
 nodeQueryUTxO :: Api.S.LocalNodeConnectInfo -> GYQueryUTxO
 nodeQueryUTxO info =

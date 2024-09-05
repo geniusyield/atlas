@@ -13,7 +13,7 @@ import Data.Aeson qualified as Aeson
 import Data.ByteString.Lazy qualified as LBS
 import GeniusYield.Imports
 
-readJSON :: (FromJSON a) => FilePath -> IO a
+readJSON :: FromJSON a => FilePath -> IO a
 readJSON fp = do
   bs <- LBS.readFile fp
   case Aeson.eitherDecode' bs of

@@ -61,8 +61,8 @@ nodeSlotActions info =
     , gyWaitForNextBlock' = gyWaitForNextBlockDefault getSlotOfCurrentBlock
     , gyWaitUntilSlot' = gyWaitUntilSlotDefault getSlotOfCurrentBlock
     }
-  where
-    getSlotOfCurrentBlock = nodeGetSlotOfCurrentBlock info
+ where
+  getSlotOfCurrentBlock = nodeGetSlotOfCurrentBlock info
 
 -------------------------------------------------------------------------------
 -- Parameters

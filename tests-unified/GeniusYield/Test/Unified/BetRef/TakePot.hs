@@ -31,63 +31,63 @@ takeBetPotTests setup =
     , mkTestFor "Must fail even if old guess was closest but updated one is not" $ mustFail . badUpdatedGuessTakeBetsTest
     , mkPrivnetTestFor_ "Must fail even if old guess was closest but updated one is not - privnet" $ mustFailPrivnet . badUpdatedGuessTakeBetsTest
     ]
-  where
-    mkPrivnetTestFor_ = flip mkPrivnetTestFor setup
-    takeBetsTest :: (GYTxGameMonad m) => TestInfo -> m ()
-    takeBetsTest TestInfo {..} =
-      takeBetsTrace
-        400
-        1_000
-        (valueFromLovelace 10_000_000)
-        [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
-        , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
-        , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
-        , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
-        , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> valueSingleton testGoldAsset 1_000)
-        ]
-        4
-        w2
-        testWallets
-    wrongGuesserTakeBetsTest :: (GYTxGameMonad m) => TestInfo -> m ()
-    wrongGuesserTakeBetsTest TestInfo {..} =
-      takeBetsTrace
-        400
-        1_000
-        (valueFromLovelace 10_000_000)
-        [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
-        , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
-        , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
-        , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
-        , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> valueSingleton testGoldAsset 1_000)
-        ]
-        5
-        w2
-        testWallets
-    badUpdatedGuessTakeBetsTest :: (GYTxGameMonad m) => TestInfo -> m ()
-    badUpdatedGuessTakeBetsTest TestInfo {..} =
-      takeBetsTrace
-        400
-        1_000
-        (valueFromLovelace 10_000_000)
-        [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
-        , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
-        , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
-        , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
-        , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> valueSingleton testGoldAsset 1_000)
-        ]
-        2
-        w2
-        testWallets
-    -- Must fail with script execution error (which is fired in the body error auto balance).
-    mustFailPrivnet =
-      handleError
-        ( \case
-            GYBuildTxException GYBuildTxBodyErrorAutoBalance {} -> pure ()
-            e -> throwError e
-        )
+ where
+  mkPrivnetTestFor_ = flip mkPrivnetTestFor setup
+  takeBetsTest :: GYTxGameMonad m => TestInfo -> m ()
+  takeBetsTest TestInfo {..} =
+    takeBetsTrace
+      400
+      1_000
+      (valueFromLovelace 10_000_000)
+      [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
+      , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
+      , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
+      , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
+      , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> valueSingleton testGoldAsset 1_000)
+      ]
+      4
+      w2
+      testWallets
+  wrongGuesserTakeBetsTest :: GYTxGameMonad m => TestInfo -> m ()
+  wrongGuesserTakeBetsTest TestInfo {..} =
+    takeBetsTrace
+      400
+      1_000
+      (valueFromLovelace 10_000_000)
+      [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
+      , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
+      , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
+      , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
+      , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> valueSingleton testGoldAsset 1_000)
+      ]
+      5
+      w2
+      testWallets
+  badUpdatedGuessTakeBetsTest :: GYTxGameMonad m => TestInfo -> m ()
+  badUpdatedGuessTakeBetsTest TestInfo {..} =
+    takeBetsTrace
+      400
+      1_000
+      (valueFromLovelace 10_000_000)
+      [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
+      , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
+      , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
+      , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
+      , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> valueSingleton testGoldAsset 1_000)
+      ]
+      2
+      w2
+      testWallets
+  -- Must fail with script execution error (which is fired in the body error auto balance).
+  mustFailPrivnet =
+    handleError
+      ( \case
+          GYBuildTxException GYBuildTxBodyErrorAutoBalance {} -> pure ()
+          e -> throwError e
+      )
 
 -- | Run to call the `takeBets` operation.
-takeBetsRun :: (GYTxMonad m) => GYTxOutRef -> BetRefParams -> GYTxOutRef -> GYTxOutRef -> m GYTxId
+takeBetsRun :: GYTxMonad m => GYTxOutRef -> BetRefParams -> GYTxOutRef -> GYTxOutRef -> m GYTxId
 takeBetsRun refScript brp toConsume refInput = do
   addr <- ownChangeAddress
   skeleton <- takeBets refScript brp toConsume addr refInput
@@ -95,7 +95,7 @@ takeBetsRun refScript brp toConsume refInput = do
 
 -- | Trace for taking bet pot.
 takeBetsTrace ::
-  (GYTxGameMonad m) =>
+  GYTxGameMonad m =>
   -- | slot for betUntil
   Integer ->
   -- | slot for betReveal

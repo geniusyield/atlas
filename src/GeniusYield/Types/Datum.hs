@@ -102,7 +102,7 @@ datumFromPlutus' :: PlutusTx.BuiltinData -> GYDatum
 datumFromPlutus' = GYDatum
 
 -- | Get a 'GYDatum' from any Plutus 'Plutus.ToData' type.
-datumFromPlutusData :: (PlutusTx.ToData a) => a -> GYDatum
+datumFromPlutusData :: PlutusTx.ToData a => a -> GYDatum
 datumFromPlutusData = GYDatum . PlutusTx.toBuiltinData
 
 {- | Unit datum
@@ -141,7 +141,7 @@ instance Aeson.ToJSON GYDatum where
 -------------------------------------------------------------------------------
 
 newtype GYDatumHash = GYDatumHash (Api.Hash Api.ScriptData)
-  deriving stock (Show)
+  deriving stock Show
   deriving newtype (Eq, Ord, ToJSON, FromJSON)
 
 -- >>> Web.toUrlPiece (GYDatumHash "0103c27d58a7b32241bb7f03045fae8edc01dd2f2a70a349addc17f6536fde76")

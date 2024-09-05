@@ -21,16 +21,16 @@ import GeniusYield.Types
 
 slotToTime :: forall xs. Ouroboros.SystemStart -> Ouroboros.Interpreter xs -> Api.SlotNo -> Either String UTCTime
 slotToTime systemStart eraHistory x = bimap show (Ouroboros.fromRelativeTime systemStart) res
-  where
-    res = Ouroboros.interpretQuery eraHistory $ fst <$> Ouroboros.slotToWallclock x
+ where
+  res = Ouroboros.interpretQuery eraHistory $ fst <$> Ouroboros.slotToWallclock x
 
 timeToSlot :: forall xs. Ouroboros.SystemStart -> Ouroboros.Interpreter xs -> UTCTime -> Either String Api.SlotNo
 timeToSlot systemStart eraHistory utc = first show res
-  where
-    res =
-      Ouroboros.interpretQuery eraHistory $
-        (\(slot, _, _) -> slot)
-          <$> Ouroboros.wallclockToSlot (Ouroboros.toRelativeTime systemStart utc)
+ where
+  res =
+    Ouroboros.interpretQuery eraHistory $
+      (\(slot, _, _) -> slot)
+        <$> Ouroboros.wallclockToSlot (Ouroboros.toRelativeTime systemStart utc)
 
 checkTimeToSlot :: Api.EraHistory -> Property
 checkTimeToSlot eraHistory =
@@ -44,9 +44,9 @@ checkTimeToSlot eraHistory =
       let actualRes = enclosingSlotFromTimePure slotCfg $ timeFromPOSIX (utcTimeToPOSIXSeconds utc)
 
       pure $ Just expected == (slotToApi <$> actualRes)
-  where
-    summaries = extractEraSummaries eraHistory
-    (_, eraEnd) = Ouroboros.summaryBounds summaries
+ where
+  summaries = extractEraSummaries eraHistory
+  (_, eraEnd) = Ouroboros.summaryBounds summaries
 
 checkSlotToTime :: Api.EraHistory -> Property
 checkSlotToTime eraHistory =
@@ -60,9 +60,9 @@ checkSlotToTime eraHistory =
       slotCfg <- makeSlotConfig systemStart eraHistory
       let actualRes = posixSecondsToUTCTime (timeToPOSIX $ slotToBeginTimePure slotCfg gslot)
       pure $ expectedRes === actualRes
-  where
-    summaries = extractEraSummaries eraHistory
-    (_, eraEnd) = Ouroboros.summaryBounds summaries
+ where
+  summaries = extractEraSummaries eraHistory
+  (_, eraEnd) = Ouroboros.summaryBounds summaries
 
 slotConversionTests :: TestTree
 slotConversionTests =
@@ -87,11 +87,11 @@ slotConversionTests =
 -- | Greater than or equal to system start, less than or equal to final era bound.
 arbitraryTimeInRange :: Ouroboros.SystemStart -> Ouroboros.EraEnd -> Gen UTCTime
 arbitraryTimeInRange sysStart eraEnd = arbitrary `suchThat` (\x -> x >= absStart && ltEnd x)
-  where
-    absStart = Ouroboros.getSystemStart sysStart
-    ltEnd x = case eraEnd of
-      Ouroboros.EraEnd bo -> x < Ouroboros.fromRelativeTime sysStart (Ouroboros.boundTime bo)
-      Ouroboros.EraUnbounded -> True
+ where
+  absStart = Ouroboros.getSystemStart sysStart
+  ltEnd x = case eraEnd of
+    Ouroboros.EraEnd bo -> x < Ouroboros.fromRelativeTime sysStart (Ouroboros.boundTime bo)
+    Ouroboros.EraUnbounded -> True
 
 -- | Generate an arbitrary slot before given era end.
 arbitrarySlotBefore :: Ouroboros.EraEnd -> Gen Api.SlotNo

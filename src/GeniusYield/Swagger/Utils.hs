@@ -29,5 +29,5 @@ addSwaggerExample :: (Functor f1, Functor f2, Swagger.HasSchema b1 a, Swagger.Ha
 addSwaggerExample ex = mapped . mapped . Swagger.schema . Swagger.example ?~ ex
 
 -- | Drop the applied type symbol and convert camel case to snake case.
-dropSymbolAndCamelToSnake :: forall a. (KnownSymbol a) => String -> String
+dropSymbolAndCamelToSnake :: forall a. KnownSymbol a => String -> String
 dropSymbolAndCamelToSnake = camelTo2 '_' . drop (length $ symbolVal (Proxy @a))

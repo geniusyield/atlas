@@ -27,7 +27,7 @@ data CoinSelectionTestParams = CoinSelectionTestParams
   , cstpOwnUtxos :: [GYValue]
   -- ^ This shouldn't contain the collateral.
   }
-  deriving (Show)
+  deriving Show
 
 prettyTestParams :: CoinSelectionTestParams -> String
 prettyTestParams CoinSelectionTestParams {..} =
@@ -287,11 +287,11 @@ randomImproveTests =
           testCaseBody expectedAdditionalInps expectedChangeOuts (tokenSalePlaceTestParams 19_902_000_000 rideTheWave)
       ]
   ]
-  where
-    testCaseBody expectedAdditionalInps expectedChangeOuts params = do
-      case runCoinSelectionTest GYRandomImproveMultiAsset params of
-        Left err -> assertFailure $ "Selection failed: " ++ show err
-        Right x -> (expectedAdditionalInps, expectedChangeOuts) @=? x
+ where
+  testCaseBody expectedAdditionalInps expectedChangeOuts params = do
+    case runCoinSelectionTest GYRandomImproveMultiAsset params of
+      Left err -> assertFailure $ "Selection failed: " ++ show err
+      Right x -> (expectedAdditionalInps, expectedChangeOuts) @=? x
 
 -------------------------------------------------------------------------------
 -- Transaction representing place token sale order
@@ -309,10 +309,10 @@ tokenSalePlaceTestParams payment wallet =
     , cstpTxMint = gyTokenVal
     , cstpOwnUtxos = wallet
     }
-  where
-    lovelaceAmount = max minLovelace $ valueAssetClass gyTokenVal GYLovelace
-    minLovelace = toInteger $ mockMinimumUtxo gyTokenVal
-    gyTokenVal = valueSingleton gyToken 1
+ where
+  lovelaceAmount = max minLovelace $ valueAssetClass gyTokenVal GYLovelace
+  minLovelace = toInteger $ mockMinimumUtxo gyTokenVal
+  gyTokenVal = valueSingleton gyToken 1
 
 -------------------------------------------------------------------------------
 -- Different mock wallet distributions
@@ -403,9 +403,9 @@ runCoinSelectionTest cstrat cstParams = do
   let inpVals = gyTxInDetValue <$> additionalInps
       changeVals = gyTxOutValue <$> changeOuts
   pure (inpVals, changeVals)
-  where
-    -- We use a pure StdGen for reproducible tests.
-    pureStdGen = mkStdGen 936 -- 42 wasn't random enough.
+ where
+  -- We use a pure StdGen for reproducible tests.
+  pureStdGen = mkStdGen 936 -- 42 wasn't random enough.
 
 coinSelectionTestParamsToEnv :: CoinSelectionTestParams -> GYCoinSelectionEnv v
 coinSelectionTestParamsToEnv CoinSelectionTestParams {cstpTxExtInps, cstpTxOwnInps, cstpTxOuts, cstpTxMint, cstpOwnUtxos} =
@@ -416,9 +416,9 @@ coinSelectionTestParamsToEnv CoinSelectionTestParams {cstpTxExtInps, cstpTxOwnIn
     --       (https://github.com/geniusyield/atlas/issues/36)
     ((mockRecipientAddress,) <$> cstpTxOuts)
     cstpTxMint
-  where
-    ownUtxos = buildOwnUtxos cstpOwnUtxos
-    inps = buildInps cstpTxExtInps cstpTxOwnInps
+ where
+  ownUtxos = buildOwnUtxos cstpOwnUtxos
+  inps = buildInps cstpTxExtInps cstpTxOwnInps
 
 buildEnvWith :: GYUTxOs -> [GYTxInDetailed v] -> [(GYAddress, GYValue)] -> GYValue -> GYCoinSelectionEnv v
 buildEnvWith ownUtxos existingInps targetOuts mintVal =
@@ -437,18 +437,18 @@ buildEnvWith ownUtxos existingInps targetOuts mintVal =
 
 buildInps :: [GYValue] -> [GYValue] -> [GYTxInDetailed v]
 buildInps ext own = go (ext ++ own)
-  where
-    go =
-      zipWith
-        ( \i v ->
-            GYTxInDetailed
-              (GYTxIn (txOutRefFromTuple (mockTxId1, i)) GYTxInWitnessKey)
-              mockInpAddress
-              v
-              GYOutDatumNone
-              Nothing
-        )
-        [0 ..]
+ where
+  go =
+    zipWith
+      ( \i v ->
+          GYTxInDetailed
+            (GYTxIn (txOutRefFromTuple (mockTxId1, i)) GYTxInWitnessKey)
+            mockInpAddress
+            v
+            GYOutDatumNone
+            Nothing
+      )
+      [0 ..]
 
 buildOwnUtxos :: [GYValue] -> GYUTxOs
 buildOwnUtxos =
@@ -509,13 +509,13 @@ testCaseQuickCheckBody strat prop = forAllShrinkShow genParamsLovelace shrinkPar
       Right (addInputs, changeOuts) ->
         monitor (counterexample (getReason addInputs changeOuts))
           >> M.assert (prop cstEnv addInputs changeOuts)
-  where
-    getReason addInputs changeOuts =
-      unlines
-        [ "* AdditionalInputs: " ++ show addInputs
-        , "* ChangeOuts: " ++ show changeOuts
-        ]
-    outputsHaveLovelace env = all (\(_, v) -> valueAssetClass v GYLovelace > 0) (requiredOutputs env)
+ where
+  getReason addInputs changeOuts =
+    unlines
+      [ "* AdditionalInputs: " ++ show addInputs
+      , "* ChangeOuts: " ++ show changeOuts
+      ]
+  outputsHaveLovelace env = all (\(_, v) -> valueAssetClass v GYLovelace > 0) (requiredOutputs env)
 
 propInputsAreSubset :: GYCoinSelectionEnv v -> [GYTxInDetailed v] -> [GYTxOut v] -> Bool
 propInputsAreSubset env addIns _ = all ((`elem` utxosRefs (ownUtxos env)) . gyTxInTxOutRef . gyTxInDet) addIns
@@ -523,18 +523,18 @@ propInputsAreSubset env addIns _ = all ((`elem` utxosRefs (ownUtxos env)) . gyTx
 propInputsAreEnough :: GYCoinSelectionEnv v -> [GYTxInDetailed v] -> [GYTxOut v] -> Bool
 propInputsAreEnough env addIns _ =
   allInputsValue `valueGreaterOrEqual` allOutputsValue
-  where
-    allInputsValue = sumEntries (existingInputs env ++ addIns) <> mintValue env
-    allOutputsValue = mconcat $ map snd (requiredOutputs env)
+ where
+  allInputsValue = sumEntries (existingInputs env ++ addIns) <> mintValue env
+  allOutputsValue = mconcat $ map snd (requiredOutputs env)
 
 propChangeIsEnough :: GYCoinSelectionEnv v -> [GYTxInDetailed v] -> [GYTxOut v] -> Bool
 propChangeIsEnough env addIns changeOuts = changeAssets == txAssets
-  where
-    changeValue = mconcat (map gyTxOutValue changeOuts)
-    changeAssets = snd $ valueSplitAda changeValue
-    allInputsValue = sumEntries (existingInputs env ++ addIns) <> mintValue env
-    allOutputsValue = mconcat (map snd (requiredOutputs env)) <> naturalToValue (extraLovelace env)
-    txAssets = snd $ valueSplitAda $ allInputsValue `valueMinus` allOutputsValue
+ where
+  changeValue = mconcat (map gyTxOutValue changeOuts)
+  changeAssets = snd $ valueSplitAda changeValue
+  allInputsValue = sumEntries (existingInputs env ++ addIns) <> mintValue env
+  allOutputsValue = mconcat (map snd (requiredOutputs env)) <> naturalToValue (extraLovelace env)
+  txAssets = snd $ valueSplitAda $ allInputsValue `valueMinus` allOutputsValue
 
 -------------------------------------------------------------------------------
 -- QuickCheck Generators
@@ -559,41 +559,41 @@ genCoinSelectionParams extraLovelace = do
       , cstpTxMint = minted
       , cstpOwnUtxos = ownUtxos
       }
-  where
-    genGYAssetClass :: Gen GYAssetClass
-    genGYAssetClass = elements $ map mockAsset ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
+ where
+  genGYAssetClass :: Gen GYAssetClass
+  genGYAssetClass = elements $ map mockAsset ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
 
-    genGYValue :: Gen GYValue
-    genGYValue = oneof [genLovelaceValue, genSingleAssetValue, genAssetValue]
+  genGYValue :: Gen GYValue
+  genGYValue = oneof [genLovelaceValue, genSingleAssetValue, genAssetValue]
 
-    genLovelaceValue :: Gen GYValue
-    genLovelaceValue = valueFromLovelace <$> chooseInteger (2_000_000, 200_000_000)
+  genLovelaceValue :: Gen GYValue
+  genLovelaceValue = valueFromLovelace <$> chooseInteger (2_000_000, 200_000_000)
 
-    genSingleAssetValue :: Gen GYValue
-    genSingleAssetValue = do
-      lovelaceVal <- genLovelaceValue
-      assetClass <- genGYAssetClass
-      amount <- chooseInteger (1, 10_000)
-      return (lovelaceVal <> valueSingleton assetClass amount)
+  genSingleAssetValue :: Gen GYValue
+  genSingleAssetValue = do
+    lovelaceVal <- genLovelaceValue
+    assetClass <- genGYAssetClass
+    amount <- chooseInteger (1, 10_000)
+    return (lovelaceVal <> valueSingleton assetClass amount)
 
-    genAssetValue :: Gen GYValue
-    genAssetValue = do
-      lovelaceVal <- genLovelaceValue
-      assetClasses <- listOf1 genGYAssetClass
-      amounts <- vectorOf (length assetClasses) $ chooseInteger (1, 10_000)
-      return $ lovelaceVal <> valueFromList (zip assetClasses amounts)
+  genAssetValue :: Gen GYValue
+  genAssetValue = do
+    lovelaceVal <- genLovelaceValue
+    assetClasses <- listOf1 genGYAssetClass
+    amounts <- vectorOf (length assetClasses) $ chooseInteger (1, 10_000)
+    return $ lovelaceVal <> valueFromList (zip assetClasses amounts)
 
-    genInputs :: Gen ([GYValue], [GYValue], [GYValue], GYValue)
-    genInputs = do
-      extIns <- listOf genGYValue
-      ownIns <- listOf genGYValue
-      ownUtxos <- listOf genGYValue
-      minted <- frequency [(3, genAssetValue), (1, return mempty)]
-      let assetsMinted = snd $ valueSplitAda minted
-      return (extIns, ownIns, ownUtxos, assetsMinted)
+  genInputs :: Gen ([GYValue], [GYValue], [GYValue], GYValue)
+  genInputs = do
+    extIns <- listOf genGYValue
+    ownIns <- listOf genGYValue
+    ownUtxos <- listOf genGYValue
+    minted <- frequency [(3, genAssetValue), (1, return mempty)]
+    let assetsMinted = snd $ valueSplitAda minted
+    return (extIns, ownIns, ownUtxos, assetsMinted)
 
-    genValidInputs :: [GYValue] -> Gen ([GYValue], [GYValue], [GYValue], GYValue)
-    genValidInputs outs = genInputs `suchThat` inputsAreValid outs extraLovelace
+  genValidInputs :: [GYValue] -> Gen ([GYValue], [GYValue], [GYValue], GYValue)
+  genValidInputs outs = genInputs `suchThat` inputsAreValid outs extraLovelace
 
 genParamsLovelace :: Gen (CoinSelectionTestParams, Natural)
 genParamsLovelace = do

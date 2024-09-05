@@ -89,17 +89,17 @@ Left (UnknownPlutusToCardanoError {ptceTag = "txOutRefFromPlutus: txOutRefIdx 12
 -}
 txOutRefFromPlutus :: Plutus.TxOutRef -> Either PlutusToCardanoError GYTxOutRef
 txOutRefFromPlutus (Plutus.TxOutRef tid@(Plutus.TxId (Plutus.BuiltinByteString bs)) ix) = coerce . Api.TxIn <$> etid <*> eix
-  where
-    etid :: Either PlutusToCardanoError Api.TxId
-    etid =
-      mapLeft (\e -> UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: invalid txOutRefId " <> show tid <> ", error: " <> show e) $
-        Api.deserialiseFromRawBytes Api.AsTxId bs
+ where
+  etid :: Either PlutusToCardanoError Api.TxId
+  etid =
+    mapLeft (\e -> UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: invalid txOutRefId " <> show tid <> ", error: " <> show e) $
+      Api.deserialiseFromRawBytes Api.AsTxId bs
 
-    eix :: Either PlutusToCardanoError Api.TxIx
-    eix
-      | ix < 0 = Left $ UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: negative txOutRefIdx " ++ show ix
-      | ix > toInteger (maxBound @Word) = Left $ UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: txOutRefIdx " ++ show ix ++ " too large"
-      | otherwise = Right $ Api.TxIx $ fromInteger ix
+  eix :: Either PlutusToCardanoError Api.TxIx
+  eix
+    | ix < 0 = Left $ UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: negative txOutRefIdx " ++ show ix
+    | ix > toInteger (maxBound @Word) = Left $ UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: txOutRefIdx " ++ show ix ++ " too large"
+    | otherwise = Right $ Api.TxIx $ fromInteger ix
 
 {- |
 
@@ -143,14 +143,14 @@ instance Web.FromHttpApiData GYTxOutRef where
   parseUrlPiece tr = case Atto.parseOnly parser (TE.encodeUtf8 tr) of
     Left err -> Left (T.pack ("GYTxOutRef: " ++ err))
     Right x -> Right x
-    where
-      parser :: Atto.Parser GYTxOutRef
-      parser = do
-        tx <- Base16.decodeLenient <$> Atto.takeWhile1 isHexDigit
-        _ <- Atto.char '#'
-        ix <- Atto.decimal
-        tx' <- either (\e -> fail $ "not txid bytes: " <> show tx <> " , error: " <> show e) pure $ Api.deserialiseFromRawBytes Api.AsTxId tx
-        return (GYTxOutRef (Api.TxIn tx' (Api.TxIx ix)))
+   where
+    parser :: Atto.Parser GYTxOutRef
+    parser = do
+      tx <- Base16.decodeLenient <$> Atto.takeWhile1 isHexDigit
+      _ <- Atto.char '#'
+      ix <- Atto.decimal
+      tx' <- either (\e -> fail $ "not txid bytes: " <> show tx <> " , error: " <> show e) pure $ Api.deserialiseFromRawBytes Api.AsTxId tx
+      return (GYTxOutRef (Api.TxIn tx' (Api.TxIx ix)))
 
 instance Web.ToHttpApiData GYTxOutRef where
   toUrlPiece = showTxOutRef

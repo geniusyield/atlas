@@ -31,8 +31,8 @@ import GeniusYield.Types
 -------------------------------------------------------------------------------
 
 newtype CardanoQueryException = CardanoQueryException String
-  deriving stock (Show)
-  deriving anyclass (Exception)
+  deriving stock Show
+  deriving anyclass Exception
 
 -------------------------------------------------------------------------------
 -- Low-level query runners

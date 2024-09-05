@@ -24,7 +24,7 @@ import PlutusLedgerApi.V1.Value qualified as Value
 -- | Ada represented with a 'Micro' value.
 newtype Ada = Ada Micro
   deriving stock (Eq, Ord, Show)
-  deriving newtype (Num)
+  deriving newtype Num
 
 -- | Convert Ada amount to its corresponding Lovelace unit.
 toLovelace :: Ada -> Integer

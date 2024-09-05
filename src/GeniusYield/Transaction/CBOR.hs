@@ -75,11 +75,11 @@ recursiveTermModification f term =
     TMapI termPairList -> recursiveTermModificationHandler $ TMapI $ bimap (recursiveTermModification f) (recursiveTermModification f) <$> termPairList
     TTagged word otherTerm -> recursiveTermModificationHandler $ TTagged word $ recursiveTermModification f otherTerm
     _otherwise -> recursiveTermModificationHandler term
-  where
-    recursiveTermModificationHandler nothingHandler =
-      case f term of
-        Nothing -> nothingHandler
-        Just termMod -> if term == termMod then nothingHandler else recursiveTermModification f termMod
+ where
+  recursiveTermModificationHandler nothingHandler =
+    case f term of
+      Nothing -> nothingHandler
+      Just termMod -> if term == termMod then nothingHandler else recursiveTermModification f termMod
 
 -- | See `simplifyTxCbor`.
 simplifyTxBodyCbor :: Term -> Term
@@ -89,34 +89,34 @@ simplifyTxBodyCbor txBody =
       -- Second, we'll sort keys in any map.
       txBodySortedKeys = recursiveTermModification sortMapKeys txBodyDefinite
    in txBodySortedKeys
-  where
-    sortMapKeys :: Term -> Maybe Term
-    sortMapKeys (TMap keyValsToSort) =
-      if allSameType
-        then
-          Just $ TMap $ sortBy sortingFunction keyValsToSort
-        else Nothing
-      where
-        sortingFunction :: forall b1 b2. (Term, b1) -> (Term, b2) -> Ordering
-        sortingFunction (TInt a, _) (TInt b, _) = compare a b
-        sortingFunction (TInteger a, _) (TInteger b, _) = compare a b
-        sortingFunction (TBytes a, _) (TBytes b, _) = compare (B.length a) (B.length b) <> compare a b
-        sortingFunction (TString a, _) (TString b, _) = compare (T.length a) (T.length b) <> compare a b
-        sortingFunction _ _ = error "absurd - sortingFunction" -- We verify that all keys are of the same appropriate type before calling this function.
-        allSameType = any ($ keyValsToSort) [isTInt, isTInteger, isTBytes, isTString]
-          where
-            isTInt = all (\(k, _) -> case k of TInt _ -> True; _ow -> False)
-            isTInteger = all (\(k, _) -> case k of TInteger _ -> True; _ow -> False)
-            isTBytes = all (\(k, _) -> case k of TBytes _ -> True; _ow -> False)
-            isTString = all (\(k, _) -> case k of TString _ -> True; _ow -> False)
-    sortMapKeys _otherwise = Nothing
+ where
+  sortMapKeys :: Term -> Maybe Term
+  sortMapKeys (TMap keyValsToSort) =
+    if allSameType
+      then
+        Just $ TMap $ sortBy sortingFunction keyValsToSort
+      else Nothing
+   where
+    sortingFunction :: forall b1 b2. (Term, b1) -> (Term, b2) -> Ordering
+    sortingFunction (TInt a, _) (TInt b, _) = compare a b
+    sortingFunction (TInteger a, _) (TInteger b, _) = compare a b
+    sortingFunction (TBytes a, _) (TBytes b, _) = compare (B.length a) (B.length b) <> compare a b
+    sortingFunction (TString a, _) (TString b, _) = compare (T.length a) (T.length b) <> compare a b
+    sortingFunction _ _ = error "absurd - sortingFunction" -- We verify that all keys are of the same appropriate type before calling this function.
+    allSameType = any ($ keyValsToSort) [isTInt, isTInteger, isTBytes, isTString]
+     where
+      isTInt = all (\(k, _) -> case k of TInt _ -> True; _ow -> False)
+      isTInteger = all (\(k, _) -> case k of TInteger _ -> True; _ow -> False)
+      isTBytes = all (\(k, _) -> case k of TBytes _ -> True; _ow -> False)
+      isTString = all (\(k, _) -> case k of TString _ -> True; _ow -> False)
+  sortMapKeys _otherwise = Nothing
 
-    makeTermsDefinite :: Term -> Maybe Term
-    makeTermsDefinite (TBytesI b) = Just $ TBytes $ LBS.toStrict b
-    makeTermsDefinite (TStringI s) = Just $ TString $ LT.toStrict s
-    makeTermsDefinite (TListI l) = Just $ TList l
-    makeTermsDefinite (TMapI keyVals) = Just $ TMap keyVals
-    makeTermsDefinite _otherwise = Nothing
+  makeTermsDefinite :: Term -> Maybe Term
+  makeTermsDefinite (TBytesI b) = Just $ TBytes $ LBS.toStrict b
+  makeTermsDefinite (TStringI s) = Just $ TString $ LT.toStrict s
+  makeTermsDefinite (TListI l) = Just $ TList l
+  makeTermsDefinite (TMapI keyVals) = Just $ TMap keyVals
+  makeTermsDefinite _otherwise = Nothing
 
 -- | This `GYTxBody` doesn't represent @transaction_body@ as mentioned in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) specification, it's API's internal type to represent transaction without signing key witnesses. However `GYTx` does represent `transaction` as defined in specification. We therefore obtain `GYTx` and work with it. Here we need an invariant, which is if we receive our simplified `GYTx` transaction, then obtaining `GYTxBody` via `getTxBody` and obtaining `GYTx` back via `unsignedTx` should have the same serialisation for the modifications to CBOR encoding we do here.
 simplifyGYTxBodyCbor :: GYTxBody -> Either CborSimplificationError GYTxBody

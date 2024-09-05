@@ -216,7 +216,7 @@ logContextsToKatip :: GYLogContexts -> K.LogContexts
 logContextsToKatip = coerce
 
 -- | Add a context to the log contexts. See `sl`.
-addContext :: (KC.LogItem i) => i -> GYLogContexts -> GYLogContexts
+addContext :: KC.LogItem i => i -> GYLogContexts -> GYLogContexts
 addContext i ctx = ctx <> logContextsFromKatip (K.liftPayload i)
 
 {- | Construct a simple log payload.
@@ -224,7 +224,7 @@ addContext i ctx = ctx <> logContextsFromKatip (K.liftPayload i)
 >>> Aeson.encode $ logContextsToKatip $ addContext (sl "key" "value") mempty
 "{\"key\":\"value\"}"
 -}
-sl :: forall a. (ToJSON a) => Text -> a -> K.SimpleLogPayload
+sl :: forall a. ToJSON a => Text -> a -> K.SimpleLogPayload
 sl = K.sl
 
 {- | Get textual representation of log contexts.
@@ -232,7 +232,7 @@ sl = K.sl
 >>> logContextsToS @Text $ addContext (sl "key" "value") mempty
 "{\"key\":\"value\"}"
 -}
-logContextsToS :: (StringConv LBS8.ByteString a) => GYLogContexts -> a
+logContextsToS :: StringConv LBS8.ByteString a => GYLogContexts -> a
 logContextsToS = logContextsToKatip >>> Aeson.encode >>> toS
 
 -------------------------------------------------------------------------------
@@ -279,7 +279,7 @@ data GYLogConfiguration = GYLogConfiguration
 cfgAddNamespace :: GYLogNamespace -> GYLogConfiguration -> GYLogConfiguration
 cfgAddNamespace ns cfg = cfg {cfgLogNamespace = cfgLogNamespace cfg <> ns}
 
-cfgAddContext :: (KC.LogItem i) => i -> GYLogConfiguration -> GYLogConfiguration
+cfgAddContext :: KC.LogItem i => i -> GYLogConfiguration -> GYLogConfiguration
 cfgAddContext i cfg = cfg {cfgLogContexts = addContext i (cfgLogContexts cfg)}
 
 logRun :: (HasCallStack, MonadIO m, StringConv a Text) => GYLogConfiguration -> GYLogSeverity -> a -> m ()
@@ -411,29 +411,29 @@ mkScribe GYLogScribeConfig {..} = case cfgLogType of
   GYCustomSourceScribe source -> do
     scribe <- customSourceScribe source
     pure (scribe, Text.pack $ show source)
-  where
-    permit :: K.PermitFunc
-    permit = K.permitItem $ logSeverityToKatip cfgLogSeverity
+ where
+  permit :: K.PermitFunc
+  permit = K.permitItem $ logSeverityToKatip cfgLogSeverity
 
-    verbosity :: K.Verbosity
-    verbosity = logVerbosityToKatip cfgLogVerbosity
+  verbosity :: K.Verbosity
+  verbosity = logVerbosityToKatip cfgLogVerbosity
 
-    customSourceScribe :: LogSrc -> IO K.Scribe
-    customSourceScribe (LogSrc uri) = case uri of
-      URI {uriScheme = "", uriPath = path} ->
-        K.mkFileScribe path permit verbosity
-      URI {uriScheme = s, uriAuthority = Just URIAuth {uriRegName = domainName}}
-        | s `elem` ["http:", "https:"] && "sentry.io" `isSuffixOf` domainName ->
-            Sentry.mkSentryScribe (Sentry.sentryService $ show uri) permit verbosity
-      x ->
-        fail $ "Unsupported LogSrc: " <> show x
+  customSourceScribe :: LogSrc -> IO K.Scribe
+  customSourceScribe (LogSrc uri) = case uri of
+    URI {uriScheme = "", uriPath = path} ->
+      K.mkFileScribe path permit verbosity
+    URI {uriScheme = s, uriAuthority = Just URIAuth {uriRegName = domainName}}
+      | s `elem` ["http:", "https:"] && "sentry.io" `isSuffixOf` domainName ->
+          Sentry.mkSentryScribe (Sentry.sentryService $ show uri) permit verbosity
+    x ->
+      fail $ "Unsupported LogSrc: " <> show x
 
 mkLogEnv :: GYLogNamespace -> [GYLogScribeConfig] -> IO GYLogEnv
 mkLogEnv ns cfgs = do
   logEnv <- K.initLogEnv (logNamespaceToKatip $ "GeniusYield" <> ns) ""
   logEnvFromKatip <$> foldM f logEnv cfgs
-  where
-    f :: K.LogEnv -> GYLogScribeConfig -> IO K.LogEnv
-    f logEnv cfg = do
-      (scribe, name) <- mkScribe cfg
-      K.registerScribe name scribe K.defaultScribeSettings logEnv
+ where
+  f :: K.LogEnv -> GYLogScribeConfig -> IO K.LogEnv
+  f logEnv cfg = do
+    (scribe, name) <- mkScribe cfg
+    K.registerScribe name scribe K.defaultScribeSettings logEnv

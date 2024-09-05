@@ -496,7 +496,7 @@ tests setup =
         -- TODO: NonOutputSupplimentaryDatums is thrown by other tests when this test is run.
         -- They fail to consume utxos with (inline) datums.
         -- We need to fix utxosDatums to also return whether the datum was inline.
-        let addNewGiftV2 :: (GYTxUserQueryMonad m) => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
+        let addNewGiftV2 :: GYTxUserQueryMonad m => GYTxSkeleton 'PlutusV2 -> m (GYTxSkeleton 'PlutusV2)
             addNewGiftV2 skeleton = do
               addr <- scriptAddress giftValidatorV2
               return $
@@ -620,7 +620,7 @@ grabGifts validator = do
 
 -- | Grab gifts using a referenced validator.
 grabGiftsRef ::
-  (GYTxQueryMonad m) =>
+  GYTxQueryMonad m =>
   GYTxOutRef ->
   GYValidator 'PlutusV2 ->
   m (Maybe (GYTxSkeleton 'PlutusV2))
@@ -649,7 +649,7 @@ grabGiftsRef ref validator = do
 
 -- | Function to check for consistency of collaterals with respect to ledger laws.
 checkCollateral ::
-  (Integral a) =>
+  Integral a =>
   -- | Sum of values present in collateral inputs.
   GYValue ->
   -- | Value present in return collateral output.
@@ -667,5 +667,5 @@ checkCollateral inputValue returnValue totalCollateralLovelace txFee collPer =
     && totalCollateralLovelace == balanceLovelace
     && balanceLovelace >= ceiling (txFee * collPer % 100) -- Api checks via `balanceLovelace * 100 >= txFee * collPer` which IMO works as `balanceLovelace` is an integer & 100 but in general `c >= ceil (a / b)` is not equivalent to `c * b >= a`.
     && inputValue == returnValue <> valueFromLovelace totalCollateralLovelace
-  where
-    (balanceLovelace, balanceOther) = valueSplitAda $ inputValue `valueMinus` returnValue
+ where
+  (balanceLovelace, balanceOther) = valueSplitAda $ inputValue `valueMinus` returnValue

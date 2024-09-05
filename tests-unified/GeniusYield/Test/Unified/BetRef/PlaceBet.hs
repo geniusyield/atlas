@@ -43,43 +43,43 @@ placeBetTests setup =
           )
           . failingMultipleBetsTest
     ]
-  where
-    mkPrivnetTestFor_ = flip mkPrivnetTestFor setup
-    firstBetTest :: (GYTxGameMonad m) => TestInfo -> m ()
-    firstBetTest = firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000) . testWallets
-    multipleBetsTest :: (GYTxGameMonad m) => TestInfo -> m ()
-    multipleBetsTest TestInfo {..} =
-      multipleBetsTraceWrapper
-        400
-        1_000
-        (valueFromLovelace 10_000_000)
-        [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
-        , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
-        , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
-        , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
-        , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> valueSingleton testGoldAsset 1_000)
-        ]
-        testWallets
-    failingMultipleBetsTest :: (GYTxGameMonad m) => TestInfo -> m ()
-    failingMultipleBetsTest TestInfo {..} =
-      multipleBetsTraceWrapper
-        400
-        1_000
-        (valueFromLovelace 10_000_000)
-        [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
-        , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
-        , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
-        , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
-        , (w4, OracleAnswerDatum 5, valueFromLovelace 55_000_000 <> valueSingleton testGoldAsset 1_000)
-        ]
-        testWallets
+ where
+  mkPrivnetTestFor_ = flip mkPrivnetTestFor setup
+  firstBetTest :: GYTxGameMonad m => TestInfo -> m ()
+  firstBetTest = firstBetTrace (OracleAnswerDatum 3) (valueFromLovelace 20_000_000) . testWallets
+  multipleBetsTest :: GYTxGameMonad m => TestInfo -> m ()
+  multipleBetsTest TestInfo {..} =
+    multipleBetsTraceWrapper
+      400
+      1_000
+      (valueFromLovelace 10_000_000)
+      [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
+      , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
+      , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
+      , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
+      , (w4, OracleAnswerDatum 5, valueFromLovelace 65_000_000 <> valueSingleton testGoldAsset 1_000)
+      ]
+      testWallets
+  failingMultipleBetsTest :: GYTxGameMonad m => TestInfo -> m ()
+  failingMultipleBetsTest TestInfo {..} =
+    multipleBetsTraceWrapper
+      400
+      1_000
+      (valueFromLovelace 10_000_000)
+      [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
+      , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
+      , (w3, OracleAnswerDatum 3, valueFromLovelace 30_000_000)
+      , (w2, OracleAnswerDatum 4, valueFromLovelace 50_000_000)
+      , (w4, OracleAnswerDatum 5, valueFromLovelace 55_000_000 <> valueSingleton testGoldAsset 1_000)
+      ]
+      testWallets
 
 -- -----------------------------------------------------------------------------
 -- Super-trivial example
 -- -----------------------------------------------------------------------------
 
 -- | Trace for a super-simple spending transaction.
-simplSpendingTxTrace :: (GYTxGameMonad m) => Wallets -> m ()
+simplSpendingTxTrace :: GYTxGameMonad m => Wallets -> m ()
 simplSpendingTxTrace Wallets {w1} = do
   gyLogDebug' "" "Hey there!"
   -- balance assetion check
@@ -93,7 +93,7 @@ simplSpendingTxTrace Wallets {w1} = do
     gyLogDebug' "" $ printf "tx submitted, txId: %s" txId
 
 -- Pretend off-chain code written in 'GYTxUserQueryMonad m'
-mkTrivialTx :: (GYTxUserQueryMonad m) => m (GYTxSkeleton 'PlutusV2)
+mkTrivialTx :: GYTxUserQueryMonad m => m (GYTxSkeleton 'PlutusV2)
 mkTrivialTx = do
   addr <- ownChangeAddress
   gyLogDebug' "" $ printf "ownAddr: %s" (show addr)
@@ -127,7 +127,7 @@ Level 3. The action (Off-chain code)
 
 -- | Trace for placing the first bet.
 firstBetTrace ::
-  (GYTxGameMonad m) =>
+  GYTxGameMonad m =>
   -- | Guess
   OracleAnswerDatum ->
   -- | Bet
@@ -148,7 +148,7 @@ firstBetTrace dat bet ws@Wallets {w1} = do
 
 -- | Function to compute the parameters for the contract and add the corresponding refernce script.
 computeParamsAndAddRefScript ::
-  (GYTxGameMonad m) =>
+  GYTxGameMonad m =>
   -- | Bet Until slot
   Integer ->
   -- | Bet Reveal slot
@@ -179,7 +179,7 @@ computeParamsAndAddRefScript betUntil' betReveal' betStep Wallets {..} = do
     pure (brp, refScript)
 
 -- | Run to call the `placeBet` operation.
-placeBetRun :: (GYTxMonad m) => GYTxOutRef -> BetRefParams -> OracleAnswerDatum -> GYValue -> Maybe GYTxOutRef -> m GYTxId
+placeBetRun :: GYTxMonad m => GYTxOutRef -> BetRefParams -> OracleAnswerDatum -> GYValue -> Maybe GYTxOutRef -> m GYTxId
 placeBetRun refScript brp guess bet mPreviousBetsUtxoRef = do
   addr <- ownChangeAddress
   gyLogDebug' "" $ printf "bet: %s" (show bet)
@@ -197,7 +197,7 @@ placeBetRun refScript brp guess bet mPreviousBetsUtxoRef = do
 
 -- | Trace which allows for multiple bets.
 multipleBetsTraceWrapper ::
-  (GYTxGameMonad m) =>
+  GYTxGameMonad m =>
   -- | slot for betUntil
   Integer ->
   -- | slot for betReveal
@@ -219,7 +219,7 @@ multipleBetsTraceWrapper betUntil' betReveal' betStep walletBets ws = do
 
 -- | Trace which allows for multiple bets.
 multipleBetsTraceCore ::
-  (GYTxGameMonad m) =>
+  GYTxGameMonad m =>
   BetRefParams ->
   -- | Reference script
   GYTxOutRef ->
@@ -272,26 +272,26 @@ multipleBetsTraceCore brp refScript walletBets ws@Wallets {..} = do
   gyLogDebug' "" $ printf "balanceAfterAllTheseOps: %s" (mconcat balanceAfterAllTheseOps)
   -- Check the difference
   asUser w1 $ verify (zip3 balanceDiffWithoutFees balanceBeforeAllTheseOps balanceAfterAllTheseOps)
-  where
-    -- \| Function to verify that the wallet indeed lost by /roughly/ the bet amount.
-    -- We say /roughly/ as fees is assumed to be within (0, 1.5 ada].
-    -- Suppose that wallet x places bet 3 times, where for simplicity assume each tx costed 0.6 ada as fees then the threshold should be above 1.8 ada.
-    verify [] = return ()
-    verify (((wallet, diff), vBefore, vAfter) : xs) =
-      let vAfterWithoutFees = vBefore <> diff
-          (expectedAdaWithoutFees, expectedOtherAssets) = valueSplitAda vAfterWithoutFees
-          (actualAda, actualOtherAssets) = valueSplitAda vAfter
-          threshold = 1_500_000 -- 1.5 ada
-       in if expectedOtherAssets == actualOtherAssets
-            && actualAda < expectedAdaWithoutFees
-            && expectedAdaWithoutFees - threshold <= actualAda
-            then verify xs
-            else
-              throwAppError . someBackendError . T.pack $
-                ( "For wallet "
-                    <> show (userAddr wallet)
-                    <> " expected value (without fees) "
-                    <> show vAfterWithoutFees
-                    <> " but actual is "
-                    <> show vAfter
-                )
+ where
+  -- \| Function to verify that the wallet indeed lost by /roughly/ the bet amount.
+  -- We say /roughly/ as fees is assumed to be within (0, 1.5 ada].
+  -- Suppose that wallet x places bet 3 times, where for simplicity assume each tx costed 0.6 ada as fees then the threshold should be above 1.8 ada.
+  verify [] = return ()
+  verify (((wallet, diff), vBefore, vAfter) : xs) =
+    let vAfterWithoutFees = vBefore <> diff
+        (expectedAdaWithoutFees, expectedOtherAssets) = valueSplitAda vAfterWithoutFees
+        (actualAda, actualOtherAssets) = valueSplitAda vAfter
+        threshold = 1_500_000 -- 1.5 ada
+     in if expectedOtherAssets == actualOtherAssets
+          && actualAda < expectedAdaWithoutFees
+          && expectedAdaWithoutFees - threshold <= actualAda
+          then verify xs
+          else
+            throwAppError . someBackendError . T.pack $
+              ( "For wallet "
+                  <> show (userAddr wallet)
+                  <> " expected value (without fees) "
+                  <> show vAfterWithoutFees
+                  <> " but actual is "
+                  <> show vAfter
+              )

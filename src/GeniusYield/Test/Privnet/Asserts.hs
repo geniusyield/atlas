@@ -26,13 +26,13 @@ import GeniusYield.Types
 
 import GeniusYield.Test.Privnet.Ctx
 
-assertFee :: (HasCallStack) => GYTxBody -> Integer -> Integer -> IO ()
+assertFee :: HasCallStack => GYTxBody -> Integer -> Integer -> IO ()
 assertFee (txBodyFee -> fee) lb ub
   | fee < lb = assertFailure $ printf "Fee: %d less than %d" fee lb
   | fee > ub = assertFailure $ printf "Fee: %d greater than %d" fee ub
   | otherwise = return ()
 
-assertThrown :: forall e a. (Exception e) => (e -> Bool) -> IO a -> IO ()
+assertThrown :: forall e a. Exception e => (e -> Bool) -> IO a -> IO ()
 assertThrown p action = do
   thrownRef <- newIORef False
   void action `catch` \e ->
@@ -42,8 +42,8 @@ assertThrown p action = do
 
   thrown <- readIORef thrownRef
   unless thrown $ assertFailure $ "Expecting an exception: " ++ name
-  where
-    name = show (typeRep (Proxy @e))
+ where
+  name = show (typeRep (Proxy @e))
 
 -- | Asserts if the user funds change as expected. This function subtracts fees from the given expected value.
 assertUserFunds :: Integer -> Ctx -> User -> GYValue -> IO ()

@@ -57,12 +57,12 @@ txCertToApi ::
   GYTxCert' v ->
   (Api.Certificate ApiEra, Maybe (Api.StakeCredential, Api.Witness Api.WitCtxStake ApiEra))
 txCertToApi (GYTxCert' cert wit) = (certificateToApi cert, wit <&> (\wit' -> (certificateToStakeCredential cert & stakeCredentialToApi, f wit')))
-  where
-    f :: GYTxCertWitness v -> Api.Witness Api.WitCtxStake ApiEra
-    f GYTxCertWitnessKey = Api.KeyWitness Api.KeyWitnessForStakeAddr
-    f (GYTxCertWitnessScript v r) =
-      Api.ScriptWitness Api.ScriptWitnessForStakeAddr $
-        gyStakeValScriptWitnessToApiPlutusSW
-          v
-          (redeemerToApi r)
-          (Api.ExecutionUnits 0 0)
+ where
+  f :: GYTxCertWitness v -> Api.Witness Api.WitCtxStake ApiEra
+  f GYTxCertWitnessKey = Api.KeyWitness Api.KeyWitnessForStakeAddr
+  f (GYTxCertWitnessScript v r) =
+    Api.ScriptWitness Api.ScriptWitnessForStakeAddr $
+      gyStakeValScriptWitnessToApiPlutusSW
+        v
+        (redeemerToApi r)
+        (Api.ExecutionUnits 0 0)

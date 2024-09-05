@@ -58,15 +58,15 @@ import GeniusYield.Test.FeeTracker as X
 -- | Runs the second 'Tasty.TestTree' after all tests in the first 'Tasty.TestTree' succeed
 afterAllSucceed :: Tasty.TestTree -> Tasty.TestTree -> Tasty.TestTree
 afterAllSucceed = Tasty.after Tasty.AllSucceed . pat
-  where
-    pat :: Tasty.TestTree -> String
-    pat dep = case dep of
-      Tasty.SingleTest tn _ -> tn
-      Tasty.TestGroup tn _ -> tn
-      Tasty.After _ _ dep' -> pat dep'
-      Tasty.PlusTestOptions _ dep' -> pat dep'
-      Tasty.WithResource _ f -> pat (f (fail "Not running IO"))
-      Tasty.AskOptions f -> pat (f mempty)
+ where
+  pat :: Tasty.TestTree -> String
+  pat dep = case dep of
+    Tasty.SingleTest tn _ -> tn
+    Tasty.TestGroup tn _ -> tn
+    Tasty.After _ _ dep' -> pat dep'
+    Tasty.PlusTestOptions _ dep' -> pat dep'
+    Tasty.WithResource _ f -> pat (f (fail "Not running IO"))
+    Tasty.AskOptions f -> pat (f mempty)
 
 -------------------------------------------------------------------------------
 -- QC
@@ -75,9 +75,9 @@ afterAllSucceed = Tasty.after Tasty.AllSucceed . pat
 -- | Adjust the number of QuickCheck cases to generate.
 withMaxQCTests :: Int -> Tasty.TestTree -> Tasty.TestTree
 withMaxQCTests n = Tasty.adjustOption f
-  where
-    f :: Tasty.QuickCheckTests -> Tasty.QuickCheckTests
-    f (Tasty.QuickCheckTests m) = Tasty.QuickCheckTests (min m n)
+ where
+  f :: Tasty.QuickCheckTests -> Tasty.QuickCheckTests
+  f (Tasty.QuickCheckTests m) = Tasty.QuickCheckTests (min m n)
 
 -------------------------------------------------------------------------------
 -- test assets
@@ -132,7 +132,7 @@ data Wallets = Wallets
   deriving (Show, Eq, Ord)
 
 -- | Create an user and fund them with the given amount of lovelace provided by the given funder user.
-createUserWithLovelace :: (GYTxGameMonad m) => User -> Natural -> m User
+createUserWithLovelace :: GYTxGameMonad m => User -> Natural -> m User
 createUserWithLovelace funder lovelace = do
   u <- createUser
   asUser funder $ do
@@ -166,14 +166,14 @@ createUserWithLovelace funder lovelace = do
   Note: This will obviously require the user to have enough lovelace to cover the fees
   and min ada deposits for the mints.
 -}
-createUserWithAssets :: (GYTxGameMonad m) => User -> Natural -> [(FakeCoin, Natural)] -> m User
+createUserWithAssets :: GYTxGameMonad m => User -> Natural -> [(FakeCoin, Natural)] -> m User
 createUserWithAssets funder lovelace tokens = do
   user <- createUserWithLovelace funder lovelace
   asUser user $ mintTestAssets tokens
   pure user
 
 -- | Create a collateral utxo out of the existing ada within a user wallet. Returns the collateral reference.
-generateCollateral :: (GYTxMonad m) => m GYTxOutRef
+generateCollateral :: GYTxMonad m => m GYTxOutRef
 generateCollateral = do
   addr <- ownChangeAddress
   gyLogDebug' "mintTestAssets" . T.unpack $
@@ -190,14 +190,14 @@ generateCollateral = do
 It creates a user with ada, non-ada assets, and a collateral.
 Thereby making a user ready to participate in smart contracts.
 -}
-createUserFull :: (GYTxGameMonad m) => User -> Natural -> [(FakeCoin, Natural)] -> m User
+createUserFull :: GYTxGameMonad m => User -> Natural -> [(FakeCoin, Natural)] -> m User
 createUserFull funder lovelace tokens = do
   user <- createUserWithAssets funder lovelace tokens
   userCollateralRef <- asUser user generateCollateral
   pure user {userCollateral = Just UserCollateral {userCollateralRef, userCollateralCheck = True}}
 
 -- | Mint given amount of test tokens.
-mintTestAssets :: (GYTxMonad m) => [(FakeCoin, Natural)] -> m ()
+mintTestAssets :: GYTxMonad m => [(FakeCoin, Natural)] -> m ()
 mintTestAssets tokens = do
   addr <- ownChangeAddress
   let readableTkNames =
@@ -218,13 +218,13 @@ mintTestAssets tokens = do
         )
         tokens
   signAndSubmitConfirmed_ txBody
-  where
-    readableTk tk = mintingPolicyIdToText (mintingPolicyId $ fakePolicy tk) <> "." <> T.pack (show $ fakeCoinName tk)
+ where
+  readableTk tk = mintingPolicyIdToText (mintingPolicyId $ fakePolicy tk) <> "." <> T.pack (show $ fakeCoinName tk)
 
 {- | Computes a `GYTx*Monad` action and returns the result and how this action
      changed the balance of some "Address".
 -}
-withBalance :: (GYTxQueryMonad m) => String -> User -> m b -> m (b, GYValue)
+withBalance :: GYTxQueryMonad m => String -> User -> m b -> m (b, GYValue)
 withBalance n a m = do
   old <- queryBalance $ userAddr a
   b <- m
@@ -239,7 +239,7 @@ Notes:
 * An empty list means no checks are performed.
 * The 'GYValue' should be negative to check if the Wallet lost those funds.
 -}
-withWalletBalancesCheck :: (GYTxQueryMonad m) => [(User, GYValue)] -> m a -> m a
+withWalletBalancesCheck :: GYTxQueryMonad m => [(User, GYValue)] -> m a -> m a
 withWalletBalancesCheck [] m = m
 withWalletBalancesCheck ((w, v) : xs) m = do
   (b, diff) <- withBalance (show $ userAddr w) w $ withWalletBalancesCheck xs m
@@ -251,7 +251,7 @@ withWalletBalancesCheck ((w, v) : xs) m = do
      Returns Nothing if it fails to decode an address contained in the
       transaction outputs.
 -}
-findLockedUtxosInBody :: (Num a) => GYAddress -> GYTx -> Maybe [a]
+findLockedUtxosInBody :: Num a => GYAddress -> GYTx -> Maybe [a]
 findLockedUtxosInBody addr tx =
   let
     os = utxosToList . txBodyUTxOs $ getTxBody tx
@@ -264,7 +264,7 @@ findLockedUtxosInBody addr tx =
     findAllMatches (0, os, [])
 
 -- | Find reference scripts at given address.
-getRefInfos :: (GYTxQueryMonad m) => GYAddress -> m (Map GYAnyScript GYTxOutRef)
+getRefInfos :: GYTxQueryMonad m => GYAddress -> m (Map GYAnyScript GYTxOutRef)
 getRefInfos addr = do
   utxo <- utxosAtAddress addr Nothing
   return $ utxoToRefMap utxo
@@ -285,7 +285,7 @@ findRefScriptsInBody body = do
 {- | Adds the given script to the given address and returns the reference for it.
 Note: The new utxo is given an inline unit datum.
 -}
-addRefScript :: forall m. (GYTxMonad m) => GYAddress -> GYScript 'PlutusV2 -> m GYTxOutRef
+addRefScript :: forall m. GYTxMonad m => GYAddress -> GYScript 'PlutusV2 -> m GYTxOutRef
 addRefScript addr sc =
   throwAppError absurdError `runEagerT` do
     existingUtxos <- lift $ utxosAtAddress addr Nothing
@@ -303,12 +303,12 @@ addRefScript addr sc =
               }
     lift $ signAndSubmitConfirmed_ txBody
     maybeToEager . Map.lookup (GYPlutusScript sc) $ findRefScriptsInBody txBody
-  where
-    absurdError = someBackendError "Shouldn't happen: no ref in body"
+ where
+  absurdError = someBackendError "Shouldn't happen: no ref in body"
 
 -- | Adds an input (whose datum we'll refer later) and returns the reference to it.
 addRefInput ::
-  (GYTxMonad m) =>
+  GYTxMonad m =>
   -- | Whether to inline this datum?
   Bool ->
   -- | Where to place this output?
@@ -328,19 +328,19 @@ addRefInput toInline addr dat =
 
     lift $ signAndSubmitConfirmed_ txBody
     maybeToEager . findRefWithDatum $ txBodyUTxOs txBody
-  where
-    findRefWithDatum :: GYUTxOs -> Maybe GYTxOutRef
-    findRefWithDatum utxos =
-      fmap utxoRef
-        . find
-          ( \GYUTxO {utxoOutDatum} ->
-              case utxoOutDatum of
-                GYOutDatumHash dh -> hashDatum dat == dh
-                GYOutDatumInline dat' -> dat == dat'
-                _ -> False
-          )
-        $ utxosToList utxos
-    absurdError = someBackendError "Shouldn't happen: no output with expected datum in body"
+ where
+  findRefWithDatum :: GYUTxOs -> Maybe GYTxOutRef
+  findRefWithDatum utxos =
+    fmap utxoRef
+      . find
+        ( \GYUTxO {utxoOutDatum} ->
+            case utxoOutDatum of
+              GYOutDatumHash dh -> hashDatum dat == dh
+              GYOutDatumInline dat' -> dat == dat'
+              _ -> False
+        )
+      $ utxosToList utxos
+  absurdError = someBackendError "Shouldn't happen: no output with expected datum in body"
 
 {- | Abstraction for explicitly building a Value representing the fees of a
      transaction.
@@ -368,11 +368,11 @@ type EagerT m a = ExceptT a m ()
 {- | If we have a 'Just' value, we can exit with it immediately. So it gets converted
 to 'Left'.
 -}
-maybeToEager :: (Monad m) => Maybe a -> EagerT m a
+maybeToEager :: Monad m => Maybe a -> EagerT m a
 maybeToEager (Just a) = throwError a
 maybeToEager Nothing = pure ()
 
 -- If all goes well, we should finish with a 'Left'. if not, we perform the
 -- given action to signal error.
-runEagerT :: (Monad m) => m a -> ExceptT a m () -> m a
+runEagerT :: Monad m => m a -> ExceptT a m () -> m a
 runEagerT whenError = runExceptT >=> either pure (const whenError)

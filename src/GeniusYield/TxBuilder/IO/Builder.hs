@@ -49,7 +49,7 @@ newtype GYTxBuilderMonadIO a = GYTxBuilderMonadIO (GYTxBuilderIOEnv -> GYTxQuery
     , GYTxSpecialQueryMonad
     )
     via ReaderT GYTxBuilderIOEnv GYTxQueryMonadIO
-  deriving anyclass (GYTxBuilderMonad)
+  deriving anyclass GYTxBuilderMonad
 
 data GYTxBuilderIOEnv = GYTxBuilderIOEnv
   { envAddrs :: ![GYAddress]
@@ -82,9 +82,9 @@ instance GYTxUserQueryMonad GYTxBuilderMonadIO where
     usedSomeUTxOs <- getUsedSomeUTxOs
     utxos <- utxosAtAddresses addrs
     return $ utxosRemoveTxOutRefs (maybe usedSomeUTxOs ((`Set.insert` usedSomeUTxOs) . utxoRef) mCollateral) utxos
-    where
-      getCollateral = asks envCollateral
-      getUsedSomeUTxOs = asks envUsedSomeUTxOs
+   where
+    getCollateral = asks envCollateral
+    getUsedSomeUTxOs = asks envUsedSomeUTxOs
 
   someUTxO lang = do
     addrs <- ownAddresses
@@ -96,11 +96,11 @@ instance GYTxUserQueryMonad GYTxBuilderMonadIO where
         case find utxoTranslatableToV1 $ utxosToList utxosToConsider of
           Just u -> return $ utxoRef u
           Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs -- TODO: Better error message here?
-    where
-      ifNotV1 utxosToConsider addrs =
-        case someTxOutRef utxosToConsider of
-          Just (oref, _) -> return oref
-          Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs
+   where
+    ifNotV1 utxosToConsider addrs =
+      case someTxOutRef utxosToConsider of
+        Just (oref, _) -> return oref
+        Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs
 
 runGYTxBuilderMonadIO ::
   -- | Network ID.
@@ -126,14 +126,14 @@ runGYTxBuilderMonadIO envNid envProviders envAddrs envChangeAddr collateral (GYT
         , envCollateral = collateral'
         , envUsedSomeUTxOs = mempty
         }
-  where
-    obtainCollateral :: IO (Maybe GYUTxO)
-    obtainCollateral = runMaybeT $ do
-      (collateralRef, toCheck) <- hoistMaybe collateral
-      collateralUtxo <-
-        liftIO $
-          gyQueryUtxoAtTxOutRef envProviders collateralRef
-            >>= maybe (throwIO . GYQueryUTxOException $ GYNoUtxoAtRef collateralRef) pure
-      if not toCheck || (utxoValue collateralUtxo == collateralValue)
-        then return collateralUtxo
-        else hoistMaybe Nothing
+ where
+  obtainCollateral :: IO (Maybe GYUTxO)
+  obtainCollateral = runMaybeT $ do
+    (collateralRef, toCheck) <- hoistMaybe collateral
+    collateralUtxo <-
+      liftIO $
+        gyQueryUtxoAtTxOutRef envProviders collateralRef
+          >>= maybe (throwIO . GYQueryUTxOException $ GYNoUtxoAtRef collateralRef) pure
+    if not toCheck || (utxoValue collateralUtxo == collateralValue)
+      then return collateralUtxo
+      else hoistMaybe Nothing

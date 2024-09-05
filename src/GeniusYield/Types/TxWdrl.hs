@@ -43,12 +43,12 @@ txWdrlToApi ::
   GYTxWdrl v ->
   (Api.StakeAddress, Ledger.Coin, Api.BuildTxWith Api.BuildTx (Api.Witness Api.WitCtxStake ApiEra))
 txWdrlToApi (GYTxWdrl stakeAddr amt wit) = (stakeAddressToApi stakeAddr, Ledger.Coin (toInteger amt), Api.BuildTxWith $ f wit)
-  where
-    f :: GYTxWdrlWitness v -> Api.Witness Api.WitCtxStake ApiEra
-    f GYTxWdrlWitnessKey = Api.KeyWitness Api.KeyWitnessForStakeAddr
-    f (GYTxWdrlWitnessScript v r) =
-      Api.ScriptWitness Api.ScriptWitnessForStakeAddr $
-        gyStakeValScriptWitnessToApiPlutusSW
-          v
-          (redeemerToApi r)
-          (Api.ExecutionUnits 0 0)
+ where
+  f :: GYTxWdrlWitness v -> Api.Witness Api.WitCtxStake ApiEra
+  f GYTxWdrlWitnessKey = Api.KeyWitness Api.KeyWitnessForStakeAddr
+  f (GYTxWdrlWitnessScript v r) =
+    Api.ScriptWitness Api.ScriptWitnessForStakeAddr $
+      gyStakeValScriptWitnessToApiPlutusSW
+        v
+        (redeemerToApi r)
+        (Api.ExecutionUnits 0 0)

@@ -68,25 +68,25 @@ walletKeysFromMnemonicIndexed mns nAcctIndex nAddrIndex =
           accIx = indexFromWord32 $ minHardenedPathValue + nAcctIndex
           addrIx = indexFromWord32 nAddrIndex
        in deriveWalletKeys rootK accIx addrIx
-  where
-    deriveWalletKeys ::
-      S.Shelley 'RootK XPrv ->
-      -- \^ The Root Key
-      Maybe (Index 'Hardened 'AccountK) ->
-      -- \^ The Index for Account
-      Maybe (Index 'Soft 'PaymentK) ->
-      -- \^ The Index for Address
-      Either String WalletKeys
-    deriveWalletKeys _ Nothing _ = Left $ "Invalid Account Index: " <> show nAcctIndex
-    deriveWalletKeys _ _ Nothing = Left $ "Invalid Address Index: " <> show nAddrIndex
-    deriveWalletKeys rootK (Just accIx) (Just addIx) =
-      let acctK = deriveAccountPrivateKey rootK accIx
-          paymentK = deriveAddressPrivateKey acctK S.UTxOExternal addIx
-          stakeK = S.deriveDelegationPrivateKey acctK
-       in Right WalletKeys {wkRootKey = rootK, wkAcctKey = acctK, wkPaymentKey = paymentK, wkStakeKey = stakeK}
+ where
+  deriveWalletKeys ::
+    S.Shelley 'RootK XPrv ->
+    -- \^ The Root Key
+    Maybe (Index 'Hardened 'AccountK) ->
+    -- \^ The Index for Account
+    Maybe (Index 'Soft 'PaymentK) ->
+    -- \^ The Index for Address
+    Either String WalletKeys
+  deriveWalletKeys _ Nothing _ = Left $ "Invalid Account Index: " <> show nAcctIndex
+  deriveWalletKeys _ _ Nothing = Left $ "Invalid Address Index: " <> show nAddrIndex
+  deriveWalletKeys rootK (Just accIx) (Just addIx) =
+    let acctK = deriveAccountPrivateKey rootK accIx
+        paymentK = deriveAddressPrivateKey acctK S.UTxOExternal addIx
+        stakeK = S.deriveDelegationPrivateKey acctK
+     in Right WalletKeys {wkRootKey = rootK, wkAcctKey = acctK, wkPaymentKey = paymentK, wkStakeKey = stakeK}
 
-    -- value for '0H' index
-    minHardenedPathValue = 0x80000000
+  -- value for '0H' index
+  minHardenedPathValue = 0x80000000
 
 -- | Derives @WalletKeys@ from mnemonic with first account index, using derivation path @1852H/1815H/0H/2/0@ for stake key and derivation path @1852H/1815H/0H/0/0@ for payment key.
 walletKeysFromMnemonic :: Mnemonic -> Either String WalletKeys
@@ -126,10 +126,10 @@ walletKeysToAddress WalletKeys {wkPaymentKey, wkStakeKey} netId =
   let paymentCredential = S.PaymentFromExtendedKey $ toXPub <$> wkPaymentKey
       delegationCredential = S.DelegationFromExtendedKey $ toXPub <$> wkStakeKey
    in S.delegationAddress netId' paymentCredential delegationCredential & bech32 & unsafeAddressFromText
-  where
-    netId' = case netId of
-      GYMainnet -> S.shelleyMainnet
-      GYTestnetPreprod -> S.shelleyTestnet
-      GYTestnetPreview -> S.shelleyTestnet
-      GYTestnetLegacy -> S.shelleyTestnet
-      GYPrivnet {} -> S.shelleyTestnet
+ where
+  netId' = case netId of
+    GYMainnet -> S.shelleyMainnet
+    GYTestnetPreprod -> S.shelleyTestnet
+    GYTestnetPreview -> S.shelleyTestnet
+    GYTestnetLegacy -> S.shelleyTestnet
+    GYPrivnet {} -> S.shelleyTestnet

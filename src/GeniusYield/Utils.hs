@@ -37,10 +37,10 @@ fieldNamePrefixStripN :: Int -> String -> String
 fieldNamePrefixStripN n fldName = case drop n fldName of x : xs -> toLower x : xs; [] -> []
 
 -- | Map the exception type in an 'ExceptT' with a function.
-modifyException :: (Functor m) => (e -> e') -> ExceptT e m a -> ExceptT e' m a
+modifyException :: Functor m => (e -> e') -> ExceptT e m a -> ExceptT e' m a
 modifyException f (ExceptT meith) = ExceptT $ first f <$> meith
 
-serialiseToBech32WithPrefix :: (SerialiseAsRawBytes a) => Text -> a -> Text
+serialiseToBech32WithPrefix :: SerialiseAsRawBytes a => Text -> a -> Text
 serialiseToBech32WithPrefix prefix =
   case Bech32.humanReadablePartFromText prefix of
     Left e ->

@@ -30,12 +30,12 @@ giftScript =
     UPLC.LamAbs ann redeemerName $
       UPLC.LamAbs ann scName $
         UPLC.Var ann scName
-  where
-    ann = ()
+ where
+  ann = ()
 
-    datumName = UPLC.Name "datum" (UPLC.Unique 0)
-    redeemerName = UPLC.Name "redeemer" (UPLC.Unique 1)
-    scName = UPLC.Name "sc" (UPLC.Unique 2)
+  datumName = UPLC.Name "datum" (UPLC.Unique 0)
+  redeemerName = UPLC.Name "redeemer" (UPLC.Unique 1)
+  scName = UPLC.Name "sc" (UPLC.Unique 2)
 
 giftScript' :: UPLC.Term UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
 giftScript' = toDeBruijn giftScript

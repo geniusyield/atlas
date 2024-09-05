@@ -18,7 +18,7 @@ import Katip.Scribes.Handle
 
 import GeniusYield.Imports
 
-gcpFormatter :: (LogItem a) => ItemFormatter a
+gcpFormatter :: LogItem a => ItemFormatter a
 gcpFormatter
   withColor
   verb
@@ -36,17 +36,17 @@ gcpFormatter
         LTxt.toStrict $
           lazyDecodeUtf8Lenient $
             Aeson.encode obj
-    where
-      obj =
-        Aeson.object
-          [ "severity" .= toGCPSeverity severity
-          , "message" .= TxtB.toLazyText msgBuilder
-          , "extraPayload" .= payloadObject verb payload
-          , "time" .= time
-          , "threadId" .= tid
-          , "logging.googleapis.com/sourceLocation" .= (toGCPLoc <$> locMaybe)
-          , "logging.googleapis.com/labels" .= Aeson.object ["namespaces" .= namespaces]
-          ]
+   where
+    obj =
+      Aeson.object
+        [ "severity" .= toGCPSeverity severity
+        , "message" .= TxtB.toLazyText msgBuilder
+        , "extraPayload" .= payloadObject verb payload
+        , "time" .= time
+        , "threadId" .= tid
+        , "logging.googleapis.com/sourceLocation" .= (toGCPLoc <$> locMaybe)
+        , "logging.googleapis.com/labels" .= Aeson.object ["namespaces" .= namespaces]
+        ]
 
 toGCPLoc :: Loc -> Value
 toGCPLoc Loc {loc_filename, loc_package, loc_module, loc_start = (!lineNum, _)} =

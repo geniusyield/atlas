@@ -195,9 +195,9 @@ addressToPlutus addr = case addressToApi addr of
 -- Lookup Ledger.Tx.CardanoAPI module in plutus-ledger.
 byronAddressToPlutus :: Api.S.Address Api.S.ByronAddr -> Plutus.Address
 byronAddressToPlutus (Api.B.ByronAddress addr) = Plutus.Address plutusCredential Nothing
-  where
-    plutusCredential :: Plutus.Credential
-    plutusCredential = Plutus.PubKeyCredential $ Plutus.PubKeyHash $ PlutusTx.toBuiltin $ addrToBase58 addr
+ where
+  plutusCredential :: Plutus.Credential
+  plutusCredential = Plutus.PubKeyCredential $ Plutus.PubKeyHash $ PlutusTx.toBuiltin $ addrToBase58 addr
 
 shelleyAddressToPlutus :: Api.Address Api.ShelleyAddr -> Plutus.Address
 shelleyAddressToPlutus (Api.S.ShelleyAddress _network credential stake) =
@@ -231,31 +231,31 @@ addressFromPlutus nid addr =
     (Left $ UnknownPlutusToCardanoError $ Text.pack $ "addressFromPlutus: " <> show addr)
     (Right . GYAddress . Api.S.AddressShelley)
     $ Api.S.ShelleyAddress nid' <$> paymentCredential <*> stakeReference
-  where
-    nid' :: Ledger.Network
-    nid' = networkIdToLedger nid
+ where
+  nid' :: Ledger.Network
+  nid' = networkIdToLedger nid
 
-    credential :: Plutus.Credential -> Maybe (Ledger.Credential kr Ledger.StandardCrypto)
-    credential (Plutus.PubKeyCredential (Plutus.PubKeyHash (Plutus.BuiltinByteString bs))) = Ledger.KeyHashObj . Ledger.KeyHash <$> Crypto.hashFromBytes bs
-    credential (Plutus.ScriptCredential (Plutus.ScriptHash (Plutus.BuiltinByteString bs))) = Ledger.ScriptHashObj . Ledger.ScriptHash <$> Crypto.hashFromBytes bs
+  credential :: Plutus.Credential -> Maybe (Ledger.Credential kr Ledger.StandardCrypto)
+  credential (Plutus.PubKeyCredential (Plutus.PubKeyHash (Plutus.BuiltinByteString bs))) = Ledger.KeyHashObj . Ledger.KeyHash <$> Crypto.hashFromBytes bs
+  credential (Plutus.ScriptCredential (Plutus.ScriptHash (Plutus.BuiltinByteString bs))) = Ledger.ScriptHashObj . Ledger.ScriptHash <$> Crypto.hashFromBytes bs
 
-    paymentCredential :: Maybe (Ledger.PaymentCredential Ledger.StandardCrypto)
-    paymentCredential = credential $ Plutus.addressCredential addr
+  paymentCredential :: Maybe (Ledger.PaymentCredential Ledger.StandardCrypto)
+  paymentCredential = credential $ Plutus.addressCredential addr
 
-    stakeReference :: Maybe (Ledger.StakeReference Ledger.StandardCrypto)
-    stakeReference = case Plutus.addressStakingCredential addr of
-      Nothing -> Just Ledger.StakeRefNull
-      Just (Plutus.StakingHash c) -> Ledger.StakeRefBase <$> credential c
-      Just (Plutus.StakingPtr x y z) -> Ledger.StakeRefPtr <$> ptr x y z
+  stakeReference :: Maybe (Ledger.StakeReference Ledger.StandardCrypto)
+  stakeReference = case Plutus.addressStakingCredential addr of
+    Nothing -> Just Ledger.StakeRefNull
+    Just (Plutus.StakingHash c) -> Ledger.StakeRefBase <$> credential c
+    Just (Plutus.StakingPtr x y z) -> Ledger.StakeRefPtr <$> ptr x y z
 
-    ptr :: Integer -> Integer -> Integer -> Maybe Ledger.Ptr
-    ptr x y z = Ledger.Ptr <$> coerce integerToWord64 x <*> coerce integerToWord64 y <*> coerce integerToWord64 z
+  ptr :: Integer -> Integer -> Integer -> Maybe Ledger.Ptr
+  ptr x y z = Ledger.Ptr <$> coerce integerToWord64 x <*> coerce integerToWord64 y <*> coerce integerToWord64 z
 
-    integerToWord64 :: Integer -> Maybe Word64
-    integerToWord64 n
-      | n < 0 = Nothing
-      | n > toInteger (maxBound @Word64) = Nothing
-      | otherwise = Just $ fromInteger n
+  integerToWord64 :: Integer -> Maybe Word64
+  integerToWord64 n
+    | n < 0 = Nothing
+    | n > toInteger (maxBound @Word64) = Nothing
+    | otherwise = Just $ fromInteger n
 
 {- | If an address is a shelley address, then we'll return payment credential wrapped in `Just`, `Nothing` otherwise.
 
@@ -370,18 +370,18 @@ addressToPubKeyHash :: GYAddress -> Maybe GYPubKeyHash
 addressToPubKeyHash (GYAddress (Api.AddressByron (Api.B.ByronAddress _addr))) =
   Nothing -- It's not clear what to do with these, and whether GY should support Byron addresses at all (as owners of pools)
 addressToPubKeyHash (GYAddress (Api.AddressShelley (Api.S.ShelleyAddress _network credential _stake))) = f (Api.S.fromShelleyPaymentCredential credential)
-  where
-    f :: Api.S.PaymentCredential -> Maybe GYPubKeyHash
-    f (Api.S.PaymentCredentialByKey h) = Just (pubKeyHashFromApi h)
-    f (Api.S.PaymentCredentialByScript _) = Nothing
+ where
+  f :: Api.S.PaymentCredential -> Maybe GYPubKeyHash
+  f (Api.S.PaymentCredentialByKey h) = Just (pubKeyHashFromApi h)
+  f (Api.S.PaymentCredentialByScript _) = Nothing
 
 addressToValidatorHash :: GYAddress -> Maybe GYValidatorHash
 addressToValidatorHash (GYAddress (Api.AddressByron _)) = Nothing
 addressToValidatorHash (GYAddress (Api.AddressShelley (Api.S.ShelleyAddress _network credential _stake))) = f (Api.S.fromShelleyPaymentCredential credential)
-  where
-    f :: Api.S.PaymentCredential -> Maybe GYValidatorHash
-    f (Api.S.PaymentCredentialByKey _) = Nothing
-    f (Api.S.PaymentCredentialByScript h) = Just (validatorHashFromApi h)
+ where
+  f :: Api.S.PaymentCredential -> Maybe GYValidatorHash
+  f (Api.S.PaymentCredentialByKey _) = Nothing
+  f (Api.S.PaymentCredentialByScript h) = Just (validatorHashFromApi h)
 
 -------------------------------------------------------------------------------
 -- Text conversions

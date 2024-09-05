@@ -39,7 +39,7 @@ data GYTxOut (v :: PlutusVersion) = GYTxOut
   deriving stock (Eq, Show)
 
 data GYTxOutUseInlineDatum (v :: PlutusVersion) where
-  GYTxOutUseInlineDatum :: (v `VersionIsGreaterOrEqual` 'PlutusV2) => GYTxOutUseInlineDatum v
+  GYTxOutUseInlineDatum :: v `VersionIsGreaterOrEqual` 'PlutusV2 => GYTxOutUseInlineDatum v
   GYTxOutDontUseInlineDatum :: GYTxOutUseInlineDatum v
 
 deriving instance Show (GYTxOutUseInlineDatum v)
@@ -79,20 +79,20 @@ txOutToApi (GYTxOut addr v md mrs) =
     (valueToApiTxOutValue v)
     (mkDatum md)
     (maybe Api.S.ReferenceScriptNone (Api.S.ReferenceScript Api.S.BabbageEraOnwardsConway . resolveOutputScript) mrs)
-  where
-    resolveOutputScript (GYSimpleScript s) = Api.ScriptInAnyLang Api.SimpleScriptLanguage (Api.SimpleScript $ simpleScriptToApi s)
-    resolveOutputScript (GYPlutusScript s) =
-      let version = singPlutusVersionToApi $ scriptVersion s
-       in Api.ScriptInAnyLang (Api.PlutusScriptLanguage version) (Api.PlutusScript version (scriptToApi s))
+ where
+  resolveOutputScript (GYSimpleScript s) = Api.ScriptInAnyLang Api.SimpleScriptLanguage (Api.SimpleScript $ simpleScriptToApi s)
+  resolveOutputScript (GYPlutusScript s) =
+    let version = singPlutusVersionToApi $ scriptVersion s
+     in Api.ScriptInAnyLang (Api.PlutusScriptLanguage version) (Api.PlutusScript version (scriptToApi s))
 
-    mkDatum :: Maybe (GYDatum, GYTxOutUseInlineDatum v) -> Api.TxOutDatum Api.CtxTx ApiEra
-    mkDatum Nothing = Api.TxOutDatumNone
-    mkDatum (Just (d, di))
-      | di' = Api.TxOutDatumInline Api.BabbageEraOnwardsConway d'
-      | otherwise = Api.TxOutDatumInTx Api.AlonzoEraOnwardsConway d'
-      where
-        d' = datumToApi' d
+  mkDatum :: Maybe (GYDatum, GYTxOutUseInlineDatum v) -> Api.TxOutDatum Api.CtxTx ApiEra
+  mkDatum Nothing = Api.TxOutDatumNone
+  mkDatum (Just (d, di))
+    | di' = Api.TxOutDatumInline Api.BabbageEraOnwardsConway d'
+    | otherwise = Api.TxOutDatumInTx Api.AlonzoEraOnwardsConway d'
+   where
+    d' = datumToApi' d
 
-        di' = case di of
-          GYTxOutUseInlineDatum -> True
-          GYTxOutDontUseInlineDatum -> False
+    di' = case di of
+      GYTxOutUseInlineDatum -> True
+      GYTxOutDontUseInlineDatum -> False

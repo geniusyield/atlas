@@ -112,7 +112,7 @@ import GeniusYield.Types.StakeKeyHash (
 GYPaymentVerificationKey "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
 -}
 newtype GYPaymentVerificationKey = GYPaymentVerificationKey (Api.VerificationKey Api.PaymentKey)
-  deriving stock (Show)
+  deriving stock Show
   deriving newtype (Eq, IsString)
 
 {- |
@@ -185,8 +185,8 @@ instance Printf.PrintfArg GYPaymentVerificationKey where
 GYPaymentSigningKey "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
 -}
 newtype GYPaymentSigningKey = GYPaymentSigningKey (Api.SigningKey Api.PaymentKey)
-  deriving stock (Show)
-  deriving newtype (IsString)
+  deriving stock Show
+  deriving newtype IsString
 
 instance Eq GYPaymentSigningKey where
   (==) = (==) `on` show
@@ -199,8 +199,8 @@ instance ToShelleyWitnessSigningKey GYPaymentSigningKey where
 
 -- Handle key for extended signing key
 newtype GYExtendedPaymentSigningKey = GYExtendedPaymentSigningKey (Api.SigningKey Api.PaymentExtendedKey)
-  deriving stock (Show)
-  deriving newtype (IsString)
+  deriving stock Show
+  deriving newtype IsString
 
 instance Eq GYExtendedPaymentSigningKey where
   (==) = (==) `on` show
@@ -253,11 +253,11 @@ readPaymentSigningKey fp = do
   case s of
     Left err -> fail (show err) --- throws IOError
     Right x -> return (GYPaymentSigningKey x)
-  where
-    acceptedTypes =
-      [ Api.FromSomeType (Api.AsSigningKey Api.AsGenesisUTxOKey) Api.castSigningKey
-      , Api.FromSomeType (Api.AsSigningKey Api.AsPaymentKey) id
-      ]
+ where
+  acceptedTypes =
+    [ Api.FromSomeType (Api.AsSigningKey Api.AsGenesisUTxOKey) Api.castSigningKey
+    , Api.FromSomeType (Api.AsSigningKey Api.AsPaymentKey) id
+    ]
 
 -- | Reads extended payment signing key from file
 readExtendedPaymentSigningKey :: FilePath -> IO GYExtendedPaymentSigningKey
@@ -346,7 +346,7 @@ generatePaymentSigningKey = paymentSigningKeyFromApi <$> Api.generateSigningKey 
 GYStakeVerificationKey "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
 -}
 newtype GYStakeVerificationKey = GYStakeVerificationKey (Api.VerificationKey Api.StakeKey)
-  deriving stock (Show)
+  deriving stock Show
   deriving newtype (Eq, IsString)
 
 {- |
@@ -413,8 +413,8 @@ instance Printf.PrintfArg GYStakeVerificationKey where
 GYStakeSigningKey "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
 -}
 newtype GYStakeSigningKey = GYStakeSigningKey (Api.SigningKey Api.StakeKey)
-  deriving stock (Show)
-  deriving newtype (IsString)
+  deriving stock Show
+  deriving newtype IsString
 
 instance Eq GYStakeSigningKey where
   (==) = (==) `on` show
@@ -427,8 +427,8 @@ instance ToShelleyWitnessSigningKey GYStakeSigningKey where
 
 -- Handle key for extended signing key
 newtype GYExtendedStakeSigningKey = GYExtendedStakeSigningKey (Api.SigningKey Api.StakeExtendedKey)
-  deriving stock (Show)
-  deriving newtype (IsString)
+  deriving stock Show
+  deriving newtype IsString
 
 instance Eq GYExtendedStakeSigningKey where
   (==) = (==) `on` show

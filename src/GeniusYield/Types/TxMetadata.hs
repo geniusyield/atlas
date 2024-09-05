@@ -126,6 +126,6 @@ metadataMsgs :: [Text] -> Maybe GYTxMetadata
 metadataMsgs msgs = case metaValue of
   GYTxMetaList [] -> Nothing
   _ -> Just $ GYTxMetadata $ Map.fromList [(674, GYTxMetaMap [(GYTxMetaText "msg", metaValue)])]
-  where
-    metaValue :: GYTxMetadataValue
-    metaValue = txMetadataValueFromApi $ Api.TxMetaList $ concatMap constructTxMetadataTextChunks' msgs
+ where
+  metaValue :: GYTxMetadataValue
+  metaValue = txMetadataValueFromApi $ Api.TxMetaList $ concatMap constructTxMetadataTextChunks' msgs

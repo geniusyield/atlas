@@ -123,27 +123,27 @@ utxosFromApi (Api.UTxO m) =
 
 utxosToApi :: GYUTxOs -> Api.UTxO ApiEra
 utxosToApi (GYUTxOs m) = Api.UTxO $ Map.foldlWithKey' f Map.empty m
-  where
-    f ::
-      Map Api.TxIn (Api.TxOut Api.CtxUTxO ApiEra) ->
-      GYTxOutRef ->
-      (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript) ->
-      Map Api.TxIn (Api.TxOut Api.CtxUTxO ApiEra)
-    f m' oref out = Map.insert (txOutRefToApi oref) (g out) m'
+ where
+  f ::
+    Map Api.TxIn (Api.TxOut Api.CtxUTxO ApiEra) ->
+    GYTxOutRef ->
+    (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript) ->
+    Map Api.TxIn (Api.TxOut Api.CtxUTxO ApiEra)
+  f m' oref out = Map.insert (txOutRefToApi oref) (g out) m'
 
-    g :: (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript) -> Api.TxOut Api.CtxUTxO ApiEra
-    g (addr, v, md, ms) =
-      Api.TxOut
-        (addressToApi' addr)
-        (valueToApiTxOutValue v)
-        (outDatumToApi md)
-        (maybe Api.S.ReferenceScriptNone someScriptToReferenceApi ms)
+  g :: (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript) -> Api.TxOut Api.CtxUTxO ApiEra
+  g (addr, v, md, ms) =
+    Api.TxOut
+      (addressToApi' addr)
+      (valueToApiTxOutValue v)
+      (outDatumToApi md)
+      (maybe Api.S.ReferenceScriptNone someScriptToReferenceApi ms)
 
-    outDatumToApi GYOutDatumNone = Api.TxOutDatumNone
-    outDatumToApi (GYOutDatumHash h) =
-      Api.TxOutDatumHash Api.AlonzoEraOnwardsConway $ datumHashToApi h
-    outDatumToApi (GYOutDatumInline d) =
-      Api.TxOutDatumInline Api.BabbageEraOnwardsConway $ datumToApi' d
+  outDatumToApi GYOutDatumNone = Api.TxOutDatumNone
+  outDatumToApi (GYOutDatumHash h) =
+    Api.TxOutDatumHash Api.AlonzoEraOnwardsConway $ datumHashToApi h
+  outDatumToApi (GYOutDatumInline d) =
+    Api.TxOutDatumInline Api.BabbageEraOnwardsConway $ datumToApi' d
 
 utxoFromApi :: Api.TxIn -> Api.TxOut Api.CtxTx ApiEra -> GYUTxO
 utxoFromApi txIn (Api.TxOut a v d s) =
@@ -154,12 +154,12 @@ utxoFromApi txIn (Api.TxOut a v d s) =
     , utxoOutDatum = f d
     , utxoRefScript = someScriptFromReferenceApi s
     }
-  where
-    f :: Api.TxOutDatum Api.CtxTx ApiEra -> GYOutDatum
-    f Api.TxOutDatumNone = GYOutDatumNone
-    f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
-    f (Api.TxOutDatumInTx _ sd) = GYOutDatumHash . hashDatum $ datumFromApi' sd
-    f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' sd
+ where
+  f :: Api.TxOutDatum Api.CtxTx ApiEra -> GYOutDatum
+  f Api.TxOutDatumNone = GYOutDatumNone
+  f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
+  f (Api.TxOutDatumInTx _ sd) = GYOutDatumHash . hashDatum $ datumFromApi' sd
+  f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' sd
 
 utxoFromApi' :: Api.TxIn -> Api.TxOut Api.CtxUTxO era -> GYUTxO
 utxoFromApi' txIn (Api.TxOut a v d s) =
@@ -170,11 +170,11 @@ utxoFromApi' txIn (Api.TxOut a v d s) =
     , utxoOutDatum = f d
     , utxoRefScript = someScriptFromReferenceApi s
     }
-  where
-    f :: Api.TxOutDatum Api.CtxUTxO era -> GYOutDatum
-    f Api.TxOutDatumNone = GYOutDatumNone
-    f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
-    f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' sd
+ where
+  f :: Api.TxOutDatum Api.CtxUTxO era -> GYOutDatum
+  f Api.TxOutDatumNone = GYOutDatumNone
+  f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
+  f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' sd
 
 utxoToPlutus :: GYUTxO -> Plutus.TxOut
 utxoToPlutus GYUTxO {..} =
@@ -234,11 +234,11 @@ Used to pick an input for minting, or selecting collateral (in tests).
 -}
 someTxOutRef :: GYUTxOs -> Maybe (GYTxOutRef, GYUTxOs)
 someTxOutRef (GYUTxOs m) = f <$> Map.minViewWithKey m
-  where
-    f ((oref, _), m') = (oref, GYUTxOs m')
+ where
+  f ((oref, _), m') = (oref, GYUTxOs m')
 
 -- | Get a random output reference from 'GYUTxOs'.
-randomTxOutRef :: (MonadRandom m) => GYUTxOs -> m (Maybe (GYTxOutRef, GYUTxOs))
+randomTxOutRef :: MonadRandom m => GYUTxOs -> m (Maybe (GYTxOutRef, GYUTxOs))
 randomTxOutRef (GYUTxOs m)
   | Map.null m = pure Nothing
   | otherwise =
@@ -251,24 +251,24 @@ randomTxOutRef (GYUTxOs m)
 -- | Filter 'GYUTxOs' with a predicate on 'GYUTxO'.
 filterUTxOs :: (GYUTxO -> Bool) -> GYUTxOs -> GYUTxOs
 filterUTxOs p (GYUTxOs m) = GYUTxOs $ Map.filterWithKey p' m
-  where
-    p' r (a, v, mh, ms) = p $ GYUTxO r a v mh ms
+ where
+  p' r (a, v, mh, ms) = p $ GYUTxO r a v mh ms
 
 -- | Map & filter 'GYUTxOs' contents.
 mapMaybeUTxOs :: (GYUTxO -> Maybe a) -> GYUTxOs -> Map GYTxOutRef a
 mapMaybeUTxOs p (GYUTxOs m) = Map.mapMaybeWithKey p' m
-  where
-    p' r (a, v, mh, ms) = p $ GYUTxO r a v mh ms
+ where
+  p' r (a, v, mh, ms) = p $ GYUTxO r a v mh ms
 
 -- | Map 'GYUTxOs' contents.
 mapUTxOs :: (GYUTxO -> a) -> GYUTxOs -> Map GYTxOutRef a
 mapUTxOs f = mapMaybeUTxOs $ Just . f
 
 -- | Applicative version of 'mapMaybeUTxOs'.
-witherUTxOs :: (Applicative f) => (GYUTxO -> f (Maybe a)) -> GYUTxOs -> f (Map GYTxOutRef a)
+witherUTxOs :: Applicative f => (GYUTxO -> f (Maybe a)) -> GYUTxOs -> f (Map GYTxOutRef a)
 witherUTxOs f (GYUTxOs m) = iwither g m
-  where
-    g ref (a, v, mh, ms) = f (GYUTxO ref a v mh ms)
+ where
+  g ref (a, v, mh, ms) = f (GYUTxO ref a v mh ms)
 
 -- | Returns a 'GYUTxOs' from a given list of 'GYUTxO's.
 utxosFromList :: [GYUTxO] -> GYUTxOs
@@ -294,25 +294,25 @@ utxosFromUTxO utxo = utxosFromList [utxo]
 -- | Fold operation over a 'GYUTxOs'.
 foldlUTxOs' :: forall a. (a -> GYUTxO -> a) -> a -> GYUTxOs -> a
 foldlUTxOs' f x (GYUTxOs m) = Map.foldlWithKey' f' x m
-  where
-    f' :: a -> GYTxOutRef -> (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript) -> a
-    f' y r (a, v, mh, ms) = f y $ GYUTxO r a v mh ms
+ where
+  f' :: a -> GYTxOutRef -> (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript) -> a
+  f' y r (a, v, mh, ms) = f y $ GYUTxO r a v mh ms
 
 -- | FoldMap operation over a 'GYUTxOs'.
-foldMapUTxOs :: (Monoid m) => (GYUTxO -> m) -> GYUTxOs -> m
+foldMapUTxOs :: Monoid m => (GYUTxO -> m) -> GYUTxOs -> m
 foldMapUTxOs f = foldlUTxOs' (\m utxo -> m <> f utxo) mempty
 
-forUTxOs_ :: forall f a. (Applicative f) => GYUTxOs -> (GYUTxO -> f a) -> f ()
+forUTxOs_ :: forall f a. Applicative f => GYUTxOs -> (GYUTxO -> f a) -> f ()
 forUTxOs_ (GYUTxOs m) f = ifor_ m f'
-  where
-    f' :: GYTxOutRef -> (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript) -> f a
-    f' r (a, v, mh, ms) = f $ GYUTxO r a v mh ms
+ where
+  f' :: GYTxOutRef -> (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript) -> f a
+  f' r (a, v, mh, ms) = f $ GYUTxO r a v mh ms
 
-foldMUTxOs :: forall m a. (Monad m) => (a -> GYUTxO -> m a) -> a -> GYUTxOs -> m a
+foldMUTxOs :: forall m a. Monad m => (a -> GYUTxO -> m a) -> a -> GYUTxOs -> m a
 foldMUTxOs f x (GYUTxOs m) = foldM f' x $ Map.toList m
-  where
-    f' :: a -> (GYTxOutRef, (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript)) -> m a
-    f' y (r, (a, v, mh, ms)) = f y $ GYUTxO r a v mh ms
+ where
+  f' :: a -> (GYTxOutRef, (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript)) -> m a
+  f' y (r, (a, v, mh, ms)) = f y $ GYUTxO r a v mh ms
 
 instance Printf.PrintfArg GYUTxOs where
   formatArg (GYUTxOs m) =

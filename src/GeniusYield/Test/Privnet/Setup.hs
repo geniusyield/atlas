@@ -353,13 +353,13 @@ withPrivnet testnetOpts setupUser = do
 
       let setup = Setup $ \targetSev putLog kont -> kont $ ctx {ctxLog = simpleLogging targetSev (putLog . Txt.unpack)}
       setupUser setup
-  where
-    -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
-    cardanoTestnet' opts conf = do
-      Api.AnyCardanoEra cEra <- pure $ cardanoNodeEra cardanoDefaultTestnetOptions
-      alonzoGenesis <- getDefaultAlonzoGenesis cEra
-      (startTime, shelleyGenesis') <- getDefaultShelleyGenesis opts
-      cardanoTestnet opts conf startTime shelleyGenesis' alonzoGenesis conwayGenesis
+ where
+  -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
+  cardanoTestnet' opts conf = do
+    Api.AnyCardanoEra cEra <- pure $ cardanoNodeEra cardanoDefaultTestnetOptions
+    alonzoGenesis <- getDefaultAlonzoGenesis cEra
+    (startTime, shelleyGenesis') <- getDefaultShelleyGenesis opts
+    cardanoTestnet opts conf startTime shelleyGenesis' alonzoGenesis conwayGenesis
 
 -------------------------------------------------------------------------------
 -- Generating users
@@ -387,8 +387,8 @@ generateUser network = do
             )
 
   pure User' {userPaymentSKey' = paymentSigningKeyFromApi skey, userAddr = addr, userStakeSKey' = Nothing}
-  where
-    stake = Api.NoStakeAddress
+ where
+  stake = Api.NoStakeAddress
 
 -------------------------------------------------------------------------------
 -- Balance
@@ -425,6 +425,6 @@ mintTestTokens ctx tn' = do
     (ac, txBody) <- GY.TestTokens.mintTestTokens tn 1_000_000_000 >>= traverse buildTxBody
     signAndSubmitConfirmed_ txBody
     pure ac
-  where
-    tn :: GYTokenName
-    tn = fromString tn'
+ where
+  tn :: GYTokenName
+  tn = fromString tn'

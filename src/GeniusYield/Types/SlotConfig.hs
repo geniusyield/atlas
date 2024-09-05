@@ -110,28 +110,28 @@ This is the recommended, robust, way to create slot config.
 -}
 makeSlotConfig :: CSlot.SystemStart -> Api.EraHistory -> Either String GYSlotConfig
 makeSlotConfig sysStart eraHist = GYSlotConfig sysStart <$!> simplifiedEraSumms
-  where
-    simplifiedEraSumms :: Either String (NonEmpty GYEraSlotConfig)
-    !simplifiedEraSumms = case extractEraSummaries eraHist of
-      -- This pattern match ensures the summaries start with the very first era (Bound should be all 0).
-      summ@(Ouroboros.Summary eraSumms@(Ouroboros.NonEmptyCons Ouroboros.EraSummary {eraStart = FirstEraBound} _)) ->
-        -- Verify the rest of the invariants.
-        runExcept (invariantSummary summ)
-          -- Convert the summaries into a collection of 'GYEraSlotConfig'.
-          $> (toEraSlotConf <$!> toNonEmpty eraSumms)
-      _ ->
-        Left $!
-          "Initial era element within given EraHistory must be the very first ledger era"
-            ++ " (Era Start bound should be 0)"
-    toEraSlotConf :: Ouroboros.EraSummary -> GYEraSlotConfig
-    toEraSlotConf
-      Ouroboros.EraSummary
-        { eraStart = Ouroboros.Bound {boundTime, boundSlot}
-        , eraParams = Ouroboros.EraParams {eraSlotLength}
-        } = GYEraSlotConfig {gyEraSlotStart = slotFromApi boundSlot, gyEraSlotLength = eraSlotLength, gyEraSlotZeroTime = boundTime}
-    toNonEmpty :: Ouroboros.NonEmpty xs a -> NonEmpty a
-    toNonEmpty (Ouroboros.NonEmptyOne x) = x :| []
-    toNonEmpty (Ouroboros.NonEmptyCons x xs) = x :| toList xs
+ where
+  simplifiedEraSumms :: Either String (NonEmpty GYEraSlotConfig)
+  !simplifiedEraSumms = case extractEraSummaries eraHist of
+    -- This pattern match ensures the summaries start with the very first era (Bound should be all 0).
+    summ@(Ouroboros.Summary eraSumms@(Ouroboros.NonEmptyCons Ouroboros.EraSummary {eraStart = FirstEraBound} _)) ->
+      -- Verify the rest of the invariants.
+      runExcept (invariantSummary summ)
+        -- Convert the summaries into a collection of 'GYEraSlotConfig'.
+        $> (toEraSlotConf <$!> toNonEmpty eraSumms)
+    _ ->
+      Left $!
+        "Initial era element within given EraHistory must be the very first ledger era"
+          ++ " (Era Start bound should be 0)"
+  toEraSlotConf :: Ouroboros.EraSummary -> GYEraSlotConfig
+  toEraSlotConf
+    Ouroboros.EraSummary
+      { eraStart = Ouroboros.Bound {boundTime, boundSlot}
+      , eraParams = Ouroboros.EraParams {eraSlotLength}
+      } = GYEraSlotConfig {gyEraSlotStart = slotFromApi boundSlot, gyEraSlotLength = eraSlotLength, gyEraSlotZeroTime = boundTime}
+  toNonEmpty :: Ouroboros.NonEmpty xs a -> NonEmpty a
+  toNonEmpty (Ouroboros.NonEmptyOne x) = x :| []
+  toNonEmpty (Ouroboros.NonEmptyCons x xs) = x :| toList xs
 
 -- The era start bound for the very first era.
 pattern FirstEraBound :: Ouroboros.Bound
@@ -165,21 +165,21 @@ slotToBeginPOSIXTime' (GYSlotConfig sysStart slotConfs) slot =
   -- SystemStart + relativeResult
   $
     CSlot.fromRelativeTime sysStart relativeResult
-  where
-    -- slotZeroTime + (slot - startSlotNo) *  slotLength
-    relativeResult =
-      CSlot.getSlotLength gyEraSlotLength
-        `CSlot.multNominalDiffTime` (slotToInteger slot - slotToInteger gyEraSlotStart)
-        `CSlot.addRelativeTime` gyEraSlotZeroTime
-    GYEraSlotConfig {gyEraSlotZeroTime, gyEraSlotStart, gyEraSlotLength} = findSlotConf slotConfs
-    {- Finds the slot config for the given slot. Essentially, the chosen slot config must have its starting slot
-    less than, or equal to, the given slot. Furthermore, the chosen slot config's end slot, i.e next slot config's
-    starting slot (or unbounded if final era), should be greater than the given slot.
-    -}
-    findSlotConf (x :| []) = x
-    findSlotConf
-      (thisSlotConf@GYEraSlotConfig {gyEraSlotStart = startSlot} :| nextSlotConf@GYEraSlotConfig {gyEraSlotStart = endSlot} : rest) =
-        if slot >= startSlot && slot < endSlot then thisSlotConf else findSlotConf $ nextSlotConf :| rest
+ where
+  -- slotZeroTime + (slot - startSlotNo) *  slotLength
+  relativeResult =
+    CSlot.getSlotLength gyEraSlotLength
+      `CSlot.multNominalDiffTime` (slotToInteger slot - slotToInteger gyEraSlotStart)
+      `CSlot.addRelativeTime` gyEraSlotZeroTime
+  GYEraSlotConfig {gyEraSlotZeroTime, gyEraSlotStart, gyEraSlotLength} = findSlotConf slotConfs
+  {- Finds the slot config for the given slot. Essentially, the chosen slot config must have its starting slot
+  less than, or equal to, the given slot. Furthermore, the chosen slot config's end slot, i.e next slot config's
+  starting slot (or unbounded if final era), should be greater than the given slot.
+  -}
+  findSlotConf (x :| []) = x
+  findSlotConf
+    (thisSlotConf@GYEraSlotConfig {gyEraSlotStart = startSlot} :| nextSlotConf@GYEraSlotConfig {gyEraSlotStart = endSlot} : rest) =
+      if slot >= startSlot && slot < endSlot then thisSlotConf else findSlotConf $ nextSlotConf :| rest
 
 {- | Get the ending 'GYTime' of a 'GYSlot' (inclusive) given a 'GYSlotConfig'.
 
@@ -189,9 +189,9 @@ GYTime 13.999s
 slotToEndTimePure :: GYSlotConfig -> GYSlot -> GYTime
 slotToEndTimePure sc@(GYSlotConfig _ _) slot =
   timeFromPOSIX $ slotToBeginPOSIXTime' sc (unsafeAdvanceSlot slot 1) - oneMs
-  where
-    oneMs :: Time.NominalDiffTime
-    oneMs = 0.001
+ where
+  oneMs :: Time.NominalDiffTime
+  oneMs = 0.001
 
 {- | Get the 'GYSlot' of a 'GYTime' given a 'GYSlotConfig'.
 
@@ -209,24 +209,24 @@ enclosingSlotFromTimePure (GYSlotConfig sysStart slotConfs) (timeToPOSIX -> absT
   | otherwise =
       -- startSlotNo + relativeResult
       Just . slotFromApi . Ouroboros.addSlots relativeResult $ slotToApi gyEraSlotStart
-  where
-    absTimeUtc = Time.posixSecondsToUTCTime absTime
-    -- absTime - SystemStart
-    relTime = CSlot.toRelativeTime sysStart absTimeUtc
-    -- (relTime - slotZeroTime) / slotLength
-    relativeResult = (relTime `CSlot.diffRelativeTime` gyEraSlotZeroTime) `div'` CSlot.getSlotLength gyEraSlotLength
-    GYEraSlotConfig {gyEraSlotZeroTime, gyEraSlotStart, gyEraSlotLength} = findSlotConf slotConfs
-    {- Finds the slot config for the given relative time. Essentially, the chosen slot config must have its starting time
-    greater than, or equal to, the given relative time. Furthermore, the chosen slot config's end time, i.e next slot config's
-    starting time (or unbounded if final era), should be greater than the given relative time.
-    -}
-    findSlotConf (x :| []) = x
-    findSlotConf
-      ( thisSlotConf@GYEraSlotConfig {gyEraSlotZeroTime = startTime}
-          :| nextSlotConf@GYEraSlotConfig {gyEraSlotZeroTime = endTime}
-          : rest
-        ) =
-        if relTime >= startTime && relTime < endTime then thisSlotConf else findSlotConf $ nextSlotConf :| rest
+ where
+  absTimeUtc = Time.posixSecondsToUTCTime absTime
+  -- absTime - SystemStart
+  relTime = CSlot.toRelativeTime sysStart absTimeUtc
+  -- (relTime - slotZeroTime) / slotLength
+  relativeResult = (relTime `CSlot.diffRelativeTime` gyEraSlotZeroTime) `div'` CSlot.getSlotLength gyEraSlotLength
+  GYEraSlotConfig {gyEraSlotZeroTime, gyEraSlotStart, gyEraSlotLength} = findSlotConf slotConfs
+  {- Finds the slot config for the given relative time. Essentially, the chosen slot config must have its starting time
+  greater than, or equal to, the given relative time. Furthermore, the chosen slot config's end time, i.e next slot config's
+  starting time (or unbounded if final era), should be greater than the given relative time.
+  -}
+  findSlotConf (x :| []) = x
+  findSlotConf
+    ( thisSlotConf@GYEraSlotConfig {gyEraSlotZeroTime = startTime}
+        :| nextSlotConf@GYEraSlotConfig {gyEraSlotZeroTime = endTime}
+        : rest
+      ) =
+      if relTime >= startTime && relTime < endTime then thisSlotConf else findSlotConf $ nextSlotConf :| rest
 
 -- | Partial version of 'enclosingSlotFromTimePure'.
 unsafeEnclosingSlotFromTimePure :: GYSlotConfig -> GYTime -> GYSlot
@@ -249,66 +249,66 @@ invariantSummary :: Ouroboros.Summary xs -> Except String ()
 invariantSummary = \(Ouroboros.Summary summary) ->
   -- Pretend the start of the first era is the "end of the previous" one
   go (Ouroboros.eraStart (Ouroboros.nonEmptyHead summary)) (toList summary)
-  where
-    go ::
-      Ouroboros.Bound ->
-      -- \^ End of the previous era
-      [Ouroboros.EraSummary] ->
-      Except String ()
-    go _ [] = return ()
-    go prevEnd (curSummary : next) = do
-      unless (curStart == prevEnd) $
-        throwError $
-          mconcat
-            [ "Bounds don't line up: end of previous era "
-            , show prevEnd
-            , " /= start of current era "
-            , show curStart
-            ]
+ where
+  go ::
+    Ouroboros.Bound ->
+    -- \^ End of the previous era
+    [Ouroboros.EraSummary] ->
+    Except String ()
+  go _ [] = return ()
+  go prevEnd (curSummary : next) = do
+    unless (curStart == prevEnd) $
+      throwError $
+        mconcat
+          [ "Bounds don't line up: end of previous era "
+          , show prevEnd
+          , " /= start of current era "
+          , show curStart
+          ]
 
-      case mCurEnd of
-        Ouroboros.EraUnbounded ->
-          unless (null next) $
-            throwError "Unbounded non-final era"
-        Ouroboros.EraEnd curEnd -> do
-          -- Check the invariants mentioned at 'EraSummary'
-          --
-          -- o @epochsInEra@ corresponds to @e' - e@
-          -- o @slotsInEra@ corresponds to @(e' - e) * epochSize)@
-          -- o @timeInEra@ corresponds to @((e' - e) * epochSize * slotLen@
-          --   which, if INV-1b holds, equals @(s' - s) * slotLen@
-          let epochsInEra, slotsInEra :: Word64
-              epochsInEra = Ouroboros.countEpochs (Ouroboros.boundEpoch curEnd) (Ouroboros.boundEpoch curStart)
-              slotsInEra = epochsInEra * CSlot.unEpochSize (Ouroboros.eraEpochSize curParams)
+    case mCurEnd of
+      Ouroboros.EraUnbounded ->
+        unless (null next) $
+          throwError "Unbounded non-final era"
+      Ouroboros.EraEnd curEnd -> do
+        -- Check the invariants mentioned at 'EraSummary'
+        --
+        -- o @epochsInEra@ corresponds to @e' - e@
+        -- o @slotsInEra@ corresponds to @(e' - e) * epochSize)@
+        -- o @timeInEra@ corresponds to @((e' - e) * epochSize * slotLen@
+        --   which, if INV-1b holds, equals @(s' - s) * slotLen@
+        let epochsInEra, slotsInEra :: Word64
+            epochsInEra = Ouroboros.countEpochs (Ouroboros.boundEpoch curEnd) (Ouroboros.boundEpoch curStart)
+            slotsInEra = epochsInEra * CSlot.unEpochSize (Ouroboros.eraEpochSize curParams)
 
-              timeInEra :: NominalDiffTime
-              timeInEra =
-                fromIntegral slotsInEra
-                  * CSlot.getSlotLength (Ouroboros.eraSlotLength curParams)
+            timeInEra :: NominalDiffTime
+            timeInEra =
+              fromIntegral slotsInEra
+                * CSlot.getSlotLength (Ouroboros.eraSlotLength curParams)
 
-          -- NOTE: The only change is here, using >= rather than >
-          unless (Ouroboros.boundEpoch curEnd >= Ouroboros.boundEpoch curStart) $
-            throwError "Empty era"
+        -- NOTE: The only change is here, using >= rather than >
+        unless (Ouroboros.boundEpoch curEnd >= Ouroboros.boundEpoch curStart) $
+          throwError "Empty era"
 
-          unless (Ouroboros.boundSlot curEnd == Ouroboros.addSlots slotsInEra (Ouroboros.boundSlot curStart)) $
-            throwError $
-              mconcat
-                [ "Invalid final boundSlot in "
-                , show curSummary
-                , " (INV-1b)"
-                ]
+        unless (Ouroboros.boundSlot curEnd == Ouroboros.addSlots slotsInEra (Ouroboros.boundSlot curStart)) $
+          throwError $
+            mconcat
+              [ "Invalid final boundSlot in "
+              , show curSummary
+              , " (INV-1b)"
+              ]
 
-          unless (Ouroboros.boundTime curEnd == Ouroboros.addRelTime timeInEra (Ouroboros.boundTime curStart)) $
-            throwError $
-              mconcat
-                [ "Invalid final boundTime in "
-                , show curSummary
-                , " (INV-2b)"
-                ]
+        unless (Ouroboros.boundTime curEnd == Ouroboros.addRelTime timeInEra (Ouroboros.boundTime curStart)) $
+          throwError $
+            mconcat
+              [ "Invalid final boundTime in "
+              , show curSummary
+              , " (INV-2b)"
+              ]
 
-          go curEnd next
-      where
-        curStart :: Ouroboros.Bound
-        mCurEnd :: Ouroboros.EraEnd
-        curParams :: Ouroboros.EraParams
-        Ouroboros.EraSummary curStart mCurEnd curParams = curSummary
+        go curEnd next
+   where
+    curStart :: Ouroboros.Bound
+    mCurEnd :: Ouroboros.EraEnd
+    curParams :: Ouroboros.EraParams
+    Ouroboros.EraSummary curStart mCurEnd curParams = curSummary

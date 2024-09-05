@@ -29,12 +29,12 @@ limboScript =
     UPLC.LamAbs ann redeemerName $
       UPLC.LamAbs ann scName $
         UPLC.Error ann
-  where
-    ann = ()
+ where
+  ann = ()
 
-    datumName = UPLC.Name "datum" (UPLC.Unique 0)
-    redeemerName = UPLC.Name "redeemer" (UPLC.Unique 1)
-    scName = UPLC.Name "sc" (UPLC.Unique 2)
+  datumName = UPLC.Name "datum" (UPLC.Unique 0)
+  redeemerName = UPLC.Name "redeemer" (UPLC.Unique 1)
+  scName = UPLC.Name "sc" (UPLC.Unique 2)
 
 limboScript' :: UPLC.Term UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
 limboScript' = toDeBruijn limboScript

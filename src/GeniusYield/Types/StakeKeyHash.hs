@@ -43,7 +43,7 @@ import Text.Printf qualified as Printf
 -}
 
 newtype GYStakeKeyHash = GYStakeKeyHash (Api.Hash Api.StakeKey)
-  deriving stock (Show)
+  deriving stock Show
   deriving newtype (Eq, Ord, IsString)
 
 instance AsPubKeyHash GYStakeKeyHash where

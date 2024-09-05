@@ -29,23 +29,23 @@ import GeniusYield.Imports
 import GeniusYield.Types
 
 -- | Query the balance at given address.
-queryBalance :: (GYTxQueryMonad m) => GYAddress -> m GYValue
+queryBalance :: GYTxQueryMonad m => GYAddress -> m GYValue
 queryBalance addr = foldMapUTxOs utxoValue <$> utxosAtAddress addr Nothing
 
 -- | Query the balances at given addresses.
-queryBalances :: (GYTxQueryMonad m) => [GYAddress] -> m GYValue
+queryBalances :: GYTxQueryMonad m => [GYAddress] -> m GYValue
 queryBalances addrs = foldMapUTxOs utxoValue <$> utxosAtAddresses addrs
 
 {- | Query the txoutrefs at given address with ADA-only values.
 
 Useful for finding a txoutref to be used as collateral.
 -}
-getAdaOnlyUTxO :: (GYTxQueryMonad m) => GYAddress -> m [(GYTxOutRef, Natural)]
+getAdaOnlyUTxO :: GYTxQueryMonad m => GYAddress -> m [(GYTxOutRef, Natural)]
 getAdaOnlyUTxO addr = adaOnlyUTxOPure <$> utxosAtAddress addr Nothing
 
 -- | Get a UTxO suitable for use as collateral.
 getCollateral' ::
-  (GYTxQueryMonad m) =>
+  GYTxQueryMonad m =>
   -- | The address where to look.
   GYAddress ->
   -- | The minimal amount of lovelace required as collateral.
@@ -60,7 +60,7 @@ getCollateral' addr minCollateral = do
 
 -- | Get an UTxO suitable for use as collateral.
 getCollateral ::
-  (GYTxQueryMonad m) =>
+  GYTxQueryMonad m =>
   -- | The address where to look.
   GYAddress ->
   -- | The minimal amount of lovelace required as collateral.
@@ -75,16 +75,16 @@ getCollateral addr minCollateral = do
 
 adaOnlyUTxOPure :: GYUTxOs -> [(GYTxOutRef, Natural)]
 adaOnlyUTxOPure = Map.toList . mapMaybeUTxOs (valueIsPositiveAda . utxoValue)
-  where
-    valueIsPositiveAda :: GYValue -> Maybe Natural
-    valueIsPositiveAda v = case valueSplitAda v of
-      (n, v') | n > 0, isEmptyValue v' -> Just (fromInteger n)
-      _ -> Nothing
+ where
+  valueIsPositiveAda :: GYValue -> Maybe Natural
+  valueIsPositiveAda v = case valueSplitAda v of
+    (n, v') | n > 0, isEmptyValue v' -> Just (fromInteger n)
+    _ -> Nothing
 
 {- | Calculate how much balance is the given transaction
 is moving to given pubkeyhash address(es).
 -}
-getTxBalance :: (GYTxQueryMonad m) => GYPubKeyHash -> GYTx -> m GYValue
+getTxBalance :: GYTxQueryMonad m => GYPubKeyHash -> GYTx -> m GYValue
 getTxBalance pkh tx = do
   let Api.TxBody content = Api.getTxBody $ txToApi tx
       ins = txOutRefFromApi . fst <$> Api.txIns content
@@ -97,11 +97,11 @@ getTxBalance pkh tx = do
   utxos <- utxosAtTxOutRefs ins
   let inValue = foldMapUTxOs f utxos
   return $ outValue `valueMinus` inValue
-  where
-    isRelevantAddress :: GYAddress -> Bool
-    isRelevantAddress addr = Just pkh == addressToPubKeyHash addr
+ where
+  isRelevantAddress :: GYAddress -> Bool
+  isRelevantAddress addr = Just pkh == addressToPubKeyHash addr
 
-    f :: GYUTxO -> GYValue
-    f utxo
-      | isRelevantAddress $ utxoAddress utxo = utxoValue utxo
-      | otherwise = mempty
+  f :: GYUTxO -> GYValue
+  f utxo
+    | isRelevantAddress $ utxoAddress utxo = utxoValue utxo
+    | otherwise = mempty

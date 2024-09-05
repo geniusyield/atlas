@@ -21,4 +21,4 @@ data PlutusToCardanoError
     StakePtrAddressUnsupported Plutus.Address
   | -- | Wildcard unhandled constructors; shouldn't happen usually.
     UnknownPlutusToCardanoError {ptceTag :: Text}
-  deriving stock (Show)
+  deriving stock Show

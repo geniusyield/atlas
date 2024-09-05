@@ -38,5 +38,5 @@ urlPieceFromText t = case Web.parseUrlPiece t of
     printf "Failed to parse %s from %s: %s\n" (show (typeRep @a)) t msg
     exitFailure
 
-urlPieceToFile :: forall a. (Web.ToHttpApiData a) => FilePath -> a -> IO ()
+urlPieceToFile :: forall a. Web.ToHttpApiData a => FilePath -> a -> IO ()
 urlPieceToFile p x = T.IO.writeFile p (Web.toUrlPiece x)

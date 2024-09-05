@@ -107,7 +107,7 @@ data KupoProviderException
   | -- | Received an absurd response from Kupo. This shouldn't ever happen.
     KupoAbsurdResponse !Text
   deriving stock (Eq, Show)
-  deriving anyclass (Exception)
+  deriving anyclass Exception
 
 {-# INLINEABLE handleKupoError #-}
 handleKupoError :: Text -> Either ClientError a -> IO a
@@ -157,7 +157,7 @@ instance FromJSON KupoDatum where
 
 data KupoScriptLanguage = Native | PlutusV1 | PlutusV2 | PlutusV3
   deriving stock (Eq, Ord, Show, Generic)
-  deriving (FromJSON) via CustomJSON '[ConstructorTagModifier '[Rename "Native" "native", Rename "PlutusV1" "plutus:v1", Rename "PlutusV2" "plutus:v2", Rename "PlutusV3" "plutus:v3"]] KupoScriptLanguage
+  deriving FromJSON via CustomJSON '[ConstructorTagModifier '[Rename "Native" "native", Rename "PlutusV1" "plutus:v1", Rename "PlutusV2" "plutus:v2", Rename "PlutusV3" "plutus:v3"]] KupoScriptLanguage
 
 newtype KupoScript = KupoScript (Maybe GYAnyScript)
   deriving stock (Eq, Show, Generic)
@@ -215,13 +215,13 @@ instance FromJSON KupoValue where
 
 data KupoDatumType = Hash | Inline
   deriving stock (Show, Eq, Ord, Generic)
-  deriving (FromJSON) via CustomJSON '[ConstructorTagModifier '[LowerFirst]] KupoDatumType
+  deriving FromJSON via CustomJSON '[ConstructorTagModifier '[LowerFirst]] KupoDatumType
 
 newtype KupoCreatedAt = KupoCreatedAt
   { slotNo :: Word64
   }
   deriving stock (Show, Eq, Ord, Generic)
-  deriving (FromJSON) via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoCreatedAt
+  deriving FromJSON via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoCreatedAt
 
 data KupoUtxo = KupoUtxo
   { transactionId :: !GYTxId
@@ -234,7 +234,7 @@ data KupoUtxo = KupoUtxo
   , createdAt :: !KupoCreatedAt
   }
   deriving stock (Show, Eq, Ord, Generic)
-  deriving (FromJSON) via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoUtxo
+  deriving FromJSON via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoUtxo
 
 findDatumByHash :: GYDatumHash -> ClientM KupoDatum
 findScriptByHash :: GYScriptHash -> ClientM KupoScript
@@ -285,8 +285,8 @@ kupoUtxosAtAddress env addr mAssetClass = do
         Nothing -> commonRequestPart Nothing Nothing
         Just (mp, tn) -> commonRequestPart (Just mp) (Just tn)
   utxosFromList <$> traverse (transformUtxo env) (getResponse addrUtxos)
-  where
-    locationIdent = "AddressesUtxo"
+ where
+  locationIdent = "AddressesUtxo"
 
 kupoUtxoAtTxOutRef :: KupoApiEnv -> GYTxOutRef -> IO (Maybe GYUTxO)
 kupoUtxoAtTxOutRef env oref = do
@@ -295,8 +295,8 @@ kupoUtxoAtTxOutRef env oref = do
     handleKupoError locationIdent <=< runKupoClient env $
       fetchUtxosByPattern (Text.pack (show utxoIdx) <> "@" <> txId) True Nothing Nothing
   listToMaybe <$> traverse (transformUtxo env) (getResponse utxo)
-  where
-    locationIdent = "UtxoByRef"
+ where
+  locationIdent = "UtxoByRef"
 
 kupoUtxosAtPaymentCredential :: KupoApiEnv -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
 kupoUtxosAtPaymentCredential env cred mAssetClass = do
@@ -308,8 +308,8 @@ kupoUtxosAtPaymentCredential env cred mAssetClass = do
         Nothing -> commonRequestPart Nothing Nothing
         Just (mp, tn) -> commonRequestPart (Just mp) (Just tn)
   utxosFromList <$> traverse (transformUtxo env) (getResponse credUtxos)
-  where
-    locationIdent = "PaymentCredentialUtxos"
+ where
+  locationIdent = "PaymentCredentialUtxos"
 
 transformUtxo :: KupoApiEnv -> KupoUtxo -> IO GYUTxO
 transformUtxo env KupoUtxo {..} = do
@@ -334,9 +334,9 @@ transformUtxo env KupoUtxo {..} = do
       , utxoOutDatum = dat
       , utxoRefScript = sc
       }
-  where
-    locationIdent = "transformUtxo"
-    commonDatumHashError = "No 'datum_hash' present in response whereas 'datum_type' mentions "
+ where
+  locationIdent = "transformUtxo"
+  commonDatumHashError = "No 'datum_hash' present in response whereas 'datum_type' mentions "
 
 -- | Definition of 'GYQueryUTxO' for the Kupo provider.
 kupoQueryUtxo :: KupoApiEnv -> GYQueryUTxO
@@ -358,19 +358,19 @@ kupoQueryUtxo env =
 
 kupoAwaitTxConfirmed :: KupoApiEnv -> GYAwaitTx
 kupoAwaitTxConfirmed env p@GYAwaitTxParameters {..} txId = go 0
-  where
-    go attempt
-      | attempt >= maxAttempts = throwIO $ GYAwaitTxException p
-      | otherwise = do
-          utxos <-
-            handleKupoError locationIdent <=< runKupoClient env $
-              fetchUtxosByPattern (Text.pack $ "*@" <> show txId) False Nothing Nothing -- We don't require for only @unspent@. Kupo with @--prune-utxo@ option would still keep spent UTxOs until their spent record is truly immutable (see Kupo docs for more details).
-          case listToMaybe (getResponse utxos) of
-            Nothing -> threadDelay checkInterval >> go (attempt + 1)
-            Just u -> do
-              let slotsToWait = 3 * confirmations * 20 -- Ouroboros Praos guarantees that there are at least @k@ blocks in a window of @3k / f@ slots where @f@ is the active slot coefficient, which is @0.05@ for Mainnet, Preprod & Preview.
-              case (lookupResponseHeader utxos :: ResponseHeader "X-Most-Recent-Checkpoint" Word64) of
-                Header slotOfCurrentBlock -> unless (slotNo (createdAt u) + slotsToWait <= slotOfCurrentBlock) $ threadDelay checkInterval >> go (attempt + 1)
-                _ -> handleKupoAbsurdResponse locationIdent "Header 'X-Most-Recent-Checkpoint' isn't seen in response"
-      where
-        locationIdent = "AwaitTx"
+ where
+  go attempt
+    | attempt >= maxAttempts = throwIO $ GYAwaitTxException p
+    | otherwise = do
+        utxos <-
+          handleKupoError locationIdent <=< runKupoClient env $
+            fetchUtxosByPattern (Text.pack $ "*@" <> show txId) False Nothing Nothing -- We don't require for only @unspent@. Kupo with @--prune-utxo@ option would still keep spent UTxOs until their spent record is truly immutable (see Kupo docs for more details).
+        case listToMaybe (getResponse utxos) of
+          Nothing -> threadDelay checkInterval >> go (attempt + 1)
+          Just u -> do
+            let slotsToWait = 3 * confirmations * 20 -- Ouroboros Praos guarantees that there are at least @k@ blocks in a window of @3k / f@ slots where @f@ is the active slot coefficient, which is @0.05@ for Mainnet, Preprod & Preview.
+            case (lookupResponseHeader utxos :: ResponseHeader "X-Most-Recent-Checkpoint" Word64) of
+              Header slotOfCurrentBlock -> unless (slotNo (createdAt u) + slotsToWait <= slotOfCurrentBlock) $ threadDelay checkInterval >> go (attempt + 1)
+              _ -> handleKupoAbsurdResponse locationIdent "Header 'X-Most-Recent-Checkpoint' isn't seen in response"
+   where
+    locationIdent = "AwaitTx"

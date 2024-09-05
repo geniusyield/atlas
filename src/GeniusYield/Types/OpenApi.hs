@@ -42,31 +42,31 @@ liftSwaggerSchema swaggerSchema =
     & OpenApi.enum_ .~ swaggerSchema ^. Swagger.enum_
     & OpenApi.multipleOf .~ swaggerSchema ^. Swagger.multipleOf
     & OpenApi.items .~ (convertSwaggerItems <$> swaggerSchema ^. Swagger.items)
-  where
-    convertSwaggerItems :: Swagger.SwaggerItems Swagger.SwaggerKindSchema -> OpenApi.OpenApiItems
-    convertSwaggerItems (Swagger.SwaggerItemsObject s) = OpenApi.OpenApiItemsObject (convertSwaggerReferencedSchema s)
-    convertSwaggerItems (Swagger.SwaggerItemsArray s) = OpenApi.OpenApiItemsArray (convertSwaggerReferencedSchema <$> s)
-    convertSwaggerItems (Swagger.SwaggerItemsPrimitive _ _) = error "Primitive array items found in schema description, but should only be used for query params, headers and path pieces"
+ where
+  convertSwaggerItems :: Swagger.SwaggerItems Swagger.SwaggerKindSchema -> OpenApi.OpenApiItems
+  convertSwaggerItems (Swagger.SwaggerItemsObject s) = OpenApi.OpenApiItemsObject (convertSwaggerReferencedSchema s)
+  convertSwaggerItems (Swagger.SwaggerItemsArray s) = OpenApi.OpenApiItemsArray (convertSwaggerReferencedSchema <$> s)
+  convertSwaggerItems (Swagger.SwaggerItemsPrimitive _ _) = error "Primitive array items found in schema description, but should only be used for query params, headers and path pieces"
 
-    convertSwaggerReferencedSchema :: Swagger.Referenced Swagger.Schema -> OpenApi.Referenced OpenApi.Schema
-    convertSwaggerReferencedSchema (Swagger.Inline s) = OpenApi.Inline (liftSwaggerSchema s)
-    convertSwaggerReferencedSchema (Swagger.Ref r) = OpenApi.Ref (convertSwaggerRef r)
+  convertSwaggerReferencedSchema :: Swagger.Referenced Swagger.Schema -> OpenApi.Referenced OpenApi.Schema
+  convertSwaggerReferencedSchema (Swagger.Inline s) = OpenApi.Inline (liftSwaggerSchema s)
+  convertSwaggerReferencedSchema (Swagger.Ref r) = OpenApi.Ref (convertSwaggerRef r)
 
-    convertSwaggerRef :: Swagger.Reference -> OpenApi.Reference
-    convertSwaggerRef (Swagger.Reference ref) = OpenApi.Reference ref
+  convertSwaggerRef :: Swagger.Reference -> OpenApi.Reference
+  convertSwaggerRef (Swagger.Reference ref) = OpenApi.Reference ref
 
-    convertSwaggerType :: Swagger.SwaggerType 'Swagger.SwaggerKindSchema -> OpenApiType
-    convertSwaggerType Swagger.SwaggerString = OpenApiString
-    convertSwaggerType Swagger.SwaggerNumber = OpenApiNumber
-    convertSwaggerType Swagger.SwaggerInteger = OpenApiInteger
-    convertSwaggerType Swagger.SwaggerBoolean = OpenApiBoolean
-    convertSwaggerType Swagger.SwaggerArray = OpenApiArray
-    convertSwaggerType Swagger.SwaggerNull = OpenApiNull
-    convertSwaggerType Swagger.SwaggerObject = OpenApiObject
+  convertSwaggerType :: Swagger.SwaggerType 'Swagger.SwaggerKindSchema -> OpenApiType
+  convertSwaggerType Swagger.SwaggerString = OpenApiString
+  convertSwaggerType Swagger.SwaggerNumber = OpenApiNumber
+  convertSwaggerType Swagger.SwaggerInteger = OpenApiInteger
+  convertSwaggerType Swagger.SwaggerBoolean = OpenApiBoolean
+  convertSwaggerType Swagger.SwaggerArray = OpenApiArray
+  convertSwaggerType Swagger.SwaggerNull = OpenApiNull
+  convertSwaggerType Swagger.SwaggerObject = OpenApiObject
 
-    convertSwaggerAdditionalProperties :: Swagger.AdditionalProperties -> OpenApi.AdditionalProperties
-    convertSwaggerAdditionalProperties (Swagger.AdditionalPropertiesAllowed b) = OpenApi.AdditionalPropertiesAllowed b
-    convertSwaggerAdditionalProperties (Swagger.AdditionalPropertiesSchema s) = OpenApi.AdditionalPropertiesSchema (convertSwaggerReferencedSchema s)
+  convertSwaggerAdditionalProperties :: Swagger.AdditionalProperties -> OpenApi.AdditionalProperties
+  convertSwaggerAdditionalProperties (Swagger.AdditionalPropertiesAllowed b) = OpenApi.AdditionalPropertiesAllowed b
+  convertSwaggerAdditionalProperties (Swagger.AdditionalPropertiesSchema s) = OpenApi.AdditionalPropertiesSchema (convertSwaggerReferencedSchema s)
 
 -- | Convert a @Swagger.NamedSchema@ to an @OpenApi.NamedSchema@.
 convertNamedSchema :: Swagger.NamedSchema -> OpenApi.NamedSchema

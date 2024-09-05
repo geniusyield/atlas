@@ -55,9 +55,9 @@ finaliseCert pp = \case
   GYStakeAddressDeregistrationCertificatePB sc -> GYStakeAddressDeregistrationCertificate ppDep' sc
   GYStakeAddressDelegationCertificatePB sc del -> GYStakeAddressDelegationCertificate sc del
   GYStakeAddressRegistrationDelegationCertificatePB sc del -> GYStakeAddressRegistrationDelegationCertificate ppDep' sc del
-  where
-    Ledger.Coin ppDep = pp ^. Ledger.ppKeyDepositL
-    ppDep' :: Natural = fromIntegral ppDep
+ where
+  Ledger.Coin ppDep = pp ^. Ledger.ppKeyDepositL
+  ppDep' :: Natural = fromIntegral ppDep
 
 certificateToApi :: GYCertificate -> Api.Certificate ApiEra
 certificateToApi = \case
@@ -73,9 +73,9 @@ certificateToApi = \case
     Api.makeStakeAddressDelegationCertificate $
       Api.StakeDelegationRequirementsConwayOnwards Api.ConwayEraOnwardsConway (f sc) (g del)
   GYStakeAddressRegistrationDelegationCertificate dep sc del -> Api.makeStakeAddressAndDRepDelegationCertificate Api.ConwayEraOnwardsConway (f sc) (g del) (fromIntegral dep)
-  where
-    f = stakeCredentialToApi
-    g = delegateeToLedger
+ where
+  f = stakeCredentialToApi
+  g = delegateeToLedger
 
 certificateFromApiMaybe :: Api.Certificate ApiEra -> Maybe GYCertificate
 certificateFromApiMaybe (Api.ConwayCertificate _ x) = case x of
@@ -87,9 +87,9 @@ certificateFromApiMaybe (Api.ConwayCertificate _ x) = case x of
     Ledger.ConwayDelegCert sc del -> Just $ GYStakeAddressDelegationCertificate (f sc) (g del)
     Ledger.ConwayRegDelegCert sc del dep -> Just $ GYStakeAddressRegistrationDelegationCertificate (fromIntegral dep) (f sc) (g del)
   _ -> Nothing
-  where
-    f = stakeCredentialFromLedger
-    g = delegateeFromLedger
+ where
+  f = stakeCredentialFromLedger
+  g = delegateeFromLedger
 certificateFromApiMaybe _ = Nothing
 
 certificateToStakeCredential :: GYCertificate -> GYStakeCredential

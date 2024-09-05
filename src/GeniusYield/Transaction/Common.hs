@@ -120,7 +120,7 @@ data GYBuildTxError
     GYBuildTxNoSuitableCollateral
   | GYBuildTxCborSimplificationError !CborSimplificationError
   | GYBuildTxCollapseExtraOutError !Api.TxBodyError
-  deriving stock (Show)
+  deriving stock Show
 
 -------------------------------------------------------------------------------
 -- Transaction Utilities
@@ -134,17 +134,17 @@ minimumUTxO pp txOut =
 
 adjustTxOut :: (GYTxOut v -> Natural) -> GYTxOut v -> GYTxOut v
 adjustTxOut minimumUTxOF = helper
-  where
-    helper txOut =
-      let v = gyTxOutValue txOut
-          needed = minimumUTxOF txOut
-          contained = extractLovelace $ valueToApi v
-       in if needed <= contained
-            then txOut
-            else
-              let v' = valueFromLovelace (fromIntegral $ needed - contained) <> v
-                  txOut' = txOut {gyTxOutValue = v'}
-               in helper txOut'
+ where
+  helper txOut =
+    let v = gyTxOutValue txOut
+        needed = minimumUTxOF txOut
+        contained = extractLovelace $ valueToApi v
+     in if needed <= contained
+          then txOut
+          else
+            let v' = valueFromLovelace (fromIntegral $ needed - contained) <> v
+                txOut' = txOut {gyTxOutValue = v'}
+             in helper txOut'
 
 extractLovelace :: Api.Value -> Natural
 extractLovelace v = case Api.selectLovelace v of Ledger.Coin n -> fromIntegral $ max 0 n

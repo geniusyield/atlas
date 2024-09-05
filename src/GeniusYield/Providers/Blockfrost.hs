@@ -62,7 +62,7 @@ data BlockfrostProviderException
   | BlpvUnsupportedOperation !Text
   | BlpvIncorrectEraHistoryLength ![Blockfrost.NetworkEraSummary]
   deriving stock (Eq, Show)
-  deriving anyclass (Exception)
+  deriving anyclass Exception
 
 throwBlpvApiError :: Text -> Blockfrost.BlockfrostError -> IO a
 throwBlpvApiError locationInfo =
@@ -93,10 +93,10 @@ amountToValue (Blockfrost.AssetAmount sdiscr) = do
   cs <- Web.parseUrlPiece csPart
   tkName <- Web.parseUrlPiece tkNamePart
   pure . valueSingleton (GYToken cs tkName) $ Money.someDiscreteAmount sdiscr
-  where
-    csAndTkname = Money.someDiscreteCurrency sdiscr
-    -- Blockfrost uses no separator between CS and TkName.
-    (csPart, tkNamePart) = Text.splitAt 56 csAndTkname
+ where
+  csAndTkname = Money.someDiscreteCurrency sdiscr
+  -- Blockfrost uses no separator between CS and TkName.
+  (csPart, tkNamePart) = Text.splitAt 56 csAndTkname
 
 -------------------------------------------------------------------------------
 -- Submit
@@ -118,9 +118,9 @@ blockfrostSubmitTx proj tx = do
     . txIdFromHexE
     . Text.unpack
     $ Blockfrost.unTxHash txId
-  where
-    locationIdent = "SubmitTx"
-    handleBlockfrostSubmitError = either (throwIO . SubmitTxException . Text.pack . show . silenceHeadersBlockfrostClientError) pure
+ where
+  locationIdent = "SubmitTx"
+  handleBlockfrostSubmitError = either (throwIO . SubmitTxException . Text.pack . show . silenceHeadersBlockfrostClientError) pure
 
 -------------------------------------------------------------------------------
 -- Await tx confirmation
@@ -129,37 +129,37 @@ blockfrostSubmitTx proj tx = do
 -- | Awaits for the confirmation of a given 'GYTxId'
 blockfrostAwaitTxConfirmed :: Blockfrost.Project -> GYAwaitTx
 blockfrostAwaitTxConfirmed proj p@GYAwaitTxParameters {..} txId = blpAwaitTx 0
-  where
-    blpAwaitTx :: Int -> IO ()
-    blpAwaitTx attempt | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
-    blpAwaitTx attempt = do
-      eTxInfo <- blockfrostQueryTx proj txId
-      case eTxInfo of
-        Left Blockfrost.BlockfrostNotFound ->
-          threadDelay checkInterval
-            >> blpAwaitTx (attempt + 1)
-        Left err -> throwBlpvApiError "AwaitTx" err
-        Right txInfo ->
-          blpAwaitBlock attempt $
-            Blockfrost._transactionBlock txInfo
+ where
+  blpAwaitTx :: Int -> IO ()
+  blpAwaitTx attempt | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
+  blpAwaitTx attempt = do
+    eTxInfo <- blockfrostQueryTx proj txId
+    case eTxInfo of
+      Left Blockfrost.BlockfrostNotFound ->
+        threadDelay checkInterval
+          >> blpAwaitTx (attempt + 1)
+      Left err -> throwBlpvApiError "AwaitTx" err
+      Right txInfo ->
+        blpAwaitBlock attempt $
+          Blockfrost._transactionBlock txInfo
 
-    blpAwaitBlock :: Int -> Blockfrost.BlockHash -> IO ()
-    blpAwaitBlock attempt _ | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
-    blpAwaitBlock attempt blockHash = do
-      eBlockInfo <- blockfrostQueryBlock proj blockHash
-      case eBlockInfo of
-        Left Blockfrost.BlockfrostNotFound ->
-          threadDelay checkInterval
-            >> blpAwaitBlock (attempt + 1) blockHash
-        Left err -> throwBlpvApiError "AwaitBlock" err
-        Right blockInfo
-          | attempt + 1 == maxAttempts ->
-              when (Blockfrost._blockConfirmations blockInfo < toInteger confirmations) $
-                throwIO $
-                  GYAwaitTxException p
-        Right blockInfo ->
-          when (Blockfrost._blockConfirmations blockInfo < toInteger confirmations) $
-            threadDelay checkInterval >> blpAwaitBlock (attempt + 1) blockHash
+  blpAwaitBlock :: Int -> Blockfrost.BlockHash -> IO ()
+  blpAwaitBlock attempt _ | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
+  blpAwaitBlock attempt blockHash = do
+    eBlockInfo <- blockfrostQueryBlock proj blockHash
+    case eBlockInfo of
+      Left Blockfrost.BlockfrostNotFound ->
+        threadDelay checkInterval
+          >> blpAwaitBlock (attempt + 1) blockHash
+      Left err -> throwBlpvApiError "AwaitBlock" err
+      Right blockInfo
+        | attempt + 1 == maxAttempts ->
+            when (Blockfrost._blockConfirmations blockInfo < toInteger confirmations) $
+              throwIO $
+                GYAwaitTxException p
+      Right blockInfo ->
+        when (Blockfrost._blockConfirmations blockInfo < toInteger confirmations) $
+          threadDelay checkInterval >> blpAwaitBlock (attempt + 1) blockHash
 
 blockfrostQueryBlock ::
   Blockfrost.Project ->
@@ -247,11 +247,11 @@ blockfrostUtxosAtAddress proj addr mAssetClass = do
   case traverse transformUtxo addrUtxos' of
     Left err -> throwIO $ BlpvDeserializeFailure locationIdent err
     Right x -> pure $ utxosFromList x
-  where
-    locationIdent = "AddressUtxos"
-    -- This particular error is fine in this case, we can just return empty list.
-    handler (Left Blockfrost.BlockfrostNotFound) = pure []
-    handler other = handleBlockfrostError locationIdent other
+ where
+  locationIdent = "AddressUtxos"
+  -- This particular error is fine in this case, we can just return empty list.
+  handler (Left Blockfrost.BlockfrostNotFound) = pure []
+  handler other = handleBlockfrostError locationIdent other
 
 blockfrostUtxosAtPaymentCredential :: Blockfrost.Project -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
 blockfrostUtxosAtPaymentCredential proj cred mAssetClass = do
@@ -269,11 +269,11 @@ blockfrostUtxosAtPaymentCredential proj cred mAssetClass = do
   case traverse transformUtxo credUtxos' of
     Left err -> throwIO $ BlpvDeserializeFailure locationIdent err
     Right x -> pure $ utxosFromList x
-  where
-    locationIdent = "PaymentCredentialUtxos"
-    -- This particular error is fine in this case, we can just return empty list.
-    handler (Left Blockfrost.BlockfrostNotFound) = pure []
-    handler other = handleBlockfrostError locationIdent other
+ where
+  locationIdent = "PaymentCredentialUtxos"
+  -- This particular error is fine in this case, we can just return empty list.
+  handler (Left Blockfrost.BlockfrostNotFound) = pure []
+  handler other = handleBlockfrostError locationIdent other
 
 blockfrostUtxosAtTxOutRef :: Blockfrost.Project -> GYTxOutRef -> IO (Maybe GYUTxO)
 blockfrostUtxosAtTxOutRef proj ref = do
@@ -318,11 +318,11 @@ blockfrostUtxosAtTxOutRef proj ref = do
             , utxoOutDatum = d
             , utxoRefScript = ms
             }
-  where
-    -- This particular error is fine in this case, we can just return 'Nothing'.
-    handler (Left Blockfrost.BlockfrostNotFound) = pure Nothing
-    handler other = handleBlockfrostError locationIdent $ Just <$> other
-    locationIdent = "TxUtxos(single)"
+ where
+  -- This particular error is fine in this case, we can just return 'Nothing'.
+  handler (Left Blockfrost.BlockfrostNotFound) = pure Nothing
+  handler other = handleBlockfrostError locationIdent $ Just <$> other
+  locationIdent = "TxUtxos(single)"
 
 blockfrostUtxosAtTxOutRefs :: Blockfrost.Project -> [GYTxOutRef] -> IO GYUTxOs
 blockfrostUtxosAtTxOutRefs proj refs = do
@@ -356,16 +356,16 @@ blockfrostUtxosAtTxOutRefs proj refs = do
   case Map.traverseWithKey (traverse . transformUtxoOutput) txUtxoMap' of
     Left err -> throwIO $ BlpvDeserializeFailure locationIndent err
     Right res -> pure . utxosFromList . concat $ Map.elems res
-  where
-    locationIndent = "TxUtxos"
+ where
+  locationIndent = "TxUtxos"
 
-    f ::
-      Map Api.S.TxId [(Blockfrost.UtxoOutput, Maybe GYAnyScript)] ->
-      (Api.S.TxId, [Blockfrost.UtxoOutput]) ->
-      IO (Map Api.S.TxId [(Blockfrost.UtxoOutput, Maybe GYAnyScript)])
-    f m (tid, os) = do
-      xs <- forM os $ \o -> lookupScriptHashIO proj (Blockfrost._utxoOutputReferenceScriptHash o) >>= \ms -> return (o, ms)
-      return $ Map.insert tid xs m
+  f ::
+    Map Api.S.TxId [(Blockfrost.UtxoOutput, Maybe GYAnyScript)] ->
+    (Api.S.TxId, [Blockfrost.UtxoOutput]) ->
+    IO (Map Api.S.TxId [(Blockfrost.UtxoOutput, Maybe GYAnyScript)])
+  f m (tid, os) = do
+    xs <- forM os $ \o -> lookupScriptHashIO proj (Blockfrost._utxoOutputReferenceScriptHash o) >>= \ms -> return (o, ms)
+    return $ Map.insert tid xs m
 
 -- | Helper to transform a 'Blockfrost.UtxoOutput' into a 'GYUTxO'.
 transformUtxoOutput :: Api.S.TxId -> (Blockfrost.UtxoOutput, Maybe GYAnyScript) -> Either SomeDeserializeError GYUTxO
@@ -465,8 +465,8 @@ blockfrostProtocolParams nid proj = do
           , cppDRepActivity = THKD (Ledger.EpochInterval 0)
           , cppMinFeeRefScriptCostPerByte = THKD minBound
           }
-  where
-    errPath = "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: "
+ where
+  errPath = "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: "
 
 blockfrostStakePools :: Blockfrost.Project -> IO (Set Api.S.PoolId)
 blockfrostStakePools proj = do
@@ -485,8 +485,8 @@ blockfrostStakePools proj = do
     -- Deserialization failure shouldn't happen on blockfrost returned pool id.
     Left err -> throwIO . BlpvDeserializeFailure locationIdent $ DeserializeErrorBech32 err
     Right has -> pure $ Set.fromList has
-  where
-    locationIdent = "ListPools"
+ where
+  locationIdent = "ListPools"
 
 blockfrostSystemStart :: Blockfrost.Project -> IO CTime.SystemStart
 blockfrostSystemStart proj = do
@@ -497,26 +497,26 @@ blockfrostEraHistory :: Blockfrost.Project -> IO Api.EraHistory
 blockfrostEraHistory proj = do
   eraSumms <- Blockfrost.runBlockfrost proj Blockfrost.getNetworkEras >>= handleBlockfrostError "EraHistory"
   maybe (throwIO $ BlpvIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms
-  where
-    mkBound Blockfrost.NetworkEraBound {_boundEpoch, _boundSlot, _boundTime} =
-      Ouroboros.Bound
-        { boundTime = CTime.RelativeTime _boundTime
-        , boundSlot = CSlot.SlotNo $ fromIntegral _boundSlot
-        , boundEpoch = CSlot.EpochNo $ fromIntegral _boundEpoch
-        }
-    mkEraParams Blockfrost.NetworkEraParameters {_parametersEpochLength, _parametersSlotLength, _parametersSafeZone} =
-      Ouroboros.EraParams
-        { eraEpochSize = CSlot.EpochSize $ fromIntegral _parametersEpochLength
-        , eraSlotLength = CTime.mkSlotLength _parametersSlotLength
-        , eraSafeZone = Ouroboros.StandardSafeZone _parametersSafeZone
-        , eraGenesisWin = fromIntegral _parametersSafeZone -- TODO: Get it from provider? It is supposed to be 3k/f where k is security parameter (at present 2160) and f is active slot coefficient. Usually ledger set the safe zone size such that it guarantees at least k blocks...
-        }
-    mkEra Blockfrost.NetworkEraSummary {_networkEraStart, _networkEraEnd, _networkEraParameters} =
-      Ouroboros.EraSummary
-        { eraStart = mkBound _networkEraStart
-        , eraEnd = Ouroboros.EraEnd $ mkBound _networkEraEnd
-        , eraParams = mkEraParams _networkEraParameters
-        }
+ where
+  mkBound Blockfrost.NetworkEraBound {_boundEpoch, _boundSlot, _boundTime} =
+    Ouroboros.Bound
+      { boundTime = CTime.RelativeTime _boundTime
+      , boundSlot = CSlot.SlotNo $ fromIntegral _boundSlot
+      , boundEpoch = CSlot.EpochNo $ fromIntegral _boundEpoch
+      }
+  mkEraParams Blockfrost.NetworkEraParameters {_parametersEpochLength, _parametersSlotLength, _parametersSafeZone} =
+    Ouroboros.EraParams
+      { eraEpochSize = CSlot.EpochSize $ fromIntegral _parametersEpochLength
+      , eraSlotLength = CTime.mkSlotLength _parametersSlotLength
+      , eraSafeZone = Ouroboros.StandardSafeZone _parametersSafeZone
+      , eraGenesisWin = fromIntegral _parametersSafeZone -- TODO: Get it from provider? It is supposed to be 3k/f where k is security parameter (at present 2160) and f is active slot coefficient. Usually ledger set the safe zone size such that it guarantees at least k blocks...
+      }
+  mkEra Blockfrost.NetworkEraSummary {_networkEraStart, _networkEraEnd, _networkEraParameters} =
+    Ouroboros.EraSummary
+      { eraStart = mkBound _networkEraStart
+      , eraEnd = Ouroboros.EraEnd $ mkBound _networkEraEnd
+      , eraParams = mkEraParams _networkEraParameters
+      }
 
 -------------------------------------------------------------------------------
 -- Datum lookup
@@ -538,11 +538,11 @@ blockfrostLookupDatum p dh = do
         Right bd -> pure $ datumFromPlutus' bd
     )
     datumMaybe
-  where
-    -- This particular error is fine in this case, we can just return 'Nothing'.
-    handler (Left Blockfrost.BlockfrostNotFound) = pure Nothing
-    handler other = handleBlockfrostError locationIdent $ Just <$> other
-    locationIdent = "LookupDatum"
+ where
+  -- This particular error is fine in this case, we can just return 'Nothing'.
+  handler (Left Blockfrost.BlockfrostNotFound) = pure Nothing
+  handler other = handleBlockfrostError locationIdent $ Just <$> other
+  locationIdent = "LookupDatum"
 
 -------------------------------------------------------------------------------
 -- Account info
@@ -551,20 +551,20 @@ blockfrostLookupDatum p dh = do
 blockfrostStakeAddressInfo :: Blockfrost.Project -> GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
 blockfrostStakeAddressInfo p saddr = do
   Blockfrost.runBlockfrost p (Blockfrost.getAccount (Blockfrost.mkAddress $ stakeAddressToText saddr)) >>= handler
-  where
-    -- This particular error is fine.
-    handler (Left Blockfrost.BlockfrostNotFound) = pure Nothing
-    handler other =
-      handleBlockfrostError "Account" $
-        other <&> \accInfo ->
-          if Blockfrost._accountInfoActive accInfo
-            then
-              Just $
-                GYStakeAddressInfo
-                  { gyStakeAddressInfoDelegatedPool = Blockfrost._accountInfoPoolId accInfo >>= stakePoolIdFromTextMaybe . Blockfrost.unPoolId
-                  , gyStakeAddressInfoAvailableRewards = fromInteger $ lovelacesToInteger $ Blockfrost._accountInfoWithdrawableAmount accInfo
-                  }
-            else Nothing
+ where
+  -- This particular error is fine.
+  handler (Left Blockfrost.BlockfrostNotFound) = pure Nothing
+  handler other =
+    handleBlockfrostError "Account" $
+      other <&> \accInfo ->
+        if Blockfrost._accountInfoActive accInfo
+          then
+            Just $
+              GYStakeAddressInfo
+                { gyStakeAddressInfoDelegatedPool = Blockfrost._accountInfoPoolId accInfo >>= stakePoolIdFromTextMaybe . Blockfrost.unPoolId
+                , gyStakeAddressInfoAvailableRewards = fromInteger $ lovelacesToInteger $ Blockfrost._accountInfoWithdrawableAmount accInfo
+                }
+          else Nothing
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions
@@ -599,12 +599,12 @@ datumFromBlockfrostCBOR d = do
   bs <- fromEither $ BS16.decode $ Text.encodeUtf8 t
   api <- fromEither $ Api.deserialiseFromCBOR Api.AsHashableScriptData bs
   return $ datumFromApi' api
-  where
-    t = Blockfrost._scriptDatumCborCbor d
-    e = DeserializeErrorHex t
+ where
+  t = Blockfrost._scriptDatumCborCbor d
+  e = DeserializeErrorHex t
 
-    fromEither :: Either e a -> Either SomeDeserializeError a
-    fromEither = first $ const e
+  fromEither :: Either e a -> Either SomeDeserializeError a
+  fromEither = first $ const e
 
 outDatumFromBlockfrost :: Maybe Blockfrost.DatumHash -> Maybe Blockfrost.InlineDatum -> Either SomeDeserializeError GYOutDatum
 outDatumFromBlockfrost mdh mind = do

@@ -144,23 +144,23 @@ mkBetRefValidator' (BetRefParams oraclePkh betUntil betReveal betStep) (BetRefDa
           && traceIfFalse
             "Guess is not closest"
             (all (\pg -> getGuessDiff (snd pg) >= guessDiff) previousGuesses)
-  where
-    info :: TxInfo
-    info = scriptContextTxInfo ctx
+ where
+  info :: TxInfo
+  info = scriptContextTxInfo ctx
 
-    validRange :: POSIXTimeRange
-    validRange = txInfoValidRange info
+  validRange :: POSIXTimeRange
+  validRange = txInfoValidRange info
 
-    signerPkh :: PubKeyHash
-    signerPkh = case txInfoSignatories info of
-      [signerPkh'] -> signerPkh'
-      [] -> traceError "No signatory"
-      _anyOtherMatch -> traceError "Expected only one signatory"
+  signerPkh :: PubKeyHash
+  signerPkh = case txInfoSignatories info of
+    [signerPkh'] -> signerPkh'
+    [] -> traceError "No signatory"
+    _anyOtherMatch -> traceError "Expected only one signatory"
 
-    outputToDatum :: (FromData b) => TxOut -> Maybe b
-    outputToDatum o = case txOutDatum o of
-      NoOutputDatum -> Nothing
-      OutputDatum d -> processDatum d
-      OutputDatumHash dh -> processDatum =<< findDatum dh info
-      where
-        processDatum = fromBuiltinData . getDatum
+  outputToDatum :: FromData b => TxOut -> Maybe b
+  outputToDatum o = case txOutDatum o of
+    NoOutputDatum -> Nothing
+    OutputDatum d -> processDatum d
+    OutputDatumHash dh -> processDatum =<< findDatum dh info
+   where
+    processDatum = fromBuiltinData . getDatum

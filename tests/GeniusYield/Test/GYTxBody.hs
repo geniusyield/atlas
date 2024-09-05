@@ -128,19 +128,19 @@ adjustTxTests =
               ]
       val `adjustedShouldEqual` (val <> valueFromLovelace 1_184_380)
   ]
-  where
-    mockAdjust :: GYTxOut v -> GYTxOut v
-    mockAdjust = adjustTxOut mockMinimumUTxO
+ where
+  mockAdjust :: GYTxOut v -> GYTxOut v
+  mockAdjust = adjustTxOut mockMinimumUTxO
 
-    mockMinimumUTxO :: GYTxOut v -> Natural
-    mockMinimumUTxO = minimumUTxO mockProtocolParams
+  mockMinimumUTxO :: GYTxOut v -> Natural
+  mockMinimumUTxO = minimumUTxO mockProtocolParams
 
-    lovelacesAdjustedShouldEqual :: Integer -> Integer -> Assertion
-    lovelacesAdjustedShouldEqual n m =
-      mockAdjust (mockTxOutFromLovelace n) @?= mockTxOutFromLovelace m
+  lovelacesAdjustedShouldEqual :: Integer -> Integer -> Assertion
+  lovelacesAdjustedShouldEqual n m =
+    mockAdjust (mockTxOutFromLovelace n) @?= mockTxOutFromLovelace m
 
-    adjustedShouldEqual :: GYValue -> GYValue -> Assertion
-    adjustedShouldEqual v1 v2 = mockAdjust (mockTxOut v1) @?= mockTxOut v2
+  adjustedShouldEqual :: GYValue -> GYValue -> Assertion
+  adjustedShouldEqual v1 v2 = mockAdjust (mockTxOut v1) @?= mockTxOut v2
 
 balanceTxStepTests :: [TestTree]
 balanceTxStepTests =
@@ -231,14 +231,14 @@ mockBuildTxEnv wallet =
     , gyBTxEnvChangeAddr = mockChangeAddress
     , gyBTxEnvCollateral = collateralUtxo
     }
-  where
-    slotLen = fromInteger (scSlotLength defaultSlotConfig) / 1000
-    slotZero =
-      posixSecondsToUTCTime $
-        timeToPOSIX $
-          timeFromPlutus $
-            scSlotZeroTime defaultSlotConfig
-    mockSystemStart = gyscSystemStart $ simpleSlotConfig slotZero slotLen
+ where
+  slotLen = fromInteger (scSlotLength defaultSlotConfig) / 1000
+  slotZero =
+    posixSecondsToUTCTime $
+      timeToPOSIX $
+        timeFromPlutus $
+          scSlotZeroTime defaultSlotConfig
+  mockSystemStart = gyscSystemStart $ simpleSlotConfig slotZero slotLen
 
 buildOwnUtxos :: [GYValue] -> GYUTxOs
 buildOwnUtxos =

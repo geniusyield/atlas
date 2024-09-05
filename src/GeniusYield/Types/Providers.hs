@@ -263,7 +263,7 @@ data GYAwaitTxParameters = GYAwaitTxParameters
   , confirmations :: !Word64
   -- ^ Min number of block confirmation. __NOTE:__ We might wait for more blocks than what is mentioned here but certainly not less.
   }
-  deriving stock (Show)
+  deriving stock Show
 
 instance Default GYAwaitTxParameters where
   def =
@@ -274,7 +274,7 @@ instance Default GYAwaitTxParameters where
       }
 
 newtype GYAwaitTxException = GYAwaitTxException GYAwaitTxParameters
-  deriving anyclass (Exception)
+  deriving anyclass Exception
 
 instance Show GYAwaitTxException where
   show (GYAwaitTxException awaitTxParams) =
@@ -299,14 +299,14 @@ gyWaitForNextBlockDefault :: IO GYSlot -> IO GYSlot
 gyWaitForNextBlockDefault getSlotOfCurrentBlock = do
   s <- getSlotOfCurrentBlock
   go s
-  where
-    go :: GYSlot -> IO GYSlot
-    go s = do
-      threadDelay 100_000
-      t <- getSlotOfCurrentBlock
-      if t > s
-        then return t
-        else go s
+ where
+  go :: GYSlot -> IO GYSlot
+  go s = do
+    threadDelay 100_000
+    t <- getSlotOfCurrentBlock
+    if t > s
+      then return t
+      else go s
 
 {- | Wait until slot.
 
@@ -314,15 +314,15 @@ Returns the new current slot, which might be larger.
 -}
 gyWaitUntilSlotDefault :: IO GYSlot -> GYSlot -> IO GYSlot
 gyWaitUntilSlotDefault getSlotOfCurrentBlock s = loop
-  where
-    loop :: IO GYSlot
-    loop = do
-      t <- getSlotOfCurrentBlock
-      if t >= s
-        then return t
-        else do
-          threadDelay 100_000
-          loop
+ where
+  loop :: IO GYSlot
+  loop = do
+    t <- getSlotOfCurrentBlock
+    if t >= s
+      then return t
+      else do
+        threadDelay 100_000
+        loop
 
 -- | Contains the data, alongside the time after which it should be refetched.
 data GYSlotStore = GYSlotStore !UTCTime !GYSlot
@@ -350,21 +350,21 @@ makeSlotActions t getSlotOfCurrentBlock = do
       , gyWaitForNextBlock' = gyWaitForNextBlockDefault gcs
       , gyWaitUntilSlot' = gyWaitUntilSlotDefault gcs
       }
-  where
-    getSlotOfCurrentBlock' :: IO UTCTime -> StrictMVar IO GYSlotStore -> IO GYSlot
-    getSlotOfCurrentBlock' getTime var = do
-      -- See note: [Caching and concurrently accessible MVars].
-      modifyMVar var $ \(GYSlotStore slotRefetchTime slotData) -> do
-        now <- getTime
-        if now < slotRefetchTime
-          then do
-            -- Return unmodified.
-            pure (GYSlotStore slotRefetchTime slotData, slotData)
-          else do
-            newSlot <- getSlotOfCurrentBlock
-            newNow <- getTime
-            let newSlotRefetchTime = addUTCTime t newNow
-            pure (GYSlotStore newSlotRefetchTime newSlot, newSlot)
+ where
+  getSlotOfCurrentBlock' :: IO UTCTime -> StrictMVar IO GYSlotStore -> IO GYSlot
+  getSlotOfCurrentBlock' getTime var = do
+    -- See note: [Caching and concurrently accessible MVars].
+    modifyMVar var $ \(GYSlotStore slotRefetchTime slotData) -> do
+      now <- getTime
+      if now < slotRefetchTime
+        then do
+          -- Return unmodified.
+          pure (GYSlotStore slotRefetchTime slotData, slotData)
+        else do
+          newSlot <- getSlotOfCurrentBlock
+          newNow <- getTime
+          let newSlotRefetchTime = addUTCTime t newNow
+          pure (GYSlotStore newSlotRefetchTime newSlot, newSlot)
 
 -------------------------------------------------------------------------------
 -- Protocol parameters
@@ -439,14 +439,14 @@ makeGetParameters getProtParams getSysStart getEraHist getStkPools = do
       , gyGetStakePools' = getStkPools'
       , gyGetSlotConfig' = getSlotConf'
       }
-  where
-    beforeEnd _ Nothing = True
-    beforeEnd currTime (Just endTime) = currTime < endTime
-    makeSlotConfigIO sysStart =
-      either
-        (throwIO . GYConversionException . GYEraSummariesToSlotConfigError . Txt.pack)
-        pure
-        . makeSlotConfig sysStart
+ where
+  beforeEnd _ Nothing = True
+  beforeEnd currTime (Just endTime) = currTime < endTime
+  makeSlotConfigIO sysStart =
+    either
+      (throwIO . GYConversionException . GYEraSummariesToSlotConfigError . Txt.pack)
+      pure
+      . makeSlotConfig sysStart
 
 -------------------------------------------------------------------------------
 -- Query UTxO
@@ -496,31 +496,31 @@ gyQueryUtxosAtTxOutRefsDefault queryUtxoAtTxOutRef orefs = do
   pure $ utxosFromList $ catMaybes utxos
 
 -- | Lookup UTxOs at given 'GYAddress' with their datums. This is a default implementation using `utxosAtAddress` and `lookupDatum`.
-gyQueryUtxosAtAddressWithDatumsDefault :: (Monad m) => (GYAddress -> Maybe GYAssetClass -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> GYAddress -> Maybe GYAssetClass -> m [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtAddressWithDatumsDefault :: Monad m => (GYAddress -> Maybe GYAssetClass -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> GYAddress -> Maybe GYAssetClass -> m [(GYUTxO, Maybe GYDatum)]
 gyQueryUtxosAtAddressWithDatumsDefault utxosAtAddressFun lookupDatumFun addr mAssetClass = do
   utxosWithoutDatumResolutions <- utxosAtAddressFun addr mAssetClass
   utxosDatumResolver utxosWithoutDatumResolutions lookupDatumFun
 
 -- | Lookup UTxOs at zero or more 'GYAddress' with their datums. This is a default implementation using `utxosAtAddresses` and `lookupDatum`.
-gyQueryUtxosAtAddressesWithDatumsDefault :: (Monad m) => ([GYAddress] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYAddress] -> m [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtAddressesWithDatumsDefault :: Monad m => ([GYAddress] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYAddress] -> m [(GYUTxO, Maybe GYDatum)]
 gyQueryUtxosAtAddressesWithDatumsDefault utxosAtAddressesFun lookupDatumFun addrs = do
   utxosWithoutDatumResolutions <- utxosAtAddressesFun addrs
   utxosDatumResolver utxosWithoutDatumResolutions lookupDatumFun
 
 -- | Lookup UTxOs at zero or more 'GYPaymentCredential' with their datums. This is a default implementation using `utxosAtPaymentCredentials` and `lookupDatum`.
-gyQueryUtxosAtPaymentCredsWithDatumsDefault :: (Monad m) => ([GYPaymentCredential] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYPaymentCredential] -> m [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtPaymentCredsWithDatumsDefault :: Monad m => ([GYPaymentCredential] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYPaymentCredential] -> m [(GYUTxO, Maybe GYDatum)]
 gyQueryUtxosAtPaymentCredsWithDatumsDefault utxosAtPaymentCredsFun lookupDatumFun pcs = do
   utxosWithoutDatumResolutions <- utxosAtPaymentCredsFun pcs
   utxosDatumResolver utxosWithoutDatumResolutions lookupDatumFun
 
 -- | Lookup UTxOs at given 'GYPaymentCredential' with their datums. This is a default implementation using `utxosAtPaymentCredential` and `lookupDatum`.
-gyQueryUtxosAtPaymentCredWithDatumsDefault :: (Monad m) => (GYPaymentCredential -> Maybe GYAssetClass -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> GYPaymentCredential -> Maybe GYAssetClass -> m [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtPaymentCredWithDatumsDefault :: Monad m => (GYPaymentCredential -> Maybe GYAssetClass -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> GYPaymentCredential -> Maybe GYAssetClass -> m [(GYUTxO, Maybe GYDatum)]
 gyQueryUtxosAtPaymentCredWithDatumsDefault utxosAtPaymentCredFun lookupDatumFun cred mAssetClass = do
   utxosWithoutDatumResolutions <- utxosAtPaymentCredFun cred mAssetClass
   utxosDatumResolver utxosWithoutDatumResolutions lookupDatumFun
 
 -- | Append UTxO information with their fetched datum.
-utxosDatumResolver :: (Monad m) => GYUTxOs -> (GYDatumHash -> m (Maybe GYDatum)) -> m [(GYUTxO, Maybe GYDatum)]
+utxosDatumResolver :: Monad m => GYUTxOs -> (GYDatumHash -> m (Maybe GYDatum)) -> m [(GYUTxO, Maybe GYDatum)]
 utxosDatumResolver utxos lookupDatumFun = do
   let utxosWithoutDatumResolutions = utxosToList utxos
   forM utxosWithoutDatumResolutions $ \utxo -> do
@@ -530,7 +530,7 @@ utxosDatumResolver utxos lookupDatumFun = do
       GYOutDatumHash h -> (utxo,) <$> lookupDatumFun h
 
 -- | Lookup UTxOs at zero or more 'GYTxOutRef' with their datums. This is a default implementation using `utxosAtTxOutRefs` and `lookupDatum`.
-gyQueryUtxosAtTxOutRefsWithDatumsDefault :: (Monad m) => ([GYTxOutRef] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYTxOutRef] -> m [(GYUTxO, Maybe GYDatum)]
+gyQueryUtxosAtTxOutRefsWithDatumsDefault :: Monad m => ([GYTxOutRef] -> m GYUTxOs) -> (GYDatumHash -> m (Maybe GYDatum)) -> [GYTxOutRef] -> m [(GYUTxO, Maybe GYDatum)]
 gyQueryUtxosAtTxOutRefsWithDatumsDefault utxosAtTxOutRefsFun lookupDatumFun refs = do
   utxosWithoutDatumResolutions <- utxosToList <$> utxosAtTxOutRefsFun refs
   forM utxosWithoutDatumResolutions $ \utxo -> do

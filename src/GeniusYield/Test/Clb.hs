@@ -126,7 +126,7 @@ newtype GYTxMonadClb a = GYTxMonadClb
   { unGYTxMonadClb :: ReaderT GYTxClbEnv (StateT GYTxClbState (ExceptT GYTxMonadException (RandT StdGen AtlasClb))) a
   }
   deriving newtype (Functor, Applicative, Monad, MonadReader GYTxClbEnv, MonadState GYTxClbState)
-  deriving anyclass (GYTxBuilderMonad)
+  deriving anyclass GYTxBuilderMonad
 
 instance MonadRandom GYTxMonadClb where
   getRandomR = GYTxMonadClb . getRandomR
@@ -165,49 +165,49 @@ mkTestFor name action =
   testNoErrorsTraceClb v w Clb.defaultConway name $ do
     asClb pureGen (w1 testWallets) nextWalletInt $
       action TestInfo {testGoldAsset = fakeCoin fakeGold, testIronAsset = fakeCoin fakeIron, testWallets}
-  where
-    -- TODO (simplify-genesis): Remove generation of non ada funds.
-    v =
-      valueFromLovelace 1_000_000_000_000_000
-        <> fakeValue fakeGold 1_000_000_000
-        <> fakeValue fakeIron 1_000_000_000
+ where
+  -- TODO (simplify-genesis): Remove generation of non ada funds.
+  v =
+    valueFromLovelace 1_000_000_000_000_000
+      <> fakeValue fakeGold 1_000_000_000
+      <> fakeValue fakeIron 1_000_000_000
 
-    w =
-      valueFromLovelace 1_000_000_000_000
-        <> fakeValue fakeGold 1_000_000
-        <> fakeValue fakeIron 1_000_000
+  w =
+    valueFromLovelace 1_000_000_000_000
+      <> fakeValue fakeGold 1_000_000
+      <> fakeValue fakeIron 1_000_000
 
-    -- TODO (simplify-genesis):: Remove creation of wallets. Only create one (or more) genesis/funder wallet and pass it on.
-    testWallets :: Wallets
-    testWallets =
-      Wallets
-        (mkSimpleWallet (Clb.intToKeyPair 1))
-        (mkSimpleWallet (Clb.intToKeyPair 2))
-        (mkSimpleWallet (Clb.intToKeyPair 3))
-        (mkSimpleWallet (Clb.intToKeyPair 4))
-        (mkSimpleWallet (Clb.intToKeyPair 5))
-        (mkSimpleWallet (Clb.intToKeyPair 6))
-        (mkSimpleWallet (Clb.intToKeyPair 7))
-        (mkSimpleWallet (Clb.intToKeyPair 8))
-        (mkSimpleWallet (Clb.intToKeyPair 9))
+  -- TODO (simplify-genesis):: Remove creation of wallets. Only create one (or more) genesis/funder wallet and pass it on.
+  testWallets :: Wallets
+  testWallets =
+    Wallets
+      (mkSimpleWallet (Clb.intToKeyPair 1))
+      (mkSimpleWallet (Clb.intToKeyPair 2))
+      (mkSimpleWallet (Clb.intToKeyPair 3))
+      (mkSimpleWallet (Clb.intToKeyPair 4))
+      (mkSimpleWallet (Clb.intToKeyPair 5))
+      (mkSimpleWallet (Clb.intToKeyPair 6))
+      (mkSimpleWallet (Clb.intToKeyPair 7))
+      (mkSimpleWallet (Clb.intToKeyPair 8))
+      (mkSimpleWallet (Clb.intToKeyPair 9))
 
-    -- This is the next consecutive number after the highest one used above for 'Clb.intToKeyPair' calls.
-    nextWalletInt :: Integer
-    nextWalletInt = 10
+  -- This is the next consecutive number after the highest one used above for 'Clb.intToKeyPair' calls.
+  nextWalletInt :: Integer
+  nextWalletInt = 10
 
-    -- \| Helper for building tests
-    testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig ApiEra -> String -> AtlasClb a -> Tasty.TestTree
-    testNoErrorsTraceClb funds walletFunds cfg msg act =
-      testCaseInfo msg $
-        maybe (pure mockLog) assertFailure $
-          mbErrors >>= \errors -> pure (mockLog <> "\n\nError :\n-------\n" <> errors)
-      where
-        -- _errors since we decided to store errors in the log as well.
-        (mbErrors, mock) = Clb.runClb (act >> Clb.checkErrors) $ Clb.initClb cfg (valueToApi funds) (valueToApi walletFunds)
-        mockLog = "\nEmulator log :\n--------------\n" <> logString
-        options = defaultLayoutOptions {layoutPageWidth = AvailablePerLine 150 1.0}
-        logDoc = Clb.ppLog $ Clb.mockInfo mock
-        logString = renderString $ layoutPretty options logDoc
+  -- \| Helper for building tests
+  testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig ApiEra -> String -> AtlasClb a -> Tasty.TestTree
+  testNoErrorsTraceClb funds walletFunds cfg msg act =
+    testCaseInfo msg $
+      maybe (pure mockLog) assertFailure $
+        mbErrors >>= \errors -> pure (mockLog <> "\n\nError :\n-------\n" <> errors)
+   where
+    -- _errors since we decided to store errors in the log as well.
+    (mbErrors, mock) = Clb.runClb (act >> Clb.checkErrors) $ Clb.initClb cfg (valueToApi funds) (valueToApi walletFunds)
+    mockLog = "\nEmulator log :\n--------------\n" <> logString
+    options = defaultLayoutOptions {layoutPageWidth = AvailablePerLine 150 1.0}
+    logDoc = Clb.ppLog $ Clb.mockInfo mock
+    logString = renderString $ layoutPretty options logDoc
 
 mkSimpleWallet :: TL.KeyPair r L.StandardCrypto -> User
 mkSimpleWallet kp =
@@ -248,10 +248,10 @@ mustFailWith isExpectedError act = do
             }
     Left err -> liftClb $ logError $ "Action failed with unexpected exception: " ++ show err
     Right _ -> liftClb $ logError "Expected action to fail but it succeeds"
-  where
-    mkMustFailLog (unLog -> pre) (unLog -> post) =
-      Log $ second (LogEntry Error . ((msg <> ":") <>) . show) <$> Seq.drop (Seq.length pre) post
-    msg = "Unnamed failure action"
+ where
+  mkMustFailLog (unLog -> pre) (unLog -> post) =
+    Log $ second (LogEntry Error . ((msg <> ":") <>) . show) <$> Seq.drop (Seq.length pre) post
+  msg = "Unnamed failure action"
 
 instance MonadError GYTxMonadException GYTxMonadClb where
   throwError = GYTxMonadClb . throwError
@@ -285,12 +285,12 @@ instance GYTxQueryMonad GYTxMonadClb where
             Nothing -> utxos
             Just ac -> filter (\GYUTxO {..} -> valueAssetClass utxoValue ac > 0) utxos
     return $ utxosFromList utxos'
-    where
-      f :: Plutus.TxOutRef -> GYTxMonadClb (Maybe GYUTxO)
-      f ref = do
-        case txOutRefFromPlutus ref of
-          Left _ -> return Nothing -- TODO: should it error?
-          Right ref' -> utxoAtTxOutRef ref'
+   where
+    f :: Plutus.TxOutRef -> GYTxMonadClb (Maybe GYUTxO)
+    f ref = do
+      case txOutRefFromPlutus ref of
+        Left _ -> return Nothing -- TODO: should it error?
+        Right ref' -> utxoAtTxOutRef ref'
 
   utxosAtPaymentCredential :: GYPaymentCredential -> Maybe GYAssetClass -> GYTxMonadClb GYUTxOs
   utxosAtPaymentCredential cred mAssetClass = do
@@ -301,11 +301,11 @@ instance GYTxQueryMonad GYTxMonadClb where
       $ filter
         (\GYUTxO {utxoValue} -> maybe True ((> 0) . valueAssetClass utxoValue) mAssetClass)
         utxos
-    where
-      f :: Plutus.TxOutRef -> GYTxMonadClb (Maybe GYUTxO)
-      f ref = case txOutRefFromPlutus ref of
-        Left _ -> return Nothing
-        Right ref' -> utxoAtTxOutRef ref'
+   where
+    f :: Plutus.TxOutRef -> GYTxMonadClb (Maybe GYUTxO)
+    f ref = case txOutRefFromPlutus ref of
+      Left _ -> return Nothing
+      Right ref' -> utxoAtTxOutRef ref'
 
   utxoAtTxOutRef ref = do
     -- All UTxOs map
@@ -399,11 +399,11 @@ instance GYTxUserQueryMonad GYTxMonadClb where
         case find utxoTranslatableToV1 $ utxosToList utxos of
           Just u -> return $ utxoRef u
           Nothing -> throwError . GYQueryUTxOException $ GYNoUtxosAtAddress addrs -- TODO: Better error message here?
-    where
-      ifNotV1 utxos addrs =
-        case someTxOutRef utxos of
-          Nothing -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress addrs
-          Just (ref, _) -> return ref
+   where
+    ifNotV1 utxos addrs =
+      case someTxOutRef utxos of
+        Nothing -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress addrs
+        Just (ref, _) -> return ref
 
 instance GYTxMonad GYTxMonadClb where
   signTxBody = signTxBodyImpl . asks $ userPaymentSKey . clbEnvWallet
@@ -416,38 +416,38 @@ instance GYTxMonad GYTxMonadClb where
     case vRes of
       Success _state _onChainTx -> pure $ txBodyTxId txBody
       Fail _ err -> throwAppError . someBackendError . T.pack $ show err
-    where
-      -- TODO: use Prettyprinter
-      dumpBody :: GYTxBody -> GYTxMonadClb ()
-      dumpBody body = do
-        ins <- mapM utxoAtTxOutRef' $ txBodyTxIns body
-        refIns <- mapM utxoAtTxOutRef' $ txBodyTxInsReference body
-        gyLogDebug' "" $
-          printf
-            "fee: %d lovelace\nmint value: %s\nvalidity range: %s\ncollateral: %s\ntotal collateral: %d\ninputs:\n\n%sreference inputs:\n\n%soutputs:\n\n%s"
-            (txBodyFee body)
-            (txBodyMintValue body)
-            (show $ txBodyValidityRange body)
-            (show $ txBodyCollateral body)
-            (txBodyTotalCollateralLovelace body)
-            (concatMap dumpInUTxO ins)
-            (concatMap dumpInUTxO refIns)
-            (concatMap dumpOutUTxO $ utxosToList $ txBodyUTxOs body)
+   where
+    -- TODO: use Prettyprinter
+    dumpBody :: GYTxBody -> GYTxMonadClb ()
+    dumpBody body = do
+      ins <- mapM utxoAtTxOutRef' $ txBodyTxIns body
+      refIns <- mapM utxoAtTxOutRef' $ txBodyTxInsReference body
+      gyLogDebug' "" $
+        printf
+          "fee: %d lovelace\nmint value: %s\nvalidity range: %s\ncollateral: %s\ntotal collateral: %d\ninputs:\n\n%sreference inputs:\n\n%soutputs:\n\n%s"
+          (txBodyFee body)
+          (txBodyMintValue body)
+          (show $ txBodyValidityRange body)
+          (show $ txBodyCollateral body)
+          (txBodyTotalCollateralLovelace body)
+          (concatMap dumpInUTxO ins)
+          (concatMap dumpInUTxO refIns)
+          (concatMap dumpOutUTxO $ utxosToList $ txBodyUTxOs body)
 
-      dumpInUTxO :: GYUTxO -> String
-      dumpInUTxO GYUTxO {..} =
-        printf " - ref:        %s\n" utxoRef
-          <> printf "   addr:       %s\n" utxoAddress
-          <> printf "   value:      %s\n" utxoValue
-          <> printf "   datum:      %s\n" (show utxoOutDatum)
-          <> printf "   ref script: %s\n\n" (show utxoRefScript)
+    dumpInUTxO :: GYUTxO -> String
+    dumpInUTxO GYUTxO {..} =
+      printf " - ref:        %s\n" utxoRef
+        <> printf "   addr:       %s\n" utxoAddress
+        <> printf "   value:      %s\n" utxoValue
+        <> printf "   datum:      %s\n" (show utxoOutDatum)
+        <> printf "   ref script: %s\n\n" (show utxoRefScript)
 
-      dumpOutUTxO :: GYUTxO -> String
-      dumpOutUTxO GYUTxO {..} =
-        printf " - addr:       %s\n" utxoAddress
-          <> printf "   value:      %s\n" utxoValue
-          <> printf "   datum:      %s\n" (show utxoOutDatum)
-          <> printf "   ref script: %s\n\n" (show utxoRefScript)
+    dumpOutUTxO :: GYUTxO -> String
+    dumpOutUTxO GYUTxO {..} =
+      printf " - addr:       %s\n" utxoAddress
+        <> printf "   value:      %s\n" utxoValue
+        <> printf "   datum:      %s\n" (show utxoOutDatum)
+        <> printf "   ref script: %s\n\n" (show utxoRefScript)
 
   -- Transaction submission and confirmation is immediate in CLB.
   awaitTxConfirmed' _ _ = pure ()
@@ -501,62 +501,62 @@ instance GYTxSpecialQueryMonad GYTxMonadClb where
   eraHistory = do
     (_, len) <- slotConfig'
     return $ Api.EraHistory $ eh len
-    where
-      eh :: NominalDiffTime -> Ouroboros.Interpreter (Ouroboros.CardanoEras Ouroboros.StandardCrypto)
-      eh =
-        Ouroboros.mkInterpreter
-          . Ouroboros.Summary
-          . NonEmptyCons byronEra
-          . NonEmptyCons shelleyEra
-          . NonEmptyCons allegraEra
-          . NonEmptyCons maryEra
-          . NonEmptyCons alonzoEra
-          . NonEmptyCons babbageEra
-          . NonEmptyOne
-          . conwayEra
+   where
+    eh :: NominalDiffTime -> Ouroboros.Interpreter (Ouroboros.CardanoEras Ouroboros.StandardCrypto)
+    eh =
+      Ouroboros.mkInterpreter
+        . Ouroboros.Summary
+        . NonEmptyCons byronEra
+        . NonEmptyCons shelleyEra
+        . NonEmptyCons allegraEra
+        . NonEmptyCons maryEra
+        . NonEmptyCons alonzoEra
+        . NonEmptyCons babbageEra
+        . NonEmptyOne
+        . conwayEra
 
-      byronEra =
-        Ouroboros.EraSummary
-          { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-          , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-          , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864, eraGenesisWin = 0}
-          }
-      shelleyEra =
-        Ouroboros.EraSummary
-          { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-          , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-          , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
-          }
-      allegraEra =
-        Ouroboros.EraSummary
-          { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-          , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-          , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
-          }
-      maryEra =
-        Ouroboros.EraSummary
-          { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-          , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-          , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
-          }
-      alonzoEra =
-        Ouroboros.EraSummary
-          { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-          , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-          , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
-          }
-      babbageEra =
-        Ouroboros.EraSummary
-          { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-          , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-          , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
-          }
-      conwayEra len =
-        Ouroboros.EraSummary
-          { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-          , eraEnd = Ouroboros.EraUnbounded
-          , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
-          }
+    byronEra =
+      Ouroboros.EraSummary
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864, eraGenesisWin = 0}
+        }
+    shelleyEra =
+      Ouroboros.EraSummary
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        }
+    allegraEra =
+      Ouroboros.EraSummary
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        }
+    maryEra =
+      Ouroboros.EraSummary
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        }
+    alonzoEra =
+      Ouroboros.EraSummary
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        }
+    babbageEra =
+      Ouroboros.EraSummary
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        }
+    conwayEra len =
+      Ouroboros.EraSummary
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+        , eraEnd = Ouroboros.EraUnbounded
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        }
 
 dumpUtxoState :: GYTxMonadClb ()
 dumpUtxoState = liftClb Clb.dumpUtxoState
@@ -569,12 +569,12 @@ pureGen :: StdGen
 pureGen = mkStdGen 42
 
 -- | This is simply defined as @buildTxBody skeleton >>= signAndSubmitConfirmed@.
-sendSkeleton :: (GYTxMonad m) => GYTxSkeleton v -> m GYTxId
+sendSkeleton :: GYTxMonad m => GYTxSkeleton v -> m GYTxId
 sendSkeleton skeleton = snd <$> sendSkeleton' skeleton
 
-sendSkeleton' :: (GYTxMonad m) => GYTxSkeleton v -> m (GYTxBody, GYTxId)
+sendSkeleton' :: GYTxMonad m => GYTxSkeleton v -> m (GYTxBody, GYTxId)
 sendSkeleton' skeleton = buildTxBody skeleton >>= \tx -> signAndSubmitConfirmed tx >>= \txId -> pure (tx, txId)
 
 -- | Variant of `logInfo` from @Clb@ that logs a string with @Info@ severity.
-logInfoS :: (Monad m) => String -> ClbT ApiEra m ()
+logInfoS :: Monad m => String -> ClbT ApiEra m ()
 logInfoS s = Clb.logInfo $ Clb.LogEntry Clb.Info s

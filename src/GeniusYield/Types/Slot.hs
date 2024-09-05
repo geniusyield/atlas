@@ -63,9 +63,9 @@ advanceSlot :: GYSlot -> Natural -> Maybe GYSlot
 advanceSlot (GYSlot s) t
   | st > fromIntegral (maxBound :: Word64) = Nothing
   | otherwise = Just (GYSlot (fromIntegral st))
-  where
-    st :: Natural
-    st = fromIntegral s + t
+ where
+  st :: Natural
+  st = fromIntegral s + t
 
 -- | Unsafe advance 'GYSlot'. Doesn't check for the overflow.
 unsafeAdvanceSlot :: GYSlot -> Natural -> GYSlot

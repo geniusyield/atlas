@@ -43,7 +43,7 @@ refInputTests =
           . testWallets
     ]
 
-guessRefInputRun :: (GYTxMonad m) => GYTxOutRef -> GYTxOutRef -> Integer -> m ()
+guessRefInputRun :: GYTxMonad m => GYTxOutRef -> GYTxOutRef -> Integer -> m ()
 guessRefInputRun refInputORef consumeRef guess = do
   let redeemer = Guess guess
       skeleton :: GYTxSkeleton 'PlutusV2 =
@@ -59,7 +59,7 @@ guessRefInputRun refInputORef consumeRef guess = do
           <> mustHaveRefInput refInputORef
   buildTxBody skeleton >>= signAndSubmitConfirmed_
 
-refInputTrace :: (GYTxGameMonad m) => Bool -> Integer -> Integer -> Wallets -> m ()
+refInputTrace :: GYTxGameMonad m => Bool -> Integer -> Integer -> Wallets -> m ()
 refInputTrace toInline actual guess Wallets {..} = do
   let myGuess :: Integer = guess
       outValue :: GYValue = valueFromLovelace 20_000_000
@@ -78,7 +78,7 @@ refInputTrace toInline actual guess Wallets {..} = do
     gyLogInfo' "" $ printf "Locked ORef %s" oref
     guessRefInputRun refInputORef oref myGuess
 
-tryRefInputConsume :: (GYTxGameMonad m) => Wallets -> m ()
+tryRefInputConsume :: GYTxGameMonad m => Wallets -> m ()
 tryRefInputConsume Wallets {..} = do
   -- Approach: Create a new output with 60% of total ada. Mark this UTxO as reference input and try sending this same 60%, or any amount greater than 40% of this original balance. Since coin balancer can't consume this UTxO, it won't be able to build for it.
   asUser w1 $ do

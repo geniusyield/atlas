@@ -75,7 +75,7 @@ data MaestroProviderException
   | -- | The API returned an unexpected number of era summaries.
     MspvIncorrectEraHistoryLength ![Maestro.EraSummary]
   deriving stock (Eq, Show)
-  deriving anyclass (Exception)
+  deriving anyclass Exception
 
 throwMspvApiError :: Text -> Maestro.MaestroError -> IO a
 throwMspvApiError locationInfo =
@@ -103,9 +103,9 @@ maestroSubmitTx useTurboSubmit env tx = do
     pure
     $ txIdFromHexE
     $ Text.unpack txId
-  where
-    handleMaestroSubmitError :: Either Maestro.MaestroError a -> IO a
-    handleMaestroSubmitError = either (throwIO . SubmitTxException . Text.pack . show . silenceHeadersMaestroClientError) pure
+ where
+  handleMaestroSubmitError :: Either Maestro.MaestroError a -> IO a
+  handleMaestroSubmitError = either (throwIO . SubmitTxException . Text.pack . show . silenceHeadersMaestroClientError) pure
 
 -------------------------------------------------------------------------------
 -- Await tx confirmation
@@ -114,44 +114,44 @@ maestroSubmitTx useTurboSubmit env tx = do
 -- | Awaits for the confirmation of a given 'GYTxId'
 maestroAwaitTxConfirmed :: Maestro.MaestroEnv 'Maestro.V1 -> GYAwaitTx
 maestroAwaitTxConfirmed env p@GYAwaitTxParameters {..} txId = mspvAwaitTx 0
-  where
-    mspvAwaitTx :: Int -> IO ()
-    mspvAwaitTx attempt | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
-    mspvAwaitTx attempt = do
-      eTxInfo <- maestroQueryTx env txId
-      case eTxInfo of
-        Left Maestro.MaestroNotFound ->
-          threadDelay checkInterval
-            >> mspvAwaitTx (attempt + 1)
-        Left err -> throwMspvApiError "AwaitTx" err
-        Right txInfo ->
-          msvpAwaitBlock attempt $
-            Maestro.txDetailsBlockHash $
-              Maestro.getTimestampedData txInfo
+ where
+  mspvAwaitTx :: Int -> IO ()
+  mspvAwaitTx attempt | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
+  mspvAwaitTx attempt = do
+    eTxInfo <- maestroQueryTx env txId
+    case eTxInfo of
+      Left Maestro.MaestroNotFound ->
+        threadDelay checkInterval
+          >> mspvAwaitTx (attempt + 1)
+      Left err -> throwMspvApiError "AwaitTx" err
+      Right txInfo ->
+        msvpAwaitBlock attempt $
+          Maestro.txDetailsBlockHash $
+            Maestro.getTimestampedData txInfo
 
-    msvpAwaitBlock :: Int -> Maestro.BlockHash -> IO ()
-    msvpAwaitBlock attempt _ | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
-    msvpAwaitBlock attempt blockHash = do
-      eBlockInfo <- maestroQueryBlock env blockHash
-      case eBlockInfo of
-        Left Maestro.MaestroNotFound ->
-          threadDelay checkInterval
-            >> msvpAwaitBlock (attempt + 1) blockHash
-        Left err -> throwMspvApiError "AwaitBlock" err
-        Right (Maestro.getTimestampedData -> blockInfo)
-          | attempt + 1 == maxAttempts ->
-              when
-                ( toInteger (Maestro.blockDetailsConfirmations blockInfo)
-                    < toInteger confirmations
-                )
-                $ throwIO
-                $ GYAwaitTxException p
-        Right (Maestro.getTimestampedData -> blockInfo) ->
-          when
-            ( toInteger (Maestro.blockDetailsConfirmations blockInfo)
-                < toInteger confirmations
-            )
-            $ threadDelay checkInterval >> msvpAwaitBlock (attempt + 1) blockHash
+  msvpAwaitBlock :: Int -> Maestro.BlockHash -> IO ()
+  msvpAwaitBlock attempt _ | maxAttempts <= attempt = throwIO $ GYAwaitTxException p
+  msvpAwaitBlock attempt blockHash = do
+    eBlockInfo <- maestroQueryBlock env blockHash
+    case eBlockInfo of
+      Left Maestro.MaestroNotFound ->
+        threadDelay checkInterval
+          >> msvpAwaitBlock (attempt + 1) blockHash
+      Left err -> throwMspvApiError "AwaitBlock" err
+      Right (Maestro.getTimestampedData -> blockInfo)
+        | attempt + 1 == maxAttempts ->
+            when
+              ( toInteger (Maestro.blockDetailsConfirmations blockInfo)
+                  < toInteger confirmations
+              )
+              $ throwIO
+              $ GYAwaitTxException p
+      Right (Maestro.getTimestampedData -> blockInfo) ->
+        when
+          ( toInteger (Maestro.blockDetailsConfirmations blockInfo)
+              < toInteger confirmations
+          )
+          $ threadDelay checkInterval >> msvpAwaitBlock (attempt + 1) blockHash
 
 maestroQueryBlock ::
   Maestro.MaestroEnv 'Maestro.V1 ->
@@ -229,7 +229,7 @@ scriptFromMaestro Maestro.Script {..} = case scriptType of
     Just sb -> pure $ GYPlutusScript <$> scriptFromCBOR @'PlutusV3 sb
 
 -- | Convert Maestro's UTxO to our GY type.
-utxoFromMaestro :: (Maestro.IsUtxo a) => a -> Either SomeDeserializeError GYUTxO
+utxoFromMaestro :: Maestro.IsUtxo a => a -> Either SomeDeserializeError GYUTxO
 utxoFromMaestro utxo = do
   ref <- first DeserializeErrorHex . Web.parseUrlPiece $ Web.toUrlPiece (Maestro.getTxHash utxo) <> "#" <> Web.toUrlPiece (Maestro.getIndex utxo)
   addr <- maybeToRight DeserializeErrorAddress $ addressFromTextMaybe $ coerce $ Maestro.getAddress utxo
@@ -246,7 +246,7 @@ utxoFromMaestro utxo = do
       }
 
 -- | Convert Maestro's UTxO (with datum resolved) to our GY types.
-utxoFromMaestroWithDatum :: (Maestro.IsUtxo a) => a -> Either SomeDeserializeError (GYUTxO, Maybe GYDatum)
+utxoFromMaestroWithDatum :: Maestro.IsUtxo a => a -> Either SomeDeserializeError (GYUTxO, Maybe GYDatum)
 utxoFromMaestroWithDatum u = do
   gyUtxo <- utxoFromMaestro u
   case utxoOutDatum gyUtxo of
@@ -270,8 +270,8 @@ maestroUtxosAtAddress env addr mAssetClass = do
   addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (Maestro.utxosAtAddress env (coerce addrAsText) (Just False) (Just False) (extractedAssetClassToMaestro extractedAssetClass))
 
   either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro addrUtxos)
-  where
-    locationIdent = "AddressUtxos"
+ where
+  locationIdent = "AddressUtxos"
 
 -- | Query UTxOs present at given address with datums.
 maestroUtxosAtAddressWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]
@@ -285,8 +285,8 @@ maestroUtxosAtAddressWithDatums env addr mAssetClass = do
     (throwIO . MspvDeserializeFailure locationIdent)
     pure
     $ traverse utxoFromMaestroWithDatum addrUtxos
-  where
-    locationIdent = "AddressUtxosWithDatums"
+ where
+  locationIdent = "AddressUtxosWithDatums"
 
 -- | Query UTxOs present at multiple addresses.
 maestroUtxosAtAddresses :: Maestro.MaestroEnv 'Maestro.V1 -> [GYAddress] -> IO GYUTxOs
@@ -296,8 +296,8 @@ maestroUtxosAtAddresses env addrs = do
   addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosAtMultiAddresses env (Just False) (Just False)) $ coerce addrsInText)
 
   either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro addrUtxos)
-  where
-    locationIdent = "AddressesUtxos"
+ where
+  locationIdent = "AddressesUtxos"
 
 -- | Query UTxOs present at multiple addresses with datums.
 maestroUtxosAtAddressesWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> [GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]
@@ -310,8 +310,8 @@ maestroUtxosAtAddressesWithDatums env addrs = do
     (throwIO . MspvDeserializeFailure locationIdent)
     pure
     $ traverse utxoFromMaestroWithDatum addrUtxos
-  where
-    locationIdent = "AddressesUtxosWithDatums"
+ where
+  locationIdent = "AddressesUtxosWithDatums"
 
 -- | Query UTxOs present at payment credential.
 maestroUtxosAtPaymentCredential :: Maestro.MaestroEnv 'Maestro.V1 -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
@@ -322,8 +322,8 @@ maestroUtxosAtPaymentCredential env paymentCredential mAssetClass = do
   utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages $ Maestro.utxosByPaymentCredential env paymentCredentialBech32 (Just False) (Just False) (extractedAssetClassToMaestro extractedAssetClass)
 
   either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro utxos)
-  where
-    locationIdent = "PaymentCredentialUtxos"
+ where
+  locationIdent = "PaymentCredentialUtxos"
 
 -- | Query UTxOs present at payment credential with their associated datum fetched (under best effort basis).
 maestroUtxosAtPaymentCredentialWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> GYPaymentCredential -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]
@@ -337,8 +337,8 @@ maestroUtxosAtPaymentCredentialWithDatums env paymentCredential mAssetClass = do
     (throwIO . MspvDeserializeFailure locationIdent)
     pure
     $ traverse utxoFromMaestroWithDatum utxos
-  where
-    locationIdent = "PaymentCredentialUtxosWithDatums"
+ where
+  locationIdent = "PaymentCredentialUtxosWithDatums"
 
 -- | Query UTxOs present at multiple payment credentials.
 maestroUtxosAtPaymentCredentials :: Maestro.MaestroEnv 'Maestro.V1 -> [GYPaymentCredential] -> IO GYUTxOs
@@ -348,8 +348,8 @@ maestroUtxosAtPaymentCredentials env pcs = do
   utxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosByMultiPaymentCredentials env (Just False) (Just False)) $ coerce paymentCredentialsBech32)
 
   either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro utxos)
-  where
-    locationIdent = "PaymentCredentialsUtxos"
+ where
+  locationIdent = "PaymentCredentialsUtxos"
 
 -- | Query UTxOs present at multiple payment credentials with datums.
 maestroUtxosAtPaymentCredentialsWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> [GYPaymentCredential] -> IO [(GYUTxO, Maybe GYDatum)]
@@ -362,8 +362,8 @@ maestroUtxosAtPaymentCredentialsWithDatums env pcs = do
     (throwIO . MspvDeserializeFailure locationIdent)
     pure
     $ traverse utxoFromMaestroWithDatum utxos
-  where
-    locationIdent = "PaymentCredentialsUtxosWithDatums"
+ where
+  locationIdent = "PaymentCredentialsUtxosWithDatums"
 
 -- | Returns a list containing all 'GYTxOutRef' for a given 'GYAddress'.
 maestroRefsAtAddress :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> IO [GYTxOutRef]
@@ -378,8 +378,8 @@ maestroRefsAtAddress env addr = do
           Web.parseUrlPiece $ Web.toUrlPiece outputReferenceObjectTxHash <> "#" <> Web.toUrlPiece outputReferenceObjectIndex
       )
       mTxRefs
-  where
-    locationIdent = "RefsAtAddress"
+ where
+  locationIdent = "RefsAtAddress"
 
 -- | Query UTxO present at a output reference.
 maestroUtxoAtTxOutRef :: Maestro.MaestroEnv 'Maestro.V1 -> GYTxOutRef -> IO (Maybe GYUTxO)
@@ -411,12 +411,12 @@ maestroUtxosAtTxOutRefs' env refs = do
     (throwIO . MspvDeserializeFailure locationIdent)
     pure
     $ traverse utxoFromMaestro res
-  where
-    -- This particular error is fine in this case, we can just return @mempty@.
-    handler (Left Maestro.MaestroNotFound) = pure []
-    handler other = handleMaestroError locationIdent other
+ where
+  -- This particular error is fine in this case, we can just return @mempty@.
+  handler (Left Maestro.MaestroNotFound) = pure []
+  handler other = handleMaestroError locationIdent other
 
-    locationIdent = "UtxoByRefs"
+  locationIdent = "UtxoByRefs"
 
 -- | Query UTxOs present at multiple `GYTxOutRef` with datums.
 maestroUtxosAtTxOutRefsWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> [GYTxOutRef] -> IO [(GYUTxO, Maybe GYDatum)]
@@ -429,12 +429,12 @@ maestroUtxosAtTxOutRefsWithDatums env refs = do
     (throwIO . MspvDeserializeFailure locationIdent)
     pure
     $ traverse utxoFromMaestroWithDatum res
-  where
-    -- This particular error is fine in this case, we can just return @mempty@.
-    handler (Left Maestro.MaestroNotFound) = pure []
-    handler other = handleMaestroError locationIdent other
+ where
+  -- This particular error is fine in this case, we can just return @mempty@.
+  handler (Left Maestro.MaestroNotFound) = pure []
+  handler other = handleMaestroError locationIdent other
 
-    locationIdent = "UtxoByRefsWithDatums"
+  locationIdent = "UtxoByRefsWithDatums"
 
 -- | Definition of 'GYQueryUTxO' for the Maestro provider.
 maestroQueryUtxo :: Maestro.MaestroEnv 'Maestro.V1 -> GYQueryUTxO
@@ -535,8 +535,8 @@ maestroProtocolParams nid env = do
           , cppDRepActivity = THKD (Ledger.EpochInterval 0)
           , cppMinFeeRefScriptCostPerByte = THKD minBound
           }
-  where
-    errPath = "GeniusYield.Providers.Maestro.maestroProtocolParams: "
+ where
+  errPath = "GeniusYield.Providers.Maestro.maestroProtocolParams: "
 
 -- | Returns a set of all Stake Pool's 'Api.S.PoolId'.
 maestroStakePools :: Maestro.MaestroEnv 'Maestro.V1 -> IO (Set Api.S.PoolId)
@@ -552,8 +552,8 @@ maestroStakePools env = do
     -- Deserialization failure shouldn't happen on Maestro returned pool id.
     Left err -> throwIO . MspvDeserializeFailure locationIdent $ DeserializeErrorBech32 err
     Right has -> pure $ Set.fromList has
-  where
-    locationIdent = "ListPools"
+ where
+  locationIdent = "ListPools"
 
 -- | Returns the 'CTime.SystemStart' queried from Maestro.
 maestroSystemStart :: Maestro.MaestroEnv 'Maestro.V1 -> IO CTime.SystemStart
@@ -567,26 +567,26 @@ maestroEraHistory :: Maestro.MaestroEnv 'Maestro.V1 -> IO Api.EraHistory
 maestroEraHistory env = do
   eraSumms <- handleMaestroError "EraHistory" =<< try (Maestro.getTimestampedData <$> Maestro.getEraHistory env)
   maybe (throwIO $ MspvIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms
-  where
-    mkBound Maestro.EraBound {eraBoundEpoch, eraBoundSlot, eraBoundTime} =
-      Ouroboros.Bound
-        { boundTime = CTime.RelativeTime $ Maestro.eraBoundTimeSeconds eraBoundTime
-        , boundSlot = CSlot.SlotNo $ fromIntegral eraBoundSlot
-        , boundEpoch = CSlot.EpochNo $ fromIntegral eraBoundEpoch
-        }
-    mkEraParams Maestro.EraParameters {eraParametersEpochLength, eraParametersSlotLength, eraParametersSafeZone} =
-      Ouroboros.EraParams
-        { eraEpochSize = CSlot.EpochSize $ fromIntegral eraParametersEpochLength
-        , eraSlotLength = CTime.mkSlotLength $ Maestro.epochSlotLengthMilliseconds eraParametersSlotLength / 1000
-        , eraSafeZone = Ouroboros.StandardSafeZone $ fromJust eraParametersSafeZone
-        , eraGenesisWin = fromIntegral $ fromJust eraParametersSafeZone -- TODO: Get it from provider? It is supposed to be 3k/f where k is security parameter (at present 2160) and f is active slot coefficient. Usually ledger set the safe zone size such that it guarantees at least k blocks...
-        }
-    mkEra Maestro.EraSummary {eraSummaryStart, eraSummaryEnd, eraSummaryParameters} =
-      Ouroboros.EraSummary
-        { eraStart = mkBound eraSummaryStart
-        , eraEnd = maybe Ouroboros.EraUnbounded (Ouroboros.EraEnd . mkBound) eraSummaryEnd
-        , eraParams = mkEraParams eraSummaryParameters
-        }
+ where
+  mkBound Maestro.EraBound {eraBoundEpoch, eraBoundSlot, eraBoundTime} =
+    Ouroboros.Bound
+      { boundTime = CTime.RelativeTime $ Maestro.eraBoundTimeSeconds eraBoundTime
+      , boundSlot = CSlot.SlotNo $ fromIntegral eraBoundSlot
+      , boundEpoch = CSlot.EpochNo $ fromIntegral eraBoundEpoch
+      }
+  mkEraParams Maestro.EraParameters {eraParametersEpochLength, eraParametersSlotLength, eraParametersSafeZone} =
+    Ouroboros.EraParams
+      { eraEpochSize = CSlot.EpochSize $ fromIntegral eraParametersEpochLength
+      , eraSlotLength = CTime.mkSlotLength $ Maestro.epochSlotLengthMilliseconds eraParametersSlotLength / 1000
+      , eraSafeZone = Ouroboros.StandardSafeZone $ fromJust eraParametersSafeZone
+      , eraGenesisWin = fromIntegral $ fromJust eraParametersSafeZone -- TODO: Get it from provider? It is supposed to be 3k/f where k is security parameter (at present 2160) and f is active slot coefficient. Usually ledger set the safe zone size such that it guarantees at least k blocks...
+      }
+  mkEra Maestro.EraSummary {eraSummaryStart, eraSummaryEnd, eraSummaryParameters} =
+    Ouroboros.EraSummary
+      { eraStart = mkBound eraSummaryStart
+      , eraEnd = maybe Ouroboros.EraUnbounded (Ouroboros.EraEnd . mkBound) eraSummaryEnd
+      , eraParams = mkEraParams eraSummaryParameters
+      }
 
 -------------------------------------------------------------------------------
 -- Datum lookup
@@ -602,11 +602,11 @@ maestroLookupDatum env dh = do
         Right bd -> pure bd
     )
     datumMaybe
-  where
-    locationIdent = "LookupDatum"
-    -- This particular error is fine in this case, we can just return 'Nothing'.
-    handler (Left Maestro.MaestroNotFound) = pure Nothing
-    handler other = handleMaestroError locationIdent $ Just <$> other
+ where
+  locationIdent = "LookupDatum"
+  -- This particular error is fine in this case, we can just return 'Nothing'.
+  handler (Left Maestro.MaestroNotFound) = pure Nothing
+  handler other = handleMaestroError locationIdent $ Just <$> other
 
 -------------------------------------------------------------------------------
 -- Account info
@@ -616,17 +616,17 @@ maestroLookupDatum env dh = do
 maestroStakeAddressInfo :: Maestro.MaestroEnv 'Maestro.V1 -> GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
 maestroStakeAddressInfo env saddr = do
   handler <=< try $ Maestro.getTimestampedData <$> Maestro.accountInfo env (coerce stakeAddressToText saddr)
-  where
-    -- This particular error is fine.
-    handler (Left Maestro.MaestroNotFound) = pure Nothing
-    handler other =
-      handleMaestroError "AccountInfo" $
-        other <&> \accInfo ->
-          if Maestro.accountInfoRegistered accInfo
-            then
-              Just $
-                GYStakeAddressInfo
-                  { gyStakeAddressInfoDelegatedPool = Maestro.accountInfoDelegatedPool accInfo >>= stakePoolIdFromTextMaybe . coerce
-                  , gyStakeAddressInfoAvailableRewards = fromIntegral $ Maestro.accountInfoRewardsAvailable accInfo
-                  }
-            else Nothing
+ where
+  -- This particular error is fine.
+  handler (Left Maestro.MaestroNotFound) = pure Nothing
+  handler other =
+    handleMaestroError "AccountInfo" $
+      other <&> \accInfo ->
+        if Maestro.accountInfoRegistered accInfo
+          then
+            Just $
+              GYStakeAddressInfo
+                { gyStakeAddressInfoDelegatedPool = Maestro.accountInfoDelegatedPool accInfo >>= stakePoolIdFromTextMaybe . coerce
+                , gyStakeAddressInfoAvailableRewards = fromIntegral $ Maestro.accountInfoRewardsAvailable accInfo
+                }
+          else Nothing

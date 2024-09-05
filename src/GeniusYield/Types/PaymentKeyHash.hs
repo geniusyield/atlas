@@ -48,7 +48,7 @@ import Text.Printf qualified as Printf
 -}
 
 newtype GYPaymentKeyHash = GYPaymentKeyHash (Api.Hash Api.PaymentKey)
-  deriving stock (Show)
+  deriving stock Show
   deriving newtype (Eq, Ord, IsString)
 
 instance AsPubKeyHash GYPaymentKeyHash where
@@ -80,10 +80,10 @@ e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d
 -}
 paymentKeyHashToPlutus :: GYPaymentKeyHash -> Plutus.PubKeyHash
 paymentKeyHashToPlutus = coerce fromCardanoPaymentKeyHash
-  where
-    -- this is not exported from plutus-ledger
-    fromCardanoPaymentKeyHash :: Api.Hash Api.PaymentKey -> Plutus.PubKeyHash
-    fromCardanoPaymentKeyHash paymentKeyHash = Plutus.PubKeyHash $ Plutus.toBuiltin $ Api.serialiseToRawBytes paymentKeyHash
+ where
+  -- this is not exported from plutus-ledger
+  fromCardanoPaymentKeyHash :: Api.Hash Api.PaymentKey -> Plutus.PubKeyHash
+  fromCardanoPaymentKeyHash paymentKeyHash = Plutus.PubKeyHash $ Plutus.toBuiltin $ Api.serialiseToRawBytes paymentKeyHash
 
 {- |
 

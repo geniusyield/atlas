@@ -25,7 +25,7 @@ import PlutusLedgerApi.V1 qualified as PlutusV1
 import PlutusTx qualified
 
 newtype GYRedeemer = GYRedeemer PlutusTx.BuiltinData
-  deriving (Eq)
+  deriving Eq
 
 instance Show GYRedeemer where
   showsPrec d (GYRedeemer x) =
@@ -48,7 +48,7 @@ redeemerFromPlutus (PlutusV1.Redeemer x) = GYRedeemer x
 redeemerFromPlutus' :: PlutusTx.BuiltinData -> GYRedeemer
 redeemerFromPlutus' = GYRedeemer
 
-redeemerFromPlutusData :: (PlutusTx.ToData a) => a -> GYRedeemer
+redeemerFromPlutusData :: PlutusTx.ToData a => a -> GYRedeemer
 redeemerFromPlutusData = GYRedeemer . PlutusTx.toBuiltinData
 
 redeemerToApi :: GYRedeemer -> Api.HashableScriptData

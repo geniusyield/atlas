@@ -205,74 +205,74 @@ maestroTests token netId =
           res @?= expected
       ]
   ]
-  where
-    getQueryUtxo :: Text.Text -> IO GYQueryUTxO
-    getQueryUtxo pToken = maestroQueryUtxo <$> networkIdToMaestroEnv pToken netId
+ where
+  getQueryUtxo :: Text.Text -> IO GYQueryUTxO
+  getQueryUtxo pToken = maestroQueryUtxo <$> networkIdToMaestroEnv pToken netId
 
-    getUTxOsAtAddress :: GYAddress -> Text.Text -> IO (Api.UTxO ApiEra)
-    getUTxOsAtAddress addr pToken = do
-      queryUtxo <- getQueryUtxo pToken
-      utxos <- gyQueryUtxosAtAddress' queryUtxo addr Nothing
-      return $ utxosToApi utxos
+  getUTxOsAtAddress :: GYAddress -> Text.Text -> IO (Api.UTxO ApiEra)
+  getUTxOsAtAddress addr pToken = do
+    queryUtxo <- getQueryUtxo pToken
+    utxos <- gyQueryUtxosAtAddress' queryUtxo addr Nothing
+    return $ utxosToApi utxos
 
-    getUTxOsAtAddresses :: [GYAddress] -> Text.Text -> IO (Api.UTxO ApiEra)
-    getUTxOsAtAddresses addrs pToken = do
-      queryUtxo <- getQueryUtxo pToken
-      utxos <- gyQueryUtxosAtAddresses' queryUtxo addrs
-      return $ utxosToApi utxos
+  getUTxOsAtAddresses :: [GYAddress] -> Text.Text -> IO (Api.UTxO ApiEra)
+  getUTxOsAtAddresses addrs pToken = do
+    queryUtxo <- getQueryUtxo pToken
+    utxos <- gyQueryUtxosAtAddresses' queryUtxo addrs
+    return $ utxosToApi utxos
 
-    getUTxOAtRef :: GYTxOutRef -> Text.Text -> IO (Api.UTxO ApiEra)
-    getUTxOAtRef ref pToken = do
-      queryUtxo <- getQueryUtxo pToken
-      utxo <- gyQueryUtxoAtTxOutRef' queryUtxo ref
-      return $ utxosToApi $ utxosFromList [fromJust utxo]
+  getUTxOAtRef :: GYTxOutRef -> Text.Text -> IO (Api.UTxO ApiEra)
+  getUTxOAtRef ref pToken = do
+    queryUtxo <- getQueryUtxo pToken
+    utxo <- gyQueryUtxoAtTxOutRef' queryUtxo ref
+    return $ utxosToApi $ utxosFromList [fromJust utxo]
 
-    getUTxOsRefsAtAddress :: GYAddress -> Text.Text -> IO [GYTxOutRef]
-    getUTxOsRefsAtAddress addr pToken = do
-      queryUtxo <- getQueryUtxo pToken
-      gyQueryUtxoRefsAtAddress' queryUtxo addr
+  getUTxOsRefsAtAddress :: GYAddress -> Text.Text -> IO [GYTxOutRef]
+  getUTxOsRefsAtAddress addr pToken = do
+    queryUtxo <- getQueryUtxo pToken
+    gyQueryUtxoRefsAtAddress' queryUtxo addr
 
-    getFileRefs :: String -> IO [GYTxOutRef]
-    getFileRefs fileName = do
-      json <- BS.readFile fileName
-      let utxos = fromMaybe (utxosToApi $ utxosFromList []) (Aeson.decodeStrict (toStrict json))
-          refs = utxosRefs $ utxosFromApi utxos
-      return refs
+  getFileRefs :: String -> IO [GYTxOutRef]
+  getFileRefs fileName = do
+    json <- BS.readFile fileName
+    let utxos = fromMaybe (utxosToApi $ utxosFromList []) (Aeson.decodeStrict (toStrict json))
+        refs = utxosRefs $ utxosFromApi utxos
+    return refs
 
-    getFileUTxOs :: String -> IO (Api.UTxO ApiEra)
-    getFileUTxOs fileName = do
-      json <- BS.readFile fileName
-      let utxos = fromMaybe (utxosToApi $ utxosFromList []) (Aeson.decodeStrict (toStrict json))
-      return utxos
+  getFileUTxOs :: String -> IO (Api.UTxO ApiEra)
+  getFileUTxOs fileName = do
+    json <- BS.readFile fileName
+    let utxos = fromMaybe (utxosToApi $ utxosFromList []) (Aeson.decodeStrict (toStrict json))
+    return utxos
 
-    compareUTxOs :: Api.UTxO ApiEra -> Api.UTxO ApiEra -> IO (Maybe String)
-    compareUTxOs utxosFile utxosQuery = do
-      let utxosFileMap = Api.unUTxO utxosFile
-          utxosQueryMap = Api.unUTxO utxosQuery
-      return $
-        if Map.isSubmapOf utxosFileMap utxosQueryMap
-          then Nothing
-          else Just $ show (Map.difference utxosFileMap utxosQueryMap)
+  compareUTxOs :: Api.UTxO ApiEra -> Api.UTxO ApiEra -> IO (Maybe String)
+  compareUTxOs utxosFile utxosQuery = do
+    let utxosFileMap = Api.unUTxO utxosFile
+        utxosQueryMap = Api.unUTxO utxosQuery
+    return $
+      if Map.isSubmapOf utxosFileMap utxosQueryMap
+        then Nothing
+        else Just $ show (Map.difference utxosFileMap utxosQueryMap)
 
-    compareRefs :: [GYTxOutRef] -> [GYTxOutRef] -> IO (Maybe String)
-    compareRefs refsFile refsQuery = do
-      let refSetQuery = Set.fromList refsQuery
-          refSetFile = Set.fromList refsFile
-      return $
-        if Set.isSubsetOf refSetFile refSetQuery
-          then Nothing
-          else Just $ show (Set.difference refSetFile refSetQuery)
+  compareRefs :: [GYTxOutRef] -> [GYTxOutRef] -> IO (Maybe String)
+  compareRefs refsFile refsQuery = do
+    let refSetQuery = Set.fromList refsQuery
+        refSetFile = Set.fromList refsFile
+    return $
+      if Set.isSubsetOf refSetFile refSetQuery
+        then Nothing
+        else Just $ show (Set.difference refSetFile refSetQuery)
 
-    updateGolden :: (Show a) => a -> IO ()
-    updateGolden = error . show
+  updateGolden :: Show a => a -> IO ()
+  updateGolden = error . show
 
-    goldenTestUtxos :: TestName -> IO (Api.UTxO ApiEra) -> IO (Api.UTxO ApiEra) -> TestTree
-    goldenTestUtxos name queryData getFileData =
-      goldenTest name queryData getFileData compareUTxOs updateGolden
+  goldenTestUtxos :: TestName -> IO (Api.UTxO ApiEra) -> IO (Api.UTxO ApiEra) -> TestTree
+  goldenTestUtxos name queryData getFileData =
+    goldenTest name queryData getFileData compareUTxOs updateGolden
 
-    goldenTestRefs :: TestName -> IO [GYTxOutRef] -> IO [GYTxOutRef] -> TestTree
-    goldenTestRefs name queryData getFileData =
-      goldenTest name queryData getFileData compareRefs updateGolden
+  goldenTestRefs :: TestName -> IO [GYTxOutRef] -> IO [GYTxOutRef] -> TestTree
+  goldenTestRefs name queryData getFileData =
+    goldenTest name queryData getFileData compareRefs updateGolden
 
 -------------------------------------------------------------------------------
 -- Mock Values

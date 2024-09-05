@@ -38,21 +38,21 @@ See: https://docs.cardano.org/about-cardano/learn/chain-confirmation-versus-tran
 -}
 nodeAwaitTxConfirmed :: Api.LocalNodeConnectInfo -> GYAwaitTx
 nodeAwaitTxConfirmed info p@GYAwaitTxParameters {..} txId = go 0
-  where
-    go attempt
-      | attempt >= maxAttempts = throwIO $ GYAwaitTxException p
-      | otherwise = do
-          {- NOTE: Checking for created utxos is not always correct.
+ where
+  go attempt
+    | attempt >= maxAttempts = throwIO $ GYAwaitTxException p
+    | otherwise = do
+        {- NOTE: Checking for created utxos is not always correct.
 
-          Transactions that create stake deposit with a user who's remaining
-          utxos are only enough to cover the transaction cost, create no outputs.
-          However, this is an extreme edge case that is unlikely to ever exist in
-          privnet tests (where this module is meant to be used, exclusively).
-          -}
-          utxos <- nodeUtxosFromTx info txId
-          -- FIXME: This doesn't actually wait for confirmations.
-          unless (utxosSize utxos /= 0) $
-            threadDelay checkInterval >> go (attempt + 1)
+        Transactions that create stake deposit with a user who's remaining
+        utxos are only enough to cover the transaction cost, create no outputs.
+        However, this is an extreme edge case that is unlikely to ever exist in
+        privnet tests (where this module is meant to be used, exclusively).
+        -}
+        utxos <- nodeUtxosFromTx info txId
+        -- FIXME: This doesn't actually wait for confirmations.
+        unless (utxosSize utxos /= 0) $
+          threadDelay checkInterval >> go (attempt + 1)
 
 -- | Obtain UTxOs created by a transaction.
 nodeUtxosFromTx :: Api.LocalNodeConnectInfo -> GYTxId -> IO GYUTxOs
@@ -72,10 +72,10 @@ nodeUtxosFromTx info txId = do
   let startIx = 0
       uptoIx = 10
   go mempty startIx uptoIx
-  where
-    go acc startIx uptoIx = do
-      utxos <- nodeUtxosAtTxOutRefs info $ curry txOutRefFromTuple txId <$> [startIx .. uptoIx]
-      let acc' = acc <> utxos
-      if utxosSize utxos == 0
-        then pure acc'
-        else go acc' (uptoIx + 1) (uptoIx * 2)
+ where
+  go acc startIx uptoIx = do
+    utxos <- nodeUtxosAtTxOutRefs info $ curry txOutRefFromTuple txId <$> [startIx .. uptoIx]
+    let acc' = acc <> utxos
+    if utxosSize utxos == 0
+      then pure acc'
+      else go acc' (uptoIx + 1) (uptoIx * 2)

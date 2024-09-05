@@ -187,13 +187,13 @@ writeTx file tx = do
     Right () -> pure ()
 
 data PlutusTxId (v :: PlutusVersion) where
-  PlutusTxIdBeforeV3 :: (PlutusV3 `VersionIsGreater` v) => PlutusV1.TxId -> PlutusTxId v
+  PlutusTxIdBeforeV3 :: PlutusV3 `VersionIsGreater` v => PlutusV1.TxId -> PlutusTxId v
   PlutusTxIdV3 :: PlutusV3.TxId -> PlutusTxId 'PlutusV3
 
 -- | Transaction hash/id of a particular transaction.
 newtype GYTxId = GYTxId Api.TxId
   deriving (Eq, Ord)
-  deriving newtype (FromJSON) -- TODO: Also derive ToJSON?
+  deriving newtype FromJSON -- TODO: Also derive ToJSON?
 
 instance PQ.ToField GYTxId where
   toField (GYTxId txId) = PQ.toField (PQ.Binary (Api.serialiseToRawBytes txId))
@@ -278,7 +278,7 @@ txIdFromPlutus (PlutusTxIdV3 (PlutusV3.TxId (Plutus.BuiltinByteString bs))) = tx
 
 -- | Wrapper around transaction witness set. Note that Babbage ledger also uses the same @TxWitness@ type defined in Alonzo ledger, which was updated for Plutus-V2 scripts and same is expected for Plutus-V3.
 newtype GYTxWitness = GYTxWitness (AlonzoTxWits (Conway.ConwayEra Crypto.StandardCrypto))
-  deriving newtype (Show)
+  deriving newtype Show
 
 instance Swagger.ToSchema GYTxWitness where
   declareNamedSchema _ =

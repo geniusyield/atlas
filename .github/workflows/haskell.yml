@@ -118,6 +118,22 @@ jobs:
           ${{ runner.os }}-build-${{ env.cache-name }}-
           ${{ runner.os }}-build-
           ${{ runner.os }}-
+
+    - name: Install fourmolu
+      run: cabal install fourmolu --overwrite-policy=always
+
+    - name: Lint Haskell
+      run: |
+        find . -name '*.hs' -exec sh -c 'for file do fourmolu -i "$file"; done' sh {} +
+
+    - name: Auto-commit lint
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: fourmolu auto-commit
+        commit_user_name: GitHub Action
+        commit_user_email: action@github.com
+        branch: ${{ github.head_ref }}
+
     - name: Install LIBSODIUM
       run: |
         git clone https://github.com/input-output-hk/libsodium

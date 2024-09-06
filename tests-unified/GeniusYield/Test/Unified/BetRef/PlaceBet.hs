@@ -39,7 +39,7 @@ placeBetTestsClb :: TestTree
 placeBetTestsClb =
   testGroup
     "Place bet"
-    [ mkTestFor "Simple tx"   simpleTxTest
+    [ mkTestFor "Simple tx" simpleTxTest
     , mkTestFor "Placing first bet" firstBetTest'
     , mkTestFor "Multiple bets" multipleBetsTest
     , mkTestFor "Multiple bets - to small step" $ mustFail . failingMultipleBetsTest

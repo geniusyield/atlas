@@ -40,6 +40,7 @@ data BetRefParams = BetRefParams
   , brpBetReveal :: POSIXTime   -- ^ Time at which Oracle will reveal the correct match result.
   , brpBetStep   :: Value       -- ^ Each newly placed bet must be more than previous bet by `brpBetStep` amount.
   }
+  deriving stock (Show)
 -- PlutusTx.makeLift ''BetRefParams
 PlutusTx.unstableMakeIsData ''BetRefParams
 

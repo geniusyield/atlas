@@ -555,7 +555,7 @@ maestroProtocolParams env = do
         , cppGovActionDeposit = THKD $ Ledger.Coin $ fromIntegral $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersGovernanceActionDeposit
         , cppDRepDeposit = THKD $ Ledger.Coin $ fromIntegral $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersDelegateRepresentativeDeposit
         , cppDRepActivity = THKD (Ledger.EpochInterval $ fromIntegral protocolParametersDelegateRepresentativeMaxIdleTime)
-        , cppMinFeeRefScriptCostPerByte = THKD $ unsafeBoundRational $ Maestro.minFeeReferenceScriptsBase $ protocolParametersMinFeeReferenceScripts
+        , cppMinFeeRefScriptCostPerByte = THKD $ unsafeBoundRational $ Maestro.minFeeReferenceScriptsBase protocolParametersMinFeeReferenceScripts
         }
  where
   errPath = "GeniusYield.Providers.Maestro.maestroProtocolParams: "

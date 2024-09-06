@@ -116,7 +116,8 @@ TL;DR: Remove all user creation code from test setups and point Atlas users to u
 data TestInfo = TestInfo
   { testGoldAsset :: !GYAssetClass
   , testIronAsset :: !GYAssetClass
-  , testWallets :: !Wallets }
+  , testWallets :: !Wallets
+  }
 
 -- TODO (simplify-genesis): Remove this type once user creation logic is removed from test setup.
 

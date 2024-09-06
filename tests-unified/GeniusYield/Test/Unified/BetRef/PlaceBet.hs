@@ -39,7 +39,7 @@ placeBetTestsClb :: TestTree
 placeBetTestsClb =
   testGroup
     "Place bet"
-    [ mkTestFor "Simple tx" $ simpleTxTest
+    [ mkTestFor "Simple tx" simpleTxTest
     , mkTestFor "Placing first bet" firstBetTest'
     , mkTestFor "Multiple bets" multipleBetsTest
     , mkTestFor "Multiple bets - to small step" $ mustFail . failingMultipleBetsTest
@@ -50,7 +50,7 @@ placeBetTests :: Setup -> TestTree
 placeBetTests setup =
   testGroup
     "Place bet"
-    [ mkPrivnetTestFor_ "Simple tx" $ simpleTxTest
+    [ mkPrivnetTestFor_ "Simple tx" simpleTxTest
     , mkPrivnetTestFor_ "Placing first bet" firstBetTest'
     , mkPrivnetTestFor_ "Multiple bets" multipleBetsTest
     , mkPrivnetTestFor' "Multiple bets - too small step" GYDebug setup $

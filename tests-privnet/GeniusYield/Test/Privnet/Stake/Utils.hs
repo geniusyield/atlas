@@ -11,26 +11,28 @@ module GeniusYield.Test.Privnet.Stake.Utils (
   stakeIntegrationTest,
 ) where
 
-import           Data.Foldable                                (for_)
-import           Data.Maybe                                   (fromJust,
-                                                               isNothing)
-import qualified Data.Set                                     as Set
-import           GeniusYield.Imports
-import           GeniusYield.OnChain.AStakeValidator.Compiled (originalAStakeValidator)
-import           GeniusYield.Test.Privnet.Ctx
-import           GeniusYield.Transaction                      (GYCoinSelectionStrategy (..))
-import           GeniusYield.TxBuilder
-import           GeniusYield.Types
-import           GeniusYield.Types.Delegatee                  (GYDelegatee (..))
-import           Test.Tasty.HUnit                             (assertBool)
+import Data.Foldable (for_)
+import Data.Maybe (
+  fromJust,
+  isNothing,
+ )
+import Data.Set qualified as Set
+import GeniusYield.Imports
+import GeniusYield.OnChain.AStakeValidator.Compiled (originalAStakeValidator)
+import GeniusYield.Test.Privnet.Ctx
+import GeniusYield.Transaction (GYCoinSelectionStrategy (..))
+import GeniusYield.TxBuilder
+import GeniusYield.Types
+import GeniusYield.Types.Delegatee (GYDelegatee (..))
+import Test.Tasty.HUnit (assertBool)
 
 someAddr :: GYAddress
 someAddr = unsafeAddressFromText "addr_test1wpgexmeunzsykesf42d4eqet5yvzeap6trjnflxqtkcf66g0kpnxt"
 
 aStakeValidator :: GYStakeValidator 'PlutusV2
 aStakeValidator =
-    stakeValidatorFromPlutus  @'PlutusV2
-        $ originalAStakeValidator (addressToPlutus someAddr)
+  stakeValidatorFromPlutus @'PlutusV2 $
+    originalAStakeValidator (addressToPlutus someAddr)
 
 createMangledUser :: Ctx -> GYStakeCredential -> IO User
 createMangledUser ctx stakeCred = do
@@ -66,15 +68,16 @@ resolveWdrlWitness isScript = if not isScript then GYTxWdrlWitnessKey else GYTxW
 registerStakeCredentialSteps :: GYCoinSelectionStrategy -> User -> Maybe GYStakeValidatorHash -> (String -> IO ()) -> Ctx -> IO ()
 registerStakeCredentialSteps strat user mstakeValHash info ctx = do
   mstakeAddressInfo <- ctxRunQuery ctx $ stakeAddressInfo (resolveStakeAddress (ctxNetworkId ctx) user mstakeValHash)
-  if isJust mstakeAddressInfo then do
-    info "Stake credential already registered\n"
-  else do
-    pp <- ctxGetParams ctx & gyGetProtocolParameters'
-    info $ "-- Protocol parameters --\n" <> show pp <> "\n-- x --\n"
-    txBodyReg <- ctxRun ctx user $ do
-      buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressRegistrationCertificate (resolveStakeCredential user mstakeValHash) (resolveCertWitness (isJust mstakeValHash)))
-    info $ "-- Registration tx body --\n" <> show txBodyReg <> "\n-- x --\n"
-    ctxRun ctx user $ submitTxBodyConfirmed_ txBodyReg $ resolveSigningRequirement user mstakeValHash
+  if isJust mstakeAddressInfo
+    then do
+      info "Stake credential already registered\n"
+    else do
+      pp <- ctxGetParams ctx & gyGetProtocolParameters'
+      info $ "-- Protocol parameters --\n" <> show pp <> "\n-- x --\n"
+      txBodyReg <- ctxRun ctx user $ do
+        buildTxBodyWithStrategy strat $ mustHaveCertificate (mkStakeAddressRegistrationCertificate (resolveStakeCredential user mstakeValHash) (resolveCertWitness (isJust mstakeValHash)))
+      info $ "-- Registration tx body --\n" <> show txBodyReg <> "\n-- x --\n"
+      ctxRun ctx user $ submitTxBodyConfirmed_ txBodyReg $ resolveSigningRequirement user mstakeValHash
 
 delegateStakeCredentialSteps :: GYCoinSelectionStrategy -> User -> Maybe GYStakeValidatorHash -> GYStakePoolId -> (String -> IO ()) -> Ctx -> IO ()
 delegateStakeCredentialSteps strat user mstakeValHash spId info ctx = do
@@ -93,9 +96,10 @@ deregisterStakeCredentialSteps strat user mstakeValHash info ctx = do
 withdrawRewardsSteps :: GYCoinSelectionStrategy -> User -> Maybe GYStakeValidatorHash -> Natural -> (String -> IO ()) -> Ctx -> IO ()
 withdrawRewardsSteps strat user mstakeValHash rewards info ctx = do
   txBodyWithdraw <- ctxRun ctx user $ do
-    buildTxBodyWithStrategy strat $ mustHaveWithdrawal (GYTxWdrl (resolveStakeAddress (ctxNetworkId ctx) user mstakeValHash) rewards (resolveWdrlWitness (isJust mstakeValHash))) <> case mstakeValHash of
-      Just _  -> mustHaveOutput (mkGYTxOutNoDatum someAddr mempty)
-      Nothing -> mempty
+    buildTxBodyWithStrategy strat $
+      mustHaveWithdrawal (GYTxWdrl (resolveStakeAddress (ctxNetworkId ctx) user mstakeValHash) rewards (resolveWdrlWitness (isJust mstakeValHash))) <> case mstakeValHash of
+        Just _ -> mustHaveOutput (mkGYTxOutNoDatum someAddr mempty)
+        Nothing -> mempty
   info $ "-- Withdrawal tx body --\n" <> show txBodyWithdraw <> "\n-- x --\n"
   ctxRun ctx user . submitTxBodyConfirmed_ txBodyWithdraw $ resolveSigningRequirement user mstakeValHash
 

@@ -1,10 +1,9 @@
-{-|
+{- |
 Module      : GeniusYield.Types.DRep
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.Types.DRep (
   GYDRep,
@@ -12,13 +11,17 @@ module GeniusYield.Types.DRep (
   drepFromLedger,
 ) where
 
-import qualified Cardano.Api.Ledger                  as Ledger
-import           GeniusYield.Types.PubKeyHash        (GYPubKeyHash,
-                                                      pubKeyHashFromLedger,
-                                                      pubKeyHashToLedger)
-import           GeniusYield.Types.Script.ScriptHash (GYScriptHash,
-                                                      scriptHashFromLedger,
-                                                      scriptHashToLedger)
+import Cardano.Api.Ledger qualified as Ledger
+import GeniusYield.Types.PubKeyHash (
+  GYPubKeyHash,
+  pubKeyHashFromLedger,
+  pubKeyHashToLedger,
+ )
+import GeniusYield.Types.Script.ScriptHash (
+  GYScriptHash,
+  scriptHashFromLedger,
+  scriptHashToLedger,
+ )
 
 data GYDRep
   = GYDRepKeyHash !GYPubKeyHash
@@ -37,7 +40,7 @@ drepToLedger drep = case drep of
 drepFromLedger :: Ledger.DRep Ledger.StandardCrypto -> GYDRep
 drepFromLedger drep = case drep of
   Ledger.DRepCredential s -> case s of
-    Ledger.KeyHashObj kh    -> GYDRepKeyHash $ pubKeyHashFromLedger kh
+    Ledger.KeyHashObj kh -> GYDRepKeyHash $ pubKeyHashFromLedger kh
     Ledger.ScriptHashObj sh -> GYDRepScriptHash $ scriptHashFromLedger sh
   Ledger.DRepAlwaysAbstain -> GYDRepAlwaysAbstain
   Ledger.DRepAlwaysNoConfidence -> GYDRepAlwaysNoConfidence

@@ -1,4 +1,4 @@
-{-|
+{- |
 Module      : GeniusYield.Types.TxMetadata.Internal
 Copyright   : (c) 2024 GYELD GMBH
 License     : Apache 2.0
@@ -7,20 +7,19 @@ Stability   : develop
 
 Internal module defining the 'GYTxMetadataValue' type and exposing all it's constructors.
 -}
-
 module GeniusYield.Types.TxMetadata.Internal (
   GYTxMetadataValue (..),
   txMetadataValueToApi,
-  txMetadataValueFromApi
+  txMetadataValueFromApi,
 ) where
 
-import qualified Cardano.Api         as Api
-import           Data.ByteString     (ByteString)
-import           GeniusYield.Imports (Text, bimap)
+import Cardano.Api qualified as Api
+import Data.ByteString (ByteString)
+import GeniusYield.Imports (Text, bimap)
 
 -- | A value in the transaction metadata.
-data GYTxMetadataValue =
-    GYTxMetaMap [(GYTxMetadataValue, GYTxMetadataValue)]
+data GYTxMetadataValue
+  = GYTxMetaMap [(GYTxMetadataValue, GYTxMetadataValue)]
   | GYTxMetaList [GYTxMetadataValue]
   | GYTxMetaNumber Integer
   | GYTxMetaBytes ByteString

@@ -1,74 +1,79 @@
-{-|
+{- |
 Module      : GeniusYield.Types.Credential
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.Types.Credential (
-    -- * Payment credential.
-    GYPaymentCredential (..)
-  , paymentCredentialToApi
-  , paymentCredentialFromApi
-  , paymentCredentialToLedger
-  , paymentCredentialFromLedger
-  , paymentCredentialToPlutus
-  , paymentCredentialToHexText
-  , paymentCredentialToBech32
-    -- * Stake credential.
-  , GYStakeCredential (..)
-  , stakeCredentialToApi
-  , stakeCredentialFromApi
-  , stakeCredentialToLedger
-  , stakeCredentialFromLedger
-  , stakeCredentialToPlutus
-  , stakeCredentialToHexText
-  ) where
+  -- * Payment credential.
+  GYPaymentCredential (..),
+  paymentCredentialToApi,
+  paymentCredentialFromApi,
+  paymentCredentialToLedger,
+  paymentCredentialFromLedger,
+  paymentCredentialToPlutus,
+  paymentCredentialToHexText,
+  paymentCredentialToBech32,
 
+  -- * Stake credential.
+  GYStakeCredential (..),
+  stakeCredentialToApi,
+  stakeCredentialFromApi,
+  stakeCredentialToLedger,
+  stakeCredentialFromLedger,
+  stakeCredentialToPlutus,
+  stakeCredentialToHexText,
+) where
 
-import qualified Cardano.Api                      as Api
-import qualified Cardano.Api.Ledger               as Ledger
-import qualified Cardano.Api.Shelley              as Api
-import           Data.Hashable                    (Hashable (..))
-import           Data.Text                        (Text)
-import           GeniusYield.Imports              ((>>>))
-import           GeniusYield.Types.PaymentKeyHash (GYPaymentKeyHash,
-                                                   paymentKeyHashFromApi,
-                                                   paymentKeyHashFromLedger,
-                                                   paymentKeyHashToApi,
-                                                   paymentKeyHashToLedger,
-                                                   paymentKeyHashToPlutus)
-import           GeniusYield.Types.PubKeyHash     (AsPubKeyHash (fromPubKeyHash, toPubKeyHash))
-import           GeniusYield.Types.Script         (GYScriptHash,
-                                                   GYStakeValidatorHash,
-                                                   scriptHashFromApi,
-                                                   scriptHashFromLedger,
-                                                   scriptHashToApi,
-                                                   scriptHashToLedger,
-                                                   scriptHashToPlutus,
-                                                   stakeValidatorHashFromApi,
-                                                   stakeValidatorHashToApi,
-                                                   stakeValidatorHashToPlutus)
-import           GeniusYield.Types.StakeKeyHash   (GYStakeKeyHash,
-                                                   stakeKeyHashFromApi,
-                                                   stakeKeyHashToApi)
-import           GeniusYield.Utils                (serialiseToBech32WithPrefix)
-import qualified PlutusLedgerApi.V1               as Plutus (Credential (..))
-import qualified Text.Printf                      as Printf
+import Cardano.Api qualified as Api
+import Cardano.Api.Ledger qualified as Ledger
+import Cardano.Api.Shelley qualified as Api
+import Data.Hashable (Hashable (..))
+import Data.Text (Text)
+import GeniusYield.Imports ((>>>))
+import GeniusYield.Types.PaymentKeyHash (
+  GYPaymentKeyHash,
+  paymentKeyHashFromApi,
+  paymentKeyHashFromLedger,
+  paymentKeyHashToApi,
+  paymentKeyHashToLedger,
+  paymentKeyHashToPlutus,
+ )
+import GeniusYield.Types.PubKeyHash (AsPubKeyHash (fromPubKeyHash, toPubKeyHash))
+import GeniusYield.Types.Script (
+  GYScriptHash,
+  GYStakeValidatorHash,
+  scriptHashFromApi,
+  scriptHashFromLedger,
+  scriptHashToApi,
+  scriptHashToLedger,
+  scriptHashToPlutus,
+  stakeValidatorHashFromApi,
+  stakeValidatorHashToApi,
+  stakeValidatorHashToPlutus,
+ )
+import GeniusYield.Types.StakeKeyHash (
+  GYStakeKeyHash,
+  stakeKeyHashFromApi,
+  stakeKeyHashToApi,
+ )
+import GeniusYield.Utils (serialiseToBech32WithPrefix)
+import PlutusLedgerApi.V1 qualified as Plutus (Credential (..))
+import Text.Printf qualified as Printf
 
 -- | Payment credential.
 data GYPaymentCredential
-       = GYPaymentCredentialByKey !GYPaymentKeyHash
-       | GYPaymentCredentialByScript !GYScriptHash
-    deriving (Show, Eq, Ord)
+  = GYPaymentCredentialByKey !GYPaymentKeyHash
+  | GYPaymentCredentialByScript !GYScriptHash
+  deriving (Show, Eq, Ord)
 
 instance Printf.PrintfArg GYPaymentCredential where
   formatArg (GYPaymentCredentialByKey pkh) = Printf.formatArg $ "Payment key credential: " <> Api.serialiseToRawBytesHexText (paymentKeyHashToApi pkh)
   formatArg (GYPaymentCredentialByScript sh) = Printf.formatArg $ "Payment script credential: " <> Api.serialiseToRawBytesHexText (scriptHashToApi sh)
 
 instance Hashable GYPaymentCredential where
-    hashWithSalt salt cred = hashWithSalt salt $ paymentCredentialToHexText cred
+  hashWithSalt salt cred = hashWithSalt salt $ paymentCredentialToHexText cred
 
 -- | Convert @GY@ type to corresponding type in @cardano-node@ library.
 paymentCredentialToApi :: GYPaymentCredential -> Api.PaymentCredential
@@ -110,9 +115,9 @@ paymentCredentialToBech32 (GYPaymentCredentialByScript sh) = serialiseToBech32Wi
 
 -- | Stake credential.
 data GYStakeCredential
-       = GYStakeCredentialByKey !GYStakeKeyHash
-       | GYStakeCredentialByScript !GYStakeValidatorHash
-    deriving (Show, Eq, Ord)
+  = GYStakeCredentialByKey !GYStakeKeyHash
+  | GYStakeCredentialByScript !GYStakeValidatorHash
+  deriving (Show, Eq, Ord)
 
 instance Printf.PrintfArg GYStakeCredential where
   formatArg (GYStakeCredentialByKey skh) = Printf.formatArg $ "Stake key credential: " <> Api.serialiseToRawBytesHexText (stakeKeyHashToApi skh)

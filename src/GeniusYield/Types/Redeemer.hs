@@ -1,37 +1,38 @@
-{-|
+{- |
 Module      : GeniusYield.Types.Redeemer
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.Types.Redeemer (
-    GYRedeemer,
-    redeemerToApi,
-    redeemerFromApi,
-    redeemerToPlutus,
-    redeemerToPlutus',
-    redeemerFromPlutus,
-    redeemerFromPlutus',
-    redeemerFromPlutusData,
-    unitRedeemer,
-    nothingRedeemer,
+  GYRedeemer,
+  redeemerToApi,
+  redeemerFromApi,
+  redeemerToPlutus,
+  redeemerToPlutus',
+  redeemerFromPlutus,
+  redeemerFromPlutus',
+  redeemerFromPlutusData,
+  unitRedeemer,
+  nothingRedeemer,
 ) where
 
-import qualified Cardano.Api         as Api
-import qualified Cardano.Api.Shelley as Api
-import           GeniusYield.Imports ((>>>))
-import qualified PlutusLedgerApi.V1  as PlutusV1
-import qualified PlutusTx
+import Cardano.Api qualified as Api
+import Cardano.Api.Shelley qualified as Api
+import GeniusYield.Imports ((>>>))
+import PlutusLedgerApi.V1 qualified as PlutusV1
+import PlutusTx qualified
 
 newtype GYRedeemer = GYRedeemer PlutusTx.BuiltinData
-  deriving (Eq)
+  deriving Eq
 
 instance Show GYRedeemer where
-    showsPrec d (GYRedeemer x) = showParen (d > 10)
-        -- Show BuiltinData doesn't respect precedence.
-        $ showString "redeemerFromPlutus' (BuiltinData ("
+  showsPrec d (GYRedeemer x) =
+    showParen (d > 10)
+    -- Show BuiltinData doesn't respect precedence.
+    $
+      showString "redeemerFromPlutus' (BuiltinData ("
         . shows x
         . showString "))"
 
@@ -56,22 +57,22 @@ redeemerToApi = redeemerToPlutus' >>> PlutusTx.builtinDataToData >>> Api.fromPlu
 redeemerFromApi :: Api.HashableScriptData -> GYRedeemer
 redeemerFromApi = GYRedeemer . PlutusTx.dataToBuiltinData . Api.toPlutusData . Api.getScriptData
 
--- | Unit redeemer
---
--- @'redeemerFromPlutusData' ()@.
---
--- Often used as an arbitrary redeemer.
---
+{- | Unit redeemer
+
+@'redeemerFromPlutusData' ()@.
+
+Often used as an arbitrary redeemer.
+-}
 unitRedeemer :: GYRedeemer
 unitRedeemer = redeemerFromPlutusData ()
 
--- | A @'redeemerFromPlutusData' (Nothing \@a)@ for any @a@.
---
--- >>> nothingRedeemer
--- redeemerFromPlutus' (BuiltinData (Constr 1 []))
---
--- >>> redeemerFromPlutusData (Nothing @Integer)
--- redeemerFromPlutus' (BuiltinData (Constr 1 []))
---
+{- | A @'redeemerFromPlutusData' (Nothing \@a)@ for any @a@.
+
+>>> nothingRedeemer
+redeemerFromPlutus' (BuiltinData (Constr 1 []))
+
+>>> redeemerFromPlutusData (Nothing @Integer)
+redeemerFromPlutus' (BuiltinData (Constr 1 []))
+-}
 nothingRedeemer :: GYRedeemer
 nothingRedeemer = redeemerFromPlutusData (Nothing @())

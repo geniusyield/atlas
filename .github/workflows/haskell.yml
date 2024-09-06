@@ -118,6 +118,7 @@ jobs:
           ${{ runner.os }}-build-${{ env.cache-name }}-
           ${{ runner.os }}-build-
           ${{ runner.os }}-
+
     - name: Install LIBSODIUM
       run: |
         git clone https://github.com/input-output-hk/libsodium
@@ -167,6 +168,10 @@ jobs:
       run: cabal build --only-dependencies --enable-tests --enable-benchmarks
     - name: Build all targets (cabal)
       run: cabal build --enable-tests --enable-benchmarks all
+    - name: Install fourmolu
+      run: cabal install fourmolu --overwrite-policy=always
+    - name: Run checks (fourmolu)
+      run: git ls-files -z '*.hs' | xargs -P 12 -0 fourmolu --mode check
     - name: Symlink cardano-node binaries
       run: cabal install --package-env=$(pwd) --overwrite-policy=always cardano-cli cardano-node
     - name: Run privnet tests

@@ -1,24 +1,23 @@
-{-|
+{- |
 Module      : GeniusYield.Examples.Gift
 Description : The simplest script imaginable, which does nothing: always succeeds.
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.Examples.Gift (
-    -- * Scripts
-    giftValidatorV1,
-    giftValidatorV2,
+  -- * Scripts
+  giftValidatorV1,
+  giftValidatorV2,
 ) where
 
-import           GeniusYield.Types
+import GeniusYield.Types
 
-import           GeniusYield.Examples.Common (toDeBruijn)
-import qualified PlutusLedgerApi.Common      as Plutus
-import qualified UntypedPlutusCore           as UPLC
-import qualified PlutusCore.Version          as PLC
+import GeniusYield.Examples.Common (toDeBruijn)
+import PlutusCore.Version qualified as PLC
+import PlutusLedgerApi.Common qualified as Plutus
+import UntypedPlutusCore qualified as UPLC
 
 -------------------------------------------------------------------------------
 -- Script
@@ -26,17 +25,17 @@ import qualified PlutusCore.Version          as PLC
 
 -- | A very simple script: @\\datum redeemer sc -> sc@
 giftScript :: UPLC.Term UPLC.Name UPLC.DefaultUni UPLC.DefaultFun ()
-giftScript
-    = UPLC.LamAbs ann datumName
-    $ UPLC.LamAbs ann redeemerName
-    $ UPLC.LamAbs ann scName
-    $ UPLC.Var ann scName
-  where
-    ann = ()
+giftScript =
+  UPLC.LamAbs ann datumName $
+    UPLC.LamAbs ann redeemerName $
+      UPLC.LamAbs ann scName $
+        UPLC.Var ann scName
+ where
+  ann = ()
 
-    datumName    = UPLC.Name "datum" (UPLC.Unique 0)
-    redeemerName = UPLC.Name "redeemer" (UPLC.Unique 1)
-    scName       = UPLC.Name "sc" (UPLC.Unique 2)
+  datumName = UPLC.Name "datum" (UPLC.Unique 0)
+  redeemerName = UPLC.Name "redeemer" (UPLC.Unique 1)
+  scName = UPLC.Name "sc" (UPLC.Unique 2)
 
 giftScript' :: UPLC.Term UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
 giftScript' = toDeBruijn giftScript
@@ -48,5 +47,6 @@ giftValidatorV2 :: GYValidator 'PlutusV2
 giftValidatorV2 = validatorFromSerialisedScript giftValidatorPlutusSerialised
 
 giftValidatorPlutusSerialised :: Plutus.SerialisedScript
-giftValidatorPlutusSerialised = Plutus.serialiseUPLC $
+giftValidatorPlutusSerialised =
+  Plutus.serialiseUPLC $
     UPLC.Program () PLC.plcVersion100 giftScript'

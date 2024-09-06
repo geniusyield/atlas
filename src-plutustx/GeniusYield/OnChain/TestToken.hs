@@ -1,39 +1,38 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS -fno-strictness -fno-spec-constr -fno-specialise #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-{-|
+{- |
 Module      : GeniusYield.OnChain.TestToken
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.OnChain.TestToken (
-    mkTestTokenPolicy,
+  mkTestTokenPolicy,
 ) where
 
-import           PlutusLedgerApi.V1.Value (flattenValue)
-import           PlutusLedgerApi.V2
-import           PlutusTx.Prelude
+import PlutusLedgerApi.V1.Value (flattenValue)
+import PlutusLedgerApi.V2
+import PlutusTx.Prelude
 
-{-# INLINABLE mkTestTokenPolicy #-}
+{-# INLINEABLE mkTestTokenPolicy #-}
 mkTestTokenPolicy :: Integer -> TokenName -> TxOutRef -> BuiltinData -> BuiltinData -> ()
 mkTestTokenPolicy amt tn utxo _ ctx'
-    | hasn'tUTxO  = traceError "UTxO not consumed"
-    | tn /= tn'   = traceError "wrong token"
-    | amt /= amt' = traceError "wrong amount"
-    | otherwise   = ()
-  where
-    ctx :: ScriptContext
-    ctx = unsafeFromBuiltinData ctx'
+  | hasn'tUTxO = traceError "UTxO not consumed"
+  | tn /= tn' = traceError "wrong token"
+  | amt /= amt' = traceError "wrong amount"
+  | otherwise = ()
+ where
+  ctx :: ScriptContext
+  ctx = unsafeFromBuiltinData ctx'
 
-    info :: TxInfo
-    info = scriptContextTxInfo ctx
+  info :: TxInfo
+  info = scriptContextTxInfo ctx
 
-    [(_, tn', amt')] = flattenValue $ txInfoMint info
+  [(_, tn', amt')] = flattenValue $ txInfoMint info
 
-    hasn'tUTxO :: Bool
-    hasn'tUTxO = all (\i -> txInInfoOutRef i /= utxo) $ txInfoInputs info
+  hasn'tUTxO :: Bool
+  hasn'tUTxO = all (\i -> txInInfoOutRef i /= utxo) $ txInfoInputs info

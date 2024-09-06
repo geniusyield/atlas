@@ -2,22 +2,24 @@ module GeniusYield.Test.Privnet.SimpleScripts (
   simpleScriptsTests,
 ) where
 
-import           Control.Lens                   (each, (%~), (&))
-import           Control.Monad                  (when)
-import           GeniusYield.Test.Privnet.Ctx
-import           GeniusYield.Test.Privnet.Setup
-import           GeniusYield.TxBuilder
-import           GeniusYield.Types
-import           Test.Tasty                     (TestTree, testGroup)
-import           Test.Tasty.HUnit               (testCaseSteps)
+import Control.Lens (each, (%~), (&))
+import Control.Monad (when)
+import GeniusYield.Test.Privnet.Ctx
+import GeniusYield.Test.Privnet.Setup
+import GeniusYield.TxBuilder
+import GeniusYield.Types
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (testCaseSteps)
 
 simpleScriptsTests :: Setup -> TestTree
-simpleScriptsTests setup = testGroup "simple-scripts"
-  [ testCaseSteps "exercising a multi-sig simple script without giving it as reference" $ \info -> withSetup info setup $ \ctx -> do
-    exerciseASimpleScript ctx info False
-  , testCaseSteps "exercising a multi-sig simple script when given as a reference" $ \info -> withSetup info setup $ \ctx -> do
-    exerciseASimpleScript ctx info True
-  ]
+simpleScriptsTests setup =
+  testGroup
+    "simple-scripts"
+    [ testCaseSteps "exercising a multi-sig simple script without giving it as reference" $ \info -> withSetup info setup $ \ctx -> do
+        exerciseASimpleScript ctx info False
+    , testCaseSteps "exercising a multi-sig simple script when given as a reference" $ \info -> withSetup info setup $ \ctx -> do
+        exerciseASimpleScript ctx info True
+    ]
 
 exerciseASimpleScript :: Ctx -> (String -> IO ()) -> Bool -> IO ()
 exerciseASimpleScript ctx info toUseRefScript = do

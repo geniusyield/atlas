@@ -1,23 +1,22 @@
-{-|
+{- |
 Module      : GeniusYield.CardanoApi.EraHistory
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.CardanoApi.EraHistory (
   extractEraSummaries,
   showEraSummaries,
-  getEraEndSlot
- ) where
+  getEraEndSlot,
+) where
 
-import qualified Unsafe.Coerce                        as UNSAFE
+import Unsafe.Coerce qualified as UNSAFE
 
-import qualified Cardano.Api                          as Api
-import           Data.SOP.NonEmpty                    (nonEmptyLast)
-import qualified Ouroboros.Consensus.Cardano.Block    as Ouroboros
-import qualified Ouroboros.Consensus.HardFork.History as Ouroboros
+import Cardano.Api qualified as Api
+import Data.SOP.NonEmpty (nonEmptyLast)
+import Ouroboros.Consensus.Cardano.Block qualified as Ouroboros
+import Ouroboros.Consensus.HardFork.History qualified as Ouroboros
 
 {- | Extract the 'Ouroboros.Summary' from Cardano 'Api.EraHistory'.
 
@@ -40,6 +39,6 @@ showEraSummaries eraHist = show $ extractEraSummaries eraHist
 -- | Get the slot after which the current era ends.
 getEraEndSlot :: Api.EraHistory -> Maybe Api.SlotNo
 getEraEndSlot (extractEraSummaries -> Ouroboros.Summary summaries) =
-    case Ouroboros.eraEnd (nonEmptyLast summaries) of
-        Ouroboros.EraUnbounded -> Nothing
-        Ouroboros.EraEnd bound -> Just $! Ouroboros.boundSlot bound
+  case Ouroboros.eraEnd (nonEmptyLast summaries) of
+    Ouroboros.EraUnbounded -> Nothing
+    Ouroboros.EraEnd bound -> Just $! Ouroboros.boundSlot bound

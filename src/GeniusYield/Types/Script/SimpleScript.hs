@@ -1,4 +1,4 @@
-{-|
+{- |
 Module      : GeniusYield.Types.Script.SimpleScript
 Description : Simple scripts API
 Copyright   : (c) 2024 GYELD GMBH
@@ -23,29 +23,37 @@ module GeniusYield.Types.Script.SimpleScript (
   simpleScriptFromJSON,
 ) where
 
-import qualified Cardano.Api                         as Api
-import qualified Data.Aeson                          as Aeson
-import qualified Data.Aeson.Types                    as Aeson
-import           Data.ByteString                     (ByteString)
-import qualified Data.ByteString.Base16              as BS16
-import           Data.Foldable                       (foldMap')
-import qualified Data.Set                            as Set
-import           GeniusYield.Imports
-import           GeniusYield.ReadJSON                (readJSON)
-import           GeniusYield.Types.PaymentKeyHash    (GYPaymentKeyHash,
-                                                      paymentKeyHashFromApi,
-                                                      paymentKeyHashToApi)
-import           GeniusYield.Types.Script.ScriptHash (GYScriptHash,
-                                                      scriptHashFromApi)
-import           GeniusYield.Types.Slot              (GYSlot, slotFromApi,
-                                                      slotToApi)
+import Cardano.Api qualified as Api
+import Data.Aeson qualified as Aeson
+import Data.Aeson.Types qualified as Aeson
+import Data.ByteString (ByteString)
+import Data.ByteString.Base16 qualified as BS16
+import Data.Foldable (foldMap')
+import Data.Set qualified as Set
+import GeniusYield.Imports
+import GeniusYield.ReadJSON (readJSON)
+import GeniusYield.Types.PaymentKeyHash (
+  GYPaymentKeyHash,
+  paymentKeyHashFromApi,
+  paymentKeyHashToApi,
+ )
+import GeniusYield.Types.Script.ScriptHash (
+  GYScriptHash,
+  scriptHashFromApi,
+ )
+import GeniusYield.Types.Slot (
+  GYSlot,
+  slotFromApi,
+  slotToApi,
+ )
 
--- $setup
---
--- >>> :set -XOverloadedStrings -XTypeApplications
--- >>>
--- >>> import GeniusYield.Types
--- >>> import Data.Set qualified as Set
+{- $setup
+
+>>> :set -XOverloadedStrings -XTypeApplications
+>>>
+>>> import GeniusYield.Types
+>>> import Data.Set qualified as Set
+-}
 
 -- | A simple (aka native / timelock) script that can be used in a transaction.
 data GYSimpleScript
@@ -59,21 +67,21 @@ data GYSimpleScript
 
 simpleScriptToApi :: GYSimpleScript -> Api.SimpleScript
 simpleScriptToApi s = case s of
-  RequireSignature pkh   -> Api.RequireSignature $ paymentKeyHashToApi pkh
+  RequireSignature pkh -> Api.RequireSignature $ paymentKeyHashToApi pkh
   RequireTimeBefore slot -> Api.RequireTimeBefore $ slotToApi slot
-  RequireTimeAfter slot  -> Api.RequireTimeAfter $ slotToApi slot
-  RequireAllOf ss        -> Api.RequireAllOf $ map simpleScriptToApi ss
-  RequireAnyOf ss        -> Api.RequireAnyOf $ map simpleScriptToApi ss
-  RequireMOf m ss        -> Api.RequireMOf m $ map simpleScriptToApi ss
+  RequireTimeAfter slot -> Api.RequireTimeAfter $ slotToApi slot
+  RequireAllOf ss -> Api.RequireAllOf $ map simpleScriptToApi ss
+  RequireAnyOf ss -> Api.RequireAnyOf $ map simpleScriptToApi ss
+  RequireMOf m ss -> Api.RequireMOf m $ map simpleScriptToApi ss
 
 simpleScriptFromApi :: Api.SimpleScript -> GYSimpleScript
 simpleScriptFromApi s = case s of
-  Api.RequireSignature pkh   -> RequireSignature $ paymentKeyHashFromApi pkh
+  Api.RequireSignature pkh -> RequireSignature $ paymentKeyHashFromApi pkh
   Api.RequireTimeBefore slot -> RequireTimeBefore $ slotFromApi slot
-  Api.RequireTimeAfter slot  -> RequireTimeAfter $ slotFromApi slot
-  Api.RequireAllOf ss        -> RequireAllOf $ map simpleScriptFromApi ss
-  Api.RequireAnyOf ss        -> RequireAnyOf $ map simpleScriptFromApi ss
-  Api.RequireMOf m ss        -> RequireMOf m $ map simpleScriptFromApi ss
+  Api.RequireTimeAfter slot -> RequireTimeAfter $ slotFromApi slot
+  Api.RequireAllOf ss -> RequireAllOf $ map simpleScriptFromApi ss
+  Api.RequireAnyOf ss -> RequireAnyOf $ map simpleScriptFromApi ss
+  Api.RequireMOf m ss -> RequireMOf m $ map simpleScriptFromApi ss
 
 instance ToJSON GYSimpleScript where
   toJSON = toJSON . simpleScriptToApi
@@ -85,17 +93,18 @@ instance FromJSON GYSimpleScript where
 readSimpleScript :: FilePath -> IO GYSimpleScript
 readSimpleScript = readJSON
 
--- | Get the total number of unique `GYPaymentKeyHash` mentioned in a 'GYSimpleScript'.
---
--- This is useful for estimating the number of signatures required for a transaction.
---
--- >>> reqSigA = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38a"
--- >>> reqSigB = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38b"
--- >>> reqSigC = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38c"
--- >>> reqSigD = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
--- >>> reqSigE = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38e"
--- >>> Set.size $ getTotalKeysInSimpleScript $ RequireMOf 2 [RequireAllOf [reqSigA, reqSigB, reqSigC], RequireAnyOf [reqSigA, reqSigD], reqSigE]
--- 5
+{- | Get the total number of unique `GYPaymentKeyHash` mentioned in a 'GYSimpleScript'.
+
+This is useful for estimating the number of signatures required for a transaction.
+
+>>> reqSigA = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38a"
+>>> reqSigB = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38b"
+>>> reqSigC = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38c"
+>>> reqSigD = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+>>> reqSigE = RequireSignature "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38e"
+>>> Set.size $ getTotalKeysInSimpleScript $ RequireMOf 2 [RequireAllOf [reqSigA, reqSigB, reqSigC], RequireAnyOf [reqSigA, reqSigD], reqSigE]
+5
+-}
 getTotalKeysInSimpleScript :: GYSimpleScript -> Set GYPaymentKeyHash
 getTotalKeysInSimpleScript = \case
   RequireSignature pkh -> Set.singleton pkh
@@ -120,9 +129,9 @@ simpleScriptFromCBOR = simpleScriptFromCBOR' . encodeUtf8
 -- FIXME: Need to test this.
 simpleScriptFromCBOR' :: ByteString -> Maybe GYSimpleScript
 simpleScriptFromCBOR' b = do
-    bs <- rightToMaybe (BS16.decode b)
-    Api.SimpleScript s <- rightToMaybe $ Api.deserialiseFromCBOR (Api.AsScript Api.AsSimpleScript) bs
-    Just $ simpleScriptFromApi s
+  bs <- rightToMaybe (BS16.decode b)
+  Api.SimpleScript s <- rightToMaybe $ Api.deserialiseFromCBOR (Api.AsScript Api.AsSimpleScript) bs
+  Just $ simpleScriptFromApi s
 
 simpleScriptFromJSON :: Aeson.Value -> Maybe GYSimpleScript
 simpleScriptFromJSON = Aeson.parseMaybe parseJSON

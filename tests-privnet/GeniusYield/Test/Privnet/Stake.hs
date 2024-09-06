@@ -3,5 +3,5 @@ module GeniusYield.Test.Privnet.Stake (
   stakeValidatorTests,
 ) where
 
-import           GeniusYield.Test.Privnet.Stake.Key       (stakeKeyTests)
-import           GeniusYield.Test.Privnet.Stake.Validator (stakeValidatorTests)
+import GeniusYield.Test.Privnet.Stake.Key (stakeKeyTests)
+import GeniusYield.Test.Privnet.Stake.Validator (stakeValidatorTests)

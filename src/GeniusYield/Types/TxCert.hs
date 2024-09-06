@@ -1,31 +1,29 @@
-{-|
+{- |
 Module      : GeniusYield.Types.TxCert
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
-
 -}
 module GeniusYield.Types.TxCert (
-    GYTxCert,
-    GYTxCertWitness (..),
-    txCertToApi,
-    mkStakeAddressRegistrationCertificate,
-    mkStakeAddressDeregistrationCertificate,
-    mkStakeAddressDelegationCertificate,
+  GYTxCert,
+  GYTxCertWitness (..),
+  txCertToApi,
+  mkStakeAddressRegistrationCertificate,
+  mkStakeAddressDeregistrationCertificate,
+  mkStakeAddressDelegationCertificate,
 ) where
 
-import           GeniusYield.Types.Certificate
-import           GeniusYield.Types.Credential      (GYStakeCredential (..))
-import           GeniusYield.Types.Delegatee       (GYDelegatee)
-import           GeniusYield.Types.TxCert.Internal
+import GeniusYield.Types.Certificate
+import GeniusYield.Types.Credential (GYStakeCredential (..))
+import GeniusYield.Types.Delegatee (GYDelegatee)
+import GeniusYield.Types.TxCert.Internal
 
-{-| Post conway, newer stake address registration certificate also require a witness.
--}
+-- | Post conway, newer stake address registration certificate also require a witness.
 mkStakeAddressRegistrationCertificate :: GYStakeCredential -> GYTxCertWitness v -> GYTxCert v
 mkStakeAddressRegistrationCertificate sc wit = GYTxCert (GYStakeAddressRegistrationCertificatePB sc) (Just wit)
 
-{-| Note that deregistration certificate requires following preconditions:
+{- | Note that deregistration certificate requires following preconditions:
 
 1. The stake address must be registered.
 

@@ -15,7 +15,9 @@ category:           Blockchain, Cardano, Framework
 homepage:           https://github.com/geniusyield/atlas#readme
 bug-reports:        https://github.com/geniusyield/atlas/issues
 extra-source-files: README.md
-tested-with:        GHC ==9.6.5
+tested-with:
+  GHC ==9.6.5
+   || ==9.6.6
 
 source-repository head
   type:     git
@@ -376,10 +378,11 @@ test-suite atlas-unified-tests
     atlas-cardano,
     base,
     containers,
-    tasty,
-    text,
+    extra,
     mtl,
     plutus-core,
     plutus-ledger-api,
+    plutus-tx-plugin,
     plutus-tx,
-    plutus-tx-plugin
+    tasty,
+    text,

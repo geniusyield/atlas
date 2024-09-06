@@ -113,7 +113,10 @@ TL;DR: Remove all user creation code from test setups and point Atlas users to u
 -- and pass that 'User' onto the tests.
 
 -- | General information about the test environment to help in running polymorphic tests.
-data TestInfo = TestInfo {testGoldAsset :: !GYAssetClass, testIronAsset :: !GYAssetClass, testWallets :: !Wallets}
+data TestInfo = TestInfo
+  { testGoldAsset :: !GYAssetClass
+  , testIronAsset :: !GYAssetClass
+  , testWallets :: !Wallets }
 
 -- TODO (simplify-genesis): Remove this type once user creation logic is removed from test setup.
 

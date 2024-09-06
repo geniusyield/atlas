@@ -180,7 +180,7 @@ withCfgProviders
           maestroSlotActions <- makeSlotActions slotCachingTime $ MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv
           maestroGetParams <-
             makeGetParameters
-              (MaestroApi.maestroProtocolParams cfgNetworkId maestroApiEnv)
+              (MaestroApi.maestroProtocolParams maestroApiEnv)
               (MaestroApi.maestroSystemStart maestroApiEnv)
               (MaestroApi.maestroEraHistory maestroApiEnv)
               (MaestroApi.maestroStakePools maestroApiEnv)

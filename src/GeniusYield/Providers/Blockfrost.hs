@@ -407,12 +407,12 @@ blockfrostProtocolParams nid proj = do
                 Ledger.EpochInterval . fromIntegral $
                   _protocolParamsEMax
           , cppNOpt = THKD $ fromIntegral _protocolParamsNOpt
-          , cppA0 = THKD $ fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: pool influence received from Maestro is out of bounds") $ Ledger.boundRational _protocolParamsA0
-          , cppRho = THKD $ fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: monetory expansion parameter received from Maestro is out of bounds") $ Ledger.boundRational _protocolParamsRho
-          , cppTau = THKD $ fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: treasury expansion parameter received from Maestro is out of bounds") $ Ledger.boundRational _protocolParamsTau
+          , cppA0 = THKD $ fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: pool influence received from Blockfrost is out of bounds") $ Ledger.boundRational _protocolParamsA0
+          , cppRho = THKD $ fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: monetory expansion parameter received from Blockfrost is out of bounds") $ Ledger.boundRational _protocolParamsRho
+          , cppTau = THKD $ fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: treasury expansion parameter received from Blockfrost is out of bounds") $ Ledger.boundRational _protocolParamsTau
           , cppProtocolVersion =
               Ledger.ProtVer
-                { Ledger.pvMajor = Ledger.mkVersion _protocolParamsProtocolMajorVer & fromMaybe (error "GeniusYield.Providers.Maestro.maestroProtocolParams: major version received from Maestro is out of bounds")
+                { Ledger.pvMajor = Ledger.mkVersion _protocolParamsProtocolMajorVer & fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: major version received from Blockfrost is out of bounds")
                 , Ledger.pvMinor = fromIntegral _protocolParamsProtocolMinorVer
                 }
           , cppMinPoolCost = THKD $ Ledger.Coin $ lovelacesToInteger _protocolParamsMinPoolCost

@@ -198,7 +198,7 @@ withCfgProviders
           blockfrostSlotActions <- makeSlotActions slotCachingTime $ Blockfrost.blockfrostGetSlotOfCurrentBlock proj
           blockfrostGetParams <-
             makeGetParameters
-              (Blockfrost.blockfrostProtocolParams cfgNetworkId proj)
+              (Blockfrost.blockfrostProtocolParams proj)
               (Blockfrost.blockfrostSystemStart proj)
               (Blockfrost.blockfrostEraHistory proj)
               (Blockfrost.blockfrostStakePools proj)

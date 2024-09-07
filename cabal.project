@@ -32,6 +32,15 @@ source-repository-package
   tag: 29a826c26b06505d4fbe81c731125740962a00ce
   --sha256: FIXME:
 
+-- TODO: Temporary, until proposed changes are in upstream.
+source-repository-package
+  type: git
+  location: https://github.com/sourabhxyz/blockfrost-haskell
+  tag: dadffe1b4ed48b7330c6d0dc9d9a358ccef166e0
+  --sha256: FIXME:
+  subdir:
+    blockfrost-api
+
 -- TODO: Temporary, until proposed changes are in upstream (track https://github.com/mlabs-haskell/clb/pull/44)
 source-repository-package
   type: git

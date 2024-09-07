@@ -46,13 +46,16 @@ import Ouroboros.Consensus.HardFork.History qualified as Ouroboros
 import PlutusTx.Builtins qualified as Plutus
 import Web.HttpApiData qualified as Web
 
-import Data.Default (def)
+import Blockfrost.Client (unQuantity)
+import Cardano.Api.Ledger qualified as Ledger
+import Data.Maybe (fromJust)
 import GeniusYield.Imports
 import GeniusYield.Providers.Common
 import GeniusYield.Types
 import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import GeniusYield.Utils (serialiseToBech32WithPrefix)
 import Ouroboros.Consensus.HardFork.History (EraParams (eraGenesisWin))
+import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational)
 
 data BlockfrostProviderException
   = BlpvApiError !Text !Blockfrost.BlockfrostError
@@ -386,87 +389,106 @@ transformUtxoOutput txId (Blockfrost.UtxoOutput {..}, ms) = do
 -- Parameters
 -------------------------------------------------------------------------------
 
-blockfrostProtocolParams :: GYNetworkId -> Blockfrost.Project -> IO ApiProtocolParameters
-blockfrostProtocolParams nid proj = do
+blockfrostProtocolParams :: Blockfrost.Project -> IO ApiProtocolParameters
+blockfrostProtocolParams proj = do
   Blockfrost.ProtocolParams {..} <-
     Blockfrost.runBlockfrost proj Blockfrost.getLatestEpochProtocolParams
       >>= handleBlockfrostError "ProtocolParams"
   pure $
     Ledger.PParams $
-      populateMissingProtocolParameters nid $
-        ConwayPParams
-          { cppMinFeeA = THKD $ Ledger.Coin _protocolParamsMinFeeA
-          , cppMinFeeB = THKD $ Ledger.Coin _protocolParamsMinFeeB
-          , cppMaxBBSize = THKD $ fromIntegral _protocolParamsMaxBlockSize
-          , cppMaxTxSize = THKD $ fromIntegral _protocolParamsMaxTxSize
-          , cppMaxBHSize = THKD $ fromIntegral _protocolParamsMaxBlockHeaderSize
-          , cppKeyDeposit = THKD $ Ledger.Coin $ lovelacesToInteger _protocolParamsKeyDeposit
-          , cppPoolDeposit = THKD $ Ledger.Coin $ lovelacesToInteger _protocolParamsPoolDeposit
-          , cppEMax =
-              THKD $
-                Ledger.EpochInterval . fromIntegral $
-                  _protocolParamsEMax
-          , cppNOpt = THKD $ fromIntegral _protocolParamsNOpt
-          , cppA0 = THKD $ fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: pool influence received from Blockfrost is out of bounds") $ Ledger.boundRational _protocolParamsA0
-          , cppRho = THKD $ fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: monetory expansion parameter received from Blockfrost is out of bounds") $ Ledger.boundRational _protocolParamsRho
-          , cppTau = THKD $ fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: treasury expansion parameter received from Blockfrost is out of bounds") $ Ledger.boundRational _protocolParamsTau
-          , cppProtocolVersion =
-              Ledger.ProtVer
-                { Ledger.pvMajor = Ledger.mkVersion _protocolParamsProtocolMajorVer & fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: major version received from Blockfrost is out of bounds")
-                , Ledger.pvMinor = fromIntegral _protocolParamsProtocolMinorVer
+      ConwayPParams
+        { cppMinFeeA = THKD $ Ledger.Coin _protocolParamsMinFeeA
+        , cppMinFeeB = THKD $ Ledger.Coin _protocolParamsMinFeeB
+        , cppMaxBBSize = THKD $ fromIntegral _protocolParamsMaxBlockSize
+        , cppMaxTxSize = THKD $ fromIntegral _protocolParamsMaxTxSize
+        , cppMaxBHSize = THKD $ fromIntegral _protocolParamsMaxBlockHeaderSize
+        , cppKeyDeposit = THKD $ Ledger.Coin $ lovelacesToInteger _protocolParamsKeyDeposit
+        , cppPoolDeposit = THKD $ Ledger.Coin $ lovelacesToInteger _protocolParamsPoolDeposit
+        , cppEMax =
+            THKD $
+              Ledger.EpochInterval . fromIntegral $
+                _protocolParamsEMax
+        , cppNOpt = THKD $ fromIntegral _protocolParamsNOpt
+        , cppA0 = THKD $ fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: pool influence received from Blockfrost is out of bounds") $ Ledger.boundRational _protocolParamsA0
+        , cppRho = THKD $ fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: monetory expansion parameter received from Blockfrost is out of bounds") $ Ledger.boundRational _protocolParamsRho
+        , cppTau = THKD $ fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: treasury expansion parameter received from Blockfrost is out of bounds") $ Ledger.boundRational _protocolParamsTau
+        , cppProtocolVersion =
+            Ledger.ProtVer
+              { Ledger.pvMajor = Ledger.mkVersion _protocolParamsProtocolMajorVer & fromMaybe (error "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: major version received from Blockfrost is out of bounds")
+              , Ledger.pvMinor = fromIntegral _protocolParamsProtocolMinorVer
+              }
+        , cppMinPoolCost = THKD $ Ledger.Coin $ lovelacesToInteger _protocolParamsMinPoolCost
+        , cppCoinsPerUTxOByte = THKD $ Api.L.CoinPerByte $ Ledger.Coin $ lovelacesToInteger _protocolParamsCoinsPerUtxoSize
+        , cppCostModels =
+            THKD $
+              Ledger.mkCostModels $
+                Map.fromList $
+                  Map.foldlWithKey'
+                    ( \acc k x -> case k of
+                        Blockfrost.PlutusV1 -> (Ledger.PlutusV1, either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ fromInteger . snd <$> x) : acc
+                        Blockfrost.PlutusV2 -> (Ledger.PlutusV2, either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ fromInteger . snd <$> x) : acc
+                        Blockfrost.PlutusV3 -> (Ledger.PlutusV3, either (error (errPath <> "Couldn't build PlutusV3 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV3 $ fromInteger . snd <$> x) : acc
+                        -- Don't care about non plutus cost models.
+                        Blockfrost.Timelock -> acc
+                    )
+                    []
+                    (Blockfrost.unCostModels _protocolParamsCostModels)
+        , cppPrices = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's cpu steps")) $ Ledger.boundRational _protocolParamsPriceStep, Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's memory units")) $ Ledger.boundRational _protocolParamsPriceMem}
+        , cppMaxTxExUnits =
+            THKD $
+              Ledger.OrdExUnits $
+                Ledger.ExUnits
+                  { Ledger.exUnitsSteps =
+                      fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExSteps
+                  , Ledger.exUnitsMem =
+                      fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExMem
+                  }
+        , cppMaxBlockExUnits =
+            THKD $
+              Ledger.OrdExUnits $
+                Ledger.ExUnits
+                  { Ledger.exUnitsSteps =
+                      fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExSteps
+                  , Ledger.exUnitsMem =
+                      fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExMem
+                  }
+        , cppMaxValSize = THKD $ fromIntegral $ Blockfrost.unQuantity _protocolParamsMaxValSize
+        , cppCollateralPercentage = THKD $ fromIntegral _protocolParamsCollateralPercent
+        , cppMaxCollateralInputs = THKD $ fromIntegral _protocolParamsMaxCollateralInputs
+        , cppPoolVotingThresholds =
+            THKD $
+              Ledger.PoolVotingThresholds
+                { pvtPPSecurityGroup = unsafeBoundRational $ fj _protocolParamsPvtppSecurityGroup
+                , pvtMotionNoConfidence = unsafeBoundRational $ fj _protocolParamsPvtMotionNoConfidence
+                , pvtHardForkInitiation = unsafeBoundRational $ fj _protocolParamsPvtHardForkInitiation
+                , pvtCommitteeNormal = unsafeBoundRational $ fj _protocolParamsPvtCommitteeNormal
+                , pvtCommitteeNoConfidence = unsafeBoundRational $ fj _protocolParamsPvtCommitteeNoConfidence
                 }
-          , cppMinPoolCost = THKD $ Ledger.Coin $ lovelacesToInteger _protocolParamsMinPoolCost
-          , cppCoinsPerUTxOByte = THKD $ Api.L.CoinPerByte $ Ledger.Coin $ lovelacesToInteger _protocolParamsCoinsPerUtxoSize
-          , cppCostModels =
-              THKD $
-                Ledger.mkCostModels $
-                  Map.fromList $
-                    plutusV3CostModels errPath
-                      : Map.foldlWithKey'
-                        ( \acc k x -> case k of
-                            Blockfrost.PlutusV1 -> (Ledger.PlutusV1, either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ fromInteger <$> Map.elems x) : acc
-                            Blockfrost.PlutusV2 -> (Ledger.PlutusV2, either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ fromInteger <$> Map.elems x) : acc
-                            -- Don't care about non plutus cost models.
-                            Blockfrost.Timelock -> acc
-                            Blockfrost.PlutusV3 -> acc
-                        )
-                        []
-                        (Blockfrost.unCostModels _protocolParamsCostModels)
-          , cppPrices = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's cpu steps")) $ Ledger.boundRational _protocolParamsPriceStep, Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's memory units")) $ Ledger.boundRational _protocolParamsPriceMem}
-          , cppMaxTxExUnits =
-              THKD $
-                Ledger.OrdExUnits $
-                  Ledger.ExUnits
-                    { Ledger.exUnitsSteps =
-                        fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExSteps
-                    , Ledger.exUnitsMem =
-                        fromInteger $ Blockfrost.unQuantity _protocolParamsMaxTxExMem
-                    }
-          , cppMaxBlockExUnits =
-              THKD $
-                Ledger.OrdExUnits $
-                  Ledger.ExUnits
-                    { Ledger.exUnitsSteps =
-                        fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExSteps
-                    , Ledger.exUnitsMem =
-                        fromInteger $ Blockfrost.unQuantity _protocolParamsMaxBlockExMem
-                    }
-          , cppMaxValSize = THKD $ fromIntegral $ Blockfrost.unQuantity _protocolParamsMaxValSize
-          , cppCollateralPercentage = THKD $ fromIntegral _protocolParamsCollateralPercent
-          , cppMaxCollateralInputs = THKD $ fromIntegral _protocolParamsMaxCollateralInputs
-          , -- FIXME: Fetch these from provider.
-            cppPoolVotingThresholds = THKD def
-          , cppDRepVotingThresholds = THKD def
-          , cppCommitteeMinSize = THKD 0
-          , cppCommitteeMaxTermLength = THKD (Ledger.EpochInterval 0)
-          , cppGovActionLifetime = THKD (Ledger.EpochInterval 0)
-          , cppGovActionDeposit = THKD $ Ledger.Coin 0
-          , cppDRepDeposit = THKD $ Ledger.Coin 0
-          , cppDRepActivity = THKD (Ledger.EpochInterval 0)
-          , cppMinFeeRefScriptCostPerByte = THKD minBound
-          }
+        , cppDRepVotingThresholds =
+            THKD $
+              Ledger.DRepVotingThresholds
+                { dvtUpdateToConstitution = unsafeBoundRational $ fj _protocolParamsDvtUpdateToConstitution
+                , dvtTreasuryWithdrawal = unsafeBoundRational $ fj _protocolParamsDvtTreasuryWithdrawal
+                , dvtPPTechnicalGroup = unsafeBoundRational $ fj _protocolParamsDvtPPTechnicalGroup
+                , dvtPPNetworkGroup = unsafeBoundRational $ fj _protocolParamsDvtPPNetworkGroup
+                , dvtPPGovGroup = unsafeBoundRational $ fj _protocolParamsDvtPPGovGroup
+                , dvtPPEconomicGroup = unsafeBoundRational $ fj _protocolParamsDvtPPEconomicGroup
+                , dvtMotionNoConfidence = unsafeBoundRational $ fj _protocolParamsDvtMotionNoConfidence
+                , dvtHardForkInitiation = unsafeBoundRational $ fj _protocolParamsDvtHardForkInitiation
+                , dvtCommitteeNormal = unsafeBoundRational $ fj _protocolParamsDvtCommitteeNormal
+                , dvtCommitteeNoConfidence = unsafeBoundRational $ fj _protocolParamsDvtCommitteeNoConfidence
+                }
+        , cppCommitteeMinSize = THKD $ fromIntegral $ unQuantity $ fj _protocolParamsCommitteeMinSize
+        , cppCommitteeMaxTermLength = THKD (Ledger.EpochInterval $ fromIntegral $ unQuantity $ fj _protocolParamsCommitteeMaxTermLength)
+        , cppGovActionLifetime = THKD (Ledger.EpochInterval $ fromIntegral $ unQuantity $ fj _protocolParamsGovActionLifetime)
+        , cppGovActionDeposit = THKD $ Ledger.Coin $ fromIntegral $ lovelacesToInteger $ fj _protocolParamsGovActionDeposit
+        , cppDRepDeposit = THKD $ Ledger.Coin $ fromIntegral $ lovelacesToInteger $ fj _protocolParamsDrepDeposit
+        , cppDRepActivity = THKD (Ledger.EpochInterval $ fromIntegral $ unQuantity $ fj _protocolParamsDrepActivity)
+        , cppMinFeeRefScriptCostPerByte = THKD $ unsafeBoundRational $ fj _protocolParamsMinFeeRefScriptCostPerByte
+        }
  where
   errPath = "GeniusYield.Providers.Blockfrost.blockfrostProtocolParams: "
+  fj = fromJust
 
 blockfrostStakePools :: Blockfrost.Project -> IO (Set Api.S.PoolId)
 blockfrostStakePools proj = do

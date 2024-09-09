@@ -13,18 +13,17 @@ module GeniusYield.Providers.Blockfrost (
   networkIdToProject,
 ) where
 
+import Blockfrost.Client (unQuantity)
 import Blockfrost.Client qualified as Blockfrost
 import Cardano.Api qualified as Api
 import Cardano.Api.Ledger qualified as Api.L
+import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Alonzo.PParams qualified as Ledger
-import Cardano.Ledger.BaseTypes qualified as Ledger
-import Cardano.Ledger.Coin qualified as Ledger
 import Cardano.Ledger.Conway.PParams (
   ConwayPParams (..),
   THKD (..),
  )
-import Cardano.Ledger.Core qualified as Ledger
 import Cardano.Ledger.Plutus qualified as Ledger
 import Cardano.Slotting.Slot qualified as CSlot
 import Cardano.Slotting.Time qualified as CTime
@@ -37,25 +36,22 @@ import Data.ByteString.Lazy qualified as LBS
 import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (fold)
 import Data.Map.Strict qualified as Map
+import Data.Maybe (fromJust)
 import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
 import Data.Time.Clock.POSIX qualified as Time
-import Money qualified
-import Ouroboros.Consensus.HardFork.History qualified as Ouroboros
-import PlutusTx.Builtins qualified as Plutus
-import Web.HttpApiData qualified as Web
-
-import Blockfrost.Client (unQuantity)
-import Cardano.Api.Ledger qualified as Ledger
-import Data.Maybe (fromJust)
 import GeniusYield.Imports
 import GeniusYield.Providers.Common
 import GeniusYield.Types
 import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import GeniusYield.Utils (serialiseToBech32WithPrefix)
+import Money qualified
 import Ouroboros.Consensus.HardFork.History (EraParams (eraGenesisWin))
+import Ouroboros.Consensus.HardFork.History qualified as Ouroboros
+import PlutusTx.Builtins qualified as Plutus
 import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational)
+import Web.HttpApiData qualified as Web
 
 data BlockfrostProviderException
   = BlpvApiError !Text !Blockfrost.BlockfrostError
@@ -423,16 +419,16 @@ blockfrostProtocolParams proj = do
             THKD $
               Ledger.mkCostModels $
                 Map.fromList $
-                  Map.foldlWithKey'
-                    ( \acc k x -> case k of
-                        Blockfrost.PlutusV1 -> (Ledger.PlutusV1, either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ fromInteger . snd <$> x) : acc
-                        Blockfrost.PlutusV2 -> (Ledger.PlutusV2, either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ fromInteger . snd <$> x) : acc
-                        Blockfrost.PlutusV3 -> (Ledger.PlutusV3, either (error (errPath <> "Couldn't build PlutusV3 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV3 $ fromInteger . snd <$> x) : acc
-                        -- Don't care about non plutus cost models.
-                        Blockfrost.Timelock -> acc
-                    )
-                    []
-                    (Blockfrost.unCostModels _protocolParamsCostModels)
+                  plutusV3CostModels errPath
+                    : Map.foldlWithKey'
+                      ( \acc k x -> case k of
+                          Blockfrost.PlutusV1 -> (Ledger.PlutusV1, either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ fromInteger <$> Map.elems x) : acc
+                          Blockfrost.PlutusV2 -> (Ledger.PlutusV2, either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ fromInteger <$> Map.elems x) : acc
+                          -- Don't care about non plutus cost models.
+                          _ -> acc
+                      )
+                      []
+                      (Blockfrost.unCostModels _protocolParamsCostModels)
         , cppPrices = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's cpu steps")) $ Ledger.boundRational _protocolParamsPriceStep, Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's memory units")) $ Ledger.boundRational _protocolParamsPriceMem}
         , cppMaxTxExUnits =
             THKD $
@@ -660,3 +656,9 @@ lookupScriptHashIO _ Nothing = return Nothing
 lookupScriptHashIO p (Just h) = do
   e <- Blockfrost.runBlockfrost p $ lookupScriptHash h
   handleBlockfrostError "lookupScriptHash" e
+
+{-
+compareCostModelText :: forall (a :: Type). (IsParamName a, Ord a) => Text -> Text -> Ordering
+compareCostModelText (readParamName @a -> Just a) (readParamName -> Just b) = compare a b
+compareCostModelText a b = error $ "GeniusYield.Providers.Blockfrost.compareCostModelText: Couldn't parse cost model text, received: " <> show a <> " and " <> show b
+-}

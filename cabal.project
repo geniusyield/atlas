@@ -28,16 +28,16 @@ package cardano-crypto-praos
 
 source-repository-package
   type: git
-  location: https://github.com/sourabhxyz/haskell-sdk
-  tag: 29a826c26b06505d4fbe81c731125740962a00ce
-  --sha256: FIXME:
+  location: https://github.com/maestro-org/haskell-sdk
+  tag: 493f3d60114a53d32287f5d90b83b5bc3fb74c54
+  --sha256: sha256-FYZMbh9Uz+RIjjXIf3PBK94mhd1XMX/wxHDA9LukvQg=
 
--- TODO: Temporary, until proposed changes are in upstream.
+-- TODO: Temporary, until proposed changes are in upstream (track https://github.com/blockfrost/blockfrost-haskell/pull/59).
 source-repository-package
   type: git
   location: https://github.com/sourabhxyz/blockfrost-haskell
-  tag: dadffe1b4ed48b7330c6d0dc9d9a358ccef166e0
-  --sha256: FIXME:
+  tag: 08eea3cb4519d7a21fb4f4d31f236bb779a5c505
+  --sha256: sha256-9SaXsXYP5vufgyNns89//V2n7u9O8J8f2wf6CVwINSA=
   subdir:
     blockfrost-api
 
@@ -86,6 +86,9 @@ source-repository-package
     lib/wai-middleware-logging/
     lib/wallet-benchmarks/
     lib/wallet/
+
+package postgresql-libpq
+  flags: +use-pkg-config
 
 ------ Following is mostly from @cardano-wallet@'s @cabal.project@ file. -------
 

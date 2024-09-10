@@ -9,6 +9,7 @@ module GeniusYield.Types.UTxO (
   GYUTxO (..),
   utxoFromApi,
   utxoFromApi',
+  utxoToApi,
   utxoToPlutus,
   utxoHasInlineDatum,
   utxoHasReferenceScript,
@@ -29,6 +30,7 @@ module GeniusYield.Types.UTxO (
   -- * UTxO datums
   GYOutDatum (..),
   isInlineDatum,
+  outDatumToApi,
   outDatumToPlutus,
 
   -- * Filter and map
@@ -83,6 +85,13 @@ isInlineDatum :: GYOutDatum -> Bool
 isInlineDatum (GYOutDatumInline _) = True
 isInlineDatum _ = False
 
+outDatumToApi :: GYOutDatum -> Api.S.TxOutDatum ctx ApiEra
+outDatumToApi GYOutDatumNone = Api.TxOutDatumNone
+outDatumToApi (GYOutDatumHash h) =
+  Api.TxOutDatumHash Api.AlonzoEraOnwardsConway $ datumHashToApi h
+outDatumToApi (GYOutDatumInline d) =
+  Api.TxOutDatumInline Api.BabbageEraOnwardsConway $ datumToApi' d
+
 outDatumToPlutus :: GYOutDatum -> Plutus.OutputDatum
 outDatumToPlutus GYOutDatumNone = Plutus.NoOutputDatum
 outDatumToPlutus (GYOutDatumHash h) = Plutus.OutputDatumHash $ datumHashToPlutus h
@@ -129,21 +138,7 @@ utxosToApi (GYUTxOs m) = Api.UTxO $ Map.foldlWithKey' f Map.empty m
     GYTxOutRef ->
     (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript) ->
     Map Api.TxIn (Api.TxOut Api.CtxUTxO ApiEra)
-  f m' oref out = Map.insert (txOutRefToApi oref) (g out) m'
-
-  g :: (GYAddress, GYValue, GYOutDatum, Maybe GYAnyScript) -> Api.TxOut Api.CtxUTxO ApiEra
-  g (addr, v, md, ms) =
-    Api.TxOut
-      (addressToApi' addr)
-      (valueToApiTxOutValue v)
-      (outDatumToApi md)
-      (maybe Api.S.ReferenceScriptNone someScriptToReferenceApi ms)
-
-  outDatumToApi GYOutDatumNone = Api.TxOutDatumNone
-  outDatumToApi (GYOutDatumHash h) =
-    Api.TxOutDatumHash Api.AlonzoEraOnwardsConway $ datumHashToApi h
-  outDatumToApi (GYOutDatumInline d) =
-    Api.TxOutDatumInline Api.BabbageEraOnwardsConway $ datumToApi' d
+  f m' oref (a, v, mh, ms) = Map.insert (txOutRefToApi oref) (utxoToApi $ GYUTxO oref a v mh ms) m'
 
 utxoFromApi :: Api.TxIn -> Api.TxOut Api.CtxTx ApiEra -> GYUTxO
 utxoFromApi txIn (Api.TxOut a v d s) =
@@ -175,6 +170,17 @@ utxoFromApi' txIn (Api.TxOut a v d s) =
   f Api.TxOutDatumNone = GYOutDatumNone
   f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
   f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' sd
+
+utxoToApi :: GYUTxO -> Api.S.TxOut ctx ApiEra
+utxoToApi GYUTxO {utxoAddress, utxoValue, utxoOutDatum, utxoRefScript} =
+  Api.TxOut
+    (addressToApi' utxoAddress)
+    (valueToApiTxOutValue utxoValue)
+    (outDatumToApi utxoOutDatum)
+    (refScriptToApi utxoRefScript)
+ where
+  refScriptToApi Nothing = Api.S.ReferenceScriptNone
+  refScriptToApi (Just x) = someScriptToReferenceApi x
 
 utxoToPlutus :: GYUTxO -> Plutus.TxOut
 utxoToPlutus GYUTxO {..} =

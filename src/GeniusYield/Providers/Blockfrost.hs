@@ -419,16 +419,16 @@ blockfrostProtocolParams proj = do
             THKD $
               Ledger.mkCostModels $
                 Map.fromList $
-                  plutusV3CostModels errPath
-                    : Map.foldlWithKey'
-                      ( \acc k x -> case k of
-                          Blockfrost.PlutusV1 -> (Ledger.PlutusV1, either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ fromInteger <$> Map.elems x) : acc
-                          Blockfrost.PlutusV2 -> (Ledger.PlutusV2, either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ fromInteger <$> Map.elems x) : acc
-                          -- Don't care about non plutus cost models.
-                          _ -> acc
-                      )
-                      []
-                      (Blockfrost.unCostModels _protocolParamsCostModels)
+                  Map.foldlWithKey'
+                    ( \acc k x -> case k of
+                        Blockfrost.PlutusV1 -> (Ledger.PlutusV1, either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ fromInteger <$> x) : acc
+                        Blockfrost.PlutusV2 -> (Ledger.PlutusV2, either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ fromInteger <$> x) : acc
+                        Blockfrost.PlutusV3 -> (Ledger.PlutusV3, either (error (errPath <> "Couldn't build PlutusV3 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV3 $ fromInteger <$> x) : acc
+                        -- Don't care about non plutus cost models.
+                        _ -> acc
+                    )
+                    []
+                    (Blockfrost.unCostModelsRaw _protocolParamsCostModelsRaw)
         , cppPrices = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's cpu steps")) $ Ledger.boundRational _protocolParamsPriceStep, Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Blockfrost's memory units")) $ Ledger.boundRational _protocolParamsPriceMem}
         , cppMaxTxExUnits =
             THKD $

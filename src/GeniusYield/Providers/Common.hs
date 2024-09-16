@@ -145,8 +145,6 @@ parseEraHist mkEra [byronEra, shelleyEra, allegraEra, maryEra, alonzoEra, babbag
     $ NonEmptyOne (mkEra conwayEra)
 parseEraHist _ _ = Nothing
 
--- FIXME: These hardcoded era histories have to be corrected to include conway.
-
 {- | Hardcoded era history for preprod.
 
 __NOTE:__ This is only to be used for testing.
@@ -162,7 +160,8 @@ preprodEraHist =
     . NonEmptyCons allegraEra
     . NonEmptyCons maryEra
     . NonEmptyCons alonzoEra
-    $ NonEmptyOne babbageEra
+    . NonEmptyCons babbageEra
+    $ NonEmptyOne conwayEra
  where
   byronEra =
     Ouroboros.EraSummary
@@ -192,11 +191,17 @@ preprodEraHist =
     Ouroboros.EraSummary
       { eraStart = Ouroboros.Bound {boundTime = RelativeTime 3024000, boundSlot = 1382400, boundEpoch = 7}
       , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 5184000, boundSlot = 3542400, boundEpoch = 12})
-      , eraParams = Ouroboros.EraParams {eraEpochSize = 432000, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 129600, eraGenesisWin = 0}
+      , eraParams = Ouroboros.EraParams {eraEpochSize = 432000, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 129600, eraGenesisWin = 129600}
       }
   babbageEra =
     Ouroboros.EraSummary
       { eraStart = Ouroboros.Bound {boundTime = RelativeTime 5184000, boundSlot = 3542400, boundEpoch = 12}
+      , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 70416000, boundSlot = 68774400, boundEpoch = 163})
+      , eraParams = Ouroboros.EraParams {eraEpochSize = 432000, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 129600, eraGenesisWin = 129600}
+      }
+  conwayEra =
+    Ouroboros.EraSummary
+      { eraStart = Ouroboros.Bound {boundTime = RelativeTime 70416000, boundSlot = 68774400, boundEpoch = 163}
       , eraEnd = Ouroboros.EraUnbounded
       , eraParams = Ouroboros.EraParams {eraEpochSize = 432000, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 129600, eraGenesisWin = 129600}
       }
@@ -210,43 +215,50 @@ previewEraHist =
     . NonEmptyCons allegraEra
     . NonEmptyCons maryEra
     . NonEmptyCons alonzoEra
-    $ NonEmptyOne babbageEra
+    . NonEmptyCons babbageEra
+    $ NonEmptyOne conwayEra
  where
   byronEra =
     Ouroboros.EraSummary
       { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
       , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-      , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864, eraGenesisWin = 0}
+      , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864, eraGenesisWin = 864}
       }
   shelleyEra =
     Ouroboros.EraSummary
       { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
       , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-      , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+      , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 25920}
       }
   allegraEra =
     Ouroboros.EraSummary
       { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
       , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-      , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+      , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 25920}
       }
   maryEra =
     Ouroboros.EraSummary
       { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
       , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-      , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+      , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 25920}
       }
   alonzoEra =
     Ouroboros.EraSummary
       { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
       , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 259200, boundSlot = 259200, boundEpoch = 3})
-      , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+      , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 25920}
       }
   babbageEra =
     Ouroboros.EraSummary
       { eraStart = Ouroboros.Bound {boundTime = RelativeTime 259200, boundSlot = 259200, boundEpoch = 3}
+      , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 55814400, boundSlot = 55814400, boundEpoch = 646})
+      , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 25920}
+      }
+  conwayEra =
+    Ouroboros.EraSummary
+      { eraStart = Ouroboros.Bound {boundTime = RelativeTime 55814400, boundSlot = 55814400, boundEpoch = 646}
       , eraEnd = Ouroboros.EraUnbounded
-      , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+      , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 25920}
       }
 
 mainnetEraHist :: Ouroboros.Interpreter (Ouroboros.CardanoEras Ouroboros.StandardCrypto)
@@ -258,7 +270,8 @@ mainnetEraHist =
     . NonEmptyCons allegraEra
     . NonEmptyCons maryEra
     . NonEmptyCons alonzoEra
-    $ NonEmptyOne babbageEra
+    . NonEmptyCons babbageEra
+    $ NonEmptyOne conwayEra
  where
   byronEra =
     Ouroboros.EraSummary
@@ -293,6 +306,12 @@ mainnetEraHist =
   babbageEra =
     Ouroboros.EraSummary
       { eraStart = Ouroboros.Bound {boundTime = RelativeTime 157680000, boundSlot = 72316800, boundEpoch = 365}
+      , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 219024000, boundSlot = 133660800, boundEpoch = 507})
+      , eraParams = Ouroboros.EraParams {eraEpochSize = 432000, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 129600, eraGenesisWin = 129600}
+      }
+  conwayEra =
+    Ouroboros.EraSummary
+      { eraStart = Ouroboros.Bound {boundTime = RelativeTime 219024000, boundSlot = 133660800, boundEpoch = 507}
       , eraEnd = Ouroboros.EraUnbounded
       , eraParams = Ouroboros.EraParams {eraEpochSize = 432000, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 129600, eraGenesisWin = 129600}
       }

@@ -89,6 +89,8 @@ source-repository-package
     lib/wallet-benchmarks/
     lib/wallet/
 
+package postgresql-libpq
+  flags: +use-pkg-config
 
 ------ Following is mostly from @cardano-wallet@'s @cabal.project@ file. -------
 

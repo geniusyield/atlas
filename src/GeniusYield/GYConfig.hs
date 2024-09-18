@@ -180,7 +180,7 @@ withCfgProviders
           maestroSlotActions <- makeSlotActions slotCachingTime $ MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv
           maestroGetParams <-
             makeGetParameters
-              (MaestroApi.maestroProtocolParams cfgNetworkId maestroApiEnv)
+              (MaestroApi.maestroProtocolParams maestroApiEnv)
               (MaestroApi.maestroSystemStart maestroApiEnv)
               (MaestroApi.maestroEraHistory maestroApiEnv)
               (MaestroApi.maestroStakePools maestroApiEnv)
@@ -198,7 +198,7 @@ withCfgProviders
           blockfrostSlotActions <- makeSlotActions slotCachingTime $ Blockfrost.blockfrostGetSlotOfCurrentBlock proj
           blockfrostGetParams <-
             makeGetParameters
-              (Blockfrost.blockfrostProtocolParams cfgNetworkId proj)
+              (Blockfrost.blockfrostProtocolParams proj)
               (Blockfrost.blockfrostSystemStart proj)
               (Blockfrost.blockfrostEraHistory proj)
               (Blockfrost.blockfrostStakePools proj)

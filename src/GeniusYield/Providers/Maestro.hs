@@ -39,7 +39,6 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (try)
 import Control.Monad ((<=<))
 import Data.Aeson qualified as Aeson
-import Data.Default (def)
 import Data.Either.Combinators (maybeToRight)
 import Data.Int (Int64)
 import Data.Map.Strict qualified as M
@@ -58,6 +57,7 @@ import Maestro.Types.V1 qualified as Maestro
 import Ouroboros.Consensus.HardFork.History qualified as Ouroboros
 import Ouroboros.Consensus.HardFork.History.EraParams (EraParams (eraGenesisWin))
 import PlutusTx.Builtins qualified as Plutus
+import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational)
 import Web.HttpApiData qualified as Web
 
 -- | Convert our representation of Network ID to Maestro's.
@@ -459,82 +459,104 @@ maestroQueryUtxo env =
 -------------------------------------------------------------------------------
 
 -- | Returns the 'ApiProtocolParameters' queried from Maestro.
-maestroProtocolParams :: GYNetworkId -> Maestro.MaestroEnv 'Maestro.V1 -> IO ApiProtocolParameters
-maestroProtocolParams nid env = do
+maestroProtocolParams :: Maestro.MaestroEnv 'Maestro.V1 -> IO ApiProtocolParameters
+maestroProtocolParams env = do
   Maestro.ProtocolParameters {..} <- handleMaestroError "ProtocolParams" <=< try $ Maestro.getTimestampedData <$> Maestro.getProtocolParameters env
   pure $
     Ledger.PParams $
-      populateMissingProtocolParameters nid $
-        ConwayPParams
-          { cppMinFeeA = THKD $ Ledger.Coin $ toInteger protocolParametersMinFeeCoefficient
-          , cppMinFeeB = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinFeeConstant
-          , cppMaxBBSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxBlockBodySize
-          , cppMaxTxSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxTransactionSize
-          , cppMaxBHSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxBlockHeaderSize
-          , cppKeyDeposit = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersStakeCredentialDeposit
-          , cppPoolDeposit = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersStakePoolDeposit
-          , cppEMax =
-              THKD $
-                Ledger.EpochInterval . fromIntegral $
-                  Maestro.unEpochNo protocolParametersStakePoolRetirementEpochBound
-          , cppNOpt = THKD $ fromIntegral protocolParametersDesiredNumberOfStakePools
-          , cppA0 = THKD $ fromMaybe (error (errPath <> "Pool influence received from Maestro is out of bounds")) $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersStakePoolPledgeInfluence
-          , cppRho = THKD $ fromMaybe (error (errPath <> "Monetory expansion parameter received from Maestro is out of bounds")) $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersMonetaryExpansion
-          , cppTau = THKD $ fromMaybe (error (errPath <> "Treasury expansion parameter received from Maestro is out of bounds")) $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersTreasuryExpansion
-          , cppProtocolVersion =
-              Ledger.ProtVer
-                { Ledger.pvMajor = Ledger.mkVersion (Maestro.protocolVersionMajor protocolParametersVersion) & fromMaybe (error (errPath <> "Major version received from Maestro is out of bounds"))
-                , Ledger.pvMinor = Maestro.protocolVersionMinor protocolParametersVersion
+      ConwayPParams
+        { cppMinFeeA = THKD $ Ledger.Coin $ toInteger protocolParametersMinFeeCoefficient
+        , cppMinFeeB = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinFeeConstant
+        , cppMaxBBSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxBlockBodySize
+        , cppMaxTxSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxTransactionSize
+        , cppMaxBHSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxBlockHeaderSize
+        , cppKeyDeposit = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersStakeCredentialDeposit
+        , cppPoolDeposit = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersStakePoolDeposit
+        , cppEMax =
+            THKD $
+              Ledger.EpochInterval . fromIntegral $
+                Maestro.unEpochNo protocolParametersStakePoolRetirementEpochBound
+        , cppNOpt = THKD $ fromIntegral protocolParametersDesiredNumberOfStakePools
+        , cppA0 = THKD $ fromMaybe (error (errPath <> "Pool influence received from Maestro is out of bounds")) $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersStakePoolPledgeInfluence
+        , cppRho = THKD $ fromMaybe (error (errPath <> "Monetory expansion parameter received from Maestro is out of bounds")) $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersMonetaryExpansion
+        , cppTau = THKD $ fromMaybe (error (errPath <> "Treasury expansion parameter received from Maestro is out of bounds")) $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersTreasuryExpansion
+        , cppProtocolVersion =
+            Ledger.ProtVer
+              { Ledger.pvMajor = Ledger.mkVersion (Maestro.protocolVersionMajor protocolParametersVersion) & fromMaybe (error (errPath <> "Major version received from Maestro is out of bounds"))
+              , Ledger.pvMinor = Maestro.protocolVersionMinor protocolParametersVersion
+              }
+        , cppMinPoolCost = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinStakePoolCost
+        , cppCoinsPerUTxOByte = THKD $ Api.L.CoinPerByte $ Ledger.Coin $ toInteger protocolParametersMinUtxoDepositCoefficient
+        , cppCostModels =
+            THKD $
+              Ledger.mkCostModels $
+                M.fromList
+                  [
+                    ( Ledger.PlutusV1
+                    , either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ coerce @_ @[Int64] (Maestro.costModelsPlutusV1 protocolParametersPlutusCostModels)
+                    )
+                  ,
+                    ( Ledger.PlutusV2
+                    , either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ coerce @_ @[Int64] (Maestro.costModelsPlutusV2 protocolParametersPlutusCostModels)
+                    )
+                  ,
+                    ( Ledger.PlutusV3
+                    , either (error (errPath <> "Couldn't build PlutusV3 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV3 $ coerce @_ @[Int64] (Maestro.costModelsPlutusV3 protocolParametersPlutusCostModels)
+                    )
+                  ]
+        , cppPrices = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Maestro's cpu steps")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithCpu protocolParametersScriptExecutionPrices, Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Maestro's memory units")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithMemory protocolParametersScriptExecutionPrices}
+        , cppMaxTxExUnits =
+            THKD $
+              Ledger.OrdExUnits $
+                Ledger.ExUnits
+                  { Ledger.exUnitsSteps =
+                      Maestro.memoryCpuWithCpu protocolParametersMaxExecutionUnitsPerTransaction
+                  , Ledger.exUnitsMem =
+                      Maestro.memoryCpuWithMemory protocolParametersMaxExecutionUnitsPerTransaction
+                  }
+        , cppMaxBlockExUnits =
+            THKD $
+              Ledger.OrdExUnits $
+                Ledger.ExUnits
+                  { Ledger.exUnitsSteps =
+                      Maestro.memoryCpuWithCpu protocolParametersMaxExecutionUnitsPerBlock
+                  , Ledger.exUnitsMem =
+                      Maestro.memoryCpuWithMemory protocolParametersMaxExecutionUnitsPerBlock
+                  }
+        , cppMaxValSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxValueSize
+        , cppCollateralPercentage = THKD $ fromIntegral protocolParametersCollateralPercentage
+        , cppMaxCollateralInputs = THKD $ fromIntegral protocolParametersMaxCollateralInputs
+        , cppPoolVotingThresholds =
+            THKD $
+              Ledger.PoolVotingThresholds
+                { pvtPPSecurityGroup = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.ppUpdateStakePoolSecurity $ Maestro.stakePoolVotingThresholdsProtocolParametersUpdate protocolParametersStakePoolVotingThresholds
+                , pvtMotionNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.stakePoolVotingThresholdsNoConfidence protocolParametersStakePoolVotingThresholds
+                , pvtHardForkInitiation = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.stakePoolVotingThresholdsHardForkInitiation protocolParametersStakePoolVotingThresholds
+                , pvtCommitteeNormal = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.constitutionalCommitteeDefault $ Maestro.stakePoolVotingThresholdsConstitutionalCommittee protocolParametersStakePoolVotingThresholds
+                , pvtCommitteeNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.constitutionalCommitteeStateOfNoConfidence $ Maestro.stakePoolVotingThresholdsConstitutionalCommittee protocolParametersStakePoolVotingThresholds
                 }
-          , cppMinPoolCost = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinStakePoolCost
-          , cppCoinsPerUTxOByte = THKD $ Api.L.CoinPerByte $ Ledger.Coin $ toInteger protocolParametersMinUtxoDepositCoefficient
-          , cppCostModels =
-              THKD $
-                Ledger.mkCostModels $
-                  M.fromList
-                    [
-                      ( Ledger.PlutusV1
-                      , either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ coerce @_ @[Int64] (Maestro.costModelsPlutusV1 protocolParametersPlutusCostModels)
-                      )
-                    ,
-                      ( Ledger.PlutusV2
-                      , either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ coerce @_ @[Int64] (Maestro.costModelsPlutusV2 protocolParametersPlutusCostModels)
-                      )
-                    , plutusV3CostModels errPath
-                    ]
-          , cppPrices = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Maestro's cpu steps")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithCpu protocolParametersScriptExecutionPrices, Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Maestro's memory units")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithMemory protocolParametersScriptExecutionPrices}
-          , cppMaxTxExUnits =
-              THKD $
-                Ledger.OrdExUnits $
-                  Ledger.ExUnits
-                    { Ledger.exUnitsSteps =
-                        Maestro.memoryCpuWithCpu protocolParametersMaxExecutionUnitsPerTransaction
-                    , Ledger.exUnitsMem =
-                        Maestro.memoryCpuWithMemory protocolParametersMaxExecutionUnitsPerTransaction
-                    }
-          , cppMaxBlockExUnits =
-              THKD $
-                Ledger.OrdExUnits $
-                  Ledger.ExUnits
-                    { Ledger.exUnitsSteps =
-                        Maestro.memoryCpuWithCpu protocolParametersMaxExecutionUnitsPerBlock
-                    , Ledger.exUnitsMem =
-                        Maestro.memoryCpuWithMemory protocolParametersMaxExecutionUnitsPerBlock
-                    }
-          , cppMaxValSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxValueSize
-          , cppCollateralPercentage = THKD $ fromIntegral protocolParametersCollateralPercentage
-          , cppMaxCollateralInputs = THKD $ fromIntegral protocolParametersMaxCollateralInputs
-          , -- FIXME: Fetch these from provider.
-            cppPoolVotingThresholds = THKD def
-          , cppDRepVotingThresholds = THKD def
-          , cppCommitteeMinSize = THKD 0
-          , cppCommitteeMaxTermLength = THKD (Ledger.EpochInterval 0)
-          , cppGovActionLifetime = THKD (Ledger.EpochInterval 0)
-          , cppGovActionDeposit = THKD $ Ledger.Coin 0
-          , cppDRepDeposit = THKD $ Ledger.Coin 0
-          , cppDRepActivity = THKD (Ledger.EpochInterval 0)
-          , cppMinFeeRefScriptCostPerByte = THKD minBound
-          }
+        , cppDRepVotingThresholds =
+            THKD $
+              Ledger.DRepVotingThresholds
+                { dvtUpdateToConstitution = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.drepVotingThresholdsConstitution protocolParametersDelegateRepresentativeVotingThresholds
+                , dvtTreasuryWithdrawal = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.drepVotingThresholdsTreasuryWithdrawals protocolParametersDelegateRepresentativeVotingThresholds
+                , dvtPPTechnicalGroup = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.ppUpdateDrepTechnical $ Maestro.drepVotingThresholdsProtocolParametersUpdate protocolParametersDelegateRepresentativeVotingThresholds
+                , dvtPPNetworkGroup = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.ppUpdateDrepNetwork $ Maestro.drepVotingThresholdsProtocolParametersUpdate protocolParametersDelegateRepresentativeVotingThresholds
+                , dvtPPGovGroup = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.ppUpdateDrepGovernance $ Maestro.drepVotingThresholdsProtocolParametersUpdate protocolParametersDelegateRepresentativeVotingThresholds
+                , dvtPPEconomicGroup = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.ppUpdateDrepEconomic $ Maestro.drepVotingThresholdsProtocolParametersUpdate protocolParametersDelegateRepresentativeVotingThresholds
+                , dvtMotionNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.drepVotingThresholdsNoConfidence protocolParametersDelegateRepresentativeVotingThresholds
+                , dvtHardForkInitiation = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.drepVotingThresholdsHardForkInitiation protocolParametersDelegateRepresentativeVotingThresholds
+                , dvtCommitteeNormal = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.constitutionalCommitteeDefault $ Maestro.drepVotingThresholdsConstitutionalCommittee protocolParametersDelegateRepresentativeVotingThresholds
+                , dvtCommitteeNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.constitutionalCommitteeStateOfNoConfidence $ Maestro.drepVotingThresholdsConstitutionalCommittee protocolParametersDelegateRepresentativeVotingThresholds
+                }
+        , cppCommitteeMinSize = THKD $ fromIntegral protocolParametersConstitutionalCommitteeMinSize
+        , cppCommitteeMaxTermLength = THKD (Ledger.EpochInterval $ fromIntegral protocolParametersConstitutionalCommitteeMaxTermLength)
+        , cppGovActionLifetime = THKD (Ledger.EpochInterval $ fromIntegral protocolParametersGovernanceActionLifetime)
+        , cppGovActionDeposit = THKD $ Ledger.Coin $ fromIntegral $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersGovernanceActionDeposit
+        , cppDRepDeposit = THKD $ Ledger.Coin $ fromIntegral $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersDelegateRepresentativeDeposit
+        , cppDRepActivity = THKD (Ledger.EpochInterval $ fromIntegral protocolParametersDelegateRepresentativeMaxIdleTime)
+        , cppMinFeeRefScriptCostPerByte = THKD $ unsafeBoundRational $ Maestro.minFeeReferenceScriptsBase protocolParametersMinFeeReferenceScripts
+        }
  where
   errPath = "GeniusYield.Providers.Maestro.maestroProtocolParams: "
 

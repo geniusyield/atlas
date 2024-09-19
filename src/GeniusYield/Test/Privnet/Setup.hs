@@ -8,6 +8,7 @@ Stability   : develop
 module GeniusYield.Test.Privnet.Setup (
   Setup,
   withPrivnet,
+  withPrivnet',
   withSetup,
   withSetup',
   withSetupOld,
@@ -22,6 +23,7 @@ module GeniusYield.Test.Privnet.Setup (
   TestnetNodeOptions (..),
   NodeLoggingFormat (..),
   NodeConfigurationYaml (..),
+  mkPrivnetTestFor'',
 ) where
 
 import Cardano.Api qualified as Api
@@ -62,6 +64,11 @@ import Test.Tasty (TestName, TestTree)
 import Test.Tasty.HUnit (testCaseSteps)
 import Testnet.Property.Util
 import Testnet.Types
+
+-- import System.IO.Temp (
+--   createTempDirectory,
+--   getCanonicalTemporaryDirectory,
+--  )
 
 -------------------------------------------------------------------------------
 -- Setup
@@ -105,6 +112,16 @@ mkPrivnetTestFor name = mkPrivnetTestFor' name GYDebug
 mkPrivnetTestFor' :: TestName -> GYLogSeverity -> Setup -> (TestInfo -> GYTxGameMonadIO ()) -> TestTree
 mkPrivnetTestFor' name targetSev setup action = testCaseSteps name $ \info -> withSetup' targetSev info setup $ \ctx -> do
   ctxRunGame ctx $ action TestInfo {testGoldAsset = ctxGold ctx, testIronAsset = ctxIron ctx, testWallets = ctxWallets ctx}
+
+mkPrivnetTestFor'' :: TestName -> GYLogSeverity -> IO (Setup, ThreadId) -> (TestInfo -> GYTxGameMonadIO ()) -> TestTree
+mkPrivnetTestFor'' name targetSev getSetup action =
+  testCaseSteps name $
+    \info -> getSetup >>= \(setup, _) -> withSetup' targetSev info setup $
+      \ctx -> ctxRunGame ctx $ action
+        TestInfo
+          { testGoldAsset = ctxGold ctx
+          , testIronAsset = ctxIron ctx
+          , testWallets = ctxWallets ctx}
 
 {-
 TODO: WIP: Provide a variant of `withSetup` that can access `Ctx` to return a non-unit result.
@@ -353,6 +370,186 @@ withPrivnet testnetOpts setupUser = do
 
       let setup = Setup $ \targetSev putLog kont -> kont $ ctx {ctxLog = simpleLogging targetSev (putLog . Txt.unpack)}
       setupUser setup
+ where
+  -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
+  cardanoTestnet' opts conf = do
+    Api.AnyCardanoEra cEra <- pure $ cardanoNodeEra cardanoDefaultTestnetOptions
+    alonzoGenesis <- getDefaultAlonzoGenesis cEra
+    (startTime, shelleyGenesis') <- getDefaultShelleyGenesis opts
+    cardanoTestnet opts conf startTime shelleyGenesis' alonzoGenesis conwayGenesis
+
+withPrivnet' :: CardanoTestnetOptions -> IO (Setup, ThreadId)
+withPrivnet' testnetOpts = do
+  -- Based on: https://github.com/IntersectMBO/cardano-node/blob/master/cardano-testnet/src/Testnet/Property/Run.hs
+  -- They are using hedgehog (property testing framework) to orchestrate a testnet running in the background
+  -- ....for some god forsaken reason
+  -- the result is very awkward.
+  tmvRuntime <- STM.newEmptyTMVarIO
+
+  void . H.check $ integrationWorkspace "tn" $ \workspaceDir -> do
+    conf <- mkConf workspaceDir
+
+    -- Fork a thread to keep alive indefinitely any resources allocated by testnet.
+    threadId <- H.evalM . liftResourceT . resourceForkIO . forever . liftIO $ threadDelay 10000000
+
+    TestnetRuntime
+      { wallets
+      , poolNodes
+      , testnetMagic
+      } <-
+      cardanoTestnet' testnetOpts conf
+
+    liftIO . STM.atomically $
+      STM.writeTMVar
+        tmvRuntime
+        PrivnetRuntime
+          { -- TODO: Consider obtaining everything here from shelleyGenesis rather than testnetOpts.
+            -- See: https://www.doitwithlovelace.io/haddock/cardano-ledger-shelley/html/Cardano-Ledger-Shelley-Genesis.html
+            -- See: https://github.com/IntersectMBO/cardano-node/blob/43149909fc4942e93e14a2686826543a2d9432bf/cardano-testnet/src/Testnet/Types.hs#L155
+            runtimeNodeSocket =
+              H'.sprocketSystemName
+                . nodeSprocket
+                . poolRuntime
+                $ head poolNodes
+          , runtimeNetworkInfo =
+              GYNetworkInfo
+                { gyNetworkEpochSlots = fromIntegral $ cardanoEpochLength testnetOpts
+                , gyNetworkMagic = fromIntegral testnetMagic
+                }
+          , runtimeWallets = wallets
+          , runtimeThreadId = threadId
+          }
+
+    -- Forced failure (just like upstream).
+    -- For some god forsaken reason, not making this whole thing fail makes the node workspace directory disappear and the nodes not run.
+    -- Assumption: Hedgehog clears the workspace (since it's temp) in case of success.
+    -- No clue why the nodes don't run. Laziness?
+    H.failure
+
+  PrivnetRuntime
+    { runtimeNodeSocket
+    , runtimeNetworkInfo
+    , runtimeWallets
+    , runtimeThreadId
+    } <-
+    STM.atomically $ STM.readTMVar tmvRuntime
+
+  let runtimeNetworkId = GYPrivnet runtimeNetworkInfo
+
+  -- Kill the resource holding thread at the end of all this to stop the privnet.
+  -- (`finally` killThread runtimeThreadId) $ do
+  -- Read pre-existing users.
+  -- NOTE: As of writing, cardano-testnet creates three (3) users.
+  genesisUsers <- fmap V.fromList . liftIO . forM (zip [1 :: Int ..] runtimeWallets) $
+    \(idx, PaymentKeyInfo {paymentKeyInfoPair, paymentKeyInfoAddr}) -> do
+      debug $ printf "userF = %s\n" (show idx)
+      userAddr <- addressFromBech32 <$> urlPieceFromText paymentKeyInfoAddr
+      debug $ printf "userF addr = %s\n" userAddr
+      userPaymentSKey' <- readPaymentSigningKey $ Api.unFile $ signingKey paymentKeyInfoPair
+      debug $ printf "userF skey = %s\n" userPaymentSKey'
+      pure User' {userPaymentSKey', userStakeSKey' = Nothing, userAddr}
+
+  -- Generate upto 9 users.
+  let extraIndices = [length genesisUsers + 1 .. 9]
+  extraUsers <- fmap V.fromList . forM extraIndices $ \idx -> do
+    User' {userPaymentSKey', userAddr, userStakeSKey'} <- generateUser runtimeNetworkId
+    debug $ printf "user = %s\n" (show idx)
+    debug $ printf "user addr = %s\n" userAddr
+    debug $ printf "user skey = %s\n" (show userPaymentSKey')
+    debug $ printf "user vkey = %s\n" (show $ paymentVerificationKey userPaymentSKey')
+    debug $ printf "user pkh  = %s\n" (show $ paymentKeyHash $ paymentVerificationKey userPaymentSKey')
+    pure User' {userPaymentSKey', userAddr, userStakeSKey'}
+
+  -- Further down we need local node connection
+  let info :: Api.LocalNodeConnectInfo
+      info =
+        Api.LocalNodeConnectInfo
+          { Api.localConsensusModeParams = Api.CardanoModeParams . Api.EpochSlots $ gyNetworkEpochSlots runtimeNetworkInfo
+          , Api.localNodeNetworkId = networkIdToApi runtimeNetworkId
+          , Api.localNodeSocketPath = Api.File runtimeNodeSocket
+          }
+
+  -- ask current slot, so we know local node connection works
+  slot <- nodeGetSlotOfCurrentBlock info
+  debug $ printf "slotOfCurrentBlock = %s\n" slot
+
+  withLCIClient info [] $ \lci -> do
+    let localLookupDatum :: GYLookupDatum
+        localLookupDatum = lciLookupDatum lci
+
+    let localAwaitTxConfirmed :: GYAwaitTx
+        localAwaitTxConfirmed = nodeAwaitTxConfirmed info
+
+    let localQueryUtxo :: GYQueryUTxO
+        localQueryUtxo = nodeQueryUTxO info
+
+    localGetParams <- nodeGetParameters info
+
+    -- context used for tests
+    --
+    let allUsers = genesisUsers <> extraUsers
+    let ctx0 :: Ctx
+        ctx0 =
+          Ctx
+            { ctxNetworkInfo = runtimeNetworkInfo
+            , ctxInfo = info
+            , -- FIXME: Some of the users which are supposed to be non genesis are actually genesis.
+              -- This is because we have multiple genesis users with cardano testnet.
+              -- Need a better (more dynamic mechanism for users).
+              ctxUserF = V.head allUsers
+            , ctxUser2 = allUsers V.! 1
+            , ctxUser3 = allUsers V.! 2
+            , ctxUser4 = allUsers V.! 3
+            , ctxUser5 = allUsers V.! 4
+            , ctxUser6 = allUsers V.! 5
+            , ctxUser7 = allUsers V.! 6
+            , ctxUser8 = allUsers V.! 7
+            , ctxUser9 = allUsers V.! 8
+            , ctxGold = GYLovelace -- temporarily
+            , ctxIron = GYLovelace -- temporarily
+            , ctxLog = noLogging
+            , ctxLookupDatum = localLookupDatum
+            , ctxAwaitTxConfirmed = localAwaitTxConfirmed
+            , ctxQueryUtxos = localQueryUtxo
+            , ctxGetParams = localGetParams
+            }
+
+    V.imapM_
+      ( \i User' {userAddr = userIaddr} -> do
+          userIbalance <- ctxRunQuery ctx0 $ queryBalance userIaddr
+          when (isEmptyValue userIbalance) $ do
+            debug $ printf "User %d balance is empty, giving some ada\n" $ i + 1
+            giveAda ctx0 userIaddr
+            when (i == 0) (giveAda ctx0 . userAddr $ ctxUserF ctx0) -- we also give ada to itself to create some small utxos
+      )
+      allUsers
+
+    -- mint test tokens
+    goldAC <- mintTestTokens ctx0 "GOLD"
+    debug $ printf "gold = %s\n" goldAC
+
+    ironAC <- mintTestTokens ctx0 "IRON"
+    debug $ printf "iron = %s\n" ironAC
+
+    let ctx :: Ctx
+        ctx =
+          ctx0
+            { ctxGold = goldAC
+            , ctxIron = ironAC
+            }
+
+    -- distribute tokens
+    V.imapM_
+      ( \i User' {userAddr = userIaddr} -> do
+          userIbalance <- ctxRunQuery ctx0 $ queryBalance userIaddr
+          when (isEmptyValue $ snd $ valueSplitAda userIbalance) $ do
+            debug $ printf "User %d has no tokens, giving some\n" $ i + 1
+            giveTokens ctx userIaddr
+      )
+      allUsers
+
+    let setup = Setup $ \targetSev putLog kont -> kont $ ctx {ctxLog = simpleLogging targetSev (putLog . Txt.unpack)}
+    pure (setup, runtimeThreadId)
  where
   -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
   cardanoTestnet' opts conf = do

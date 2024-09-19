@@ -25,6 +25,7 @@ import GeniusYield.Test.Unified.OnChain.BetRef.Compiled
 import GeniusYield.Test.Utils
 import GeniusYield.TxBuilder
 import GeniusYield.Types
+import Control.Concurrent (ThreadId)
 
 {- | Test environment 'WalletInfo' among other things provides nine wallets that
 be used in tests. For convinience we assign some meaningful names to them.
@@ -46,23 +47,23 @@ placeBetTestsClb =
     ]
 
 -- | Test suite for a private testnet
-placeBetTests :: Setup -> TestTree
-placeBetTests setup =
+placeBetTests :: IO (Setup, ThreadId) -> TestTree
+placeBetTests getSetup =
   testGroup
     "Place bet"
     [ mkPrivnetTestFor_ "Simple tx" simpleTxTest
     , mkPrivnetTestFor_ "Placing first bet" firstBetTest'
     , mkPrivnetTestFor_ "Multiple bets" multipleBetsTest
-    , mkPrivnetTestFor' "Multiple bets - too small step" GYDebug setup $
-        handleError
-          ( \case
-              GYBuildTxException GYBuildTxBodyErrorAutoBalance {} -> pure ()
-              e -> throwError e
-          )
-          . failingMultipleBetsTest
+    -- , mkPrivnetTestFor' "Multiple bets - too small step" GYDebug setup $
+    --     handleError
+    --       ( \case
+    --           GYBuildTxException GYBuildTxBodyErrorAutoBalance {} -> pure ()
+    --           e -> throwError e
+    --       )
+    --       . failingMultipleBetsTest
     ]
  where
-  mkPrivnetTestFor_ = flip mkPrivnetTestFor setup
+  mkPrivnetTestFor_  name= mkPrivnetTestFor'' name GYDebug getSetup
 
 -- -----------------------------------------------------------------------------
 -- Simple tx

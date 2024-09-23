@@ -1,0 +1,80 @@
+{
+  "$id": "test",
+  "preamble": {
+    "title": "blueprint/test",
+    "description": "Aiken contracts for project 'blueprint/test'",
+    "version": "0.0.0",
+    "plutusVersion": "v2",
+    "compiler": {
+      "name": "Aiken",
+      "version": "v1.0.29-alpha+16fb02e"
+    },
+    "license": "Apache-2.0"
+  },
+  "validators": [
+    {
+      "title": "always_true.spend",
+      "datum": {
+        "title": "_datum",
+        "schema": {
+          "$ref": "#/definitions/List$Int"
+        }
+      },
+      "redeemer": {
+        "title": "_redeemer",
+        "schema": {
+          "$ref": "#/definitions/Int"
+        }
+      },
+      "parameters": [
+        {
+          "title": "_param1",
+          "schema": {
+            "$ref": "#/definitions/Int"
+          }
+        },
+        {
+          "title": "_param2",
+          "schema": {
+            "$ref": "#/definitions/ByteArray"
+          }
+        }
+      ],
+      "compiledCode": "5848010000323232322322322322322533300a4a229309b2b1bad0013233001001375800444a6660120022930991980180198060011bad300a001375c0026eb40055cd2ab9f5742ae881",
+      "hash": "d0cf08dca31123692a4b93c9d063eeff8ae5bc71282544bcdbc296d5"
+    },
+    {
+      "title": "nested/sometimes_true.spend",
+      "redeemer": {
+        "title": "redeemer",
+        "schema": {
+          "$ref": "#/definitions/Int"
+        }
+      },
+      "parameters": [
+        {
+          "title": "param",
+          "schema": {
+            "$ref": "#/definitions/Int"
+          }
+        }
+      ],
+      "compiledCode": "581e01000032232232253330063371000800429309b2b1bad001375a002ae681",
+      "hash": "ed3f8f41ef1cd903d9ae4304191ab71c97422189df37d70174d73b7d"
+    }
+  ],
+  "definitions": {
+    "ByteArray": {
+      "dataType": "bytes"
+    },
+    "Int": {
+      "dataType": "integer"
+    },
+    "List$Int": {
+      "dataType": "list",
+      "items": {
+        "$ref": "#/definitions/Int"
+      }
+    }
+  }
+}

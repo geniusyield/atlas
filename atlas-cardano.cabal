@@ -301,6 +301,7 @@ test-suite atlas-tests
   -- set target plutus-core version
   ghc-options:    -fplugin-opt PlutusTx.Plugin:target-version=1.0.0
   other-modules:
+    GeniusYield.Test.Blueprint
     GeniusYield.Test.CoinSelection
     GeniusYield.Test.Config
     GeniusYield.Test.FeeTracking

@@ -35,10 +35,11 @@ instance FromJSON ArgumentBlueprint where
     MkArgumentBlueprint
       <$> o .:? "title"
       <*> o .:? "description"
-      <*> ((o .: "purpose") >>= parsePurpose)
+      <*> ((o .:? "purpose") >>= parsePurpose)
       <*> o .: "schema"
    where
-    parsePurpose :: Value -> Parser (Set Purpose)
-    parsePurpose v =
+    parsePurpose :: Maybe Value -> Parser (Set Purpose)
+    parsePurpose Nothing = pure Set.empty
+    parsePurpose (Just v) =
       (Set.singleton <$> parseJSON v)
         <|> withObject "Purpose" (\o -> Set.fromList <$> o .: "oneOf") v

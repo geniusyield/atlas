@@ -13,8 +13,11 @@ module GeniusYield.Types.Blueprint.Schema (
   ListSchema (..),
   ListItemSchema (..),
   BytesSchema (..),
+  emptyBytesSchema,
   IntegerSchema (..),
+  emptyIntegerSchema,
   SchemaInfo (..),
+  emptySchemaInfo,
 ) where
 
 import Control.Applicative ((<|>))
@@ -62,6 +65,9 @@ data SchemaInfo = MkSchemaInfo
   }
   deriving stock (Eq, Ord, Show)
 
+emptySchemaInfo :: SchemaInfo
+emptySchemaInfo = MkSchemaInfo Nothing Nothing Nothing
+
 data IntegerSchema = MkIntegerSchema
   { isMultipleOf :: Maybe Integer
   -- ^ An instance is valid if division by this value results in an integer.
@@ -79,6 +85,9 @@ data IntegerSchema = MkIntegerSchema
     FromJSON
     via CustomJSON '[FieldLabelModifier '[StripPrefix "is", LowerFirst]] IntegerSchema
 
+emptyIntegerSchema :: IntegerSchema
+emptyIntegerSchema = MkIntegerSchema Nothing Nothing Nothing Nothing Nothing
+
 data BytesSchema = MkBytesSchema
   { bsEnum :: [ByteString]
   -- ^ An instance validates successfully if once hex-encoded,
@@ -90,10 +99,13 @@ data BytesSchema = MkBytesSchema
   }
   deriving stock (Eq, Ord, Show)
 
+emptyBytesSchema :: BytesSchema
+emptyBytesSchema = MkBytesSchema [] Nothing Nothing
+
 instance FromJSON BytesSchema where
   parseJSON = withObject "BytesSchema" $ \o ->
     MkBytesSchema
-      <$> ((o .: "enum") >>= traverse fromText)
+      <$> ((o .:? "enum") >>= maybe (pure []) (traverse fromText))
       <*> o .:? "minLength"
       <*> o .:? "maxLength"
    where

@@ -116,6 +116,15 @@ library
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
+    GeniusYield.Types.Blueprint
+    GeniusYield.Types.Blueprint.Argument
+    GeniusYield.Types.Blueprint.Contract
+    GeniusYield.Types.Blueprint.DefinitionId
+    GeniusYield.Types.Blueprint.Parameter
+    GeniusYield.Types.Blueprint.Purpose
+    GeniusYield.Types.Blueprint.Preamble
+    GeniusYield.Types.Blueprint.Schema
+    GeniusYield.Types.Blueprint.Validator
     GeniusYield.Types.Certificate
     GeniusYield.Types.Credential
     GeniusYield.Types.Datum

@@ -10,7 +10,7 @@ import GeniusYield.ReadJSON (readJSON)
 import GeniusYield.Types.Blueprint
 import GeniusYield.Types.PlutusVersion (PlutusVersion (..))
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (assertBool, testCase)
+import Test.Tasty.HUnit (Assertion, testCase, (@?=))
 
 simpleBlueprint :: ContractBlueprint
 simpleBlueprint =
@@ -22,7 +22,7 @@ simpleBlueprint =
           , preambleDescription = Just "Aiken contracts for project 'blueprint/test'"
           , preambleVersion = "0.0.0"
           , preamblePlutusVersion = PlutusV2
-          , preambleLicense = Just "Apache 2.0"
+          , preambleLicense = Just "Apache-2.0"
           }
     , contractValidators =
         Set.fromList
@@ -100,12 +100,12 @@ blueprintTests :: TestTree
 blueprintTests =
   testGroup
     "Blueprint"
-    [ testCase "parse-and-match-simple-blueprint" $ testParseResult (== simpleBlueprint) "simple-blueprint.json"
+    [ testCase "parse-and-match-simple-blueprint" $ testParseResult (@?= simpleBlueprint) "simple-blueprint.json"
     ]
 
-testParseResult :: (ContractBlueprint -> Bool) -> FilePath -> IO ()
+testParseResult :: (ContractBlueprint -> Assertion) -> FilePath -> IO ()
 testParseResult expectation filePath =
-  readJSON (mockBlueprintsDir </> filePath) >>= assertBool "parses as expected" . expectation
+  readJSON (mockBlueprintsDir </> filePath) >>= expectation
 
 mockBlueprintsDir :: FilePath
 mockBlueprintsDir = "tests/mock-blueprints"

@@ -7,9 +7,10 @@ Stability   : develop
 -}
 module GeniusYield.Types.Blueprint.Preamble (Preamble (..)) where
 
-import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.:?))
+import Data.Aeson (FromJSON (parseJSON), ToJSON (..), withObject, (.:), (.:?))
 import Data.Aeson.Types (Parser)
 import Deriving.Aeson
+import GeniusYield.Aeson.Utils (buildObject, optionalField, requiredField)
 import GeniusYield.Imports (Text)
 import GeniusYield.Types.PlutusVersion (PlutusVersion (..))
 
@@ -44,3 +45,18 @@ instance FromJSON Preamble where
       "v2" -> pure PlutusV2
       "v3" -> pure PlutusV3
       _ -> fail "Invalid Plutus version"
+
+instance ToJSON Preamble where
+  toJSON MkPreamble {..} =
+    buildObject $
+      requiredField "title" preambleTitle
+        . optionalField "description" preambleDescription
+        . requiredField "version" preambleVersion
+        . requiredField "plutusVersion" (encodePlutusVersion preamblePlutusVersion)
+        . optionalField "license" preambleLicense
+   where
+    encodePlutusVersion :: PlutusVersion -> Text
+    encodePlutusVersion = \case
+      PlutusV1 -> "v1"
+      PlutusV2 -> "v2"
+      PlutusV3 -> "v3"

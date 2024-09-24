@@ -7,9 +7,11 @@ Stability   : develop
 -}
 module GeniusYield.Types.Blueprint.Contract (ContractBlueprint (..)) where
 
+import Data.Aeson (ToJSON (..), object, (.=))
 import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Deriving.Aeson
+import GeniusYield.Aeson.Utils (buildObject, optionalField, requiredField)
 import GeniusYield.Imports (Text)
 import GeniusYield.Types.Blueprint.DefinitionId (DefinitionId)
 import GeniusYield.Types.Blueprint.Preamble (Preamble)
@@ -35,3 +37,26 @@ data ContractBlueprint
     via CustomJSON '[FieldLabelModifier '[StripPrefix "contract", LowerFirst, Rename "id" "$id"]] ContractBlueprint
 
 -- TODO: Define LowerFirst in some common module.
+instance ToJSON ContractBlueprint where
+  toJSON MkContractBlueprint {..} =
+    buildObject $
+      requiredField "$schema" schemaUrl
+        . requiredField
+          "$vocabulary"
+          ( object
+              [ "https://json-schema.org/draft/2020-12/vocab/core" .= True
+              , "https://json-schema.org/draft/2020-12/vocab/applicator" .= True
+              , "https://json-schema.org/draft/2020-12/vocab/validation" .= True
+              , "https://cips.cardano.org/cips/cip57" .= True
+              ]
+          )
+        . requiredField "preamble" contractPreamble
+        . requiredField "validators" contractValidators
+        . optionalField "$id" contractId
+        . optionalField "definitions" (nonMempty contractDefinitions)
+   where
+    schemaUrl :: String
+    schemaUrl = "https://cips.cardano.org/cips/cip57/schemas/plutus-blueprint.json"
+
+    nonMempty :: (Eq a, Monoid a) => a -> Maybe a
+    nonMempty a = if a == mempty then Nothing else Just a

@@ -64,6 +64,7 @@ library
   import:          common
   hs-source-dirs:  src
   exposed-modules:
+    GeniusYield.Aeson.Utils
     GeniusYield.Api.TestTokens
     GeniusYield.CardanoApi.EraHistory
     GeniusYield.CardanoApi.Query
@@ -125,6 +126,7 @@ library
     GeniusYield.Types.Blueprint.Preamble
     GeniusYield.Types.Blueprint.Schema
     GeniusYield.Types.Blueprint.Validator
+    GeniusYield.Types.Blueprint.Write
     GeniusYield.Types.Certificate
     GeniusYield.Types.Credential
     GeniusYield.Types.Datum
@@ -178,6 +180,7 @@ library
   build-depends:
     async ^>=2.2.5,
     aeson ^>=2.2.3,
+    aeson-pretty ^>= 0.8.10,
     attoparsec ^>=0.14.4,
     auto-update ^>=0.2.1,
     base ^>=4.18.2,

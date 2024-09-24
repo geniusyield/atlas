@@ -8,9 +8,10 @@ import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import GeniusYield.ReadJSON (readJSON)
 import GeniusYield.Types.Blueprint
+import GeniusYield.Types.Blueprint.Write (writeBlueprint)
 import GeniusYield.Types.PlutusVersion (PlutusVersion (..))
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (Assertion, testCase, (@?=))
+import Test.Tasty.HUnit (Assertion, testCase, (@=?), (@?=))
 
 simpleBlueprint :: ContractBlueprint
 simpleBlueprint =
@@ -101,11 +102,25 @@ blueprintTests =
   testGroup
     "Blueprint"
     [ testCase "parse-and-match-simple-blueprint" $ testParseResult (@?= simpleBlueprint) "simple-blueprint.json"
+    , testCase "parse-complex-blueprint-and-match-round-trip" $
+        let fp = "complex-blueprint.json"
+         in testParseResult
+              ( \bp -> do
+                  let fp' = getLocalFilePath "complex-blueprint-rt.json"
+                  writeBlueprint fp' bp
+                  aContents <- readFile (getLocalFilePath fp)
+                  bContents <- readFile fp'
+                  aContents @=? bContents
+              )
+              fp
     ]
+
+getLocalFilePath :: FilePath -> FilePath
+getLocalFilePath fp = mockBlueprintsDir </> fp
 
 testParseResult :: (ContractBlueprint -> Assertion) -> FilePath -> IO ()
 testParseResult expectation filePath =
-  readJSON (mockBlueprintsDir </> filePath) >>= expectation
+  readJSON (getLocalFilePath filePath) >>= expectation
 
 mockBlueprintsDir :: FilePath
 mockBlueprintsDir = "tests/mock-blueprints"

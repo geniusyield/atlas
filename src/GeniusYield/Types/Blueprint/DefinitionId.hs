@@ -7,8 +7,8 @@ Stability   : develop
 -}
 module GeniusYield.Types.Blueprint.DefinitionId (DefinitionId, mkDefinitionId, unDefinitionId) where
 
-import Data.Aeson (FromJSON (..), FromJSONKey, FromJSONKeyFunction (..), withText)
-import Data.Aeson.Types (FromJSONKey (..))
+import Data.Aeson (FromJSON (..), FromJSONKey, FromJSONKeyFunction (..), ToJSON (..), ToJSONKey (..), withText)
+import Data.Aeson.Types (FromJSONKey (..), toJSONKeyText)
 import Data.Text (Text)
 import Data.Text qualified as Text
 
@@ -26,5 +26,11 @@ unDefinitionId (DefinitionId t) = t
 instance FromJSON DefinitionId where
   parseJSON = withText "DefinitionId" (pure . mkDefinitionId)
 
+instance ToJSON DefinitionId where
+  toJSON = toJSON . unDefinitionId
+
 instance FromJSONKey DefinitionId where
   fromJSONKey = FromJSONKeyText mkDefinitionId
+
+instance ToJSONKey DefinitionId where
+  toJSONKey = toJSONKeyText unDefinitionId

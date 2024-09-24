@@ -8,12 +8,14 @@ Stability   : develop
 module GeniusYield.Types.Blueprint.Parameter (ParameterBlueprint (..)) where
 
 import Control.Applicative ((<|>))
-import Data.Aeson (FromJSON (..), Value, withObject, (.:), (.:?))
+import Data.Aeson (FromJSON (..), ToJSON (..), Value, withObject, (.:), (.:?))
 import Data.Aeson.Types (Parser)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Deriving.Aeson
+import GeniusYield.Aeson.Utils (buildObject, optionalField, requiredField)
 import GeniusYield.Imports (Text)
+import GeniusYield.Types.Blueprint.Argument (oneOfASet)
 import GeniusYield.Types.Blueprint.Purpose (Purpose)
 import GeniusYield.Types.Blueprint.Schema (Schema)
 
@@ -43,3 +45,11 @@ instance FromJSON ParameterBlueprint where
     parsePurpose (Just v) =
       (Set.singleton <$> parseJSON v)
         <|> withObject "Purpose" (\o -> Set.fromList <$> o .: "oneOf") v
+
+instance ToJSON ParameterBlueprint where
+  toJSON MkParameterBlueprint {..} =
+    buildObject $
+      optionalField "title" parameterTitle
+        . optionalField "description" parameterDescription
+        . optionalField "purpose" (oneOfASet parameterPurpose)
+        . requiredField "schema" parameterSchema

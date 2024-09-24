@@ -18,4 +18,4 @@ import Maestro.Types.Common (LowerFirst)
 -}
 data Purpose = Spend | Mint | Withdraw | Publish
   deriving stock (Eq, Ord, Show, Generic)
-  deriving FromJSON via CustomJSON '[ConstructorTagModifier '[LowerFirst]] Purpose
+  deriving (ToJSON, FromJSON) via CustomJSON '[ConstructorTagModifier '[LowerFirst]] Purpose

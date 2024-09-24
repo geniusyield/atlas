@@ -21,18 +21,21 @@ module GeniusYield.Types.Blueprint.Schema (
 ) where
 
 import Control.Applicative ((<|>))
-import Data.Aeson (FromJSON (parseJSON), Value (..), withObject, (.:), (.:?))
+import Data.Aeson (FromJSON (parseJSON), ToJSON (..), Value (..), object, withObject, (.:), (.:?), (.=))
+import Data.Aeson qualified as Aeson
 import Data.Aeson.KeyMap qualified as AesonMap
+import Data.Aeson.KeyMap qualified as KeyMap
 import Data.Aeson.Types (Parser)
 import Data.ByteString (ByteString)
 import Data.ByteString.Base16 qualified as BS16
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import Data.Text qualified as Text
-import Data.Text.Encoding (encodeUtf8)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Deriving.Aeson
 import GHC.Natural (Natural)
-import GeniusYield.Imports (Text)
-import GeniusYield.Types.Blueprint.DefinitionId (DefinitionId)
+import GeniusYield.Aeson.Utils (optionalField, requiredField)
+import GeniusYield.Imports (Text, (&))
+import GeniusYield.Types.Blueprint.DefinitionId (DefinitionId, unDefinitionId)
 import Maestro.Types.Common (LowerFirst)
 
 -- | Blueprint schema definition, as defined by the CIP-0057.
@@ -177,7 +180,7 @@ data PairSchema = MkPairSchema
 
 instance FromJSON Schema where
   parseJSON = withObject "Schema" $ \o -> do
-    let info = MkSchemaInfo <$> o .:? "title" <*> o .:? "description" <*> o .:? "comment"
+    let info = MkSchemaInfo <$> o .:? "title" <*> o .:? "description" <*> o .:? "$comment"
     dt :: Maybe Text <- o .:? "dataType"
     case dt of
       Just dt' ->
@@ -203,3 +206,83 @@ instance FromJSON Schema where
           | AesonMap.member "not" o -> SchemaNot <$> o .: "not"
           | AesonMap.member "$ref" o -> SchemaDefinitionRef <$> o .: "$ref" -- TODO: Remove definitions prefix.
           | otherwise -> SchemaBuiltInData <$> info
+
+instance ToJSON Schema where
+  toJSON = \case
+    SchemaInteger info MkIntegerSchema {..} ->
+      dataType info "integer"
+        & optionalField "multipleOf" isMultipleOf
+        & optionalField "minimum" isMinimum
+        & optionalField "maximum" isMaximum
+        & optionalField "exclusiveMinimum" isExclusiveMinimum
+        & optionalField "exclusiveMaximum" isExclusiveMaximum
+        & Object
+    SchemaBytes info MkBytesSchema {..} ->
+      dataType info "bytes"
+        & optionalField "enum" (fmap toHex <$> nonEmpty bsEnum)
+        & optionalField "maxLength" bsMaxLength
+        & optionalField "minLength" bsMinLength
+        & Object
+     where
+      toHex :: ByteString -> Text
+      toHex = decodeUtf8 . BS16.encode
+    SchemaList info MkListSchema {..} ->
+      dataType info "list"
+        & requiredField "items" (case lsItems of ListItemSchemaSchema s -> toJSON s; ListItemSchemaSchemas ss -> toJSON ss)
+        & optionalField "minItems" lsMinItems
+        & optionalField "maxItems" lsMaxItems
+        & optionalField "uniqueItems" lsUniqueItems
+        & Object
+    SchemaMap info MkMapSchema {..} ->
+      dataType info "map"
+        & requiredField "keys" msKeys
+        & requiredField "values" msValues
+        & optionalField "minItems" msMinItems
+        & optionalField "maxItems" msMaxItems
+        & Object
+    SchemaConstructor info MkConstructorSchema {..} ->
+      dataType info "constructor"
+        & requiredField "index" csIndex
+        & requiredField "fields" csFields
+        & Object
+    SchemaBuiltInData info ->
+      Object $ infoFields info
+    SchemaBuiltInUnit info ->
+      Object $ dataType info "#unit"
+    SchemaBuiltInBoolean info ->
+      Object $ dataType info "#boolean"
+    SchemaBuiltInInteger info ->
+      Object $ dataType info "#integer"
+    SchemaBuiltInBytes info ->
+      Object $ dataType info "#bytes"
+    SchemaBuiltInString info ->
+      Object $ dataType info "#string"
+    SchemaBuiltInPair info MkPairSchema {psLeft, psRight} ->
+      dataType info "#pair"
+        & requiredField "left" psLeft
+        & requiredField "right" psRight
+        & Object
+    SchemaBuiltInList info schema ->
+      dataType info "#list"
+        & requiredField "items" schema
+        & Object
+    SchemaOneOf schemas ->
+      object ["oneOf" .= schemas]
+    SchemaAnyOf schemas ->
+      object ["anyOf" .= schemas]
+    SchemaAllOf schemas ->
+      object ["allOf" .= schemas]
+    SchemaNot schema ->
+      object ["not" .= schema]
+    SchemaDefinitionRef definitionId ->
+      object ["$ref" .= ("#/definitions/" <> unDefinitionId definitionId)]
+   where
+    dataType :: SchemaInfo -> String -> Aeson.Object
+    dataType info ty = requiredField "dataType" ty (infoFields info)
+
+    infoFields :: SchemaInfo -> Aeson.Object
+    infoFields info =
+      KeyMap.empty
+        & optionalField "title" (title info)
+        & optionalField "description" (description info)
+        & optionalField "$comment" (comment info)

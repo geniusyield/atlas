@@ -7,8 +7,10 @@ Stability   : develop
 -}
 module GeniusYield.Types.Blueprint.Validator (ValidatorBlueprint (..), CompiledValidator (..)) where
 
-import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.:?))
+import Data.Aeson (FromJSON (parseJSON), ToJSON (..), withObject, (.:), (.:?))
+import Data.List.NonEmpty (nonEmpty)
 import Deriving.Aeson
+import GeniusYield.Aeson.Utils (buildObject, optionalField, requiredField)
 import GeniusYield.Imports (Text)
 import GeniusYield.Types.Blueprint.Argument (ArgumentBlueprint)
 import GeniusYield.Types.Blueprint.Parameter (ParameterBlueprint)
@@ -52,3 +54,14 @@ data CompiledValidator = MkCompiledValidator
   , compiledValidatorHash :: GYScriptHash
   }
   deriving stock (Show, Eq, Ord)
+
+instance ToJSON ValidatorBlueprint where
+  toJSON MkValidatorBlueprint {..} =
+    buildObject $
+      requiredField "title" validatorTitle
+        . requiredField "redeemer" validatorRedeemer
+        . optionalField "description" validatorDescription
+        . optionalField "datum" validatorDatum
+        . optionalField "parameters" (nonEmpty validatorParameters)
+        . optionalField "compiledCode" (compiledValidatorCode <$> validatorCompiled)
+        . optionalField "hash" (toJSON . compiledValidatorHash <$> validatorCompiled)

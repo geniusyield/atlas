@@ -53,7 +53,7 @@ decTypes defId = \case
     pure [NewtypeD [] tyconName [] Nothing (NormalC tyconName [(Bang NoSourceUnpackedness NoSourceStrictness, ConT ''Integer)]) stockDerivations]
   SchemaBytes _schemaInfo _bytesSchema ->
     pure [NewtypeD [] tyconName [] Nothing (NormalC tyconName [(Bang NoSourceUnpackedness NoSourceStrictness, ConT ''Plutus.BuiltinByteString)]) stockDerivations]
-  SchemaList _schemaInfo (MkListSchema {..}) ->
+  SchemaList _schemaInfo MkListSchema {..} ->
     case lsItems of
       ListItemSchemaSchema s -> case s of
         SchemaDefinitionRef itemDefId -> pure [NewtypeD [] tyconName [] Nothing (NormalC tyconName [(Bang NoSourceUnpackedness NoSourceStrictness, AppT ListT (ConT (genTyconName itemDefId)))]) stockDerivations]
@@ -62,11 +62,11 @@ decTypes defId = \case
           let itemDefId = mkDefinitionId $ unDefinitionId defId <> "_Item"
            in pure [NewtypeD [] tyconName [] Nothing (NormalC tyconName [(Bang NoSourceUnpackedness NoSourceStrictness, AppT ListT (ConT (genTyconName itemDefId)))]) stockDerivations] <> decTypes itemDefId s
       ListItemSchemaSchemas _ -> error $ moduleName <> ": items as a list of schemas is unsupported. " <> createIssue
-  SchemaMap _schemaInfo (MkMapSchema {..}) ->
+  SchemaMap _schemaInfo MkMapSchema {..} ->
     let keyDefId = mkDefinitionId $ unDefinitionId defId <> "_Key"
         valDefId = mkDefinitionId $ unDefinitionId defId <> "_Value"
      in pure [NewtypeD [] tyconName [] Nothing (NormalC tyconName [(Bang NoSourceUnpackedness NoSourceStrictness, AppT (AppT (ConT ''Map.Map) (ConT (genTyconName keyDefId))) (ConT (genTyconName valDefId)))]) stockDerivations] <> decTypes keyDefId msKeys <> decTypes valDefId msValues -- TODO: Possibly make optimisation here, to not use newtypes? Not really clear, perhaps should get rid of newtypes entirely.
-  SchemaConstructor _schemaInfo (MkConstructorSchema {..}) ->
+  SchemaConstructor _schemaInfo MkConstructorSchema {..} ->
     if csFields == mempty
       then error (moduleName <> ": top level \"constructor\" fields must not be empty. " <> createIssue)
       else do
@@ -87,7 +87,7 @@ decTypes defId = \case
         compareConstructors _ _ = error $ moduleName <> ": schemas inside \"oneOf\" must be all of dataType \"constructor\". " <> createIssue
         ssSorted = NE.sortBy compareConstructors ss
         f acc s = case s of
-          SchemaConstructor _schemaInfo (MkConstructorSchema {..}) ->
+          SchemaConstructor _schemaInfo MkConstructorSchema {..} ->
             let constructorName = genTyconName $ mkDefinitionId $ unDefinitionId defId <> Text.pack (show csIndex)
              in NormalC constructorName (reverse $ foldl' getFieldRefs [] csFields) : acc
           _anyOther -> error $ moduleName <> ": absurd case encountered when handling \"oneOf\"."

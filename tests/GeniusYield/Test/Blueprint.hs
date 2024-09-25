@@ -101,6 +101,8 @@ simpleBlueprint =
     }
 
 $(makeBlueprintTypes "tests/mock-blueprints/complex-blueprint.json")
+
+$(makeIsDataInstances "tests/mock-blueprints/complex-blueprint.json")
 -- $(makeBlueprintTypes "tests/mock-blueprints/simple-blueprint.json")
 
 blueprintTests :: TestTree

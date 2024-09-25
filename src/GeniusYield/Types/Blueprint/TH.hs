@@ -7,7 +7,10 @@ License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
 -}
-module GeniusYield.Types.Blueprint.TH (makeBlueprintTypes) where
+module GeniusYield.Types.Blueprint.TH (
+  makeBlueprintTypes,
+  makeIsDataInstances,
+) where
 
 import Data.List (foldl')
 import Data.List.NonEmpty qualified as NE
@@ -22,6 +25,7 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import PlutusLedgerApi.Common qualified as Plutus
 import PlutusTx qualified
+import PlutusTx.AssocMap qualified as PlutusTx
 
 -- | Get the name of the current module.
 moduleName :: String
@@ -50,29 +54,29 @@ stockDerivations = [DerivClause (Just StockStrategy) [ConT ''Eq, ConT ''Show, Co
 decTypes :: DefinitionId -> Schema -> Q [Dec]
 decTypes defId = \case
   SchemaInteger _schemaInfo _integerSchema ->
-    pure [NewtypeD [] tyconName [] Nothing (NormalC tyconName [(Bang NoSourceUnpackedness NoSourceStrictness, ConT ''Integer)]) stockDerivations]
+    pure [TySynD tyconName [] (ConT ''Integer)]
   SchemaBytes _schemaInfo _bytesSchema ->
-    pure [NewtypeD [] tyconName [] Nothing (NormalC tyconName [(Bang NoSourceUnpackedness NoSourceStrictness, ConT ''Plutus.BuiltinByteString)]) stockDerivations]
+    pure [TySynD tyconName [] (ConT ''Plutus.BuiltinByteString)]
   SchemaList _schemaInfo MkListSchema {..} ->
     case lsItems of
       ListItemSchemaSchema s -> case s of
-        SchemaDefinitionRef itemDefId -> pure [NewtypeD [] tyconName [] Nothing (NormalC tyconName [(Bang NoSourceUnpackedness NoSourceStrictness, AppT ListT (ConT (genTyconName itemDefId)))]) stockDerivations]
+        SchemaDefinitionRef itemDefId ->
+          pure [TySynD tyconName [] (AppT ListT (ConT (genTyconName itemDefId)))]
         _anyOther ->
           -- TODO: Should I do something to avoid their being name conflicts in case there is already a type with name ..._Item?
           let itemDefId = mkDefinitionId $ unDefinitionId defId <> "_Item"
-           in pure [NewtypeD [] tyconName [] Nothing (NormalC tyconName [(Bang NoSourceUnpackedness NoSourceStrictness, AppT ListT (ConT (genTyconName itemDefId)))]) stockDerivations] <> decTypes itemDefId s
+           in pure [TySynD tyconName [] (AppT ListT (ConT (genTyconName itemDefId)))] <> decTypes itemDefId s
       ListItemSchemaSchemas _ -> error $ moduleName <> ": items as a list of schemas is unsupported. " <> createIssue
   SchemaMap _schemaInfo MkMapSchema {..} ->
     let keyDefId = mkDefinitionId $ unDefinitionId defId <> "_Key"
         valDefId = mkDefinitionId $ unDefinitionId defId <> "_Value"
-     in pure [NewtypeD [] tyconName [] Nothing (NormalC tyconName [(Bang NoSourceUnpackedness NoSourceStrictness, AppT (AppT (ConT ''Map.Map) (ConT (genTyconName keyDefId))) (ConT (genTyconName valDefId)))]) stockDerivations] <> decTypes keyDefId msKeys <> decTypes valDefId msValues -- TODO: Possibly make optimisation here, to not use newtypes? Not really clear, perhaps should get rid of newtypes entirely.
+     in pure [TySynD tyconName [] (AppT (AppT (ConT ''PlutusTx.Map) (ConT (genTyconName keyDefId))) (ConT (genTyconName valDefId)))] <> decTypes keyDefId msKeys <> decTypes valDefId msValues
   SchemaConstructor _schemaInfo MkConstructorSchema {..} ->
     if csFields == mempty
       then error (moduleName <> ": top level \"constructor\" fields must not be empty. " <> createIssue)
       else do
         pure [DataD [] tyconName [] Nothing [NormalC tyconName (reverse $ foldl' getFieldRefs [] csFields)] stockDerivations]
-  -- TODO: Define as a type synonym for defId?
-  SchemaBuiltInData _ -> pure [NewtypeD [] tyconName [] Nothing (NormalC tyconName [(Bang NoSourceUnpackedness NoSourceStrictness, ConT ''PlutusTx.BuiltinData)]) stockDerivations]
+  SchemaBuiltInData _ -> pure [TySynD tyconName [] (ConT ''PlutusTx.BuiltinData)]
   SchemaBuiltInUnit _ -> error $ moduleName <> ": \"#unit\" " <> avoidBuiltin
   SchemaBuiltInBoolean _ -> error $ moduleName <> ": \"#boolean\" " <> avoidBuiltin
   SchemaBuiltInInteger _ -> error $ moduleName <> ": \"#integer\" " <> avoidBuiltin
@@ -95,7 +99,6 @@ decTypes defId = \case
   SchemaAnyOf _ -> error $ moduleName <> ": \"anyOf\" is not supported as type is ambiguous."
   SchemaAllOf _ -> error $ moduleName <> ": \"allOf\" is not supported as type is ambiguous."
   SchemaNot _ -> error $ moduleName <> ": \"not\" is not supported as type is ambiguous."
-  -- TODO: To use newtype here instead?
   SchemaDefinitionRef r -> pure [TySynD tyconName [] (ConT (genTyconName r))]
  where
   avoidBuiltin = "is a built-in type which are not supported."
@@ -113,3 +116,12 @@ makeBlueprintTypes fp = do
     (\acc defId schema -> acc <> decTypes defId schema)
     (pure [])
     (contractDefinitions bp)
+
+makeIsDataInstances :: FilePath -> Q [Dec]
+makeIsDataInstances fp = do
+  typeDecs <- makeBlueprintTypes fp
+  foldl' f (pure []) typeDecs
+ where
+  f acc dec = case dec of
+    DataD _ n _ _ _ _ -> acc <> PlutusTx.unstableMakeIsData n
+    _ -> acc

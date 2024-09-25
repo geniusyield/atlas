@@ -127,7 +127,6 @@ library
     GeniusYield.Types.Blueprint.Schema
     GeniusYield.Types.Blueprint.TH
     GeniusYield.Types.Blueprint.Validator
-    GeniusYield.Types.Blueprint.Write
     GeniusYield.Types.Certificate
     GeniusYield.Types.Credential
     GeniusYield.Types.Datum

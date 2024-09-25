@@ -13,7 +13,6 @@ import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import GeniusYield.ReadJSON (readJSON)
 import GeniusYield.Types.Blueprint
-import GeniusYield.Types.Blueprint.Write (writeBlueprint)
 import GeniusYield.Types.PlutusVersion (PlutusVersion (..))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, testCase, (@=?), (@?=))

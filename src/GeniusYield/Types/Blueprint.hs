@@ -18,4 +18,5 @@ import GeniusYield.Types.Blueprint.Parameter as X
 import GeniusYield.Types.Blueprint.Preamble as X
 import GeniusYield.Types.Blueprint.Purpose as X
 import GeniusYield.Types.Blueprint.Schema as X
+import GeniusYield.Types.Blueprint.TH as X
 import GeniusYield.Types.Blueprint.Validator as X

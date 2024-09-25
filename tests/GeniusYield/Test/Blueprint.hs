@@ -1,3 +1,8 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -ddump-splices -ddump-to-file #-}
+
+-- Note: See [this](https://stackoverflow.com/a/69678961/20330802) answer on where one can find dumped splice file. As an example, @dist-newstyle/build/aarch64-osx/ghc-9.6.5/atlas-cardano-0.6.0/t/atlas-tests/build/atlas-tests/atlas-tests-tmp/tests/GeniusYield/Test@.
+
 module GeniusYield.Test.Blueprint (
   blueprintTests,
 ) where
@@ -96,7 +101,9 @@ simpleBlueprint =
     , contractDefinitions = Map.fromList [(mkDefinitionId "Int", SchemaInteger emptySchemaInfo emptyIntegerSchema), (mkDefinitionId "List$Int", SchemaList emptySchemaInfo (MkListSchema (ListItemSchemaSchema $ SchemaDefinitionRef (mkDefinitionId "#/definitions/Int")) Nothing Nothing Nothing)), (mkDefinitionId "ByteArray", SchemaBytes emptySchemaInfo emptyBytesSchema)]
     }
 
--- | These tests check that we can parse configs
+$(makeBlueprintTypes "tests/mock-blueprints/complex-blueprint.json")
+-- $(makeBlueprintTypes "tests/mock-blueprints/simple-blueprint.json")
+
 blueprintTests :: TestTree
 blueprintTests =
   testGroup

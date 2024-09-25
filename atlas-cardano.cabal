@@ -125,6 +125,7 @@ library
     GeniusYield.Types.Blueprint.Purpose
     GeniusYield.Types.Blueprint.Preamble
     GeniusYield.Types.Blueprint.Schema
+    GeniusYield.Types.Blueprint.TH
     GeniusYield.Types.Blueprint.Validator
     GeniusYield.Types.Blueprint.Write
     GeniusYield.Types.Certificate

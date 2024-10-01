@@ -12,6 +12,49 @@
   },
   "validators": [
     {
+      "title": "baz.baz.spend",
+      "datum": {
+        "title": "datumOpt",
+        "schema": {
+          "$ref": "#/definitions/baz~1MyDatum"
+        }
+      },
+      "redeemer": {
+        "title": "redeemer",
+        "schema": {
+          "$ref": "#/definitions/baz~1MyRedeemer"
+        }
+      },
+      "parameters": [
+        {
+          "title": "isTrue",
+          "schema": {
+            "$ref": "#/definitions/Bool"
+          }
+        },
+        {
+          "title": "st_arg",
+          "schema": {
+            "$ref": "#/definitions/baz~1ParamConstr"
+          }
+        },
+        {
+          "title": "primitiveInt",
+          "schema": {
+            "$ref": "#/definitions/Int"
+          }
+        },
+        {
+          "title": "primitiveBA",
+          "schema": {
+            "$ref": "#/definitions/ByteArray"
+          }
+        }
+      ],
+      "compiledCode": "59015c0101003232323232322322232232253330093232323232533300e3370e900118079baa001132323253323301230013013375400c264646464a66603260360042646464a666032601060346ea80244c8c94ccc06c0644cdc399b803370066e00cdc019b80337000026eb4c07cc074dd50079b8d375c603e6040603a6ea803c010dc680180b1b8d014481e0528299980d1804980d9baa00113232337006eb4c080008dc68009bae301f3020001301c37540022646466e00dd698100011b8d001375c603e604000260386ea8004c074c06cdd50048b1bae301c301d002375a603600260306ea804c58dd7180c800980c8011bad30170013014375400c6e1d200016301430150023013001301037540022646464c6eb8c050c054008dd6980980098081baa00b3011301200230100013010002300e001300b375400229309b2b1bae001375a00266e1d200230033754002ae6955ceaab9e5573eae855d11",
+      "hash": "8365f50a4b02c51505e73ce2aef01370cd34afe3bbe68a157c5f7301"
+    },
+    {
       "title": "baz.baz.else",
       "parameters": [
         {
@@ -39,13 +82,8 @@
           }
         }
       ],
-      "compiledCode": "588c010100323232323223222322322533300932323232323232323232533301301113370e66e00cdc019b80337000080046e34004038dc6806240f02940dd7180a980b0011bad30140013014002375a602400260206ea802cc040c044008c03c004c03c008c034004c02cdd50008a4c26cac6eb8004dd680099b8748008c00cdd5000ab9a5573aaae795d0aba21",
-      "hash": "4b6794422725078802b525bc30b04e66f02f03056ff463e5fdcf9c3e"
-    },
-    {
-      "title": "maz.baz.else",
-      "compiledCode": "5834010100323232322533300232323232324a260106012004600e002600e004600a00260066ea8004526136565734aae795d0aba201",
-      "hash": "4879a89543b28b9eed2348badba89fe65fb7378dc4e57e49f0e04577"
+      "compiledCode": "59015c0101003232323232322322232232253330093232323232533300e3370e900118079baa001132323253323301230013013375400c264646464a66603260360042646464a666032601060346ea80244c8c94ccc06c0644cdc399b803370066e00cdc019b80337000026eb4c07cc074dd50079b8d375c603e6040603a6ea803c010dc680180b1b8d014481e0528299980d1804980d9baa00113232337006eb4c080008dc68009bae301f3020001301c37540022646466e00dd698100011b8d001375c603e604000260386ea8004c074c06cdd50048b1bae301c301d002375a603600260306ea804c58dd7180c800980c8011bad30170013014375400c6e1d200016301430150023013001301037540022646464c6eb8c050c054008dd6980980098081baa00b3011301200230100013010002300e001300b375400229309b2b1bae001375a00266e1d200230033754002ae6955ceaab9e5573eae855d11",
+      "hash": "8365f50a4b02c51505e73ce2aef01370cd34afe3bbe68a157c5f7301"
     }
   ],
   "definitions": {
@@ -72,6 +110,61 @@
     "Int": {
       "dataType": "integer"
     },
+    "baz/MyDatum": {
+      "title": "MyDatum",
+      "anyOf": [
+        {
+          "title": "DatumA",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "intA",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "msgA",
+              "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        },
+        {
+          "title": "DatumB",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": [
+            {
+              "title": "intB",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "msgB",
+              "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        }
+      ]
+    },
+    "baz/MyRedeemer": {
+      "title": "MyRedeemer",
+      "anyOf": [
+        {
+          "title": "MyRedeemer",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "intR",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "msgR",
+              "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        }
+      ]
+    },
     "baz/ParamConstr": {
       "title": "ParamConstr",
       "anyOf": [
@@ -81,15 +174,11 @@
           "index": 0,
           "fields": [
             {
-              "title": "intA",
+              "title": "intP",
               "$ref": "#/definitions/Int"
             },
             {
-              "title": "intB",
-              "$ref": "#/definitions/Int"
-            },
-            {
-              "title": "msg",
+              "title": "msgP",
               "$ref": "#/definitions/ByteArray"
             }
           ]

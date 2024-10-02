@@ -12,20 +12,32 @@ module GeniusYield.Types.Blueprint.TH (
   makeIsDataInstances,
 ) where
 
+import Control.Monad (foldM)
+import Data.ByteString.Base16 qualified as BS16
+import Data.ByteString.Short qualified as SBS
+import Data.Char (toUpper)
 import Data.List (foldl')
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
-import GeniusYield.Imports (Generic)
+import Data.Text.Encoding qualified as Text
+import GHC.Natural (Natural)
+import GeniusYield.Imports (Generic, (&))
 import GeniusYield.ReadJSON (readJSON)
 import GeniusYield.Types.Blueprint.Contract
 import GeniusYield.Types.Blueprint.DefinitionId (DefinitionId, mkDefinitionId, unDefinitionId)
+import GeniusYield.Types.Blueprint.Parameter
+import GeniusYield.Types.Blueprint.Preamble
 import GeniusYield.Types.Blueprint.Schema
+import GeniusYield.Types.Blueprint.Validator
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
+import PlutusCore qualified as PLC
+import PlutusLedgerApi.Common (serialiseUPLC, uncheckedDeserialiseUPLC)
 import PlutusLedgerApi.Common qualified as Plutus
 import PlutusTx qualified
 import PlutusTx.AssocMap qualified as PlutusTx
+import UntypedPlutusCore qualified as UPLC
 
 -- | Get the name of the current module.
 moduleName :: String
@@ -34,6 +46,8 @@ moduleName = $(location >>= stringE . loc_module)
 -- | In case there is a valid use for an unsupported case.
 createIssue :: String
 createIssue = "Please raise an issue if you think it's a valid use case o/w."
+
+-- TODO: Maybe not replace by '_' but rather remove it.
 
 -- | Sanitize type names to be valid.
 sanitize :: Text.Text -> Text.Text
@@ -84,9 +98,19 @@ decTypes defId = \case
   SchemaBuiltInString _ -> error $ moduleName <> ": \"#string\" " <> avoidBuiltin
   SchemaBuiltInPair _ _ -> error $ moduleName <> ": \"#pair\" " <> avoidBuiltin
   SchemaBuiltInList _ _ -> error $ moduleName <> ": \"#list\" " <> avoidBuiltin
-  SchemaOneOf ss ->
-    -- TODO: To enforce strictness for fields?
-    -- TODO: To enforce that indices are all unique?
+  SchemaOneOf ss -> g ss
+  -- TODO: To enforce strictness for fields?
+  -- TODO: To enforce that indices are all unique?
+  SchemaAnyOf ss -> g ss
+  SchemaAllOf _ -> error $ moduleName <> ": \"allOf\" is not supported as type is ambiguous."
+  SchemaNot _ -> error $ moduleName <> ": \"not\" is not supported as type is ambiguous."
+  SchemaDefinitionRef r -> pure [TySynD tyconName [] (ConT (genTyconName r))]
+ where
+  avoidBuiltin = "is a built-in type which are not supported."
+  tyconName = genTyconName defId
+  getFieldRefs racc (SchemaDefinitionRef d) = (Bang NoSourceUnpackedness NoSourceStrictness, ConT (genTyconName d)) : racc
+  getFieldRefs _racc _ = error $ moduleName <> ": \"constructor\" fields must be all of type \"$ref\". " <> createIssue
+  g ss =
     let compareConstructors (SchemaConstructor _ a) (SchemaConstructor _ b) = compare (csIndex a) (csIndex b)
         compareConstructors _ _ = error $ moduleName <> ": schemas inside \"oneOf\" must be all of dataType \"constructor\". " <> createIssue
         ssSorted = NE.sortBy compareConstructors ss
@@ -96,26 +120,78 @@ decTypes defId = \case
              in NormalC constructorName (reverse $ foldl' getFieldRefs [] csFields) : acc
           _anyOther -> error $ moduleName <> ": absurd case encountered when handling \"oneOf\"."
      in pure [DataD [] tyconName [] Nothing (reverse $ foldl' f [] ssSorted) stockDerivations]
-  SchemaAnyOf _ -> error $ moduleName <> ": \"anyOf\" is not supported as type is ambiguous."
-  SchemaAllOf _ -> error $ moduleName <> ": \"allOf\" is not supported as type is ambiguous."
-  SchemaNot _ -> error $ moduleName <> ": \"not\" is not supported as type is ambiguous."
-  SchemaDefinitionRef r -> pure [TySynD tyconName [] (ConT (genTyconName r))]
- where
-  avoidBuiltin = "is a built-in type which are not supported."
-  tyconName = genTyconName defId
-  getFieldRefs racc (SchemaDefinitionRef d) = (Bang NoSourceUnpackedness NoSourceStrictness, ConT (genTyconName d)) : racc
-  getFieldRefs _racc _ = error $ moduleName <> ": \"constructor\" fields must be all of type \"$ref\". " <> createIssue
+
+type UPLCProgram = UPLC.Program UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
+
+applyConstant :: UPLCProgram -> PLC.Some (PLC.ValueOf UPLC.DefaultUni) -> UPLCProgram
+applyConstant (UPLC.Program () v f) c = UPLC.Program () v . UPLC.Apply () f $ UPLC.Constant () c
+
+applyParam :: PlutusTx.ToData p => UPLCProgram -> p -> UPLCProgram
+applyParam prog arg = prog `applyConstant` PLC.someValue (PlutusTx.toData arg)
+
+applyParam' :: PlutusTx.ToData p => SBS.ShortByteString -> p -> SBS.ShortByteString
+applyParam' (uncheckedDeserialiseUPLC -> prog) = serialiseUPLC . applyParam prog
+
+{- | To convert from camel case to snake.
+
+>>> toCamel "hello_worldWelcome"
+"helloWorldWelcome"
+-}
+toCamel :: String -> String
+toCamel ('_' : y : ys) = toUpper y : toCamel ys
+toCamel (x : xs) = x : toCamel xs
+toCamel x = x
 
 makeBlueprintTypes :: FilePath -> Q [Dec]
 makeBlueprintTypes fp = do
   bp :: ContractBlueprint <- runIO (readJSON fp)
   addDependentFile fp
+  let plcVersion = preamblePlutusVersion $ contractPreamble bp
+  -- TODO: Assume that all validator definitions are via reference, error o/w.
+  valDecs <-
+    foldM
+      ( \mapAcc MkValidatorBlueprint {..} -> do
+          let valName' = toCamel $ Text.unpack $ "applyParamsToBlueprintValidator" <> sanitize validatorTitle -- TODO: Naming could be improved here.
+              valName = mkName valName'
+              valUPLC = case compiledValidatorCode <$> validatorCompiled of
+                Nothing -> error $ moduleName <> ": " <> valName' <> " is missing compiled code."
+                Just c ->
+                  Text.encodeUtf8 c & BS16.decode & \case
+                    Left e -> error $ moduleName <> ": " <> valName' <> " failed to decode compiled code: " <> e
+                    Right bs -> SBS.toShort bs -- & uncheckedDeserialiseUPLC -- FIXME:
+              paramNames =
+                zipWith
+                  ( curry
+                      ( \(MkParameterBlueprint {..}, i :: Natural) ->
+                          let prefix = valName' <> show i
+                           in mkName $ case parameterTitle of
+                                Nothing -> prefix
+                                Just pt -> prefix <> toCamel (Text.unpack $ sanitize pt)
+                      )
+                  )
+                  validatorParameters
+                  [0 ..]
+              paramSchemas =
+                map
+                  ( \p -> case parameterSchema p of
+                      SchemaDefinitionRef d -> genTyconName d
+                      _ -> error $ moduleName <> ": " <> valName' <> " parameter schemas must be of type \"$ref\". " <> createIssue
+                  )
+                  validatorParameters
+          body :: Exp <- foldl' (\acc var -> [|applyParam' $acc $(varE var)|]) [|valUPLC|] paramNames
+          pure mapAcc
+            <> pure [FunD valName [Clause (map VarP paramNames) (NormalB body) []]]
+            -- <> pure [SigD valName (foldr (AppT . AppT ArrowT . ConT) (ConT ''SBS.ShortByteString) paramSchemas)]  -- FIXME: This must come after instance declaration.
+      )
+      mempty
+      (contractValidators bp)
   -- TODO: As a first step, I should get all the definitions (including those in validator if not via reference), and generate types for them all.
   -- TODO: Ok to prefix these with Blueprint?
-  Map.foldlWithKey'
-    (\acc defId schema -> acc <> decTypes defId schema)
-    (pure [])
-    (contractDefinitions bp)
+  pure valDecs
+    <> Map.foldlWithKey'
+      (\acc defId schema -> acc <> decTypes defId schema)
+      (pure [])
+      (contractDefinitions bp)
 
 makeIsDataInstances :: FilePath -> Q [Dec]
 makeIsDataInstances fp = do

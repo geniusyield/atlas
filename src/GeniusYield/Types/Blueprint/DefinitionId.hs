@@ -9,16 +9,20 @@ module GeniusYield.Types.Blueprint.DefinitionId (DefinitionId, mkDefinitionId, u
 
 import Data.Aeson (FromJSON (..), FromJSONKey, FromJSONKeyFunction (..), ToJSON (..), ToJSONKey (..), withText)
 import Data.Aeson.Types (FromJSONKey (..), toJSONKeyText)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
+import GeniusYield.Imports ((>>>))
 
 newtype DefinitionId = DefinitionId Text
   deriving stock (Show, Eq, Ord)
 
+-- >>> mkDefinitionId "#/definitions/baz~1ParamConstr"
+-- DefinitionId "baz/ParamConstr"
 mkDefinitionId :: Text -> DefinitionId
-mkDefinitionId t = case Text.stripPrefix "#/definitions/" t of
-  Just rest -> DefinitionId rest
-  Nothing -> DefinitionId t
+mkDefinitionId = DefinitionId . preprocessText
+ where
+  preprocessText = Text.replace "~1" "/" >>> \t -> fromMaybe t (Text.stripPrefix "#/definitions/" t)
 
 unDefinitionId :: DefinitionId -> Text
 unDefinitionId (DefinitionId t) = t

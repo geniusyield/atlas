@@ -9,11 +9,17 @@ module GeniusYield.Test.Blueprint (
 
 import System.FilePath
 
+import Codec.Serialise qualified as CBOR
+import Data.ByteString.Base16 qualified as BS16
+import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import GeniusYield.ReadJSON (readJSON)
+import GeniusYield.Types (scriptFromSerialisedScript, writeScript)
 import GeniusYield.Types.Blueprint
 import GeniusYield.Types.PlutusVersion (PlutusVersion (..))
+import GeniusYield.Types.Script (hashScript)
+import PlutusLedgerApi.Common qualified as Plutus
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, testCase, (@=?), (@?=))
 
@@ -100,9 +106,14 @@ simpleBlueprint =
     , contractDefinitions = Map.fromList [(mkDefinitionId "Int", SchemaInteger emptySchemaInfo emptyIntegerSchema), (mkDefinitionId "List$Int", SchemaList emptySchemaInfo (MkListSchema (ListItemSchemaSchema $ SchemaDefinitionRef (mkDefinitionId "#/definitions/Int")) Nothing Nothing Nothing)), (mkDefinitionId "ByteArray", SchemaBytes emptySchemaInfo emptyBytesSchema)]
     }
 
-$(makeBlueprintTypes "tests/mock-blueprints/complex-blueprint.json")
+$(makeBlueprintTypes "tests/aiken/bar/plutus.json")
 
-$(makeIsDataInstances "tests/mock-blueprints/complex-blueprint.json")
+$(makeIsDataInstances "tests/aiken/bar/plutus.json")
+
+-- $(makeBlueprintTypes "tests/mock-blueprints/complex-blueprint.json")
+
+-- $(makeIsDataInstances "tests/mock-blueprints/complex-blueprint.json")
+
 -- $(makeBlueprintTypes "tests/mock-blueprints/simple-blueprint.json")
 
 blueprintTests :: TestTree
@@ -121,6 +132,22 @@ blueprintTests =
                   aContents @=? bContents
               )
               fp
+    , -- , testCase "work-with-blueprint-th" $
+      --     let
+      --       val = scriptFromSerialisedScript @'PlutusV3 $ applyParamsToBlueprintValidatorbazBazSpend (BlueprintBool0) (Blueprintbaz_ParamConstr0 23 (mempty :: BlueprintByteArray)) (23 :: BlueprintInt) (mempty :: BlueprintByteArray)
+      --       valHash = hashScript val
+      --      in
+      --       writeScript "tests/aiken/bar/plutus-compiled" val
+      --         >> print valHash
+      testCase "FIXME: delete me" $
+        let
+          pA = Plutus.Constr 0 []
+          pB = Plutus.Constr 0 [Plutus.I 23, Plutus.B mempty]
+          pC = Plutus.I 23
+          pD = Plutus.B mempty
+          toHex = BS16.encode . LBS.toStrict . CBOR.serialise
+         in
+          putStrLn $ "pA: " <> show (toHex pA) <> ", pB: " <> show (toHex pB) <> ", pC: " <> show (toHex pC) <> ", pD: " <> show (toHex pD)
     ]
 
 getLocalFilePath :: FilePath -> FilePath

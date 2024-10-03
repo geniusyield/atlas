@@ -106,9 +106,9 @@ simpleBlueprint =
     , contractDefinitions = Map.fromList [(mkDefinitionId "Int", SchemaInteger emptySchemaInfo emptyIntegerSchema), (mkDefinitionId "List$Int", SchemaList emptySchemaInfo (MkListSchema (ListItemSchemaSchema $ SchemaDefinitionRef (mkDefinitionId "#/definitions/Int")) Nothing Nothing Nothing)), (mkDefinitionId "ByteArray", SchemaBytes emptySchemaInfo emptyBytesSchema)]
     }
 
-$(makeBlueprintTypes "tests/aiken/bar/plutus.json")
+$(makeBPTypes "tests/aiken/bar/plutus.json")
 
-$(makeIsDataInstances "tests/aiken/bar/plutus.json")
+$(uponBPTypes "tests/aiken/bar/plutus.json")
 
 -- $(makeBlueprintTypes "tests/mock-blueprints/complex-blueprint.json")
 
@@ -132,14 +132,14 @@ blueprintTests =
                   aContents @=? bContents
               )
               fp
-    , -- , testCase "work-with-blueprint-th" $
-      --     let
-      --       val = scriptFromSerialisedScript @'PlutusV3 $ applyParamsToBlueprintValidatorbazBazSpend (BlueprintBool0) (Blueprintbaz_ParamConstr0 23 (mempty :: BlueprintByteArray)) (23 :: BlueprintInt) (mempty :: BlueprintByteArray)
-      --       valHash = hashScript val
-      --      in
-      --       writeScript "tests/aiken/bar/plutus-compiled" val
-      --         >> print valHash
-      testCase "FIXME: delete me" $
+    , testCase "work-with-blueprint-th" $
+        let
+          val = scriptFromSerialisedScript @'PlutusV3 $ applyParamsToBlueprintValidatorbazBazSpend BPBool0False (BPbaz_ParamConstr0ParamConstr 23 mempty) 23 mempty
+          valHash = hashScript val
+         in
+          writeScript "tests/aiken/bar/plutus-compiled" val
+            >> print valHash
+    , testCase "FIXME: delete me" $
         let
           pA = Plutus.Constr 0 []
           pB = Plutus.Constr 0 [Plutus.I 23, Plutus.B mempty]

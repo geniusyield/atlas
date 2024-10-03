@@ -8,8 +8,8 @@ Maintainer  : support@geniusyield.co
 Stability   : develop
 -}
 module GeniusYield.Types.Blueprint.TH (
-  makeBlueprintTypes,
-  makeIsDataInstances,
+  makeBPTypes,
+  uponBPTypes,
 ) where
 
 import Control.Monad (foldM)
@@ -19,6 +19,7 @@ import Data.Char (toUpper)
 import Data.List (foldl')
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
+import Data.Maybe (fromMaybe)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
 import GHC.Natural (Natural)
@@ -58,7 +59,7 @@ sanitize = Text.map (\c -> if c `elem` supportedChars then c else '_')
 
 -- | Generate `Name` from `DefinitionId`.
 genTyconName :: DefinitionId -> Name
-genTyconName defId = mkName $ Text.unpack $ "Blueprint" <> sanitize (unDefinitionId defId)
+genTyconName defId = mkName $ Text.unpack $ "BP" <> sanitize (unDefinitionId defId)
 
 -- | Some stock derivations for our types.
 stockDerivations :: [DerivClause]
@@ -112,13 +113,13 @@ decTypes defId = \case
   getFieldRefs _racc _ = error $ moduleName <> ": \"constructor\" fields must be all of type \"$ref\". " <> createIssue
   g ss =
     let compareConstructors (SchemaConstructor _ a) (SchemaConstructor _ b) = compare (csIndex a) (csIndex b)
-        compareConstructors _ _ = error $ moduleName <> ": schemas inside \"oneOf\" must be all of dataType \"constructor\". " <> createIssue
+        compareConstructors _ _ = error $ moduleName <> ": schemas inside \"oneOf\" or \"anyOf\" must be all of dataType \"constructor\". " <> createIssue
         ssSorted = NE.sortBy compareConstructors ss
         f acc s = case s of
-          SchemaConstructor _schemaInfo MkConstructorSchema {..} ->
-            let constructorName = genTyconName $ mkDefinitionId $ unDefinitionId defId <> Text.pack (show csIndex)
+          SchemaConstructor schemaInfo MkConstructorSchema {..} ->
+            let constructorName = genTyconName $ mkDefinitionId $ unDefinitionId defId <> Text.pack (show csIndex) <> fromMaybe "" (title schemaInfo) -- TODO: Sanitize title?
              in NormalC constructorName (reverse $ foldl' getFieldRefs [] csFields) : acc
-          _anyOther -> error $ moduleName <> ": absurd case encountered when handling \"oneOf\"."
+          _anyOther -> error $ moduleName <> ": absurd case encountered when handling \"oneOf\"." -- FIXME: Improve this error message
      in pure [DataD [] tyconName [] Nothing (reverse $ foldl' f [] ssSorted) stockDerivations]
 
 type UPLCProgram = UPLC.Program UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
@@ -142,10 +143,23 @@ toCamel ('_' : y : ys) = toUpper y : toCamel ys
 toCamel (x : xs) = x : toCamel xs
 toCamel x = x
 
-makeBlueprintTypes :: FilePath -> Q [Dec]
-makeBlueprintTypes fp = do
+makeBPTypes' :: FilePath -> Q ([Dec], ContractBlueprint)
+makeBPTypes' fp = do
   bp :: ContractBlueprint <- runIO (readJSON fp)
   addDependentFile fp
+  decs <-
+    Map.foldlWithKey'
+      (\acc defId schema -> acc <> decTypes defId schema)
+      (pure [])
+      (contractDefinitions bp)
+  pure (decs, bp)
+
+makeBPTypes :: FilePath -> Q [Dec]
+makeBPTypes fp = fst <$> makeBPTypes' fp
+
+uponBPTypes :: FilePath -> Q [Dec]
+uponBPTypes fp = do
+  (typeDecs, bp) <- makeBPTypes' fp
   let plcVersion = preamblePlutusVersion $ contractPreamble bp
   -- TODO: Assume that all validator definitions are via reference, error o/w.
   valDecs <-
@@ -180,23 +194,14 @@ makeBlueprintTypes fp = do
                   validatorParameters
           body :: Exp <- foldl' (\acc var -> [|applyParam' $acc $(varE var)|]) [|valUPLC|] paramNames
           pure mapAcc
+            <> pure [SigD valName (foldr (AppT . AppT ArrowT . ConT) (ConT ''SBS.ShortByteString) paramSchemas)]
             <> pure [FunD valName [Clause (map VarP paramNames) (NormalB body) []]]
-            -- <> pure [SigD valName (foldr (AppT . AppT ArrowT . ConT) (ConT ''SBS.ShortByteString) paramSchemas)]  -- FIXME: This must come after instance declaration.
       )
       mempty
       (contractValidators bp)
   -- TODO: As a first step, I should get all the definitions (including those in validator if not via reference), and generate types for them all.
   -- TODO: Ok to prefix these with Blueprint?
-  pure valDecs
-    <> Map.foldlWithKey'
-      (\acc defId schema -> acc <> decTypes defId schema)
-      (pure [])
-      (contractDefinitions bp)
-
-makeIsDataInstances :: FilePath -> Q [Dec]
-makeIsDataInstances fp = do
-  typeDecs <- makeBlueprintTypes fp
-  foldl' f (pure []) typeDecs
+  pure valDecs <> foldl' f (pure []) typeDecs
  where
   f acc dec = case dec of
     DataD _ n _ _ _ _ -> acc <> PlutusTx.unstableMakeIsData n

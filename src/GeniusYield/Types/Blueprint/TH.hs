@@ -171,7 +171,7 @@ uponBPTypes fp = do
   valDecs <-
     foldM
       ( \mapAcc MkValidatorBlueprint {..} -> do
-          let valName' = toCamel $ Text.unpack $ "applyParamsToBlueprintValidator" <> sanitize validatorTitle -- TODO: Naming could be improved here.
+          let valName' = toCamel $ Text.unpack $ "applyParamsToBPValidator" <> sanitize validatorTitle -- TODO: Naming could be improved here.
               valName = mkName valName'
               valUPLC = case compiledValidatorCode <$> validatorCompiled of
                 Nothing -> error $ moduleName <> ": " <> valName' <> " is missing compiled code."

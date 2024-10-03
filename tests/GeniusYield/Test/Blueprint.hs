@@ -134,7 +134,7 @@ blueprintTests =
               fp
     , testCase "work-with-blueprint-th" $
         let
-          val = scriptFromBPSerialisedScript $ applyParamsToBPValidatorbazBazSpend BPBool0False (BPbaz_ParamConstr0ParamConstr 23 mempty) 23 mempty
+          val = scriptFromBPSerialisedScript $ applyParamsToBPValidator_baz_baz_spend BPBool0False (BPbaz_ParamConstr0ParamConstr 23 mempty) 23 mempty
           valHash = hashScript val
          in
           writeScript "tests/aiken/bar/plutus-compiled" val

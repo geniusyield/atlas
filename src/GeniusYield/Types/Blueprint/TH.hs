@@ -6,6 +6,8 @@ Copyright   : (c) 2024 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
+
+Template Haskell utilities to work with blueprint file. It is useful to see generated Template Haskell code which can be done via @-ddump-splices@ GHC flag. You may combine this with @-ddump-to-file@ to save the output to a file. If you are using cabal, see [this](https://stackoverflow.com/a/69678961/20330802) answer on where one can find dumped splice files.
 -}
 module GeniusYield.Types.Blueprint.TH (
   makeBPTypes,
@@ -15,7 +17,6 @@ module GeniusYield.Types.Blueprint.TH (
 import Control.Monad (foldM)
 import Data.ByteString.Base16 qualified as BS16
 import Data.ByteString.Short qualified as SBS
-import Data.Char (toUpper)
 import Data.List (foldl')
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
@@ -50,13 +51,11 @@ moduleName = $(location >>= stringE . loc_module)
 createIssue :: String
 createIssue = "Please raise an issue if you think it's a valid use case o/w."
 
--- TODO: Maybe not replace by '_' but rather remove it.
-
--- | Sanitize type names to be valid.
+-- | Sanitize type names to be valid. Replaced unsupported character with underscore.
 sanitize :: Text.Text -> Text.Text
 sanitize = Text.map (\c -> if c `elem` supportedChars then c else '_')
  where
-  -- TODO: Are these exhaustive?
+  -- NOTE: Extend if following is not exhaustive.
   supportedChars = '_' : ['A' .. 'Z'] ++ ['a' .. 'z'] ++ ['0' .. '9']
 
 -- | Generate `Name` from `DefinitionId`.
@@ -80,7 +79,6 @@ decTypes defId = \case
         SchemaDefinitionRef itemDefId ->
           pure [TySynD tyconName [] (AppT ListT (ConT (genTyconName itemDefId)))]
         _anyOther ->
-          -- TODO: Should I do something to avoid their being name conflicts in case there is already a type with name ..._Item?
           let itemDefId = mkDefinitionId $ unDefinitionId defId <> "_Item"
            in pure [TySynD tyconName [] (AppT ListT (ConT (genTyconName itemDefId)))] <> decTypes itemDefId s
       ListItemSchemaSchemas _ -> error $ moduleName <> ": items as a list of schemas is unsupported. " <> createIssue
@@ -102,26 +100,27 @@ decTypes defId = \case
   SchemaBuiltInPair _ _ -> error $ moduleName <> ": \"#pair\" " <> avoidBuiltin
   SchemaBuiltInList _ _ -> error $ moduleName <> ": \"#list\" " <> avoidBuiltin
   SchemaOneOf ss -> g ss
-  -- TODO: To enforce strictness for fields?
-  -- TODO: To enforce that indices are all unique?
   SchemaAnyOf ss -> g ss
   SchemaAllOf _ -> error $ moduleName <> ": \"allOf\" is not supported as type is ambiguous."
   SchemaNot _ -> error $ moduleName <> ": \"not\" is not supported as type is ambiguous."
   SchemaDefinitionRef r -> pure [TySynD tyconName [] (ConT (genTyconName r))]
  where
   avoidBuiltin = "is a built-in type which are not supported."
+
   tyconName = genTyconName defId
+
   getFieldRefs racc (SchemaDefinitionRef d) = (Bang NoSourceUnpackedness NoSourceStrictness, ConT (genTyconName d)) : racc
   getFieldRefs _racc _ = error $ moduleName <> ": \"constructor\" fields must be all of type \"$ref\". " <> createIssue
+
   g ss =
     let compareConstructors (SchemaConstructor _ a) (SchemaConstructor _ b) = compare (csIndex a) (csIndex b)
         compareConstructors _ _ = error $ moduleName <> ": schemas inside \"oneOf\" or \"anyOf\" must be all of dataType \"constructor\". " <> createIssue
         ssSorted = NE.sortBy compareConstructors ss
         f acc s = case s of
           SchemaConstructor schemaInfo MkConstructorSchema {..} ->
-            let constructorName = genTyconName $ mkDefinitionId $ unDefinitionId defId <> Text.pack (show csIndex) <> fromMaybe "" (title schemaInfo) -- TODO: Sanitize title?
+            let constructorName = genTyconName $ mkDefinitionId $ unDefinitionId defId <> sanitize (Text.pack (show csIndex) <> fromMaybe "" (title schemaInfo))
              in NormalC constructorName (reverse $ foldl' getFieldRefs [] csFields) : acc
-          _anyOther -> error $ moduleName <> ": absurd case encountered when handling \"oneOf\"." -- FIXME: Improve this error message
+          _anyOther -> error $ moduleName <> ": absurd case encountered when handling constructors."
      in pure [DataD [] tyconName [] Nothing (reverse $ foldl' f [] ssSorted) stockDerivations]
 
 type UPLCProgram = UPLC.Program UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
@@ -132,18 +131,9 @@ applyConstant (UPLC.Program () v f) c = UPLC.Program () v . UPLC.Apply () f $ UP
 applyParam :: PlutusTx.ToData p => UPLCProgram -> p -> UPLCProgram
 applyParam prog arg = prog `applyConstant` PLC.someValue (PlutusTx.toData arg)
 
+-- | Variant of `applyParam` that takes serialised program. Reason to work with `ShortByteString` is to avoid having to require `Lift` instance for `UPLCProgram`.
 applyParam' :: PlutusTx.ToData p => SBS.ShortByteString -> p -> SBS.ShortByteString
 applyParam' (uncheckedDeserialiseUPLC -> prog) = serialiseUPLC . applyParam prog
-
-{- | To convert from camel case to snake.
-
->>> toCamel "hello_worldWelcome"
-"helloWorldWelcome"
--}
-toCamel :: String -> String
-toCamel ('_' : y : ys) = toUpper y : toCamel ys
-toCamel (x : xs) = x : toCamel xs
-toCamel x = x
 
 makeBPTypes' :: FilePath -> Q ([Dec], ContractBlueprint)
 makeBPTypes' fp = do
@@ -156,9 +146,21 @@ makeBPTypes' fp = do
       (contractDefinitions bp)
   pure (decs, bp)
 
+{- | Generate types corresponding to definitions in the blueprint file.
+
+Type names are generated by prefixing with "BP" and sanitizing the definition id, where unsupported characters are replaced by underscores.
+-}
 makeBPTypes :: FilePath -> Q [Dec]
 makeBPTypes fp = fst <$> makeBPTypes' fp
 
+{- | After having spliced `makeBPTypes`, following adds data related instances (@ToData@, @FromData@, etc.) and @applyParamsToBPValidator_<ValidatorName>@, @scriptFromBPSerialisedScript@ utility function.
+
+__EXAMPLE__:
+
+> $(makeBPTypes "path/to/bluprint.json")
+>
+> $(uponBPTypes "path/to/blueprint.json")
+-}
 uponBPTypes :: FilePath -> Q [Dec]
 uponBPTypes fp = do
   (typeDecs, bp) <- makeBPTypes' fp
@@ -167,18 +169,19 @@ uponBPTypes fp = do
         PlutusV1 -> 'PlutusV1
         PlutusV2 -> 'PlutusV2
         PlutusV3 -> 'PlutusV3
-  -- TODO: Assume that all validator definitions are via reference, error o/w.
+  -- NOTE: We assume that all validator definitions are via reference.
   valDecs <-
     foldM
       ( \mapAcc MkValidatorBlueprint {..} -> do
-          let valName' = toCamel $ Text.unpack $ "applyParamsToBPValidator" <> sanitize validatorTitle -- TODO: Naming could be improved here.
+          let valName' =
+                Text.unpack $ "applyParamsToBPValidator_" <> sanitize validatorTitle
               valName = mkName valName'
               valUPLC = case compiledValidatorCode <$> validatorCompiled of
                 Nothing -> error $ moduleName <> ": " <> valName' <> " is missing compiled code."
                 Just c ->
                   Text.encodeUtf8 c & BS16.decode & \case
                     Left e -> error $ moduleName <> ": " <> valName' <> " failed to decode compiled code: " <> e
-                    Right bs -> SBS.toShort bs -- & uncheckedDeserialiseUPLC -- FIXME:
+                    Right bs -> SBS.toShort bs
               paramNames =
                 zipWith
                   ( curry
@@ -186,7 +189,9 @@ uponBPTypes fp = do
                           let prefix = valName' <> show i
                            in mkName $ case parameterTitle of
                                 Nothing -> prefix
-                                Just pt -> prefix <> toCamel (Text.unpack $ sanitize pt)
+                                Just pt ->
+                                  prefix
+                                    <> Text.unpack (sanitize pt)
                       )
                   )
                   validatorParameters
@@ -210,8 +215,6 @@ uponBPTypes fp = do
       )
       mempty
       (contractValidators bp)
-  -- TODO: As a first step, I should get all the definitions (including those in validator if not via reference), and generate types for them all.
-  -- TODO: Ok to prefix these with Blueprint?
   pure valDecs <> foldl' f (pure []) typeDecs
  where
   f acc dec = case dec of

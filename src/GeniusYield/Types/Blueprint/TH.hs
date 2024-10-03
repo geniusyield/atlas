@@ -164,11 +164,6 @@ __EXAMPLE__:
 uponBPTypes :: FilePath -> Q [Dec]
 uponBPTypes fp = do
   (typeDecs, bp) <- makeBPTypes' fp
-  let plcVersion = preamblePlutusVersion $ contractPreamble bp
-      plcVersionN = case plcVersion of
-        PlutusV1 -> 'PlutusV1
-        PlutusV2 -> 'PlutusV2
-        PlutusV3 -> 'PlutusV3
   -- NOTE: We assume that all validator definitions are via reference.
   valDecs <-
     foldM
@@ -204,18 +199,24 @@ uponBPTypes fp = do
                   )
                   validatorParameters
           body :: Exp <- foldl' (\acc var -> [|applyParam' $acc $(varE var)|]) [|valUPLC|] paramNames
-          let getScript = mkName "scriptFromBPSerialisedScript"
-              scriptParamName = mkName "s"
-          bodyGetScript :: Exp <- [|scriptFromSerialisedScript $(varE scriptParamName)|]
           pure mapAcc
             <> pure [SigD valName (foldr (AppT . AppT ArrowT . ConT) (ConT ''SBS.ShortByteString) paramSchemas)]
             <> pure [FunD valName [Clause (map VarP paramNames) (NormalB body) []]]
-            <> pure [SigD getScript (AppT (AppT ArrowT (ConT ''SBS.ShortByteString)) (AppT (ConT ''GYScript) (PromotedT plcVersionN)))]
-            <> pure [FunD getScript [Clause [VarP scriptParamName] (NormalB bodyGetScript) []]]
       )
       mempty
       (contractValidators bp)
-  pure valDecs <> foldl' f (pure []) typeDecs
+  let plcVersion = preamblePlutusVersion $ contractPreamble bp
+      plcVersionN = case plcVersion of
+        PlutusV1 -> 'PlutusV1
+        PlutusV2 -> 'PlutusV2
+        PlutusV3 -> 'PlutusV3
+      getScript = mkName "scriptFromBPSerialisedScript"
+      scriptParamName = mkName "s"
+  bodyGetScript :: Exp <- [|scriptFromSerialisedScript $(varE scriptParamName)|]
+  pure [SigD getScript (AppT (AppT ArrowT (ConT ''SBS.ShortByteString)) (AppT (ConT ''GYScript) (PromotedT plcVersionN)))]
+    <> pure [FunD getScript [Clause [VarP scriptParamName] (NormalB bodyGetScript) []]]
+    <> pure valDecs
+    <> foldl' f (pure []) typeDecs
  where
   f acc dec = case dec of
     DataD _ n _ _ _ _ -> acc <> PlutusTx.unstableMakeIsData n

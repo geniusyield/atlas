@@ -31,6 +31,8 @@ import GeniusYield.Types.Blueprint.Parameter
 import GeniusYield.Types.Blueprint.Preamble
 import GeniusYield.Types.Blueprint.Schema
 import GeniusYield.Types.Blueprint.Validator
+import GeniusYield.Types.PlutusVersion (PlutusVersion (..))
+import GeniusYield.Types.Script (GYScript, scriptFromSerialisedScript)
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import PlutusCore qualified as PLC
@@ -161,6 +163,10 @@ uponBPTypes :: FilePath -> Q [Dec]
 uponBPTypes fp = do
   (typeDecs, bp) <- makeBPTypes' fp
   let plcVersion = preamblePlutusVersion $ contractPreamble bp
+      plcVersionN = case plcVersion of
+        PlutusV1 -> 'PlutusV1
+        PlutusV2 -> 'PlutusV2
+        PlutusV3 -> 'PlutusV3
   -- TODO: Assume that all validator definitions are via reference, error o/w.
   valDecs <-
     foldM
@@ -193,9 +199,14 @@ uponBPTypes fp = do
                   )
                   validatorParameters
           body :: Exp <- foldl' (\acc var -> [|applyParam' $acc $(varE var)|]) [|valUPLC|] paramNames
+          let getScript = mkName "scriptFromBPSerialisedScript"
+              scriptParamName = mkName "s"
+          bodyGetScript :: Exp <- [|scriptFromSerialisedScript $(varE scriptParamName)|]
           pure mapAcc
             <> pure [SigD valName (foldr (AppT . AppT ArrowT . ConT) (ConT ''SBS.ShortByteString) paramSchemas)]
             <> pure [FunD valName [Clause (map VarP paramNames) (NormalB body) []]]
+            <> pure [SigD getScript (AppT (AppT ArrowT (ConT ''SBS.ShortByteString)) (AppT (ConT ''GYScript) (PromotedT plcVersionN)))]
+            <> pure [FunD getScript [Clause [VarP scriptParamName] (NormalB bodyGetScript) []]]
       )
       mempty
       (contractValidators bp)

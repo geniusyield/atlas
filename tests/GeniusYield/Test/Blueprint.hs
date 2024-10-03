@@ -15,7 +15,7 @@ import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import GeniusYield.ReadJSON (readJSON)
-import GeniusYield.Types (scriptFromSerialisedScript, writeScript)
+import GeniusYield.Types (writeScript)
 import GeniusYield.Types.Blueprint
 import GeniusYield.Types.PlutusVersion (PlutusVersion (..))
 import GeniusYield.Types.Script (hashScript)
@@ -134,7 +134,7 @@ blueprintTests =
               fp
     , testCase "work-with-blueprint-th" $
         let
-          val = scriptFromSerialisedScript @'PlutusV3 $ applyParamsToBlueprintValidatorbazBazSpend BPBool0False (BPbaz_ParamConstr0ParamConstr 23 mempty) 23 mempty
+          val = scriptFromBPSerialisedScript $ applyParamsToBlueprintValidatorbazBazSpend BPBool0False (BPbaz_ParamConstr0ParamConstr 23 mempty) 23 mempty
           valHash = hashScript val
          in
           writeScript "tests/aiken/bar/plutus-compiled" val

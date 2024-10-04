@@ -593,7 +593,7 @@ giftCleanup ctx = do
 grabGifts ::
   forall u v m.
   (GYTxQueryMonad m, VersionIsGreaterOrEqual v u) =>
-  GYValidator v ->
+  GYScript v ->
   m (Maybe (GYTxSkeleton u))
 grabGifts validator = do
   addr <- scriptAddress validator
@@ -622,7 +622,7 @@ grabGifts validator = do
 grabGiftsRef ::
   GYTxQueryMonad m =>
   GYTxOutRef ->
-  GYValidator 'PlutusV2 ->
+  GYScript 'PlutusV2 ->
   m (Maybe (GYTxSkeleton 'PlutusV2))
 grabGiftsRef ref validator = do
   addr <- scriptAddress validator

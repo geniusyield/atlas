@@ -361,6 +361,7 @@ test-suite atlas-privnet-tests
   hs-source-dirs: tests-privnet
   main-is:        atlas-privnet-tests.hs
   other-modules:
+    GeniusYield.Test.Privnet.Blueprint
     GeniusYield.Test.Privnet.SimpleScripts
     GeniusYield.Test.Privnet.Stake
     GeniusYield.Test.Privnet.Stake.Key
@@ -371,8 +372,11 @@ test-suite atlas-privnet-tests
   build-depends:
     atlas-cardano:{atlas-cardano, framework-onchain-plutustx},
     base,
+    base16-bytestring,
+    bytestring,
     containers,
     lens,
+    plutus-tx,
     tasty,
     tasty-hunit
 

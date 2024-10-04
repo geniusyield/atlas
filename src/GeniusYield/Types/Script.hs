@@ -111,6 +111,7 @@ module GeniusYield.Types.Script (
 
   -- * Script
   GYScript,
+  scriptHash,
   hashScript,
   scriptVersion,
   validatorToScript,
@@ -191,18 +192,12 @@ import Web.HttpApiData qualified as Web
 -- Validator
 -------------------------------------------------------------------------------
 
-newtype GYValidator v = GYValidator (GYScript v)
-  deriving (Eq, Ord, Show)
-
-deriving newtype instance GEq GYValidator
-deriving newtype instance GCompare GYValidator
-
-instance GShow GYValidator where
-  gshowsPrec = showsPrec
+{-# DEPRECATED GYValidator "Use GYScript." #-}
+type GYValidator v = GYScript v
 
 -- FIXME: Seeing inclusion of CIP-69, we should likely get rid of all these different types of scripts and just have one type of script.
 -- To make it use BuiltinUnit.
-validatorFromPlutus :: forall v. SingPlutusVersionI v => PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ()) -> GYValidator v
+validatorFromPlutus :: forall v a. SingPlutusVersionI v => PlutusTx.CompiledCode a -> GYValidator v
 validatorFromPlutus = coerce (scriptFromPlutus @v)
 
 validatorFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYValidator v
@@ -221,7 +216,7 @@ validatorFromApi :: forall v. SingPlutusVersionI v => Api.PlutusScript (PlutusVe
 validatorFromApi = coerce (scriptFromApi @v)
 
 validatorHash :: GYValidator v -> GYValidatorHash
-validatorHash = coerce scriptApiHash
+validatorHash = coerce scriptHash
 
 validatorPlutusHash :: GYValidator v -> PlutusV1.ScriptHash
 validatorPlutusHash = coerce scriptPlutusHash
@@ -238,8 +233,8 @@ validatorToApiPlutusScriptWitness ::
   Api.ScriptRedeemer ->
   Api.ExecutionUnits ->
   Api.ScriptWitness Api.WitCtxTxIn ApiEra
-validatorToApiPlutusScriptWitness (GYValidator s) =
-  scriptToApiPlutusScriptWitness s
+validatorToApiPlutusScriptWitness =
+  scriptToApiPlutusScriptWitness
 
 -- | Writes a validator to a file.
 writeValidator :: FilePath -> GYValidator v -> IO ()
@@ -248,50 +243,6 @@ writeValidator file = writeScriptCore "Validator" file . coerce
 -- | Reads a validator from a file.
 readValidator :: SingPlutusVersionI v => FilePath -> IO (GYValidator v)
 readValidator = coerce readScript
-
-newtype GYValidatorHash = GYValidatorHash Api.ScriptHash
-  deriving stock (Show, Eq, Ord)
-
-{- |
-
->>> "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYValidatorHash
-GYValidatorHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
--}
-instance IsString GYValidatorHash where
-  fromString = GYValidatorHash . fromString
-
-{- |
-
->>> printf "%s" ("cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYValidatorHash)
-cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0
--}
-instance Printf.PrintfArg GYValidatorHash where
-  formatArg (GYValidatorHash h) = formatArg $ init $ tail $ show h
-
-validatorHashToPlutus :: GYValidatorHash -> PlutusV1.ScriptHash
-validatorHashToPlutus = apiHashToPlutus . validatorHashToApi
-
-validatorHashToApi :: GYValidatorHash -> Api.ScriptHash
-validatorHashToApi = coerce
-
-validatorHashFromApi :: Api.ScriptHash -> GYValidatorHash
-validatorHashFromApi = coerce
-
-{- |
-
->>> validatorHashFromPlutus "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
-Right (GYValidatorHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0")
-
->>> validatorHashFromPlutus "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7"
-Left (DeserialiseRawBytesError {ptceTag = "validatorHashFromPlutus: cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7, error: SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise ScriptHash\"}"})
--}
-validatorHashFromPlutus :: PlutusV1.ScriptHash -> Either PlutusToCardanoError GYValidatorHash
-validatorHashFromPlutus vh@(PlutusV1.ScriptHash ibs) =
-  bimap
-    (\e -> DeserialiseRawBytesError $ Text.pack $ "validatorHashFromPlutus: " <> show vh <> ", error: " <> show e)
-    validatorHashFromApi
-    $ Api.deserialiseFromRawBytes Api.AsScriptHash
-    $ PlutusTx.fromBuiltin ibs
 
 -------------------------------------------------------------------------------
 -- Minting Policy
@@ -684,6 +635,10 @@ instance GShow GYScript where
 
 -- In implementation we cache the api representation and hashes.
 
+scriptHash :: GYScript v -> GYScriptHash
+scriptHash = hashScript
+
+{-# DEPRECATED hashScript "Use scriptHash." #-}
 hashScript :: GYScript v -> GYScriptHash
 hashScript = scriptApiHash >>> scriptHashFromApi
 

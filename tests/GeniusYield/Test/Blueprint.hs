@@ -1,26 +1,14 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -ddump-splices -ddump-to-file #-}
-
--- Note: See [this](https://stackoverflow.com/a/69678961/20330802) answer on where one can find dumped splice file. As an example, @dist-newstyle/build/aarch64-osx/ghc-9.6.5/atlas-cardano-0.6.0/t/atlas-tests/build/atlas-tests/atlas-tests-tmp/tests/GeniusYield/Test@.
-
 module GeniusYield.Test.Blueprint (
   blueprintTests,
 ) where
 
-import System.FilePath
-
-import Codec.Serialise qualified as CBOR
-import Data.ByteString.Base16 qualified as BS16
-import Data.ByteString.Lazy qualified as LBS
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import GeniusYield.ReadJSON (readJSON)
-import GeniusYield.Types (writeScript)
 import GeniusYield.Types.Blueprint
 import GeniusYield.Types.PlutusVersion (PlutusVersion (..))
-import GeniusYield.Types.Script (hashScript)
-import PlutusLedgerApi.Common qualified as Plutus
+import System.FilePath
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, testCase, (@=?), (@?=))
 
@@ -173,10 +161,6 @@ simpleBlueprint =
           ]
     }
 
-$(makeBPTypes "tests/aiken/bar/plutus.json")
-
-$(uponBPTypes "tests/aiken/bar/plutus.json")
-
 blueprintTests :: TestTree
 blueprintTests =
   testGroup
@@ -193,22 +177,6 @@ blueprintTests =
                   aContents @=? bContents
               )
               fp
-    , testCase "work-with-blueprint-th" $
-        let
-          val = scriptFromBPSerialisedScript $ applyParamsToBPValidator_baz_baz_spend BPBool0False (BPbaz_ParamConstr0ParamConstr 23 mempty) 23 mempty
-          valHash = hashScript val
-         in
-          writeScript "tests/aiken/bar/plutus-compiled-2" val
-            >> print valHash
-    , testCase "FIXME: delete me" $
-        let
-          pA = Plutus.Constr 0 []
-          pB = Plutus.Constr 0 [Plutus.I 23, Plutus.B mempty]
-          pC = Plutus.I 23
-          pD = Plutus.B mempty
-          toHex = BS16.encode . LBS.toStrict . CBOR.serialise
-         in
-          putStrLn $ "pA: " <> show (toHex pA) <> ", pB: " <> show (toHex pB) <> ", pC: " <> show (toHex pC) <> ", pD: " <> show (toHex pD)
     ]
 
 testParseResult :: (ContractBlueprint -> Assertion) -> FilePath -> IO ()

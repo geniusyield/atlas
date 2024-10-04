@@ -17,6 +17,7 @@ module GeniusYield.Types.Address (
   addressToStakeCredential,
   addressFromPubKeyHash,
   addressFromPaymentKeyHash,
+  addressFromScript,
   addressFromValidator,
   addressFromCredential,
   addressFromValidatorHash,
@@ -325,11 +326,11 @@ addressFromPaymentKeyHash nid pkh =
         (Api.S.PaymentCredentialByKey (paymentKeyHashToApi pkh))
         Api.S.NoStakeAddress
 
-{- | Create address from 'GYValidatorHash'.
+{- | Create address from 'GYScriptHash'.
 
 /note:/ no stake credential.
 -}
-addressFromValidatorHash :: GYNetworkId -> GYValidatorHash -> GYAddress
+addressFromValidatorHash :: GYNetworkId -> GYScriptHash -> GYAddress
 addressFromValidatorHash nid vh = addressFromScriptHash' nid (validatorHashToApi vh)
 
 -- | Create address from 'GYScriptHash'.
@@ -359,11 +360,18 @@ addressFromCredential nid pc sc =
         (paymentCredentialToApi pc)
         (maybe Api.S.NoStakeAddress (Api.S.StakeAddressByValue . stakeCredentialToApi) sc)
 
-{- | Create address from 'GYValidator'.
+{- | Create address from 'GYScript'.
 
 /note:/ no stake credential.
 -}
-addressFromValidator :: GYNetworkId -> GYValidator v -> GYAddress
+addressFromScript :: GYNetworkId -> GYScript v -> GYAddress
+addressFromScript nid v = addressFromScriptHash nid (scriptHash v)
+
+{- | Create address from 'GYScript'.
+
+/note:/ no stake credential.
+-}
+addressFromValidator :: GYNetworkId -> GYScript v -> GYAddress
 addressFromValidator nid v = addressFromValidatorHash nid (validatorHash v)
 
 addressToPubKeyHash :: GYAddress -> Maybe GYPubKeyHash
@@ -375,11 +383,11 @@ addressToPubKeyHash (GYAddress (Api.AddressShelley (Api.S.ShelleyAddress _networ
   f (Api.S.PaymentCredentialByKey h) = Just (pubKeyHashFromApi h)
   f (Api.S.PaymentCredentialByScript _) = Nothing
 
-addressToValidatorHash :: GYAddress -> Maybe GYValidatorHash
+addressToValidatorHash :: GYAddress -> Maybe GYScriptHash
 addressToValidatorHash (GYAddress (Api.AddressByron _)) = Nothing
 addressToValidatorHash (GYAddress (Api.AddressShelley (Api.S.ShelleyAddress _network credential _stake))) = f (Api.S.fromShelleyPaymentCredential credential)
  where
-  f :: Api.S.PaymentCredential -> Maybe GYValidatorHash
+  f :: Api.S.PaymentCredential -> Maybe GYScriptHash
   f (Api.S.PaymentCredentialByKey _) = Nothing
   f (Api.S.PaymentCredentialByScript h) = Just (validatorHashFromApi h)
 

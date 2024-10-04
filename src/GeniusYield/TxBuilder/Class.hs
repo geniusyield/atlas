@@ -533,13 +533,13 @@ enclosingSlotFromTime' x = do
 -------------------------------------------------------------------------------
 
 -- | Calculate script's address.
-scriptAddress :: GYTxQueryMonad m => GYValidator v -> m GYAddress
+scriptAddress :: GYTxQueryMonad m => GYScript v -> m GYAddress
 scriptAddress v = do
   nid <- networkId
   return $ addressFromValidator nid v
 
 -- | Calculate script's address.
-scriptAddress' :: GYTxQueryMonad m => GYValidatorHash -> m GYAddress
+scriptAddress' :: GYTxQueryMonad m => GYScriptHash -> m GYAddress
 scriptAddress' h = do
   nid <- networkId
   return $ addressFromValidatorHash nid h
@@ -582,18 +582,18 @@ addressToPubKeyHashIO addr =
     pure
     (addressToPubKeyHash addr)
 
-{- | Convert 'GYAddress' to 'GYValidatorHash' in 'GYTxMonad'.
+{- | Convert 'GYAddress' to 'GYScriptHash' in 'GYTxMonad'.
 
 Throw 'GYConversionException' if address is not script-hash one.
 -}
-addressToValidatorHash' :: MonadError GYTxMonadException m => GYAddress -> m GYValidatorHash
+addressToValidatorHash' :: MonadError GYTxMonadException m => GYAddress -> m GYScriptHash
 addressToValidatorHash' addr =
   maybe
     (throwError . GYConversionException $ GYNotPubKeyAddress addr)
     pure
     (addressToValidatorHash addr)
 
-addressToValidatorHashIO :: GYAddress -> IO GYValidatorHash
+addressToValidatorHashIO :: GYAddress -> IO GYScriptHash
 addressToValidatorHashIO addr =
   maybe
     (throwIO . GYConversionException $ GYNotScriptAddress addr)

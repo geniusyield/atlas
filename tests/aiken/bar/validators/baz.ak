@@ -34,11 +34,12 @@ validator baz(
         DatumA { intA, msgA } -> intA + bytearray.length(msgA)
         DatumB { intB, msgB } -> intB + bytearray.length(msgB)
       }
+    trace @"datResult": datResult
     and {
-      isTrue,
-      datResult + redeemer.intR + bytearray.length(redeemer.msgR) + intP + bytearray.length(
+      isTrue?,
+      (datResult + redeemer.intR + bytearray.length(redeemer.msgR) + intP + bytearray.length(
         msgP,
-      ) + primitiveInt + bytearray.length(primitiveBA) == 60,
+      ) + primitiveInt + bytearray.length(primitiveBA) == 60)?,
     }
   }
 

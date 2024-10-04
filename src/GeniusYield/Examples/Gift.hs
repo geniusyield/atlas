@@ -40,10 +40,10 @@ giftScript =
 giftScript' :: UPLC.Term UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
 giftScript' = toDeBruijn giftScript
 
-giftValidatorV1 :: GYValidator 'PlutusV1
+giftValidatorV1 :: GYScript 'PlutusV1
 giftValidatorV1 = validatorFromSerialisedScript giftValidatorPlutusSerialised
 
-giftValidatorV2 :: GYValidator 'PlutusV2
+giftValidatorV2 :: GYScript 'PlutusV2
 giftValidatorV2 = validatorFromSerialisedScript giftValidatorPlutusSerialised
 
 giftValidatorPlutusSerialised :: Plutus.SerialisedScript

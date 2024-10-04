@@ -145,5 +145,5 @@ prepTest :: GYTxGameMonad m => LovelaceConfig -> TestFunction -> TestInfo -> m (
 prepTest lovelaceConf f TestInfo {testWallets, testGoldAsset} =
   f testWallets . mkAmt lovelaceConf $ valueSingleton testGoldAsset 10
 
-gyAlwaysSucceedsValidator :: GYValidator 'PlutusV2
+gyAlwaysSucceedsValidator :: GYScript 'PlutusV2
 gyAlwaysSucceedsValidator = validatorFromPlutus alwaysSucceedsValidator

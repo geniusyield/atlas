@@ -8,7 +8,7 @@ import GeniusYield.Types
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCaseSteps)
 
-aStakeValidatorHash :: GYStakeValidatorHash
+aStakeValidatorHash :: GYScriptHash
 aStakeValidatorHash = stakeValidatorHash aStakeValidator
 
 stakeValidatorTests :: Setup -> TestTree

@@ -28,7 +28,7 @@ import GeniusYield.Transaction
 import GeniusYield.TxBuilder
 import GeniusYield.Types
 
-gyGuessRefInputDatumValidator :: GYValidator 'PlutusV2
+gyGuessRefInputDatumValidator :: GYScript 'PlutusV2
 gyGuessRefInputDatumValidator = validatorFromPlutus guessRefInputDatumValidator
 
 refInputTests :: TestTree

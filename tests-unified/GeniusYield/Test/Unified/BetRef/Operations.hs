@@ -43,7 +43,7 @@ mkScript betUntil betReveal oraclePkh betStep = do
   pure (params, validatorToScript $ mkBetRefValidator params)
 
 -- | Validator in question, obtained after giving required parameters.
-mkBetRefValidator :: BetRefParams -> GYValidator 'PlutusV2
+mkBetRefValidator :: BetRefParams -> GYScript PlutusV2
 mkBetRefValidator brp = validatorFromPlutus $ betRefValidator brp
 
 -- | Address of the validator, given params.

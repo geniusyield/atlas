@@ -111,6 +111,7 @@ module GeniusYield.Types.Script (
 
   -- * Script
   GYScript,
+  scriptHash,
   hashScript,
   scriptVersion,
   validatorToScript,
@@ -179,7 +180,6 @@ import PlutusLedgerApi.Common qualified as Plutus
 import PlutusLedgerApi.V1 qualified as PlutusV1
 import PlutusTx qualified
 import PlutusTx.Builtins qualified as PlutusTx
-import Text.Printf qualified as Printf
 import Web.HttpApiData qualified as Web
 
 {- $setup
@@ -191,18 +191,11 @@ import Web.HttpApiData qualified as Web
 -- Validator
 -------------------------------------------------------------------------------
 
-newtype GYValidator v = GYValidator (GYScript v)
-  deriving (Eq, Ord, Show)
+{-# DEPRECATED GYValidator "Use GYScript." #-}
+type GYValidator v = GYScript v
 
-deriving newtype instance GEq GYValidator
-deriving newtype instance GCompare GYValidator
-
-instance GShow GYValidator where
-  gshowsPrec = showsPrec
-
--- FIXME: Seeing inclusion of CIP-69, we should likely get rid of all these different types of scripts and just have one type of script.
--- To make it use BuiltinUnit.
-validatorFromPlutus :: forall v. SingPlutusVersionI v => PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ()) -> GYValidator v
+-- TODO: To make it use BuiltinUnit.
+validatorFromPlutus :: forall v a. SingPlutusVersionI v => PlutusTx.CompiledCode a -> GYValidator v
 validatorFromPlutus = coerce (scriptFromPlutus @v)
 
 validatorFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYValidator v
@@ -220,8 +213,8 @@ validatorToApi = coerce scriptToApi
 validatorFromApi :: forall v. SingPlutusVersionI v => Api.PlutusScript (PlutusVersionToApi v) -> GYValidator v
 validatorFromApi = coerce (scriptFromApi @v)
 
-validatorHash :: GYValidator v -> GYValidatorHash
-validatorHash = coerce scriptApiHash
+validatorHash :: GYValidator v -> GYScriptHash
+validatorHash = coerce scriptHash
 
 validatorPlutusHash :: GYValidator v -> PlutusV1.ScriptHash
 validatorPlutusHash = coerce scriptPlutusHash
@@ -238,8 +231,8 @@ validatorToApiPlutusScriptWitness ::
   Api.ScriptRedeemer ->
   Api.ExecutionUnits ->
   Api.ScriptWitness Api.WitCtxTxIn ApiEra
-validatorToApiPlutusScriptWitness (GYValidator s) =
-  scriptToApiPlutusScriptWitness s
+validatorToApiPlutusScriptWitness =
+  scriptToApiPlutusScriptWitness
 
 -- | Writes a validator to a file.
 writeValidator :: FilePath -> GYValidator v -> IO ()
@@ -249,62 +242,12 @@ writeValidator file = writeScriptCore "Validator" file . coerce
 readValidator :: SingPlutusVersionI v => FilePath -> IO (GYValidator v)
 readValidator = coerce readScript
 
-newtype GYValidatorHash = GYValidatorHash Api.ScriptHash
-  deriving stock (Show, Eq, Ord)
-
-{- |
-
->>> "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYValidatorHash
-GYValidatorHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
--}
-instance IsString GYValidatorHash where
-  fromString = GYValidatorHash . fromString
-
-{- |
-
->>> printf "%s" ("cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYValidatorHash)
-cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0
--}
-instance Printf.PrintfArg GYValidatorHash where
-  formatArg (GYValidatorHash h) = formatArg $ init $ tail $ show h
-
-validatorHashToPlutus :: GYValidatorHash -> PlutusV1.ScriptHash
-validatorHashToPlutus = apiHashToPlutus . validatorHashToApi
-
-validatorHashToApi :: GYValidatorHash -> Api.ScriptHash
-validatorHashToApi = coerce
-
-validatorHashFromApi :: Api.ScriptHash -> GYValidatorHash
-validatorHashFromApi = coerce
-
-{- |
-
->>> validatorHashFromPlutus "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
-Right (GYValidatorHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0")
-
->>> validatorHashFromPlutus "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7"
-Left (DeserialiseRawBytesError {ptceTag = "validatorHashFromPlutus: cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7, error: SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise ScriptHash\"}"})
--}
-validatorHashFromPlutus :: PlutusV1.ScriptHash -> Either PlutusToCardanoError GYValidatorHash
-validatorHashFromPlutus vh@(PlutusV1.ScriptHash ibs) =
-  bimap
-    (\e -> DeserialiseRawBytesError $ Text.pack $ "validatorHashFromPlutus: " <> show vh <> ", error: " <> show e)
-    validatorHashFromApi
-    $ Api.deserialiseFromRawBytes Api.AsScriptHash
-    $ PlutusTx.fromBuiltin ibs
-
 -------------------------------------------------------------------------------
 -- Minting Policy
 -------------------------------------------------------------------------------
 
-newtype GYMintingPolicy v = GYMintingPolicy (GYScript v)
-  deriving stock (Eq, Ord, Show)
-
-deriving newtype instance GEq GYMintingPolicy
-deriving newtype instance GCompare GYMintingPolicy
-
-instance GShow GYMintingPolicy where
-  gshowsPrec = showsPrec
+{-# DEPRECATED GYMintingPolicy "Use GYScript." #-}
+type GYMintingPolicy v = GYScript v
 
 mintingPolicyVersion :: GYMintingPolicy v -> SingPlutusVersion v
 mintingPolicyVersion = coerce scriptVersion
@@ -320,7 +263,7 @@ mintingPolicyIdFromWitness :: GYMintScript v -> GYMintingPolicyId
 mintingPolicyIdFromWitness (GYMintScript p) = mintingPolicyId p
 mintingPolicyIdFromWitness (GYMintReference _ s) = mintingPolicyId $ coerce s
 
-mintingPolicyFromPlutus :: forall v. SingPlutusVersionI v => PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ()) -> GYMintingPolicy v
+mintingPolicyFromPlutus :: forall v a. SingPlutusVersionI v => PlutusTx.CompiledCode a -> GYMintingPolicy v
 mintingPolicyFromPlutus = coerce (scriptFromPlutus @v)
 
 mintingPolicyFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYMintingPolicy v
@@ -352,12 +295,12 @@ mintingPolicyToApiPlutusScriptWitness ::
   Api.ScriptRedeemer ->
   Api.ExecutionUnits ->
   Api.ScriptWitness Api.WitCtxMint ApiEra
-mintingPolicyToApiPlutusScriptWitness (GYMintingPolicy s) =
+mintingPolicyToApiPlutusScriptWitness s =
   scriptToApiPlutusScriptWitness s Api.NoScriptDatumForMint
 
 data GYMintScript (u :: PlutusVersion) where
   -- | 'VersionIsGreaterOrEqual' restricts which version scripts can be used in this transaction.
-  GYMintScript :: v `VersionIsGreaterOrEqual` u => GYMintingPolicy v -> GYMintScript u
+  GYMintScript :: v `VersionIsGreaterOrEqual` u => GYScript v -> GYMintScript u
   -- | Reference inputs can be only used in V2 transactions.
   GYMintReference :: v `VersionIsGreaterOrEqual` 'PlutusV2 => !GYTxOutRef -> !(GYScript v) -> GYMintScript v
 
@@ -498,14 +441,8 @@ mintingPolicyIdFromText policyid =
 -- Stake validator
 -------------------------------------------------------------------------------
 
-newtype GYStakeValidator v = GYStakeValidator (GYScript v)
-  deriving stock (Eq, Ord, Show)
-
-deriving newtype instance GEq GYStakeValidator
-deriving newtype instance GCompare GYStakeValidator
-
-instance GShow GYStakeValidator where
-  gshowsPrec = showsPrec
+{-# DEPRECATED GYStakeValidator "Use GYScript." #-}
+type GYStakeValidator v = GYScript v
 
 stakeValidatorVersion :: GYStakeValidator v -> SingPlutusVersion v
 stakeValidatorVersion = coerce scriptVersion
@@ -514,7 +451,7 @@ stakeValidatorVersionFromWitness :: GYStakeValScript v -> PlutusVersion
 stakeValidatorVersionFromWitness (GYStakeValScript mp) = fromSingPlutusVersion $ stakeValidatorVersion mp
 stakeValidatorVersionFromWitness (GYStakeValReference _ s) = fromSingPlutusVersion $ stakeValidatorVersion $ coerce s
 
-stakeValidatorFromPlutus :: forall v. SingPlutusVersionI v => PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ()) -> GYStakeValidator v
+stakeValidatorFromPlutus :: forall v a. SingPlutusVersionI v => PlutusTx.CompiledCode a -> GYStakeValidator v
 stakeValidatorFromPlutus = coerce (scriptFromPlutus @v)
 
 stakeValidatorFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYStakeValidator v
@@ -537,12 +474,12 @@ stakeValidatorToApiPlutusScriptWitness ::
   Api.ScriptRedeemer ->
   Api.ExecutionUnits ->
   Api.ScriptWitness Api.WitCtxStake ApiEra
-stakeValidatorToApiPlutusScriptWitness (GYStakeValidator s) =
+stakeValidatorToApiPlutusScriptWitness s =
   scriptToApiPlutusScriptWitness s Api.NoScriptDatumForStake
 
 data GYStakeValScript (u :: PlutusVersion) where
   -- | 'VersionIsGreaterOrEqual' restricts which version scripts can be used in this transaction.
-  GYStakeValScript :: v `VersionIsGreaterOrEqual` u => GYStakeValidator v -> GYStakeValScript u
+  GYStakeValScript :: v `VersionIsGreaterOrEqual` u => GYScript v -> GYStakeValScript u
   -- | Reference inputs can be only used in V2 transactions.
   GYStakeValReference :: v `VersionIsGreaterOrEqual` 'PlutusV2 => !GYTxOutRef -> !(GYScript v) -> GYStakeValScript v
 
@@ -575,58 +512,14 @@ gyStakeValScriptWitnessToApiPlutusSW (GYStakeValReference r s) =
     s
     Api.NoScriptDatumForStake
 
-stakeValidatorHash :: GYStakeValidator v -> GYStakeValidatorHash
-stakeValidatorHash = coerce scriptApiHash
+stakeValidatorHash :: GYStakeValidator v -> GYScriptHash
+stakeValidatorHash = coerce scriptHash
 
 stakeValidatorPlutusHash :: GYStakeValidator v -> PlutusV1.ScriptHash
 stakeValidatorPlutusHash = coerce scriptPlutusHash
 
 stakeValidatorApiHash :: GYStakeValidator v -> Api.ScriptHash
 stakeValidatorApiHash = coerce scriptApiHash
-
-newtype GYStakeValidatorHash = GYStakeValidatorHash Api.ScriptHash
-  deriving stock (Show, Eq, Ord)
-
-{- |
-
->>> "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYStakeValidatorHash
-GYStakeValidatorHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
--}
-instance IsString GYStakeValidatorHash where
-  fromString = GYStakeValidatorHash . fromString
-
-{- |
-
->>> printf "%s" ("cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0" :: GYStakeValidatorHash)
-cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0
--}
-instance Printf.PrintfArg GYStakeValidatorHash where
-  formatArg (GYStakeValidatorHash h) = formatArg $ init $ tail $ show h
-
-stakeValidatorHashToPlutus :: GYStakeValidatorHash -> PlutusV1.ScriptHash
-stakeValidatorHashToPlutus = apiHashToPlutus . stakeValidatorHashToApi
-
-stakeValidatorHashToApi :: GYStakeValidatorHash -> Api.ScriptHash
-stakeValidatorHashToApi = coerce
-
-stakeValidatorHashFromApi :: Api.ScriptHash -> GYStakeValidatorHash
-stakeValidatorHashFromApi = coerce
-
-{- |
-
->>> stakeValidatorHashFromPlutus "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
-Right (GYStakeValidatorHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0")
-
->>> stakeValidatorHashFromPlutus "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7"
-Left (DeserialiseRawBytesError {ptceTag = "stakeValidatorHashFromPlutus: cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7, error: SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise ScriptHash\"}"})
--}
-stakeValidatorHashFromPlutus :: PlutusV1.ScriptHash -> Either PlutusToCardanoError GYStakeValidatorHash
-stakeValidatorHashFromPlutus vh@(PlutusV1.ScriptHash ibs) =
-  bimap
-    (\e -> DeserialiseRawBytesError $ Text.pack $ "stakeValidatorHashFromPlutus: " <> show vh <> ", error: " <> show e)
-    stakeValidatorHashFromApi
-    $ Api.deserialiseFromRawBytes Api.AsScriptHash
-    $ PlutusTx.fromBuiltin ibs
 
 -- | Writes a stake validator to a file.
 writeStakeValidator :: FilePath -> GYStakeValidator v -> IO ()
@@ -684,6 +577,10 @@ instance GShow GYScript where
 
 -- In implementation we cache the api representation and hashes.
 
+scriptHash :: GYScript v -> GYScriptHash
+scriptHash = hashScript
+
+{-# DEPRECATED hashScript "Use scriptHash." #-}
 hashScript :: GYScript v -> GYScriptHash
 hashScript = scriptApiHash >>> scriptHashFromApi
 

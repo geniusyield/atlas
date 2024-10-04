@@ -17,7 +17,7 @@ import GeniusYield.Types
 -- | Test assets.
 newtype FakeCoin = FakeCoin {fakeCoinName :: GYTokenName}
 
-fakePolicy :: FakeCoin -> GYMintingPolicy PlutusV2
+fakePolicy :: FakeCoin -> GYScript PlutusV2
 fakePolicy = fakeMintingPolicy . fakeCoinName
 
 fakeValue :: FakeCoin -> Integer -> GYValue
@@ -27,7 +27,7 @@ fakeValue tag = valueSingleton (fakeCoin tag)
 fakeCoin :: FakeCoin -> GYAssetClass
 fakeCoin (FakeCoin tag) = mintingPolicyId (fakeMintingPolicy tag) `GYToken` tag
 
-fakeMintingPolicy :: GYTokenName -> GYMintingPolicy PlutusV2
+fakeMintingPolicy :: GYTokenName -> GYScript PlutusV2
 fakeMintingPolicy = mintingPolicyFromPlutus . fakeMintingPolicyPlutus . tokenNameToPlutus
 
 fakeMintingPolicyPlutus :: TokenName -> PlutusTx.CompiledCode (BuiltinData -> BuiltinData -> ())

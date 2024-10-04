@@ -24,7 +24,7 @@ import GeniusYield.Test.Privnet.Setup
 import GeniusYield.TxBuilder
 import GeniusYield.Types
 
-readOracleValidatorV2 :: GYValidator 'PlutusV2
+readOracleValidatorV2 :: GYScript 'PlutusV2
 readOracleValidatorV2 = validatorFromPlutus readOracleValidator
 
 tests :: Setup -> TestTree

@@ -28,7 +28,6 @@ blueprintTests setup =
     "blueprint"
     [ testCaseSteps "e2e blueprint validator test" $ \info -> withSetup info setup $ \ctx -> do
         let user = ctxUserF ctx
-            -- IsString instance of BuiltinByteString uses encodeUtf8
             val = scriptFromBPSerialisedScript $ applyParamsToBPValidator_baz_baz_spend BPBool1True (BPbaz_ParamConstr0ParamConstr 23 (g "ff")) 10 (g "ddee")
             dat = datumFromPlutusData $ BPbaz_MyDatum0DatumA 10 (g "aabbccdd")
         oref <- ctxRun ctx user $ do

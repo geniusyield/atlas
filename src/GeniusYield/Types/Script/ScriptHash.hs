@@ -18,6 +18,11 @@ module GeniusYield.Types.Script.ScriptHash (
   validatorHashFromPlutus,
   validatorHashToApi,
   validatorHashFromApi,
+  GYStakeValidatorHash,
+  stakeValidatorHashToPlutus,
+  stakeValidatorHashFromPlutus,
+  stakeValidatorHashToApi,
+  stakeValidatorHashFromApi,
 ) where
 
 import Cardano.Api qualified as Api
@@ -110,3 +115,31 @@ validatorHashToApi = coerce
 
 validatorHashFromApi :: Api.ScriptHash -> GYValidatorHash
 validatorHashFromApi = coerce
+
+{-# DEPRECATED GYStakeValidatorHash "Use GYScriptHash." #-}
+type GYStakeValidatorHash = GYScriptHash
+
+stakeValidatorHashToPlutus :: GYStakeValidatorHash -> PlutusV1.ScriptHash
+stakeValidatorHashToPlutus = apiHashToPlutus . stakeValidatorHashToApi
+
+{- |
+
+>>> stakeValidatorHashFromPlutus "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
+Right (GYStakeValidatorHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0")
+
+>>> stakeValidatorHashFromPlutus "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7"
+Left (DeserialiseRawBytesError {ptceTag = "stakeValidatorHashFromPlutus: cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7, error: SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise ScriptHash\"}"})
+-}
+stakeValidatorHashFromPlutus :: PlutusV1.ScriptHash -> Either PlutusToCardanoError GYStakeValidatorHash
+stakeValidatorHashFromPlutus vh@(PlutusV1.ScriptHash ibs) =
+  bimap
+    (\e -> DeserialiseRawBytesError $ Text.pack $ "stakeValidatorHashFromPlutus: " <> show vh <> ", error: " <> show e)
+    stakeValidatorHashFromApi
+    $ Api.deserialiseFromRawBytes Api.AsScriptHash
+    $ PlutusTx.fromBuiltin ibs
+
+stakeValidatorHashToApi :: GYStakeValidatorHash -> Api.ScriptHash
+stakeValidatorHashToApi = coerce
+
+stakeValidatorHashFromApi :: Api.ScriptHash -> GYStakeValidatorHash
+stakeValidatorHashFromApi = coerce

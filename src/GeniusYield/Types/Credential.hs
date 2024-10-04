@@ -43,7 +43,6 @@ import GeniusYield.Types.PaymentKeyHash (
 import GeniusYield.Types.PubKeyHash (AsPubKeyHash (fromPubKeyHash, toPubKeyHash))
 import GeniusYield.Types.Script (
   GYScriptHash,
-  GYStakeValidatorHash,
   scriptHashFromApi,
   scriptHashFromLedger,
   scriptHashToApi,
@@ -116,7 +115,7 @@ paymentCredentialToBech32 (GYPaymentCredentialByScript sh) = serialiseToBech32Wi
 -- | Stake credential.
 data GYStakeCredential
   = GYStakeCredentialByKey !GYStakeKeyHash
-  | GYStakeCredentialByScript !GYStakeValidatorHash
+  | GYStakeCredentialByScript !GYScriptHash
   deriving (Show, Eq, Ord)
 
 instance Printf.PrintfArg GYStakeCredential where

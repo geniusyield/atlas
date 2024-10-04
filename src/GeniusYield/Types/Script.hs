@@ -247,14 +247,7 @@ readValidator = coerce readScript
 -- Minting Policy
 -------------------------------------------------------------------------------
 
-newtype GYMintingPolicy v = GYMintingPolicy (GYScript v)
-  deriving stock (Eq, Ord, Show)
-
-deriving newtype instance GEq GYMintingPolicy
-deriving newtype instance GCompare GYMintingPolicy
-
-instance GShow GYMintingPolicy where
-  gshowsPrec = showsPrec
+type GYMintingPolicy v = GYScript v
 
 mintingPolicyVersion :: GYMintingPolicy v -> SingPlutusVersion v
 mintingPolicyVersion = coerce scriptVersion
@@ -270,7 +263,7 @@ mintingPolicyIdFromWitness :: GYMintScript v -> GYMintingPolicyId
 mintingPolicyIdFromWitness (GYMintScript p) = mintingPolicyId p
 mintingPolicyIdFromWitness (GYMintReference _ s) = mintingPolicyId $ coerce s
 
-mintingPolicyFromPlutus :: forall v. SingPlutusVersionI v => PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ()) -> GYMintingPolicy v
+mintingPolicyFromPlutus :: forall v a. SingPlutusVersionI v => PlutusTx.CompiledCode a -> GYMintingPolicy v
 mintingPolicyFromPlutus = coerce (scriptFromPlutus @v)
 
 mintingPolicyFromSerialisedScript :: forall v. SingPlutusVersionI v => Plutus.SerialisedScript -> GYMintingPolicy v
@@ -302,12 +295,12 @@ mintingPolicyToApiPlutusScriptWitness ::
   Api.ScriptRedeemer ->
   Api.ExecutionUnits ->
   Api.ScriptWitness Api.WitCtxMint ApiEra
-mintingPolicyToApiPlutusScriptWitness (GYMintingPolicy s) =
+mintingPolicyToApiPlutusScriptWitness s =
   scriptToApiPlutusScriptWitness s Api.NoScriptDatumForMint
 
 data GYMintScript (u :: PlutusVersion) where
   -- | 'VersionIsGreaterOrEqual' restricts which version scripts can be used in this transaction.
-  GYMintScript :: v `VersionIsGreaterOrEqual` u => GYMintingPolicy v -> GYMintScript u
+  GYMintScript :: v `VersionIsGreaterOrEqual` u => GYScript v -> GYMintScript u
   -- | Reference inputs can be only used in V2 transactions.
   GYMintReference :: v `VersionIsGreaterOrEqual` 'PlutusV2 => !GYTxOutRef -> !(GYScript v) -> GYMintScript v
 

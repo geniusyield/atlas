@@ -247,6 +247,7 @@ readValidator = coerce readScript
 -- Minting Policy
 -------------------------------------------------------------------------------
 
+{-# DEPRECATED GYMintingPolicy "Use GYScript." #-}
 type GYMintingPolicy v = GYScript v
 
 mintingPolicyVersion :: GYMintingPolicy v -> SingPlutusVersion v

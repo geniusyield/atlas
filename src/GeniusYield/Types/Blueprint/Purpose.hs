@@ -7,8 +7,6 @@ Stability   : develop
 -}
 module GeniusYield.Types.Blueprint.Purpose (Purpose (..)) where
 
--- TODO: Rename Purpose to BlueprintPurpose or BPPurpose?
-
 import Deriving.Aeson
 import Maestro.Types.Common (LowerFirst)
 

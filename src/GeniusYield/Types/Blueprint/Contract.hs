@@ -36,7 +36,6 @@ data ContractBlueprint
     FromJSON
     via CustomJSON '[FieldLabelModifier '[StripPrefix "contract", LowerFirst, Rename "id" "$id"]] ContractBlueprint
 
--- TODO: Define LowerFirst in some common module.
 instance ToJSON ContractBlueprint where
   toJSON MkContractBlueprint {..} =
     buildObject $

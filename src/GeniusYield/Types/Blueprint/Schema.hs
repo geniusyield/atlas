@@ -204,7 +204,7 @@ instance FromJSON Schema where
           | AesonMap.member "anyOf" o -> SchemaAnyOf <$> o .: "anyOf"
           | AesonMap.member "allOf" o -> SchemaAllOf <$> o .: "allOf"
           | AesonMap.member "not" o -> SchemaNot <$> o .: "not"
-          | AesonMap.member "$ref" o -> SchemaDefinitionRef <$> o .: "$ref" -- TODO: Remove definitions prefix.
+          | AesonMap.member "$ref" o -> SchemaDefinitionRef <$> o .: "$ref"
           | otherwise -> SchemaBuiltInData <$> info
 
 instance ToJSON Schema where

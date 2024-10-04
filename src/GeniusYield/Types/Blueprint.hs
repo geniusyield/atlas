@@ -1,11 +1,11 @@
--- TODO: Haddock properly, exports and all module functions, etc.
-
 {- |
 Module      : GeniusYield.Types.Blueprint
 Copyright   : (c) 2024 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
+
+This module provides types related to contract blueprint (which largely correspond to ones defined by [PlutusTx](https://github.com/IntersectMBO/plutus/tree/master/plutus-tx/src/PlutusTx/Blueprint)) and related utilities.
 -}
 module GeniusYield.Types.Blueprint (
   module X,
@@ -28,6 +28,7 @@ import GeniusYield.Types.Blueprint.Schema as X
 import GeniusYield.Types.Blueprint.TH as X
 import GeniusYield.Types.Blueprint.Validator as X
 
+-- | Write a 'ContractBlueprint' to a file.
 writeBlueprint :: FilePath -> ContractBlueprint -> IO ()
 writeBlueprint f blueprint = LBS.writeFile f (encodeBlueprint blueprint)
 
@@ -60,5 +61,6 @@ encodeBlueprint =
       }
     . toJSON
 
+-- | Read a 'ContractBlueprint' from a file.
 readBlueprint :: FilePath -> IO ContractBlueprint
 readBlueprint = readJSON

@@ -194,8 +194,7 @@ import Web.HttpApiData qualified as Web
 {-# DEPRECATED GYValidator "Use GYScript." #-}
 type GYValidator v = GYScript v
 
--- FIXME: Seeing inclusion of CIP-69, we should likely get rid of all these different types of scripts and just have one type of script.
--- To make it use BuiltinUnit.
+-- TODO: To make it use BuiltinUnit.
 validatorFromPlutus :: forall v a. SingPlutusVersionI v => PlutusTx.CompiledCode a -> GYValidator v
 validatorFromPlutus = coerce (scriptFromPlutus @v)
 

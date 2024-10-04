@@ -41,7 +41,7 @@ placeBetTestsClb =
     "Place bet"
     [ mkTestFor "Simple tx" simpleTxTest
     , mkTestFor "Placing first bet" firstBetTest'
-    , mkTestFor "Multiple bets" multipleBetsTest
+    , mkTestFor "Multiple bets - good steps" multipleBetsTest
     , mkTestFor "Multiple bets - to small step" $ mustFail . failingMultipleBetsTest
     ]
 
@@ -52,7 +52,7 @@ placeBetTests setup =
     "Place bet"
     [ mkPrivnetTestFor_ "Simple tx" simpleTxTest
     , mkPrivnetTestFor_ "Placing first bet" firstBetTest'
-    , mkPrivnetTestFor_ "Multiple bets" multipleBetsTest
+    , mkPrivnetTestFor_ "Multiple bets - good steps" multipleBetsTest
     , mkPrivnetTestFor' "Multiple bets - too small step" GYDebug setup $
         handleError
           ( \case
@@ -109,9 +109,13 @@ mkTrivialTx = do
 
 -- | Run to call the `placeBet` operation.
 runPlaceBet ::
-  GYTxGameMonad m =>
+  ( GYTxGameMonad m
+  , v `VersionIsGreaterOrEqual` 'PlutusV2
+  ) =>
   -- | Script output reference
   GYTxOutRef ->
+  -- | Script
+  GYValidator v ->
   -- | Parameters
   BetRefParams ->
   -- | Bet guess
@@ -123,7 +127,7 @@ runPlaceBet ::
   -- | User that plays bet
   User ->
   m GYTxId
-runPlaceBet refScript brp guess bet mPrevBets user = do
+runPlaceBet refScript script brp guess bet mPrevBets user = do
   gyLogDebug' "" $
     printf
       "placing a bet with guess %s and value %s"
@@ -136,7 +140,7 @@ runPlaceBet refScript brp guess bet mPrevBets user = do
         pure
         $ listToMaybe <$> ownAddresses
     -- Call the operation
-    skeleton <- placeBet refScript brp guess bet addr mPrevBets
+    skeleton <- placeBet refScript script brp guess bet addr mPrevBets
     buildTxBody skeleton >>= signAndSubmitConfirmed
 
 firstBetTest' :: GYTxGameMonad m => TestInfo -> m ()
@@ -159,9 +163,9 @@ firstBetTest ::
   TestInfo ->
   m ()
 firstBetTest betUntil betReveal betStep dat bet (testWallets -> ws@Wallets {w1}) = do
-  (brp, refScript) <- runDeployScript betUntil betReveal betStep ws
+  (brp, refScript, script) <- runDeployScript betUntil betReveal betStep ws
   withWalletBalancesCheckSimple [w1 := valueNegate bet] $ do
-    void $ runPlaceBet refScript brp dat bet Nothing w1
+    void $ runPlaceBet refScript script brp dat bet Nothing w1
 
 -- -----------------------------------------------------------------------------
 -- Multiple bets
@@ -227,12 +231,12 @@ mkMultipleBetsTest ::
   m ()
 mkMultipleBetsTest betUntil betReveal betStep bets ws = do
   -- Deploy script
-  (brp, refScript) <- runDeployScript betUntil betReveal betStep ws
+  (brp, refScript, script) <- runDeployScript betUntil betReveal betStep ws
   -- Get the balance
   balanceBefore <- getBalance
   gyLogDebug' "" $ printf "balanceBeforeAllTheseOps: %s" (mconcat balanceBefore)
   -- Run operations
-  runMultipleBets brp refScript bets ws
+  runMultipleBets brp refScript script bets ws
   -- Get the balance again
   balanceAfter <- getBalance
   gyLogDebug' "" $ printf "balanceAfterAllTheseOps: %s" (mconcat balanceAfter)
@@ -303,29 +307,33 @@ mkMultipleBetsTest betUntil betReveal betStep bets ws = do
 
 -- | Runner for multiple bets.
 runMultipleBets ::
-  GYTxGameMonad m =>
+  ( GYTxGameMonad m
+  , v `VersionIsGreaterOrEqual` 'PlutusV2
+  ) =>
   BetRefParams ->
   -- | Reference script
   GYTxOutRef ->
+  -- | Script
+  GYValidator v ->
   [Bet] ->
   Wallets ->
   m ()
-runMultipleBets brp refScript bets ws = go bets True
+runMultipleBets brp refScript script bets ws = go bets True
  where
   go [] _ = return ()
   go ((getWallet, dat, bet) : remBets) isFirst = do
     if isFirst
       then do
         gyLogInfo' "" "placing the first bet"
-        void $ runPlaceBet refScript brp dat bet Nothing (getWallet ws)
+        void $ runPlaceBet refScript script brp dat bet Nothing (getWallet ws)
         go remBets False
       else do
         gyLogInfo' "" "placing a next bet"
         -- need to get previous bet utxo
-        betRefAddr <- betRefAddress brp
+        betRefAddr <- scriptAddress script
         GYUTxO {utxoRef} <- head . utxosToList <$> utxosAtAddress betRefAddr Nothing
         gyLogDebug' "" $ printf "previous bet utxo: %s" utxoRef
-        void $ runPlaceBet refScript brp dat bet (Just utxoRef) (getWallet ws)
+        void $ runPlaceBet refScript script brp dat bet (Just utxoRef) (getWallet ws)
         go remBets False
 
 -- -----------------------------------------------------------------------------
@@ -342,12 +350,12 @@ runDeployScript ::
   -- | Bet step value
   GYValue ->
   Wallets ->
-  m (BetRefParams, GYTxOutRef)
+  m (BetRefParams, GYTxOutRef, GYValidator PlutusV2)
 runDeployScript betUntil betReveal betStep ws = do
   (params, script) <- mkScript betUntil betReveal (userPkh $ oracle ws) betStep
   asUser (admin ws) $ do
     let sAddr = userAddr (holder ws)
     gyLogDebug' "" $ printf "Ref script storage addr: %s" (show sAddr)
-    refScript <- addRefScript sAddr script
+    refScript <- addRefScript sAddr (validatorToScript script)
     gyLogDebug' "" $ printf "Ref script deployed, ref output is: %s" (show refScript)
-    pure (params, refScript)
+    pure (params, refScript, script)

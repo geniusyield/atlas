@@ -11,7 +11,7 @@ import Test.Tasty (
   testGroup,
  )
 
-import GeniusYield.HTTP.Errors (someBackendError)
+import GeniusYield.HTTP.Errors
 import GeniusYield.Imports
 import GeniusYield.Test.Clb
 import GeniusYield.Test.Privnet.Setup
@@ -26,7 +26,7 @@ takeBetPotTestsClb :: TestTree
 takeBetPotTestsClb =
   testGroup
     "Take bet pot"
-    [ mkTestFor "Take bet pot" takeBetsTest
+    [ mkTestFor "Just take bet pot" takeBetsTest
     , mkTestFor "Take by wrong guesser" $
         mustFail . wrongGuesserTakeBetsTest
     , mkTestFor "The first bet matters" $
@@ -38,7 +38,7 @@ takeBetPotTests :: Setup -> TestTree
 takeBetPotTests setup =
   testGroup
     "Take bet pot"
-    [ mkPrivnetTestFor_ "Take bet pot" takeBetsTest
+    [ mkPrivnetTestFor_ "Just take bet pot" takeBetsTest
     , mkPrivnetTestFor_ "Take by wrong guesser" $
         mustFailPrivnet . wrongGuesserTakeBetsTest
     , mkPrivnetTestFor_ "The first bet matters" $
@@ -130,12 +130,12 @@ mkTakeBetsTest ::
   Wallets ->
   m ()
 mkTakeBetsTest betUntil betReveal betStep walletBets answer getTaker ws@Wallets {..} = do
-  (brp, refScript) <- runDeployScript betUntil betReveal betStep ws
-  runMultipleBets brp refScript walletBets ws
+  (brp, refScript, script) <- runDeployScript betUntil betReveal betStep ws
+  runMultipleBets brp refScript script walletBets ws
   -- Now lets take the bet
   refInput <- asUser w1 $ addRefInput True (userAddr w8) (datumFromPlutusData $ OracleAnswerDatum answer)
   let taker = getTaker ws
-  betRefAddr <- betRefAddress brp
+  betRefAddr <- scriptAddress script
   GYUTxO {utxoRef, utxoValue} <-
     head . utxosToList
       <$> utxosAtAddress betRefAddr Nothing
@@ -144,17 +144,27 @@ mkTakeBetsTest betUntil betReveal betStep walletBets answer getTaker ws@Wallets 
   gyLogDebug' "" $ "waiting till slot: " <> show waitUntil
   waitUntilSlot_ waitUntil
   withWalletBalancesCheckSimple [taker := utxoValue]
-    . asUser taker
     . void
-    $ takeBetsRun refScript brp utxoRef refInput
+    $ takeBetsRun refScript script brp utxoRef refInput taker
 
 -- | Run to call the `takeBets` operation.
-takeBetsRun :: GYTxMonad m => GYTxOutRef -> BetRefParams -> GYTxOutRef -> GYTxOutRef -> m GYTxId
-takeBetsRun refScript brp toConsume refInput = do
-  addr <-
-    maybeM
-      (throwAppError $ someBackendError "No own addresses")
-      pure
-      $ listToMaybe <$> ownAddresses
-  skeleton <- takeBets refScript brp toConsume addr refInput
-  buildTxBody skeleton >>= signAndSubmitConfirmed
+takeBetsRun ::
+  ( GYTxGameMonad m
+  , v `VersionIsGreaterOrEqual` 'PlutusV2
+  ) =>
+  GYTxOutRef ->
+  GYValidator v ->
+  BetRefParams ->
+  GYTxOutRef ->
+  GYTxOutRef ->
+  User ->
+  m GYTxId
+takeBetsRun refScript script brp toConsume refInput taker = do
+  asUser taker $ do
+    addr <-
+      maybeM
+        (throwAppError $ someBackendError "No own addresses")
+        pure
+        $ listToMaybe <$> ownAddresses
+    skeleton <- takeBets refScript script brp toConsume addr refInput
+    buildTxBody skeleton >>= signAndSubmitConfirmed

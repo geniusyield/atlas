@@ -20,10 +20,11 @@ main = do
       [ placeBetTestsClb
       , takeBetPotTestsClb
       ]
-  withPrivnet cardanoDefaultTestnetOptionsConway $ \setup ->
-    defaultMain $
-      testGroup
-        "Privnet"
-        [ placeBetTests setup
-        , takeBetPotTests setup
-        ]
+
+-- withPrivnet cardanoDefaultTestnetOptionsConway $ \setup ->
+--   defaultMain $
+--     testGroup
+--       "Privnet"
+--       [ placeBetTests setup
+--       , takeBetPotTests setup
+--       ]

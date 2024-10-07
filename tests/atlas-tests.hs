@@ -28,6 +28,7 @@ import GeniusYield.Test.GYTxBody (gyTxBodyTests)
 import GeniusYield.Test.GYTxSkeleton (gyTxSkeletonTests)
 import GeniusYield.Test.Providers (providersTests)
 import GeniusYield.Test.RefInput (refInputTests)
+import GeniusYield.Test.SimpleScript (simpleScriptTests)
 import GeniusYield.Test.SlotConfig (slotConversionTests)
 import GeniusYield.Test.Stake (stakeTests)
 import GeniusYield.Types
@@ -91,6 +92,7 @@ main = do
       , refInputTests
       , feeTrackingTests
       , stakeTests (head configs)
+      , simpleScriptTests configs
       , providersTests configs providerToken netId
       ]
 

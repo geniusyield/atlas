@@ -122,11 +122,9 @@ hashSimpleScript = scriptHashFromApi . hashSimpleScript'
 hashSimpleScript' :: GYSimpleScript -> Api.ScriptHash
 hashSimpleScript' = Api.hashScript . Api.SimpleScript . simpleScriptToApi
 
--- FIXME: Need to test this.
 simpleScriptFromCBOR :: Text -> Maybe GYSimpleScript
 simpleScriptFromCBOR = simpleScriptFromCBOR' . encodeUtf8
 
--- FIXME: Need to test this.
 simpleScriptFromCBOR' :: ByteString -> Maybe GYSimpleScript
 simpleScriptFromCBOR' b = do
   bs <- rightToMaybe (BS16.decode b)

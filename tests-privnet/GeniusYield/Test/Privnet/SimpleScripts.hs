@@ -8,7 +8,6 @@ import GeniusYield.Test.Privnet.Asserts (assertEqual)
 import GeniusYield.Test.Privnet.Ctx
 import GeniusYield.Test.Privnet.Setup
 import GeniusYield.TxBuilder
-import GeniusYield.TxBuilder (GYTxQueryMonad (utxoAtTxOutRef))
 import GeniusYield.Types
 import GeniusYield.Types.Script (GYAnyScript (GYSimpleScript))
 import GeniusYield.Types.UTxO (GYUTxO (utxoRefScript))

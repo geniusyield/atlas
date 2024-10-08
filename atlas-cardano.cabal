@@ -317,6 +317,7 @@ test-suite atlas-tests
     GeniusYield.Test.Providers
     GeniusYield.Test.Providers.Mashup
     GeniusYield.Test.RefInput
+    GeniusYield.Test.SimpleScript
     GeniusYield.Test.SlotConfig
     GeniusYield.Test.Stake
 

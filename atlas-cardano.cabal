@@ -374,6 +374,7 @@ test-suite atlas-privnet-tests
     bytestring,
     containers,
     lens,
+    mtl,
     plutus-tx,
     tasty,
     tasty-hunit

@@ -278,7 +278,7 @@ txIdFromPlutus (PlutusTxIdV3 (PlutusV3.TxId (Plutus.BuiltinByteString bs))) = tx
 
 -- | Wrapper around transaction witness set. Note that Babbage ledger also uses the same @TxWitness@ type defined in Alonzo ledger, which was updated for Plutus-V2 scripts and same is expected for Plutus-V3.
 newtype GYTxWitness = GYTxWitness (AlonzoTxWits (Conway.ConwayEra Crypto.StandardCrypto))
-  deriving newtype Show
+  deriving newtype (Show, Eq, Semigroup, Monoid)
 
 instance Swagger.ToSchema GYTxWitness where
   declareNamedSchema _ =

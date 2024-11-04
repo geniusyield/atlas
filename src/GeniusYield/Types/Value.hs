@@ -24,6 +24,7 @@ module GeniusYield.Types.Value (
   valueTotalAssets,
   valueInsert,
   valueAdjust,
+  valueAlter,
   valueFromLovelace,
   valueFromApiTxOutValue,
   valueToApiTxOutValue,
@@ -253,9 +254,23 @@ valueInsert :: GYAssetClass -> Integer -> GYValue -> GYValue
 valueInsert asc 0 (GYValue m) = GYValue (Map.delete asc m)
 valueInsert asc i (GYValue m) = GYValue (Map.insert asc i m)
 
--- | Adjust the amount of a given 'GYAssetClass' in the given 'GYValue'.
+{- | Adjust the amount of a given 'GYAssetClass' in the given 'GYValue'.
+If the asset is not present in the value, original value is returned instead.
+-}
 valueAdjust :: (Integer -> Integer) -> GYAssetClass -> GYValue -> GYValue
 valueAdjust f asc (GYValue m) = GYValue (Map.adjust f asc m)
+
+{- | The expression (@'valueAlter' f asc val@) alters the value @x@ at @asc@, or absence thereof.
+'valueAlter' can be used to insert, delete, or update a value in a 'GYValue'.
+
+>>> valueAlter (Just . maybe 1 (+ 1)) GYLovelace $ mempty
+valueFromList [(GYLovelace,1)]
+
+>>> valueAlter (Just . maybe 1 (+ 1)) GYLovelace $ valueFromList [(GYLovelace, 1)]
+valueFromList [(GYLovelace,2)]
+-}
+valueAlter :: (Maybe Integer -> Maybe Integer) -> GYAssetClass -> GYValue -> GYValue
+valueAlter f asc (GYValue m) = GYValue (Map.alter f asc m)
 
 -- | Set of assets within a 'GYValue' in non-zero quantities.
 valueAssets :: GYValue -> Set GYAssetClass

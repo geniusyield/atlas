@@ -69,6 +69,8 @@ placeBet refScript script brp guess bet ownAddr mPreviousBetsUtxoRef = do
             }
     -- Need to append to previous.
     Just previousBetsUtxoRef -> do
+      sc <- slotConfig
+      gyLogDebug' "" $ show sc
       previousUtxo <- utxoAtTxOutRef' previousBetsUtxoRef
       gyLogDebug' "" $ printf "1. previousUtxo: %s" (show previousUtxo)
       (_addr, previousValue, dat@(BetRefDatum previousGuesses _previousBet)) <- utxoDatum' previousUtxo

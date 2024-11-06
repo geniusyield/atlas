@@ -47,8 +47,8 @@ source-repository-package
 source-repository-package
   type: git
   location: https://github.com/mlabs-haskell/clb
-  tag: 6ad0322b2d07e5db4e1a10775580a601d40eed5b
-  --sha256: sha256-IRxEferT7siE/HgKMffLBlKGcryQmkOW1eFEqr886ZA=
+  tag: 080e2b4852f162d33e8a3d5e2faaa9b5400d878c
+  --sha256: sha256-IazNffJyUIPZh3ypiSBpfdZAenWD5oixfzrhYJlrI8s=
   subdir:
     clb
 

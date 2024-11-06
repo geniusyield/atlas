@@ -206,7 +206,7 @@ mkTestFor name action =
     (mbErrors, mock) = Clb.runClb (act >> Clb.checkErrors) $ Clb.initClb cfg (valueToApi funds) (valueToApi walletFunds) Nothing
     mockLog = "\nEmulator log :\n--------------\n" <> logString
     options = defaultLayoutOptions {layoutPageWidth = AvailablePerLine 150 1.0}
-    logDoc = Clb.ppLog $ Clb._mockInfo mock
+    logDoc = Clb.ppLog $ Clb._clbLog mock
     logString = renderString $ layoutPretty options logDoc
 
 mkSimpleWallet :: TL.KeyPair r L.StandardCrypto -> User
@@ -238,12 +238,12 @@ mustFailWith isExpectedError act = do
   tryError (void act) >>= \case
     Left e@(isExpectedError -> True) -> do
       gyLogInfo' "" . printf "Successfully caught expected exception %s" $ show e
-      infoLog <- liftClb $ gets (^. Clb.mockInfo)
+      infoLog <- liftClb $ gets (^. Clb.clbLog)
       postFails <- liftClb getFails
       liftClb $
         put
           st
-            { _mockInfo = infoLog <> mkMustFailLog preFails postFails
+            { _clbLog = infoLog <> mkMustFailLog preFails postFails
             -- , mustFailLog = mkMustFailLog preFails postFails
             }
     Left err -> liftClb $ logError $ "Action failed with unexpected exception: " ++ show err
@@ -270,7 +270,7 @@ instance GYTxQueryMonad GYTxMonadClb where
 
   lookupDatum :: GYDatumHash -> GYTxMonadClb (Maybe GYDatum)
   lookupDatum h = liftClb $ do
-    mdh <- gets (^. Clb.mockDatums)
+    mdh <- gets (^. Clb.knownDatums)
     return $ do
       d <- Map.lookup (datumHashToPlutus h) mdh
       return $ datumFromPlutus d
@@ -309,7 +309,7 @@ instance GYTxQueryMonad GYTxMonadClb where
 
   utxoAtTxOutRef ref = do
     -- All UTxOs map
-    utxos <- liftClb $ gets (L.unUTxO . L.S.utxosUtxo . L.S.lsUTxOState . Clb._ledgerState . Clb._emulatedLedgerState)
+    utxos <- liftClb $ gets (L.unUTxO . L.S.utxosUtxo . L.S.lsUTxOState . Clb._ledgerState . Clb._chainState)
     -- Maps keys to Plutus TxOutRef
     let m = Map.mapKeys (txOutRefToPlutus . txOutRefFromApi . Api.S.fromShelleyTxIn) utxos
 

@@ -1,4 +1,4 @@
-  {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 {- |
@@ -59,13 +59,13 @@ import Cardano.Slotting.Time (
  )
 import Clb (
   Clb,
+  ClbConfig (..),
   ClbState (..),
   ClbT,
   EmulatedLedgerState (..),
   Log (Log),
   LogEntry (LogEntry),
   LogLevel (..),
-  ClbConfig (..),
   SlotConfig (..),
   ValidationResult (..),
   getCurrentSlot,

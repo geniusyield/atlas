@@ -50,7 +50,6 @@ data BetRefParams = BetRefParams
   }
   deriving stock Show
 
--- PlutusTx.makeLift ''BetRefParams
 PlutusTx.unstableMakeIsData ''BetRefParams
 
 -- | List of guesses by users along with the maximum bet placed yet. A new guess gets /prepended/ to this list. Note that since we are always meant to increment previously placed bet with `brpBetStep`, the newly placed bet would necessarily be maximum (it would be foolish to initialize `brpBetStep` with some negative amounts).

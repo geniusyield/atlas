@@ -30,3 +30,4 @@ log.txt
 .direnv
 secrets/
 .vscode
+tests/mock-blueprints/complex-blueprint-rt.json

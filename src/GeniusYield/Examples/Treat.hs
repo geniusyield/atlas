@@ -52,8 +52,8 @@ treatValidatorPlutusSerialised =
   Plutus.serialiseUPLC $
     UPLC.Program () PLC.plcVersion100 treatScript'
 
-treatValidatorV1 :: GYValidator 'PlutusV1
+treatValidatorV1 :: GYScript 'PlutusV1
 treatValidatorV1 = validatorFromSerialisedScript treatValidatorPlutusSerialised
 
-treatValidatorV2 :: GYValidator 'PlutusV2
+treatValidatorV2 :: GYScript 'PlutusV2
 treatValidatorV2 = validatorFromSerialisedScript treatValidatorPlutusSerialised

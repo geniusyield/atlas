@@ -11,7 +11,6 @@ import Test.Tasty.HUnit (
   assertEqual,
   testCase,
   (@=?),
-  (@?=),
  )
 
 import GeniusYield.Examples.Gift
@@ -20,6 +19,7 @@ import GeniusYield.GYConfig (
   findMaestroTokenAndNetId,
  )
 import GeniusYield.Imports
+import GeniusYield.Test.Blueprint (blueprintTests)
 import GeniusYield.Test.CoinSelection (coinSelectionTests)
 import GeniusYield.Test.Config (configTests)
 import GeniusYield.Test.FeeTracking (feeTrackingTests)
@@ -27,6 +27,7 @@ import GeniusYield.Test.GYTxBody (gyTxBodyTests)
 import GeniusYield.Test.GYTxSkeleton (gyTxSkeletonTests)
 import GeniusYield.Test.Providers (providersTests)
 import GeniusYield.Test.RefInput (refInputTests)
+import GeniusYield.Test.SimpleScript (simpleScriptTests)
 import GeniusYield.Test.SlotConfig (slotConversionTests)
 import GeniusYield.Test.Stake (stakeTests)
 import GeniusYield.Types
@@ -72,9 +73,7 @@ main = do
 
               expected @=? first (dropWhile (/= '(') . show) e
           ]
-      , testCase "able to read simple-script" $ do
-          ss <- readSimpleScript (mockDataDir </> "simple-script.json")
-          ss @?= RequireAllOf [RequireTimeAfter (slotFromWord64 1000), RequireSignature "966e394a544f242081e41d1965137b1bb412ac230d40ed5407821c37", RequireMOf 2 [RequireSignature "2f3d4cf10d0471a1db9f2d2907de867968c27bca6272f062cd1c2413", RequireSignature "f856c0c5839bab22673747d53f1ae9eed84afafb085f086e8e988614", RequireSignature "b275b08c999097247f7c17e77007c7010cd19f20cc086ad99d398538"], RequireAnyOf [RequireSignature "4d780ed1bfc88cbd4da3f48de91fe728c3530d662564bf5a284b5321", RequireSignature "3a94d6d4e786a3f5d439939cafc0536f6abc324fb8404084d6034bf8"]]
+      , blueprintTests
       , slotConversionTests
       , coinSelectionTests
       , gyTxBodyTests
@@ -83,6 +82,7 @@ main = do
       , refInputTests
       , feeTrackingTests
       , stakeTests (head configs)
+      , simpleScriptTests configs
       , providersTests configs providerToken netId
       ]
 
@@ -109,6 +109,3 @@ findPackageRoot = do
   if here
     then return "."
     else fail "Cannot find package root"
-
-mockDataDir :: FilePath
-mockDataDir = "tests/mock-data"

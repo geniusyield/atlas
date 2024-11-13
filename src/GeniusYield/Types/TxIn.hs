@@ -51,7 +51,7 @@ data GYTxInWitness v
 
 data GYInScript (u :: PlutusVersion) where
   -- | 'VersionIsGreaterOrEqual' restricts which version validators can be used in this transaction.
-  GYInScript :: forall u v. v `VersionIsGreaterOrEqual` u => GYValidator v -> GYInScript u
+  GYInScript :: forall u v. v `VersionIsGreaterOrEqual` u => GYScript v -> GYInScript u
   -- | Reference inputs can be only used in V2 transactions.
   GYInReference :: forall v. v `VersionIsGreaterOrEqual` 'PlutusV2 => !GYTxOutRef -> !(GYScript v) -> GYInScript v
 

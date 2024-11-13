@@ -1,6 +1,6 @@
 cabal-version:      3.8
 name:               atlas-cardano
-version:            0.6.0
+version:            0.6.2
 synopsis:           Application backend for Plutus smart contracts on Cardano
 description:
   Atlas is an all-in-one, Haskell-native application backend for writing off-chain code for on-chain Plutus smart contracts.
@@ -14,7 +14,8 @@ build-type:         Simple
 category:           Blockchain, Cardano, Framework
 homepage:           https://github.com/geniusyield/atlas#readme
 bug-reports:        https://github.com/geniusyield/atlas/issues
-extra-source-files: README.md
+extra-source-files: CHANGELOG.md
+                    README.md
 tested-with:
   GHC ==9.6.5
    || ==9.6.6
@@ -64,6 +65,7 @@ library
   import:          common
   hs-source-dirs:  src
   exposed-modules:
+    GeniusYield.Aeson.Utils
     GeniusYield.Api.TestTokens
     GeniusYield.CardanoApi.EraHistory
     GeniusYield.CardanoApi.Query
@@ -116,6 +118,16 @@ library
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
+    GeniusYield.Types.Blueprint
+    GeniusYield.Types.Blueprint.Argument
+    GeniusYield.Types.Blueprint.Contract
+    GeniusYield.Types.Blueprint.DefinitionId
+    GeniusYield.Types.Blueprint.Parameter
+    GeniusYield.Types.Blueprint.Purpose
+    GeniusYield.Types.Blueprint.Preamble
+    GeniusYield.Types.Blueprint.Schema
+    GeniusYield.Types.Blueprint.TH
+    GeniusYield.Types.Blueprint.Validator
     GeniusYield.Types.Certificate
     GeniusYield.Types.Credential
     GeniusYield.Types.Datum
@@ -169,6 +181,7 @@ library
   build-depends:
     async ^>=2.2.5,
     aeson ^>=2.2.3,
+    aeson-pretty ^>= 0.8.10,
     attoparsec ^>=0.14.4,
     auto-update ^>=0.2.1,
     base ^>=4.18.2,
@@ -292,6 +305,7 @@ test-suite atlas-tests
   -- set target plutus-core version
   ghc-options:    -fplugin-opt PlutusTx.Plugin:target-version=1.0.0
   other-modules:
+    GeniusYield.Test.Blueprint
     GeniusYield.Test.CoinSelection
     GeniusYield.Test.Config
     GeniusYield.Test.FeeTracking
@@ -304,6 +318,7 @@ test-suite atlas-tests
     GeniusYield.Test.Providers
     GeniusYield.Test.Providers.Mashup
     GeniusYield.Test.RefInput
+    GeniusYield.Test.SimpleScript
     GeniusYield.Test.SlotConfig
     GeniusYield.Test.Stake
 
@@ -346,6 +361,7 @@ test-suite atlas-privnet-tests
   hs-source-dirs: tests-privnet
   main-is:        atlas-privnet-tests.hs
   other-modules:
+    GeniusYield.Test.Privnet.Blueprint
     GeniusYield.Test.Privnet.SimpleScripts
     GeniusYield.Test.Privnet.Stake
     GeniusYield.Test.Privnet.Stake.Key
@@ -356,8 +372,12 @@ test-suite atlas-privnet-tests
   build-depends:
     atlas-cardano:{atlas-cardano, framework-onchain-plutustx},
     base,
+    base16-bytestring,
+    bytestring,
     containers,
     lens,
+    mtl,
+    plutus-tx,
     tasty,
     tasty-hunit
 

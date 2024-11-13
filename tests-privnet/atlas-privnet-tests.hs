@@ -15,6 +15,7 @@ import Test.Tasty.HUnit (testCaseSteps)
 import GeniusYield.CardanoApi.EraHistory
 import GeniusYield.Types
 
+import GeniusYield.Test.Privnet.Blueprint qualified
 import GeniusYield.Test.Privnet.Ctx
 import GeniusYield.Test.Privnet.Examples qualified
 import GeniusYield.Test.Privnet.Setup
@@ -58,6 +59,7 @@ main = do
 
             pp <- ctxRunQuery ctx protocolParams
             info $ printf "Protocol parameters: %s" (show pp)
+        , GeniusYield.Test.Privnet.Blueprint.blueprintTests setup
         , GeniusYield.Test.Privnet.Examples.tests setup
         , GeniusYield.Test.Privnet.Stake.stakeKeyTests setup
         , GeniusYield.Test.Privnet.Stake.stakeValidatorTests setup

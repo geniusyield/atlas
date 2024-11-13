@@ -90,7 +90,7 @@ tests setup =
 grabTreats ::
   forall u v m.
   (GYTxUserQueryMonad m, VersionIsGreaterOrEqual v u) =>
-  GYValidator v ->
+  GYScript v ->
   m (Maybe (GYTxSkeleton u))
 grabTreats validator = do
   addr <- scriptAddress validator

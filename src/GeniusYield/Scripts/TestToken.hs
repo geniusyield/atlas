@@ -19,7 +19,7 @@ testTokenPolicy ::
   GYTokenName ->
   -- | utxo to base token on
   GYTxOutRef ->
-  GYMintingPolicy 'PlutusV2
+  GYScript 'PlutusV2
 testTokenPolicy count tn utxo =
   mintingPolicyFromPlutus @'PlutusV2 $
     originalTestTokenPolicy count (tokenNameToPlutus tn) (txOutRefToPlutus utxo)

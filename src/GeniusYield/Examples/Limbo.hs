@@ -39,10 +39,10 @@ limboScript =
 limboScript' :: UPLC.Term UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
 limboScript' = toDeBruijn limboScript
 
-limboValidatorV1 :: GYValidator 'PlutusV1
+limboValidatorV1 :: GYScript 'PlutusV1
 limboValidatorV1 = validatorFromSerialisedScript limboValidatorPlutusSerialised
 
-limboValidatorV2 :: GYValidator 'PlutusV2
+limboValidatorV2 :: GYScript 'PlutusV2
 limboValidatorV2 = validatorFromSerialisedScript limboValidatorPlutusSerialised
 
 limboValidatorPlutusSerialised :: Plutus.SerialisedScript

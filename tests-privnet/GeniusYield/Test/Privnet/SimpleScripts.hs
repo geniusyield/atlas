@@ -4,6 +4,7 @@ module GeniusYield.Test.Privnet.SimpleScripts (
 
 import Control.Lens (each, (%~), (&))
 import Control.Monad (when)
+import GeniusYield.Test.Privnet.Asserts (assertEqual)
 import GeniusYield.Test.Privnet.Ctx
 import GeniusYield.Test.Privnet.Setup
 import GeniusYield.TxBuilder
@@ -39,6 +40,9 @@ exerciseASimpleScript ctx info toUseRefScript = do
   info $ "Successfully funded the simple script, with tx id: " <> show txIdFund
   info "Now consuming from the simple script"
   let toConsume = txOutRefFromTuple (txIdFund, 0)
+  when toUseRefScript $ do
+    toConsumeUtxo <- ctxRun ctx fundUser $ utxoAtTxOutRef' toConsume
+    assertEqual "Reference script must be equal to actual script" (Just $ GYSimpleScript multiSigSimpleScript) (utxoRefScript toConsumeUtxo)
   txIdConsume <- ctxRun ctx fundUser $ do
     txBodyConsume <- buildTxBody $ mustHaveInput @'PlutusV2 $ GYTxIn toConsume (GYTxInWitnessSimpleScript $ if toUseRefScript then GYInReferenceSimpleScript toConsume multiSigSimpleScript else GYInSimpleScript multiSigSimpleScript)
     submitTxBodyConfirmed txBodyConsume $ userPaymentSKey <$> [user1, user2, user3]

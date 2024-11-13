@@ -214,7 +214,7 @@ valueFromMaestro Maestro.Asset {..} = do
 
 -- | Convert Maestro's script to our GY type.
 scriptFromMaestro :: Maestro.Script -> Either SomeDeserializeError (Maybe GYAnyScript)
-scriptFromMaestro Maestro.Script {..} = case scriptType of
+scriptFromMaestro Maestro.Script {scriptJson, scriptType, scriptBytes} = case scriptType of
   Maestro.Native -> case scriptJson of
     Nothing -> Left $ DeserializeErrorImpossibleBranch "UTxO has native script but no script JSON is present"
     Just sj -> pure $ GYSimpleScript <$> simpleScriptFromJSON sj

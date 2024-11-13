@@ -59,20 +59,20 @@ import Cardano.Slotting.Time (
  )
 import Clb (
   Clb,
+  ClbConfig (..),
   ClbState (..),
   ClbT,
   EmulatedLedgerState (..),
   Log (Log),
   LogEntry (LogEntry),
   LogLevel (..),
-  MockConfig (..),
   SlotConfig (..),
   ValidationResult (..),
   getCurrentSlot,
   getFails,
   logError,
   logInfo,
-  sendTx,
+  submitTx,
   txOutRefAt,
   txOutRefAtPaymentCred,
   unLog,
@@ -162,7 +162,7 @@ liftClb = GYTxMonadClb . lift . lift . lift . lift
 -}
 mkTestFor :: String -> (TestInfo -> GYTxMonadClb a) -> Tasty.TestTree
 mkTestFor name action =
-  testNoErrorsTraceClb v w Clb.defaultConway name $ do
+  testNoErrorsTraceClb v w Clb.defaultConwayClbConfig name $ do
     asClb pureGen (w1 testWallets) nextWalletInt $
       action TestInfo {testGoldAsset = fakeCoin fakeGold, testIronAsset = fakeCoin fakeIron, testWallets}
  where
@@ -196,17 +196,17 @@ mkTestFor name action =
   nextWalletInt = 10
 
   -- \| Helper for building tests
-  testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.MockConfig ApiEra -> String -> AtlasClb a -> Tasty.TestTree
+  testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.ClbConfig ApiEra -> String -> AtlasClb a -> Tasty.TestTree
   testNoErrorsTraceClb funds walletFunds cfg msg act =
     testCaseInfo msg $
       maybe (pure mockLog) assertFailure $
         mbErrors >>= \errors -> pure (mockLog <> "\n\nError :\n-------\n" <> errors)
    where
     -- _errors since we decided to store errors in the log as well.
-    (mbErrors, mock) = Clb.runClb (act >> Clb.checkErrors) $ Clb.initClb cfg (valueToApi funds) (valueToApi walletFunds)
+    (mbErrors, mock) = Clb.runClb (act >> Clb.checkErrors) $ Clb.initClb cfg (valueToApi funds) (valueToApi walletFunds) Nothing
     mockLog = "\nEmulator log :\n--------------\n" <> logString
     options = defaultLayoutOptions {layoutPageWidth = AvailablePerLine 150 1.0}
-    logDoc = Clb.ppLog $ Clb.mockInfo mock
+    logDoc = Clb.ppLog $ Clb._clbLog mock
     logString = renderString $ layoutPretty options logDoc
 
 mkSimpleWallet :: TL.KeyPair r L.StandardCrypto -> User
@@ -238,12 +238,12 @@ mustFailWith isExpectedError act = do
   tryError (void act) >>= \case
     Left e@(isExpectedError -> True) -> do
       gyLogInfo' "" . printf "Successfully caught expected exception %s" $ show e
-      infoLog <- liftClb $ gets mockInfo
+      infoLog <- liftClb $ gets (^. Clb.clbLog)
       postFails <- liftClb getFails
       liftClb $
         put
           st
-            { mockInfo = infoLog <> mkMustFailLog preFails postFails
+            { _clbLog = infoLog <> mkMustFailLog preFails postFails
             -- , mustFailLog = mkMustFailLog preFails postFails
             }
     Left err -> liftClb $ logError $ "Action failed with unexpected exception: " ++ show err
@@ -260,7 +260,7 @@ instance MonadError GYTxMonadException GYTxMonadClb where
 
 instance GYTxQueryMonad GYTxMonadClb where
   networkId = do
-    magic <- liftClb $ gets (mockConfigNetworkId . mockConfig)
+    magic <- liftClb $ gets (clbConfigNetworkId . Clb._clbConfig)
     -- TODO: Add epoch slots and network era to clb and retrieve from there.
     pure . GYPrivnet $
       GYNetworkInfo
@@ -270,7 +270,7 @@ instance GYTxQueryMonad GYTxMonadClb where
 
   lookupDatum :: GYDatumHash -> GYTxMonadClb (Maybe GYDatum)
   lookupDatum h = liftClb $ do
-    mdh <- gets mockDatums
+    mdh <- gets (^. Clb.knownDatums)
     return $ do
       d <- Map.lookup (datumHashToPlutus h) mdh
       return $ datumFromPlutus d
@@ -309,7 +309,7 @@ instance GYTxQueryMonad GYTxMonadClb where
 
   utxoAtTxOutRef ref = do
     -- All UTxOs map
-    utxos <- liftClb $ gets (L.unUTxO . L.S.utxosUtxo . L.S.lsUTxOState . _memPoolState . emulatedLedgerState)
+    utxos <- liftClb $ gets (L.unUTxO . L.S.utxosUtxo . L.S.lsUTxOState . Clb._ledgerState . Clb._chainState)
     -- Maps keys to Plutus TxOutRef
     let m = Map.mapKeys (txOutRefToPlutus . txOutRefFromApi . Api.S.fromShelleyTxIn) utxos
 
@@ -412,7 +412,7 @@ instance GYTxMonad GYTxMonadClb where
     let txBody = getTxBody tx
     dumpBody txBody
     gyLogDebug' "" $ "encoded tx: " <> txToHex tx
-    vRes <- liftClb . sendTx $ txToApi tx
+    vRes <- liftClb . Clb.submitTx $ txToApi tx
     case vRes of
       Success _state _onChainTx -> pure $ txBodyTxId txBody
       Fail _ err -> throwAppError . someBackendError . T.pack $ show err
@@ -469,14 +469,14 @@ instance GYTxGameMonad GYTxMonadClb where
 
 slotConfig' :: GYTxMonadClb (UTCTime, NominalDiffTime)
 slotConfig' = liftClb $ do
-  sc <- gets $ mockConfigSlotConfig . mockConfig
+  sc <- gets $ Clb.clbConfigSlotConfig . _clbConfig
   let len = fromInteger (scSlotLength sc) / 1000
       zero = posixSecondsToUTCTime $ timeToPOSIX $ timeFromPlutus $ scSlotZeroTime sc
   return (zero, len)
 
 protocolParameters :: GYTxMonadClb (ConwayCore.PParams (Api.S.ShelleyLedgerEra ApiEra))
 protocolParameters = do
-  pparams <- liftClb $ gets $ mockConfigProtocol . mockConfig
+  pparams <- liftClb $ gets $ clbConfigProtocol . _clbConfig
   pure $ coerce pparams
 
 instance GYTxSpecialQueryMonad GYTxMonadClb where

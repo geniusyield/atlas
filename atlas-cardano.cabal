@@ -400,8 +400,11 @@ test-suite atlas-unified-tests
   build-depends:
     atlas-cardano,
     base,
+    bytestring,
+    cardano-api,
     containers,
     extra,
+    lens,
     mtl,
     plutus-core,
     plutus-ledger-api,

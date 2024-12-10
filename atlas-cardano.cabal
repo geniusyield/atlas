@@ -247,7 +247,6 @@ library
     cardano-addresses,
     cardano-api,
     cardano-api:internal,
-    cardano-balance-tx:internal,
     cardano-coin-selection,
     cardano-crypto-class,
     cardano-ledger-api,

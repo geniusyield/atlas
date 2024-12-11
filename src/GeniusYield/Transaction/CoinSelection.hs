@@ -24,7 +24,6 @@ import Data.ByteString qualified as BS
 import Data.Default (Default (def))
 import Data.Map qualified as Map
 import Data.Set qualified as S
-import Data.Text qualified as Text
 import Data.Text.Class (
   ToText (toText),
   fromText,
@@ -50,11 +49,6 @@ import Cardano.Wallet.Primitive.Types.TokenMap qualified as CWTokenMap
 import Cardano.Wallet.Primitive.Types.TokenPolicyId qualified as CWallet
 import Cardano.Wallet.Primitive.Types.TokenQuantity qualified as CWallet
 import Cardano.Wallet.Primitive.Types.Tx.Constraints qualified as CWallet
-import Cardano.Wallet.Primitive.Types.Tx.TxIn qualified as CWallet
-import Internal.Cardano.Write.Tx.Balance.CoinSelection qualified as CBalanceInternal (
-  SelectionBalanceError (..),
-  WalletUTxO (..),
- )
 
 import Cardano.Ledger.Conway.Core (eraProtVerHigh)
 import GeniusYield.Imports
@@ -64,6 +58,12 @@ import GeniusYield.Utils
 
 type GYCoinSelectionContext :: PlutusVersion -> Type
 data GYCoinSelectionContext v
+
+data WalletUTxO = WalletUTxO
+  { txIn :: !GYTxOutRef
+  , address :: !GYAddress
+  }
+  deriving (Eq, Generic, Ord, Show)
 
 {- Note: The vast majority of partial functions in this module are fine since they are localized.
 
@@ -78,7 +78,7 @@ TODO:
 -}
 instance CCoinSelection.SelectionContext (GYCoinSelectionContext v) where
   type Address (GYCoinSelectionContext v) = CWallet.Address
-  type UTxO (GYCoinSelectionContext v) = CBalanceInternal.WalletUTxO
+  type UTxO (GYCoinSelectionContext v) = WalletUTxO
 
 data GYCoinSelectionEnv v = GYCoinSelectionEnv
   { existingInputs :: ![GYTxInDetailed v]
@@ -206,9 +206,9 @@ selectInputs
           map
             (\(fromTokenBundle -> tokenChange) -> GYTxOut changeAddr tokenChange Nothing Nothing)
             changeGenerated
-        foldHelper acc (CBalanceInternal.WalletUTxO {txIn}, _)
-          | fromCWalletTxIn txIn `S.member` inRefs = acc
-          | otherwise = case utxosLookup (fromCWalletTxIn txIn) ownUtxos of
+        foldHelper acc (WalletUTxO {txIn}, _)
+          | txIn `S.member` inRefs = acc
+          | otherwise = case utxosLookup txIn ownUtxos of
               {- Invariant: The balancer should only select inputs from 'existingInputs' or 'ownUtxos'
               Thus, if this txIn doesn't exist in ownUtxos, it must already be in 'existingInputs',
               so we don't need it in additional inputs -}
@@ -403,10 +403,10 @@ toTokenBundle v = CTokenBundle.fromCoin coins `CTokenBundle.add` CTokenBundle.fr
 fromTokenBundle :: CTokenBundle.TokenBundle -> GYValue
 fromTokenBundle (CTokenBundle.TokenBundle (CWallet.Coin n) tkMap) = valueFromLovelace (toInteger n) <> fromTokenMap tkMap
 
-utxosToUtxoIndex :: GYUTxOs -> CWallet.UTxOIndex CBalanceInternal.WalletUTxO
+utxosToUtxoIndex :: GYUTxOs -> CWallet.UTxOIndex WalletUTxO
 utxosToUtxoIndex = CWallet.fromSequence . map utxoToTuple . utxosToList
 
-utxoToTuple :: GYUTxO -> (CBalanceInternal.WalletUTxO, CTokenBundle.TokenBundle)
+utxoToTuple :: GYUTxO -> (WalletUTxO, CTokenBundle.TokenBundle)
 utxoToTuple
   GYUTxO
     { utxoRef
@@ -415,16 +415,16 @@ utxoToTuple
     } = (wUtxo, bundle)
    where
     wUtxo =
-      CBalanceInternal.WalletUTxO
-        { txIn = toCWalletTxIn utxoRef
-        , address = toCWalletAddress utxoAddress
+      WalletUTxO
+        { txIn = utxoRef
+        , address = utxoAddress
         }
     bundle = toTokenBundle utxoValue
 
-txInDetailedToUtxoIndex :: [GYTxInDetailed v] -> CWallet.UTxOIndex CBalanceInternal.WalletUTxO
+txInDetailedToUtxoIndex :: [GYTxInDetailed v] -> CWallet.UTxOIndex WalletUTxO
 txInDetailedToUtxoIndex = CWallet.fromSequence . map txInDetailedToTuple
 
-txInDetailedToTuple :: GYTxInDetailed v -> (CBalanceInternal.WalletUTxO, CTokenBundle.TokenBundle)
+txInDetailedToTuple :: GYTxInDetailed v -> (WalletUTxO, CTokenBundle.TokenBundle)
 txInDetailedToTuple
   GYTxInDetailed
     { gyTxInDet
@@ -433,9 +433,9 @@ txInDetailedToTuple
     } = (wUtxo, bundle)
    where
     wUtxo =
-      CBalanceInternal.WalletUTxO
-        { txIn = toCWalletTxIn $ gyTxInTxOutRef gyTxInDet
-        , address = toCWalletAddress gyTxInDetAddress
+      WalletUTxO
+        { txIn = gyTxInTxOutRef gyTxInDet
+        , address = gyTxInDetAddress
         }
     bundle = toTokenBundle gyTxInDetValue
 
@@ -447,24 +447,7 @@ fromCWalletAddress (CWallet.Address bs) = either customError addressFromApi $ Ap
  where
   customError e = error $ "fromCWalletAddress: unable to deserialize, error: " <> show e
 
-toCWalletTxIn :: GYTxOutRef -> CWallet.TxIn
-toCWalletTxIn ref =
-  CWallet.TxIn
-    { inputId = nTxId
-    , inputIx = fromIntegral txIx
-    }
- where
-  (txId, txIx) = txOutRefToTuple ref
-  nTxId = either customError id $ fromText $ Text.pack $ show txId
-  customError = error "toCWalletTxIn: unable to deserialise"
-
-fromCWalletTxIn :: CWallet.TxIn -> GYTxOutRef
-fromCWalletTxIn CWallet.TxIn {inputId, inputIx} = txOutRefFromTuple (txId, fromIntegral inputIx)
- where
-  txId = fromMaybe customError . txIdFromHex . Text.unpack $ toText inputId
-  customError = error "fromCWalletTxIn: unable to deserialise txId"
-
-fromCWalletBalancingError :: CBalanceInternal.SelectionBalanceError ctx -> GYBalancingError
+fromCWalletBalancingError :: CBalance.SelectionBalanceError ctx -> GYBalancingError
 fromCWalletBalancingError (CBalance.BalanceInsufficient (CBalance.BalanceInsufficientError _ _ delta)) =
   GYBalancingErrorInsufficientFunds $ fromTokenBundle delta
 fromCWalletBalancingError (CBalance.UnableToConstructChange (CBalance.UnableToConstructChangeError _ n)) =

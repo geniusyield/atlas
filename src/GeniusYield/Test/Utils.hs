@@ -289,7 +289,7 @@ findRefScriptsInBody body = do
 {- | Adds the given script to the given address and returns the reference for it.
 Note: The new utxo is given an inline unit datum.
 -}
-addRefScript :: forall m. GYTxMonad m => GYAddress -> GYScript 'PlutusV2 -> m GYTxOutRef
+addRefScript :: forall m v. (GYTxMonad m, v `VersionIsGreaterOrEqual` 'PlutusV2)  => GYAddress -> GYScript v -> m GYTxOutRef
 addRefScript addr sc =
   throwAppError absurdError `runEagerT` do
     existingUtxos <- lift $ utxosAtAddress addr Nothing

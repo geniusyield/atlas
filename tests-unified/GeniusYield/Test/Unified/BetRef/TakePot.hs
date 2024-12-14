@@ -58,7 +58,7 @@ takeBetsTest :: GYTxGameMonad m => TestInfo -> m ()
 takeBetsTest TestInfo {..} =
   mkTakeBetsTest
     400
-    1_000
+    100
     (valueFromLovelace 10_000_000)
     [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
     , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
@@ -79,7 +79,7 @@ wrongGuesserTakeBetsTest :: GYTxGameMonad m => TestInfo -> m ()
 wrongGuesserTakeBetsTest TestInfo {..} =
   mkTakeBetsTest
     400
-    1_000
+    100
     (valueFromLovelace 10_000_000)
     [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
     , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
@@ -100,7 +100,7 @@ badUpdatedGuessTakeBetsTest :: GYTxGameMonad m => TestInfo -> m ()
 badUpdatedGuessTakeBetsTest TestInfo {..} =
   mkTakeBetsTest
     400
-    1_000
+    100
     (valueFromLovelace 10_000_000)
     [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
     , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)

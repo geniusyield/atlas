@@ -28,7 +28,7 @@ import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import Data.Text qualified as Txt
 import GeniusYield.CardanoApi.Query
-import GeniusYield.Providers.Common (SubmitTxException (SubmitTxException))
+import GeniusYield.Providers.Common (SubmitTxException (SubmitTxException), makeLastEraEndUnbounded)
 import GeniusYield.Types
 import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import Ouroboros.Network.Protocol.LocalTxSubmission.Type (SubmitResult (..))
@@ -95,7 +95,7 @@ systemStart :: Api.LocalNodeConnectInfo -> IO SystemStart
 systemStart info = queryCardanoMode info Api.QuerySystemStart
 
 eraHistory :: Api.LocalNodeConnectInfo -> IO Api.EraHistory
-eraHistory info = queryCardanoMode info Api.QueryEraHistory
+eraHistory info = makeLastEraEndUnbounded <$> queryCardanoMode info Api.QueryEraHistory
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions

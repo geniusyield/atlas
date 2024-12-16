@@ -402,7 +402,6 @@ makeGetParameters getProtParams getSysStart getEraHist getStkPools = do
   let getSlotConf = makeSlotConfigIO sysStart
   initProtParams <- getProtParams
   initEraHist <- getEraHist
-  initStkPools <- getStkPools
   initSlotConf <- getSlotConf initEraHist
 
   let slotEndToUTCTime slotConf = posixSecondsToUTCTime . timeToPOSIX . slotToBeginTimePure slotConf . flip unsafeAdvanceSlot 1 . slotFromApi
@@ -410,7 +409,6 @@ makeGetParameters getProtParams getSysStart getEraHist getStkPools = do
       buildParam = GYParameterStore (slotEndToUTCTime initSlotConf <$!> getEraEndSlot initEraHist)
       getProtParams' = newMVar (buildParam initProtParams) >>= mkMethod (const getProtParams)
       getEraHist' = newMVar (buildParam initEraHist) >>= mkMethod pure
-      getStkPools' = newMVar (buildParam initStkPools) >>= mkMethod (const getStkPools)
       getSlotConf' = newMVar (buildParam initSlotConf) >>= mkMethod getSlotConf
       -- \| Make an efficient 'GYGetParameters' method.
       --        This will only refresh the data (using the provided 'dataRefreshF') if current time has passed the
@@ -436,7 +434,7 @@ makeGetParameters getProtParams getSysStart getEraHist getStkPools = do
       { gyGetSystemStart' = pure sysStart
       , gyGetProtocolParameters' = getProtParams'
       , gyGetEraHistory' = getEraHist'
-      , gyGetStakePools' = getStkPools'
+      , gyGetStakePools' = getStkPools
       , gyGetSlotConfig' = getSlotConf'
       }
  where

@@ -13,6 +13,7 @@ module GeniusYield.Providers.Common (
   datumFromCBOR,
   newServantClientEnv,
   fromJson,
+  makeLastEraEndUnbounded,
   parseEraHist,
   preprodEraHist,
   previewEraHist,
@@ -50,7 +51,8 @@ import Cardano.Slotting.Time (
  )
 import Control.Exception (Exception)
 import Data.Bifunctor (first)
-import Data.SOP.NonEmpty (NonEmpty (NonEmptyCons, NonEmptyOne))
+import Data.SOP.NonEmpty (NonEmpty (NonEmptyCons, NonEmptyOne), nonEmptyFromList, nonEmptyToList)
+import GeniusYield.CardanoApi.EraHistory (extractEraSummaries)
 import GeniusYield.Types.Datum (
   GYDatum,
   datumFromApi',
@@ -119,6 +121,18 @@ fromJson b = do
   x <- first DeserializeErrorScriptDataJson $ Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema v
   pure . fromJust . fromData $ Api.toPlutusData $ Api.getScriptData x
 
+makeLastEraEndUnbounded :: Api.EraHistory -> Api.EraHistory
+makeLastEraEndUnbounded eh =
+  let Ouroboros.Summary eraList = extractEraSummaries eh
+   in Api.EraHistory $ Ouroboros.mkInterpreter $ Ouroboros.Summary $ g eraList
+ where
+  g eraList =
+    let eraList' = nonEmptyToList eraList
+        f [] = []
+        f [x] = [x {Ouroboros.eraEnd = Ouroboros.EraUnbounded}]
+        f (x : xs) = x : f xs
+     in fromJust $ nonEmptyFromList $ f eraList'
+
 {- | Convert a regular list of era summaries (a la Ogmios) into a typed EraHistory (a la Ouroboros).
 
 == NOTE ==
@@ -133,6 +147,7 @@ Well, unless one uses vectors, from dependent type land.
 parseEraHist :: (t -> Ouroboros.EraSummary) -> [t] -> Maybe Api.EraHistory
 parseEraHist mkEra [byronEra, shelleyEra, allegraEra, maryEra, alonzoEra, babbageEra, conwayEra] =
   Just
+    . makeLastEraEndUnbounded
     . Api.EraHistory
     . Ouroboros.mkInterpreter
     . Ouroboros.Summary

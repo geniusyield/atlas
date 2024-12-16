@@ -950,8 +950,7 @@ buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
   ss <- systemStart
   eh <- eraHistory
   pp <- protocolParams
-  ps <- stakePools
-
+  let ps = mempty -- This denotes the set of registered stake pools that are being unregistered in current transaction. We don't support this yet.
   collateral <- ownCollateral
   addrs <- ownAddresses
   change <- ownChangeAddress

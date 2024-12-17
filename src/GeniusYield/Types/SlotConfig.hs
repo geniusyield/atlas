@@ -16,6 +16,8 @@ module GeniusYield.Types.SlotConfig (
   slotToEndTimePure,
   enclosingSlotFromTimePure,
   unsafeEnclosingSlotFromTimePure,
+  slotToEpochPure,
+  epochToBeginSlotPure,
 ) where
 
 import Control.Monad (unless, (<$!>))
@@ -42,6 +44,7 @@ import Ouroboros.Consensus.BlockchainTime qualified as Ouroboros
 import Ouroboros.Consensus.HardFork.History qualified as Ouroboros
 
 import GeniusYield.CardanoApi.EraHistory
+import GeniusYield.Types.Epoch (GYEpochNo (GYEpochNo), GYEpochSize (GYEpochSize), epochNoFromApi)
 import GeniusYield.Types.Slot
 import GeniusYield.Types.Time
 
@@ -85,6 +88,9 @@ data GYEraSlotConfig = GYEraSlotConfig
   -- ^ The slot length as set in the era.
   , gyEraSlotZeroTime :: !CSlot.RelativeTime
   -- ^ The time when the era started, relative to 'CSlot.SystemStart' in 'GYSlotConfig'.
+  , gyEraStartEpoch :: !GYEpochNo
+  -- ^ The epoch with which the era started (inclusive).
+  , gyEraEpochSize :: !GYEpochSize
   }
   deriving stock (Eq, Show)
 
@@ -126,9 +132,9 @@ makeSlotConfig sysStart eraHist = GYSlotConfig sysStart <$!> simplifiedEraSumms
   toEraSlotConf :: Ouroboros.EraSummary -> GYEraSlotConfig
   toEraSlotConf
     Ouroboros.EraSummary
-      { eraStart = Ouroboros.Bound {boundTime, boundSlot}
-      , eraParams = Ouroboros.EraParams {eraSlotLength}
-      } = GYEraSlotConfig {gyEraSlotStart = slotFromApi boundSlot, gyEraSlotLength = eraSlotLength, gyEraSlotZeroTime = boundTime}
+      { eraStart = Ouroboros.Bound {boundTime, boundSlot, boundEpoch}
+      , eraParams = Ouroboros.EraParams {eraSlotLength, eraEpochSize = CSlot.EpochSize epochSize}
+      } = GYEraSlotConfig {gyEraSlotStart = slotFromApi boundSlot, gyEraSlotLength = eraSlotLength, gyEraSlotZeroTime = boundTime, gyEraStartEpoch = epochNoFromApi boundEpoch, gyEraEpochSize = GYEpochSize epochSize}
   toNonEmpty :: Ouroboros.NonEmpty xs a -> NonEmpty a
   toNonEmpty (Ouroboros.NonEmptyOne x) = x :| []
   toNonEmpty (Ouroboros.NonEmptyCons x xs) = x :| toList xs
@@ -148,8 +154,46 @@ simpleSlotConfig zero len =
       { gyEraSlotStart = slotFromApi 0
       , gyEraSlotZeroTime = CSlot.RelativeTime 0
       , gyEraSlotLength = CSlot.mkSlotLength len
+      , gyEraStartEpoch = GYEpochNo 0
+      , gyEraEpochSize = GYEpochSize 432000
       }
       :| []
+
+{- Finds the slot config for the given slot. Essentially, the chosen slot config must have its starting slot
+less than, or equal to, the given slot. Furthermore, the chosen slot config's end slot, i.e next slot config's
+starting slot (or unbounded if final era), should be greater than the given slot.
+-}
+findSlotConfViaSlot :: GYSlot -> NonEmpty GYEraSlotConfig -> GYEraSlotConfig
+findSlotConfViaSlot _slot (x :| []) = x
+findSlotConfViaSlot
+  slot
+  (thisSlotConf@GYEraSlotConfig {gyEraSlotStart = startSlot} :| nextSlotConf@GYEraSlotConfig {gyEraSlotStart = endSlot} : rest) =
+    if slot >= startSlot && slot < endSlot then thisSlotConf else findSlotConfViaSlot slot $ nextSlotConf :| rest
+
+{- Finds the slot config for the given relative time. Essentially, the chosen slot config must have its starting time
+greater than, or equal to, the given relative time. Furthermore, the chosen slot config's end time, i.e next slot config's
+starting time (or unbounded if final era), should be greater than the given relative time.
+-}
+findSlotConfViaRelTime :: Ouroboros.RelativeTime -> NonEmpty GYEraSlotConfig -> GYEraSlotConfig
+findSlotConfViaRelTime _relTime (x :| []) = x
+findSlotConfViaRelTime
+  relTime
+  ( thisSlotConf@GYEraSlotConfig {gyEraSlotZeroTime = startTime}
+      :| nextSlotConf@GYEraSlotConfig {gyEraSlotZeroTime = endTime}
+      : rest
+    ) =
+    if relTime >= startTime && relTime < endTime then thisSlotConf else findSlotConfViaRelTime relTime $ nextSlotConf :| rest
+
+{- Finds the slot config for the given epoch. Essentially, the chosen slot config must have its starting epoch no
+less than, or equal to, the given epoch no. Furthermore, the chosen slot config's end epoch, i.e next slot config's
+starting epoch no (or unbounded if final era), should be greater than the given slot.
+-}
+findSlotConfViaEpoch :: GYEpochNo -> NonEmpty GYEraSlotConfig -> GYEraSlotConfig
+findSlotConfViaEpoch _epochNo (x :| []) = x
+findSlotConfViaEpoch
+  epochNo
+  (thisSlotConf@GYEraSlotConfig {gyEraStartEpoch = startEpoch} :| nextSlotConf@GYEraSlotConfig {gyEraStartEpoch = endEpoch} : rest) =
+    if epochNo >= startEpoch && epochNo < endEpoch then thisSlotConf else findSlotConfViaEpoch epochNo $ nextSlotConf :| rest
 
 {- | Get the starting 'GYTime' of a 'GYSlot' given a 'GYSlotConfig'.
 
@@ -171,15 +215,7 @@ slotToBeginPOSIXTime' (GYSlotConfig sysStart slotConfs) slot =
     CSlot.getSlotLength gyEraSlotLength
       `CSlot.multNominalDiffTime` (slotToInteger slot - slotToInteger gyEraSlotStart)
       `CSlot.addRelativeTime` gyEraSlotZeroTime
-  GYEraSlotConfig {gyEraSlotZeroTime, gyEraSlotStart, gyEraSlotLength} = findSlotConf slotConfs
-  {- Finds the slot config for the given slot. Essentially, the chosen slot config must have its starting slot
-  less than, or equal to, the given slot. Furthermore, the chosen slot config's end slot, i.e next slot config's
-  starting slot (or unbounded if final era), should be greater than the given slot.
-  -}
-  findSlotConf (x :| []) = x
-  findSlotConf
-    (thisSlotConf@GYEraSlotConfig {gyEraSlotStart = startSlot} :| nextSlotConf@GYEraSlotConfig {gyEraSlotStart = endSlot} : rest) =
-      if slot >= startSlot && slot < endSlot then thisSlotConf else findSlotConf $ nextSlotConf :| rest
+  GYEraSlotConfig {gyEraSlotZeroTime, gyEraSlotStart, gyEraSlotLength} = findSlotConfViaSlot slot slotConfs
 
 {- | Get the ending 'GYTime' of a 'GYSlot' (inclusive) given a 'GYSlotConfig'.
 
@@ -215,24 +251,27 @@ enclosingSlotFromTimePure (GYSlotConfig sysStart slotConfs) (timeToPOSIX -> absT
   relTime = CSlot.toRelativeTime sysStart absTimeUtc
   -- (relTime - slotZeroTime) / slotLength
   relativeResult = (relTime `CSlot.diffRelativeTime` gyEraSlotZeroTime) `div'` CSlot.getSlotLength gyEraSlotLength
-  GYEraSlotConfig {gyEraSlotZeroTime, gyEraSlotStart, gyEraSlotLength} = findSlotConf slotConfs
-  {- Finds the slot config for the given relative time. Essentially, the chosen slot config must have its starting time
-  greater than, or equal to, the given relative time. Furthermore, the chosen slot config's end time, i.e next slot config's
-  starting time (or unbounded if final era), should be greater than the given relative time.
-  -}
-  findSlotConf (x :| []) = x
-  findSlotConf
-    ( thisSlotConf@GYEraSlotConfig {gyEraSlotZeroTime = startTime}
-        :| nextSlotConf@GYEraSlotConfig {gyEraSlotZeroTime = endTime}
-        : rest
-      ) =
-      if relTime >= startTime && relTime < endTime then thisSlotConf else findSlotConf $ nextSlotConf :| rest
+  GYEraSlotConfig {gyEraSlotZeroTime, gyEraSlotStart, gyEraSlotLength} = findSlotConfViaRelTime relTime slotConfs
 
 -- | Partial version of 'enclosingSlotFromTimePure'.
 unsafeEnclosingSlotFromTimePure :: GYSlotConfig -> GYTime -> GYSlot
 unsafeEnclosingSlotFromTimePure sc =
   fromMaybe (error "Given time is before system start")
     . enclosingSlotFromTimePure sc
+
+-- | Get epoch number in which the given slot belongs to.
+slotToEpochPure :: GYSlotConfig -> GYSlot -> GYEpochNo
+slotToEpochPure (GYSlotConfig _ slotConfs) slot =
+  GYEpochNo $
+    startEpoch + ((slotToWord64 slot - slotToWord64 gyEraSlotStart) `div` epochSize)
+ where
+  GYEraSlotConfig {gyEraSlotStart, gyEraEpochSize = GYEpochSize epochSize, gyEraStartEpoch = GYEpochNo startEpoch} = findSlotConfViaSlot slot slotConfs
+
+-- | Get the first slot in the given epoch.
+epochToBeginSlotPure :: GYSlotConfig -> GYEpochNo -> GYSlot
+epochToBeginSlotPure (GYSlotConfig _ slotConfs) epochNo = gyEraSlotStart
+ where
+  GYEraSlotConfig {gyEraSlotStart} = findSlotConfViaEpoch epochNo slotConfs
 
 ----------------------------------
 -- Handrolled Invariant Summary --

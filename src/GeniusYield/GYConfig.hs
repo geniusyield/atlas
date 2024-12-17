@@ -160,7 +160,7 @@ withCfgProviders
   ns
   f =
     do
-      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo) <- case cfgCoreProvider of
+      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetStakePools) <- case cfgCoreProvider of
         GYNodeKupo path kupoUrl -> do
           let info = nodeConnectInfo path cfgNetworkId
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
@@ -174,6 +174,7 @@ withCfgProviders
             , Node.nodeSubmitTx info
             , KupoApi.kupoAwaitTxConfirmed kEnv
             , nodeStakeAddressInfo info
+            , Node.nodeStakePools info
             )
         GYMaestro (Confidential apiToken) turboSubmit -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
@@ -183,7 +184,6 @@ withCfgProviders
               (MaestroApi.maestroProtocolParams maestroApiEnv)
               (MaestroApi.maestroSystemStart maestroApiEnv)
               (MaestroApi.maestroEraHistory maestroApiEnv)
-              (MaestroApi.maestroStakePools maestroApiEnv)
           pure
             ( maestroGetParams
             , maestroSlotActions
@@ -192,6 +192,7 @@ withCfgProviders
             , MaestroApi.maestroSubmitTx (Just True == turboSubmit) maestroApiEnv
             , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
             , MaestroApi.maestroStakeAddressInfo maestroApiEnv
+            , MaestroApi.maestroStakePools maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
@@ -201,7 +202,6 @@ withCfgProviders
               (Blockfrost.blockfrostProtocolParams proj)
               (Blockfrost.blockfrostSystemStart proj)
               (Blockfrost.blockfrostEraHistory proj)
-              (Blockfrost.blockfrostStakePools proj)
           pure
             ( blockfrostGetParams
             , blockfrostSlotActions
@@ -210,6 +210,7 @@ withCfgProviders
             , Blockfrost.blockfrostSubmitTx proj
             , Blockfrost.blockfrostAwaitTxConfirmed proj
             , Blockfrost.blockfrostStakeAddressInfo proj
+            , Blockfrost.blockfrostStakePools proj
             )
 
       bracket (mkLogEnv ns cfgLogging) closeScribes $ \logEnv -> do
@@ -253,6 +254,7 @@ logTiming providers@GYProviders {..} =
     , gyQueryUTxO = gyQueryUTxO'
     , gyGetStakeAddressInfo = gyGetStakeAddressInfo'
     , gyLog' = gyLog'
+    , gyGetStakePools = gyGetStakePools'
     }
  where
   wrap :: String -> IO a -> IO a
@@ -284,9 +286,10 @@ logTiming providers@GYProviders {..} =
       { gyGetProtocolParameters' = wrap "gyGetProtocolParameters" $ gyGetProtocolParameters providers
       , gyGetSystemStart' = wrap "gyGetSystemStart" $ gyGetSystemStart providers
       , gyGetEraHistory' = wrap "gyGetEraHistory" $ gyGetEraHistory providers
-      , gyGetStakePools' = wrap "gyGetStakePools" $ gyGetStakePools providers
       , gyGetSlotConfig' = wrap "gyGetSlotConfig" $ gyGetSlotConfig providers
       }
+
+  gyGetStakePools' = wrap "gyGetStakePools" gyGetStakePools
 
   gyQueryUTxO' :: GYQueryUTxO
   gyQueryUTxO' =

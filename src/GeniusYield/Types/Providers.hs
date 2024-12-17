@@ -32,7 +32,6 @@ module GeniusYield.Types.Providers (
   gyGetProtocolParameters,
   gyGetSystemStart,
   gyGetEraHistory,
-  gyGetStakePools,
   gyGetSlotConfig,
   makeGetParameters,
 
@@ -152,6 +151,7 @@ data GYProviders = GYProviders
   , gyQueryUTxO :: !GYQueryUTxO
   , gyGetStakeAddressInfo :: !(GYStakeAddress -> IO (Maybe GYStakeAddressInfo))
   , gyLog' :: !GYLogConfiguration
+  , gyGetStakePools :: !(IO (Set Api.S.PoolId))
   }
 
 gyGetSlotOfCurrentBlock :: GYProviders -> IO GYSlot
@@ -226,9 +226,6 @@ gyGetSystemStart = gyGetSystemStart' . gyGetParameters
 
 gyGetEraHistory :: GYProviders -> IO Api.EraHistory
 gyGetEraHistory = gyGetEraHistory' . gyGetParameters
-
-gyGetStakePools :: GYProviders -> IO (Set Api.S.PoolId)
-gyGetStakePools = gyGetStakePools' . gyGetParameters
 
 gyGetSlotConfig :: GYProviders -> IO GYSlotConfig
 gyGetSlotConfig = gyGetSlotConfig' . gyGetParameters
@@ -375,7 +372,6 @@ data GYGetParameters = GYGetParameters
   { gyGetProtocolParameters' :: !(IO ApiProtocolParameters)
   , gyGetSystemStart' :: !(IO SystemStart)
   , gyGetEraHistory' :: !(IO Api.EraHistory)
-  , gyGetStakePools' :: !(IO (Set Api.S.PoolId))
   , gyGetSlotConfig' :: !(IO GYSlotConfig)
   }
 
@@ -393,10 +389,8 @@ makeGetParameters ::
   IO SystemStart ->
   -- | Getting era history
   IO Api.EraHistory ->
-  -- | Getting stake pools
-  IO (Set Api.S.PoolId) ->
   IO GYGetParameters
-makeGetParameters getProtParams getSysStart getEraHist getStkPools = do
+makeGetParameters getProtParams getSysStart getEraHist = do
   getTime <- mkAutoUpdate defaultUpdateSettings {updateAction = getCurrentTime}
   sysStart <- getSysStart
   let getSlotConf = makeSlotConfigIO sysStart
@@ -434,7 +428,6 @@ makeGetParameters getProtParams getSysStart getEraHist getStkPools = do
       { gyGetSystemStart' = pure sysStart
       , gyGetProtocolParameters' = getProtParams'
       , gyGetEraHistory' = getEraHist'
-      , gyGetStakePools' = getStkPools
       , gyGetSlotConfig' = getSlotConf'
       }
  where

@@ -210,6 +210,7 @@ ctxProviders ctx =
     , gyQueryUTxO = ctxQueryUtxos ctx
     , gyLog' = ctxLog ctx
     , gyGetStakeAddressInfo = nodeStakeAddressInfo (ctxInfo ctx)
+    , gyGetStakePools = nodeStakePools (ctxInfo ctx)
     }
 
 -- | Function to find for the first locked output in the given `GYTxBody` at the given `GYAddress`.

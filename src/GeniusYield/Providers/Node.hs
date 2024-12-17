@@ -14,6 +14,7 @@ module GeniusYield.Providers.Node (
   -- * Low-level
   nodeGetSlotOfCurrentBlock,
   nodeStakeAddressInfo,
+  nodeStakePools,
 
   -- * Auxiliary
   networkIdToLocalNodeConnectInfo,
@@ -69,13 +70,13 @@ nodeSlotActions info =
 -------------------------------------------------------------------------------
 
 nodeGetParameters :: Api.LocalNodeConnectInfo -> IO GYGetParameters
-nodeGetParameters info = makeGetParameters (nodeGetProtocolParameters info) (systemStart info) (eraHistory info) (stakePools info)
+nodeGetParameters info = makeGetParameters (nodeGetProtocolParameters info) (systemStart info) (eraHistory info)
 
 nodeGetProtocolParameters :: Api.LocalNodeConnectInfo -> IO ApiProtocolParameters
 nodeGetProtocolParameters info = queryConwayEra info Api.QueryProtocolParameters
 
-stakePools :: Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)
-stakePools info = queryConwayEra info Api.QueryStakePools
+nodeStakePools :: Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)
+nodeStakePools info = queryConwayEra info Api.QueryStakePools
 
 nodeStakeAddressInfo :: Api.LocalNodeConnectInfo -> GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
 nodeStakeAddressInfo info saddr = resolveStakeAddressInfoFromApi saddr <$> queryConwayEra info (Api.QueryStakeAddresses (Set.singleton $ stakeCredentialToApi $ stakeAddressToCredential saddr) (Api.localNodeNetworkId info))

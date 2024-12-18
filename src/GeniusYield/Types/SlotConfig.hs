@@ -17,6 +17,7 @@ module GeniusYield.Types.SlotConfig (
   enclosingSlotFromTimePure,
   unsafeEnclosingSlotFromTimePure,
   slotToEpochPure,
+  slotToEpochPure',
   epochToBeginSlotPure,
 ) where
 
@@ -261,9 +262,15 @@ unsafeEnclosingSlotFromTimePure sc =
 
 -- | Get epoch number in which the given slot belongs to.
 slotToEpochPure :: GYSlotConfig -> GYSlot -> GYEpochNo
-slotToEpochPure (GYSlotConfig _ slotConfs) slot =
-  GYEpochNo $
-    startEpoch + ((slotToWord64 slot - slotToWord64 gyEraSlotStart) `div` epochSize)
+slotToEpochPure sc slot = fst $ slotToEpochPure' sc slot
+
+-- | Get epoch number and epoch size in which the given slot belongs to.
+slotToEpochPure' :: GYSlotConfig -> GYSlot -> (GYEpochNo, GYEpochSize)
+slotToEpochPure' (GYSlotConfig _ slotConfs) slot =
+  ( GYEpochNo $
+      startEpoch + ((slotToWord64 slot - slotToWord64 gyEraSlotStart) `div` epochSize)
+  , GYEpochSize epochSize
+  )
  where
   GYEraSlotConfig {gyEraSlotStart, gyEraEpochSize = GYEpochSize epochSize, gyEraStartEpoch = GYEpochNo startEpoch} = findSlotConfViaSlot slot slotConfs
 

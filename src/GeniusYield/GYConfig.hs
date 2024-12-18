@@ -184,6 +184,7 @@ withCfgProviders
               (MaestroApi.maestroProtocolParams maestroApiEnv)
               (MaestroApi.maestroSystemStart maestroApiEnv)
               (MaestroApi.maestroEraHistory maestroApiEnv)
+              (MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv)
           pure
             ( maestroGetParams
             , maestroSlotActions
@@ -202,6 +203,7 @@ withCfgProviders
               (Blockfrost.blockfrostProtocolParams proj)
               (Blockfrost.blockfrostSystemStart proj)
               (Blockfrost.blockfrostEraHistory proj)
+              (Blockfrost.blockfrostGetSlotOfCurrentBlock proj)
           pure
             ( blockfrostGetParams
             , blockfrostSlotActions

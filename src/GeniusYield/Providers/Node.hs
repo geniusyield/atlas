@@ -70,7 +70,7 @@ nodeSlotActions info =
 -------------------------------------------------------------------------------
 
 nodeGetParameters :: Api.LocalNodeConnectInfo -> IO GYGetParameters
-nodeGetParameters info = makeGetParameters (nodeGetProtocolParameters info) (systemStart info) (eraHistory info)
+nodeGetParameters info = makeGetParameters (nodeGetProtocolParameters info) (systemStart info) (eraHistory info) (nodeGetSlotOfCurrentBlock info)
 
 nodeGetProtocolParameters :: Api.LocalNodeConnectInfo -> IO ApiProtocolParameters
 nodeGetProtocolParameters info = queryConwayEra info Api.QueryProtocolParameters

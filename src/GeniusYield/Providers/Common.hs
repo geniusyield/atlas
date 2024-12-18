@@ -129,7 +129,9 @@ makeLastEraEndUnbounded eh =
   g eraList =
     let eraList' = nonEmptyToList eraList
         f [] = []
-        f [x] = [x {Ouroboros.eraEnd = Ouroboros.EraUnbounded}]
+        f [x] =
+          let oldEraParams = Ouroboros.eraParams x
+           in [x {Ouroboros.eraEnd = Ouroboros.EraUnbounded, Ouroboros.eraParams = oldEraParams {Ouroboros.eraSafeZone = Ouroboros.UnsafeIndefiniteSafeZone}}]
         f (x : xs) = x : f xs
      in fromJust $ nonEmptyFromList $ f eraList'
 

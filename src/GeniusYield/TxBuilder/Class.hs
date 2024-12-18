@@ -46,6 +46,8 @@ module GeniusYield.TxBuilder.Class (
   slotToEndTime,
   enclosingSlotFromTime,
   enclosingSlotFromTime',
+  slotToEpoch,
+  epochToBeginSlot,
   scriptAddress,
   scriptAddress',
   addressFromText',
@@ -527,6 +529,14 @@ enclosingSlotFromTime' :: GYTxQueryMonad m => GYTime -> m GYSlot
 enclosingSlotFromTime' x = do
   sysStart <- gyscSystemStart <$> slotConfig
   enclosingSlotFromTime x >>= maybe (throwError $ GYTimeUnderflowException sysStart x) pure
+
+-- | Get epoch number in which the given slot belongs to.
+slotToEpoch :: GYTxQueryMonad m => GYSlot -> m GYEpochNo
+slotToEpoch s = flip slotToEpochPure s <$> slotConfig
+
+-- | Get the first slot in the given epoch.
+epochToBeginSlot :: GYTxQueryMonad m => GYEpochNo -> m GYSlot
+epochToBeginSlot e = flip epochToBeginSlotPure e <$> slotConfig
 
 -------------------------------------------------------------------------------
 -- Utilities

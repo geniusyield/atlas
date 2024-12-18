@@ -12,6 +12,7 @@ module GeniusYield.Types.SlotConfig (
   GYEraSlotConfig,
   makeSlotConfig,
   simpleSlotConfig,
+  mainnetSlotConfig,
   slotToBeginTimePure,
   slotToEndTimePure,
   enclosingSlotFromTimePure,
@@ -160,6 +161,61 @@ simpleSlotConfig zero len =
       }
       :| []
 
+-- | Slot config corresponding to mainnet but with parameterized zero time.
+mainnetSlotConfig :: Time.UTCTime -> GYSlotConfig
+mainnetSlotConfig zero =
+  GYSlotConfig (CSlot.SystemStart zero) $
+    GYEraSlotConfig
+      { gyEraSlotStart = slotFromApi 0
+      , gyEraSlotZeroTime = CSlot.RelativeTime 0
+      , gyEraSlotLength = CSlot.mkSlotLength 20
+      , gyEraStartEpoch = GYEpochNo 0
+      , gyEraEpochSize = GYEpochSize 21600
+      }
+      :| [ GYEraSlotConfig
+            { gyEraSlotStart = slotFromApi 4492800
+            , gyEraSlotZeroTime = CSlot.RelativeTime 89856000
+            , gyEraSlotLength = CSlot.mkSlotLength 1
+            , gyEraStartEpoch = GYEpochNo 208
+            , gyEraEpochSize = GYEpochSize 432000
+            }
+         , GYEraSlotConfig
+            { gyEraSlotStart = slotFromApi 16588800
+            , gyEraSlotZeroTime = CSlot.RelativeTime 101952000
+            , gyEraSlotLength = CSlot.mkSlotLength 1
+            , gyEraStartEpoch = GYEpochNo 236
+            , gyEraEpochSize = GYEpochSize 432000
+            }
+         , GYEraSlotConfig
+            { gyEraSlotStart = slotFromApi 23068800
+            , gyEraSlotZeroTime = CSlot.RelativeTime 108432000
+            , gyEraSlotLength = CSlot.mkSlotLength 1
+            , gyEraStartEpoch = GYEpochNo 251
+            , gyEraEpochSize = GYEpochSize 432000
+            }
+         , GYEraSlotConfig
+            { gyEraSlotStart = slotFromApi 39916800
+            , gyEraSlotZeroTime = CSlot.RelativeTime 125280000
+            , gyEraSlotLength = CSlot.mkSlotLength 1
+            , gyEraStartEpoch = GYEpochNo 290
+            , gyEraEpochSize = GYEpochSize 432000
+            }
+         , GYEraSlotConfig
+            { gyEraSlotStart = slotFromApi 72316800
+            , gyEraSlotZeroTime = CSlot.RelativeTime 157680000
+            , gyEraSlotLength = CSlot.mkSlotLength 1
+            , gyEraStartEpoch = GYEpochNo 365
+            , gyEraEpochSize = GYEpochSize 432000
+            }
+         , GYEraSlotConfig
+            { gyEraSlotStart = slotFromApi 133660800
+            , gyEraSlotZeroTime = CSlot.RelativeTime 219024000
+            , gyEraSlotLength = CSlot.mkSlotLength 1
+            , gyEraStartEpoch = GYEpochNo 507
+            , gyEraEpochSize = GYEpochSize 432000
+            }
+         ]
+
 {- Finds the slot config for the given slot. Essentially, the chosen slot config must have its starting slot
 less than, or equal to, the given slot. Furthermore, the chosen slot config's end slot, i.e next slot config's
 starting slot (or unbounded if final era), should be greater than the given slot.
@@ -260,7 +316,20 @@ unsafeEnclosingSlotFromTimePure sc =
   fromMaybe (error "Given time is before system start")
     . enclosingSlotFromTimePure sc
 
--- | Get epoch number in which the given slot belongs to.
+{- | Get epoch number in which the given slot belongs to.
+
+>>> let slotToEpochPureForMainnet = slotToEpochPure (mainnetSlotConfig $ Time.posixSecondsToUTCTime 0)
+>>> slotToEpochPureForMainnet (unsafeSlotFromInteger 72316800)
+GYEpochNo 365
+>>> slotToEpochPureForMainnet (unsafeSlotFromInteger 72316799)
+GYEpochNo 364
+>>> slotToEpochPureForMainnet (unsafeSlotFromInteger 72316801)
+GYEpochNo 365
+>>> slotToEpochPureForMainnet (unsafeSlotFromInteger 72748799)
+GYEpochNo 365
+>>> slotToEpochPureForMainnet (unsafeSlotFromInteger 72748800)
+GYEpochNo 366
+-}
 slotToEpochPure :: GYSlotConfig -> GYSlot -> GYEpochNo
 slotToEpochPure sc slot = fst $ slotToEpochPure' sc slot
 
@@ -274,11 +343,19 @@ slotToEpochPure' (GYSlotConfig _ slotConfs) slot =
  where
   GYEraSlotConfig {gyEraSlotStart, gyEraEpochSize = GYEpochSize epochSize, gyEraStartEpoch = GYEpochNo startEpoch} = findSlotConfViaSlot slot slotConfs
 
--- | Get the first slot in the given epoch.
+{- | Get the first slot in the given epoch.
+>>> let epochToBeginSlotPureForMainnet = epochToBeginSlotPure (mainnetSlotConfig $ Time.posixSecondsToUTCTime 0)
+>>> epochToBeginSlotPureForMainnet (GYEpochNo 508)
+GYSlot 134092800
+>>> epochToBeginSlotPureForMainnet (GYEpochNo 507)
+GYSlot 133660800
+>>> epochToBeginSlotPureForMainnet (GYEpochNo 506)
+GYSlot 133228800
+-}
 epochToBeginSlotPure :: GYSlotConfig -> GYEpochNo -> GYSlot
-epochToBeginSlotPure (GYSlotConfig _ slotConfs) epochNo = gyEraSlotStart
+epochToBeginSlotPure (GYSlotConfig _ slotConfs) epochNo@(GYEpochNo curEpochNo) = slotFromWord64 $ (curEpochNo - startEpoch) * epochSize + slotToWord64 gyEraSlotStart
  where
-  GYEraSlotConfig {gyEraSlotStart} = findSlotConfViaEpoch epochNo slotConfs
+  GYEraSlotConfig {gyEraSlotStart, gyEraEpochSize = GYEpochSize epochSize, gyEraStartEpoch = GYEpochNo startEpoch} = findSlotConfViaEpoch epochNo slotConfs
 
 ----------------------------------
 -- Handrolled Invariant Summary --

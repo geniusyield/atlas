@@ -374,8 +374,8 @@ data GYGetParameters = GYGetParameters
   , gyGetSlotConfig' :: !(IO GYSlotConfig)
   }
 
--- | Contains the data, optionally alongside the time after which it should be refetched.
-data GYParameterStore a = GYParameterStore !(Maybe UTCTime) !a
+-- | Contains the data, alongside the time after which it should be refetched.
+data GYParameterStore a = GYParameterStore !UTCTime !a
 
 {- | Construct efficient 'GYGetParameters' methods by ensuring the supplied IO queries are only made when necessary.
 
@@ -399,44 +399,45 @@ makeGetParameters getProtParams getSysStart getEraHist getSlotOfCurrentBlock = d
   sysStart <- getSysStart
   let getSlotConf = makeSlotConfigIO sysStart
   initProtParams <- getProtParams
-  initEraHist <- getEraHist
-  initSlotConf <- getSlotConf initEraHist
-  let GYEpochNo currentEpoch = slotToEpochPure initSlotConf currentSlot
+  cachedEraHist <- getEraHist
+  cachedSlotConf <- getSlotConf cachedEraHist
+  let GYEpochNo currentEpoch = slotToEpochPure cachedSlotConf currentSlot
       nextEpoch = GYEpochNo (currentEpoch + 1)
-      epochSlotTime epochNo = epochToBeginSlotPure initSlotConf epochNo & slotToBeginTimePure initSlotConf & timeToPOSIX & posixSecondsToUTCTime
+      epochSlotTime epochNo = epochToBeginSlotPure cachedSlotConf epochNo & slotToBeginTimePure cachedSlotConf & timeToPOSIX & posixSecondsToUTCTime
       initCacheTill = epochSlotTime nextEpoch
       timeDelta = epochSlotTime (GYEpochNo $ currentEpoch + 2) `diffUTCTime` initCacheTill
-
   let buildParam :: a -> GYParameterStore a
-      buildParam = GYParameterStore (Just initCacheTill)
-      getProtParams' = newMVar (buildParam initProtParams) >>= mkMethod getProtParams
+      buildParam = GYParameterStore initCacheTill
+      getProtParams' = mkMethod getProtParams
       -- \| Make an efficient 'GYGetParameters' method.
       --        This will only refresh the data (using the provided 'dataRefreshF') if current time has passed the
-      --        epoch end. It will also update the 'epochEndTime' to the new epoch end when necessary.
+      --        epoch end. It will also update the 'nextEpochBeginTime' to the new epoch end when necessary.
       --
       --        If refreshing is not necessary, the data is simply returned from the storage.
       --
       mkMethod :: IO a -> StrictMVar IO (GYParameterStore a) -> IO a
       mkMethod dataRefreshF dataRef = do
         -- See note: [Caching and concurrently accessible MVars].
-        modifyMVar dataRef $ \(GYParameterStore mepochEndTime a) -> do
+        modifyMVar dataRef $ \(GYParameterStore nextEpochBeginTime a) -> do
           currTime <- getTime
-          if beforeEnd currTime mepochEndTime
+          if currTime < nextEpochBeginTime
             then
-              pure (GYParameterStore mepochEndTime a, a)
+              putStrLn ("Serving cached parameters, currentTime: " <> show currTime <> " and nextEpochBeginTime: " <> show nextEpochBeginTime) >> pure (GYParameterStore nextEpochBeginTime a, a)
             else do
+              putStrLn $ "Refreshing parameters, currentTime: " <> show currTime <> " and nextEpochBeginTime: " <> show nextEpochBeginTime <> " and timeDelta: " <> show timeDelta
               newData <- dataRefreshF
-              pure (GYParameterStore ((\epochEndTime -> timeDelta `addUTCTime` epochEndTime) <$> mepochEndTime) newData, newData)
+              let newNextEpochBeginTime = timeDelta `addUTCTime` nextEpochBeginTime
+              putStrLn $ "newNextEpochBeginTime: " <> show newNextEpochBeginTime
+              pure (GYParameterStore newNextEpochBeginTime newData, newData)
+  ppMVar <- newMVar (buildParam initProtParams)
   pure $
     GYGetParameters
       { gyGetSystemStart' = pure sysStart
-      , gyGetProtocolParameters' = getProtParams'
-      , gyGetEraHistory' = pure initEraHist
-      , gyGetSlotConfig' = pure initSlotConf
+      , gyGetProtocolParameters' = getProtParams' ppMVar
+      , gyGetEraHistory' = pure cachedEraHist
+      , gyGetSlotConfig' = pure cachedSlotConf
       }
  where
-  beforeEnd _ Nothing = True
-  beforeEnd currTime (Just endTime) = currTime < endTime
   makeSlotConfigIO sysStart =
     either
       (throwIO . GYConversionException . GYEraSummariesToSlotConfigError . Txt.pack)

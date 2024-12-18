@@ -16,6 +16,7 @@ import GeniusYield.Types.Blueprint as X
 import GeniusYield.Types.Certificate as X
 import GeniusYield.Types.Credential as X
 import GeniusYield.Types.Datum as X
+import GeniusYield.Types.Epoch as X
 import GeniusYield.Types.Era as X
 import GeniusYield.Types.Key as X
 import GeniusYield.Types.Ledger as X

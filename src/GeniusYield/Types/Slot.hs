@@ -13,6 +13,7 @@ module GeniusYield.Types.Slot (
   unsafeAdvanceSlot,
   slotToInteger,
   slotFromInteger,
+  slotToWord64,
   slotFromWord64,
   unsafeSlotFromInteger,
 ) where
@@ -54,6 +55,9 @@ slotFromInteger s
   | s > toInteger (maxBound :: Word64) = Nothing
   | s < toInteger (minBound :: Word64) = Nothing
   | otherwise = Just . GYSlot $ fromInteger s
+
+slotToWord64 :: GYSlot -> Word64
+slotToWord64 = coerce
 
 slotFromWord64 :: Word64 -> GYSlot
 slotFromWord64 = GYSlot

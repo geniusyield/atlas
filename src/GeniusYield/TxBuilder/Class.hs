@@ -46,6 +46,8 @@ module GeniusYield.TxBuilder.Class (
   slotToEndTime,
   enclosingSlotFromTime,
   enclosingSlotFromTime',
+  slotToEpoch,
+  epochToBeginSlot,
   scriptAddress,
   scriptAddress',
   addressFromText',
@@ -528,6 +530,14 @@ enclosingSlotFromTime' x = do
   sysStart <- gyscSystemStart <$> slotConfig
   enclosingSlotFromTime x >>= maybe (throwError $ GYTimeUnderflowException sysStart x) pure
 
+-- | Get epoch number in which the given slot belongs to.
+slotToEpoch :: GYTxQueryMonad m => GYSlot -> m GYEpochNo
+slotToEpoch s = flip slotToEpochPure s <$> slotConfig
+
+-- | Get the first slot in the given epoch.
+epochToBeginSlot :: GYTxQueryMonad m => GYEpochNo -> m GYSlot
+epochToBeginSlot e = flip epochToBeginSlotPure e <$> slotConfig
+
 -------------------------------------------------------------------------------
 -- Utilities
 -------------------------------------------------------------------------------
@@ -950,8 +960,7 @@ buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
   ss <- systemStart
   eh <- eraHistory
   pp <- protocolParams
-  ps <- stakePools
-
+  let ps = mempty -- This denotes the set of registered stake pools that are being unregistered in current transaction. We don't support this yet.
   collateral <- ownCollateral
   addrs <- ownAddresses
   change <- ownChangeAddress

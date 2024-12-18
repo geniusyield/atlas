@@ -32,7 +32,6 @@ module GeniusYield.Types.Providers (
   gyGetProtocolParameters,
   gyGetSystemStart,
   gyGetEraHistory,
-  gyGetStakePools,
   gyGetSlotConfig,
   makeGetParameters,
 
@@ -87,7 +86,6 @@ import Control.Concurrent.Class.MonadMVar.Strict (
   modifyMVar,
   newMVar,
  )
-import Control.Monad ((<$!>))
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.Default (Default, def)
 import Data.Text qualified as Txt
@@ -95,12 +93,12 @@ import Data.Time
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Word (Word64)
 import GHC.Stack (withFrozenCallStack)
-import GeniusYield.CardanoApi.EraHistory (getEraEndSlot)
 import GeniusYield.Imports
 import GeniusYield.TxBuilder.Errors
 import GeniusYield.Types.Address
 import GeniusYield.Types.Credential (GYPaymentCredential)
 import GeniusYield.Types.Datum
+import GeniusYield.Types.Epoch (GYEpochNo (GYEpochNo))
 import GeniusYield.Types.Logging
 import GeniusYield.Types.ProtocolParameters
 import GeniusYield.Types.Slot
@@ -152,6 +150,7 @@ data GYProviders = GYProviders
   , gyQueryUTxO :: !GYQueryUTxO
   , gyGetStakeAddressInfo :: !(GYStakeAddress -> IO (Maybe GYStakeAddressInfo))
   , gyLog' :: !GYLogConfiguration
+  , gyGetStakePools :: !(IO (Set Api.S.PoolId))
   }
 
 gyGetSlotOfCurrentBlock :: GYProviders -> IO GYSlot
@@ -226,9 +225,6 @@ gyGetSystemStart = gyGetSystemStart' . gyGetParameters
 
 gyGetEraHistory :: GYProviders -> IO Api.EraHistory
 gyGetEraHistory = gyGetEraHistory' . gyGetParameters
-
-gyGetStakePools :: GYProviders -> IO (Set Api.S.PoolId)
-gyGetStakePools = gyGetStakePools' . gyGetParameters
 
 gyGetSlotConfig :: GYProviders -> IO GYSlotConfig
 gyGetSlotConfig = gyGetSlotConfig' . gyGetParameters
@@ -375,14 +371,15 @@ data GYGetParameters = GYGetParameters
   { gyGetProtocolParameters' :: !(IO ApiProtocolParameters)
   , gyGetSystemStart' :: !(IO SystemStart)
   , gyGetEraHistory' :: !(IO Api.EraHistory)
-  , gyGetStakePools' :: !(IO (Set Api.S.PoolId))
   , gyGetSlotConfig' :: !(IO GYSlotConfig)
   }
 
--- | Contains the data, optionally alongside the time after which it should be refetched.
-data GYParameterStore a = GYParameterStore !(Maybe UTCTime) !a
+-- | Contains the data, alongside the time after which it should be refetched.
+data GYParameterStore a = GYParameterStore !UTCTime !a
 
 {- | Construct efficient 'GYGetParameters' methods by ensuring the supplied IO queries are only made when necessary.
+
+In particular era histories and system start are cached throughout the run of the program whereas protocol parameters are cached only for a single epoch.
 
 This uses IO to set up some mutable references used for caching.
 -}
@@ -393,55 +390,50 @@ makeGetParameters ::
   IO SystemStart ->
   -- | Getting era history
   IO Api.EraHistory ->
-  -- | Getting stake pools
-  IO (Set Api.S.PoolId) ->
+  -- | Getting slot of current block (to know for epoch)
+  IO GYSlot ->
   IO GYGetParameters
-makeGetParameters getProtParams getSysStart getEraHist getStkPools = do
+makeGetParameters getProtParams getSysStart getEraHist getSlotOfCurrentBlock = do
+  currentSlot <- getSlotOfCurrentBlock
   getTime <- mkAutoUpdate defaultUpdateSettings {updateAction = getCurrentTime}
   sysStart <- getSysStart
   let getSlotConf = makeSlotConfigIO sysStart
   initProtParams <- getProtParams
-  initEraHist <- getEraHist
-  initStkPools <- getStkPools
-  initSlotConf <- getSlotConf initEraHist
-
-  let slotEndToUTCTime slotConf = posixSecondsToUTCTime . timeToPOSIX . slotToBeginTimePure slotConf . flip unsafeAdvanceSlot 1 . slotFromApi
-      buildParam :: a -> GYParameterStore a
-      buildParam = GYParameterStore (slotEndToUTCTime initSlotConf <$!> getEraEndSlot initEraHist)
-      getProtParams' = newMVar (buildParam initProtParams) >>= mkMethod (const getProtParams)
-      getEraHist' = newMVar (buildParam initEraHist) >>= mkMethod pure
-      getStkPools' = newMVar (buildParam initStkPools) >>= mkMethod (const getStkPools)
-      getSlotConf' = newMVar (buildParam initSlotConf) >>= mkMethod getSlotConf
+  cachedEraHist <- getEraHist
+  cachedSlotConf <- getSlotConf cachedEraHist
+  let GYEpochNo currentEpoch = slotToEpochPure cachedSlotConf currentSlot
+      nextEpoch = GYEpochNo (currentEpoch + 1)
+      epochSlotTime epochNo = epochToBeginSlotPure cachedSlotConf epochNo & slotToBeginTimePure cachedSlotConf & timeToPOSIX & posixSecondsToUTCTime
+      initCacheTill = epochSlotTime nextEpoch
+      timeDelta = epochSlotTime (GYEpochNo $ currentEpoch + 2) `diffUTCTime` initCacheTill
+  let buildParam :: a -> GYParameterStore a
+      buildParam = GYParameterStore initCacheTill
+      getProtParams' = mkMethod getProtParams
       -- \| Make an efficient 'GYGetParameters' method.
       --        This will only refresh the data (using the provided 'dataRefreshF') if current time has passed the
-      --        era end. It will also update the 'eraEndTime' to the new era end when necessary.
+      --        epoch end. It will also update the 'nextEpochBeginTime' to the new epoch end when necessary.
       --
       --        If refreshing is not necessary, the data is simply returned from the storage.
       --
-      mkMethod :: (Api.EraHistory -> IO a) -> StrictMVar IO (GYParameterStore a) -> IO a
+      mkMethod :: IO a -> StrictMVar IO (GYParameterStore a) -> IO a
       mkMethod dataRefreshF dataRef = do
         -- See note: [Caching and concurrently accessible MVars].
-        modifyMVar dataRef $ \(GYParameterStore eraEndTime a) -> do
+        modifyMVar dataRef $ \(GYParameterStore nextEpochBeginTime a) -> do
           currTime <- getTime
-          if beforeEnd currTime eraEndTime
-            then
-              pure (GYParameterStore eraEndTime a, a)
+          if currTime < nextEpochBeginTime
+            then pure (GYParameterStore nextEpochBeginTime a, a)
             else do
-              newEraHist <- getEraHist
-              newSlotConf <- getSlotConf newEraHist -- Remember that this is actually a pure computation being lifted to IO here.
-              newData <- dataRefreshF newEraHist
-              pure (GYParameterStore (slotEndToUTCTime newSlotConf <$> getEraEndSlot newEraHist) newData, newData)
+              newData <- dataRefreshF
+              pure (GYParameterStore (timeDelta `addUTCTime` nextEpochBeginTime) newData, newData)
+  ppMVar <- newMVar (buildParam initProtParams)
   pure $
     GYGetParameters
       { gyGetSystemStart' = pure sysStart
-      , gyGetProtocolParameters' = getProtParams'
-      , gyGetEraHistory' = getEraHist'
-      , gyGetStakePools' = getStkPools'
-      , gyGetSlotConfig' = getSlotConf'
+      , gyGetProtocolParameters' = getProtParams' ppMVar
+      , gyGetEraHistory' = pure cachedEraHist
+      , gyGetSlotConfig' = pure cachedSlotConf
       }
  where
-  beforeEnd _ Nothing = True
-  beforeEnd currTime (Just endTime) = currTime < endTime
   makeSlotConfigIO sysStart =
     either
       (throwIO . GYConversionException . GYEraSummariesToSlotConfigError . Txt.pack)

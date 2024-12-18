@@ -14,6 +14,7 @@ module GeniusYield.Providers.Node (
   -- * Low-level
   nodeGetSlotOfCurrentBlock,
   nodeStakeAddressInfo,
+  nodeStakePools,
 
   -- * Auxiliary
   networkIdToLocalNodeConnectInfo,
@@ -28,7 +29,7 @@ import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import Data.Text qualified as Txt
 import GeniusYield.CardanoApi.Query
-import GeniusYield.Providers.Common (SubmitTxException (SubmitTxException))
+import GeniusYield.Providers.Common (SubmitTxException (SubmitTxException), makeLastEraEndUnbounded)
 import GeniusYield.Types
 import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import Ouroboros.Network.Protocol.LocalTxSubmission.Type (SubmitResult (..))
@@ -69,13 +70,13 @@ nodeSlotActions info =
 -------------------------------------------------------------------------------
 
 nodeGetParameters :: Api.LocalNodeConnectInfo -> IO GYGetParameters
-nodeGetParameters info = makeGetParameters (nodeGetProtocolParameters info) (systemStart info) (eraHistory info) (stakePools info)
+nodeGetParameters info = makeGetParameters (nodeGetProtocolParameters info) (systemStart info) (eraHistory info) (nodeGetSlotOfCurrentBlock info)
 
 nodeGetProtocolParameters :: Api.LocalNodeConnectInfo -> IO ApiProtocolParameters
 nodeGetProtocolParameters info = queryConwayEra info Api.QueryProtocolParameters
 
-stakePools :: Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)
-stakePools info = queryConwayEra info Api.QueryStakePools
+nodeStakePools :: Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)
+nodeStakePools info = queryConwayEra info Api.QueryStakePools
 
 nodeStakeAddressInfo :: Api.LocalNodeConnectInfo -> GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
 nodeStakeAddressInfo info saddr = resolveStakeAddressInfoFromApi saddr <$> queryConwayEra info (Api.QueryStakeAddresses (Set.singleton $ stakeCredentialToApi $ stakeAddressToCredential saddr) (Api.localNodeNetworkId info))
@@ -95,7 +96,7 @@ systemStart :: Api.LocalNodeConnectInfo -> IO SystemStart
 systemStart info = queryCardanoMode info Api.QuerySystemStart
 
 eraHistory :: Api.LocalNodeConnectInfo -> IO Api.EraHistory
-eraHistory info = queryCardanoMode info Api.QueryEraHistory
+eraHistory info = makeLastEraEndUnbounded <$> queryCardanoMode info Api.QueryEraHistory
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions

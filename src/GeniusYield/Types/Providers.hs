@@ -421,14 +421,10 @@ makeGetParameters getProtParams getSysStart getEraHist getSlotOfCurrentBlock = d
         modifyMVar dataRef $ \(GYParameterStore nextEpochBeginTime a) -> do
           currTime <- getTime
           if currTime < nextEpochBeginTime
-            then
-              putStrLn ("Serving cached parameters, currentTime: " <> show currTime <> " and nextEpochBeginTime: " <> show nextEpochBeginTime) >> pure (GYParameterStore nextEpochBeginTime a, a)
+            then pure (GYParameterStore nextEpochBeginTime a, a)
             else do
-              putStrLn $ "Refreshing parameters, currentTime: " <> show currTime <> " and nextEpochBeginTime: " <> show nextEpochBeginTime <> " and timeDelta: " <> show timeDelta
               newData <- dataRefreshF
-              let newNextEpochBeginTime = timeDelta `addUTCTime` nextEpochBeginTime
-              putStrLn $ "newNextEpochBeginTime: " <> show newNextEpochBeginTime
-              pure (GYParameterStore newNextEpochBeginTime newData, newData)
+              pure (GYParameterStore (timeDelta `addUTCTime` nextEpochBeginTime) newData, newData)
   ppMVar <- newMVar (buildParam initProtParams)
   pure $
     GYGetParameters

@@ -142,8 +142,8 @@ runPlaceBet refScript brp guess bet mPrevBets user = do
 firstBetTest' :: GYTxGameMonad m => TestInfo -> m ()
 firstBetTest' =
   firstBetTest
-    40
-    100
+    10
+    20
     (valueFromLovelace 200_000_000)
     (OracleAnswerDatum 3)
     (valueFromLovelace 20_000_000)
@@ -176,8 +176,8 @@ type Bet = (Wallet, OracleAnswerDatum, GYValue)
 multipleBetsTest :: GYTxGameMonad m => TestInfo -> m ()
 multipleBetsTest TestInfo {..} =
   mkMultipleBetsTest
-    400
-    1_000
+    10
+    20
     (valueFromLovelace 10_000_000)
     [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
     , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
@@ -195,8 +195,8 @@ multipleBetsTest TestInfo {..} =
 failingMultipleBetsTest :: GYTxGameMonad m => TestInfo -> m ()
 failingMultipleBetsTest TestInfo {..} =
   mkMultipleBetsTest
-    400
-    1_000
+    10
+    20
     (valueFromLovelace 10_000_000)
     [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
     , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)

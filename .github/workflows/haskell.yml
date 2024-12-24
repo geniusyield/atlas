@@ -178,8 +178,8 @@ jobs:
       run: cabal run atlas-unified-tests -- -j1 --hide-successes
     - name: Run privnet tests
       run: cabal run atlas-privnet-tests -- -j1 --hide-successes
-    - name: Run all tests (cabal)
-      run: cabal run atlas-tests -- -j1 --hide-successes
+    # - name: Run all tests (cabal)
+    #   run: cabal run atlas-tests -- -j1 --hide-successes
     - name: Run doctest (docspec)
       run: |
         # Install docspec and run doctests.

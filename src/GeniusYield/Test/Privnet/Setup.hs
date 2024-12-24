@@ -76,7 +76,7 @@ The first argument is the log severity filter. Only logs of this severity or hig
 newtype Setup = Setup (GYLogSeverity -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ())
 
 cardanoDefaultTestnetOptionsConway :: CardanoTestnetOptions
-cardanoDefaultTestnetOptionsConway = cardanoDefaultTestnetOptions {cardanoNodeEra = Api.AnyCardanoEra Api.ConwayEra}
+cardanoDefaultTestnetOptionsConway = cardanoDefaultTestnetOptions {cardanoNodeEra = Api.AnyCardanoEra Api.ConwayEra, cardanoEpochLength = 2000}
 data PrivnetRuntime = PrivnetRuntime
   { runtimeNodeSocket :: !FilePath
   , runtimeNetworkInfo :: !GYNetworkInfo

@@ -4,6 +4,8 @@ module GeniusYield.Test.Unified.BetRef.PlaceBet (
   runDeployScript,
   runMultipleBets,
   Bet,
+  betUntilDelta,
+  betRevealDelta,
 ) where
 
 import Control.Monad.Except (handleError)
@@ -27,12 +29,17 @@ import GeniusYield.TxBuilder
 import GeniusYield.Types
 
 {- | Test environment 'WalletInfo' among other things provides nine wallets that
-be used in tests. For convinience we assign some meaningful names to them.
+be used in tests. For convenience we assign some meaningful names to them.
 -}
 admin, oracle, holder :: Wallets -> User
 admin = w1 -- Runs some administrative action, e.g. deplys the script
 oracle = w8 -- A user that is going to reveal the answer
 holder = w9 -- A user to store the reference script
+
+betUntilDelta :: Integer
+betUntilDelta = 300
+betRevealDelta :: Integer
+betRevealDelta = 300
 
 -- | Test suite for the emulator
 placeBetTestsClb :: TestTree
@@ -142,8 +149,8 @@ runPlaceBet refScript brp guess bet mPrevBets user = do
 firstBetTest' :: GYTxGameMonad m => TestInfo -> m ()
 firstBetTest' =
   firstBetTest
-    500
-    600
+    betUntilDelta
+    betRevealDelta
     (valueFromLovelace 200_000_000)
     (OracleAnswerDatum 3)
     (valueFromLovelace 20_000_000)
@@ -176,8 +183,8 @@ type Bet = (Wallet, OracleAnswerDatum, GYValue)
 multipleBetsTest :: GYTxGameMonad m => TestInfo -> m ()
 multipleBetsTest TestInfo {..} =
   mkMultipleBetsTest
-    500
-    600
+    betUntilDelta
+    betRevealDelta
     (valueFromLovelace 10_000_000)
     [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
     , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)
@@ -195,8 +202,8 @@ multipleBetsTest TestInfo {..} =
 failingMultipleBetsTest :: GYTxGameMonad m => TestInfo -> m ()
 failingMultipleBetsTest TestInfo {..} =
   mkMultipleBetsTest
-    500
-    600
+    betUntilDelta
+    betRevealDelta
     (valueFromLovelace 10_000_000)
     [ (w1, OracleAnswerDatum 1, valueFromLovelace 10_000_000)
     , (w2, OracleAnswerDatum 2, valueFromLovelace 20_000_000)

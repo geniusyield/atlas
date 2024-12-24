@@ -75,7 +75,7 @@ nodeUtxosFromTx info txId = do
  where
   go acc startIx uptoIx = do
     utxos <- nodeUtxosAtTxOutRefs info $ curry txOutRefFromTuple txId <$> [startIx .. uptoIx]
-    let acc' = acc <> utxos
+    let !acc' = acc <> utxos
     if utxosSize utxos == 0
       then pure acc'
       else go acc' (uptoIx + 1) (uptoIx * 2)

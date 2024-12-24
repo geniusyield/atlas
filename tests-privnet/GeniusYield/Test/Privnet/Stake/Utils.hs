@@ -110,7 +110,7 @@ stakeIntegrationTest mstakeValHash info ctx = do
       Just stakeValHash -> createMangledUser ctx (GYStakeCredentialByScript stakeValHash)
       Nothing -> newTempUserCtx ctx (ctxUserF ctx) (valueFromLovelace 1_000_000_000) (CreateUserConfig {cucGenerateCollateral = False, cucGenerateStakeKey = True})
     registerStakeCredentialSteps strat user mstakeValHash info ctx
-    sps <- ctx & ctxGetParams & gyGetStakePools'
+    sps <- ctx & ctxProviders & gyGetStakePools
     info $ "Total stake pools: " <> show sps <> "\n"
     let spId = Set.findMin sps & stakePoolIdFromApi
     info $ "Stake pool id: " <> show spId <> "\n"

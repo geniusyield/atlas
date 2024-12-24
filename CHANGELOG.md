@@ -1,3 +1,11 @@
+## 0.7.0
+
+* Era histories are now cached through entire run of the program whereas protocol parameters are fetched once per epoch. In case you were utilising era summary given by Atlas, note that era end of last era is now set to being unbounded.
+* Bug fix for our caching mechanism, see PR [#370](https://github.com/geniusyield/atlas/pull/370) for more details.
+* We no longer fetch registered stake pools as it is not required.
+* Added utility functions to do slot to epoch related conversations.
+* `addRefScript` now accepts for scripts that has version greater than or equal to `PlutusV2`.
+
 ## 0.6.3
 
 * Avoid dependency upon `cardano-balance-tx:internal`. See [#368](https://github.com/geniusyield/atlas/issues/368) for more details.

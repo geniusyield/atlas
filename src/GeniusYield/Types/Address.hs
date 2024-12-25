@@ -261,7 +261,7 @@ addressFromPlutus nid addr =
 {- | If an address is a shelley address, then we'll return payment credential wrapped in `Just`, `Nothing` otherwise.
 
 >>> addressToPaymentCredential addr
-Just (GYPaymentCredentialByKey (GYPaymentKeyHash "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"))
+Just (GYPaymentCredentialByKey (GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"))
 >>> addressToPaymentCredential addrScript
 Just (GYPaymentCredentialByScript (GYScriptHash "178155803bc461c5b0b371c779cb481ec7420df0c619cd9860e570d2"))
 >>> addressToPaymentCredential addrByron1

@@ -41,11 +41,14 @@ import Text.Printf qualified as Printf
 
 {- $setup
 
->>> :set -XOverloadedStrings -XTypeApplications
+>>> :set -XOverloadedStrings -XTypeApplications -XDataKinds
 >>> import qualified Data.Aeson                 as Aeson
 >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 >>> import qualified Data.Csv                   as Csv
 >>> import qualified Text.Printf                as Printf
+>>> import           Data.Proxy
+>>> import qualified Data.Swagger               as Swagger
+>>> import GeniusYield.Types.KeyRole
 >>> let pkh :: GYKeyHash 'GYKeyRolePayment = "ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
 -}
 
@@ -69,7 +72,7 @@ instance IsString (GYKeyHash kr) where
 -- >>> pkh
 -- GYKeyHash (GYKeyRolePayment) "ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
 instance SingGYKeyRoleI kr => Show (GYKeyHash kr) where
-  show kh = "GYKeyHash (" <> show (fromSingGYKeyRole (singGYKeyRole @kr)) <> ") " <> show (keyHashToRawBytesHex kh)
+  showsPrec d kh = showParen (d > 10) $ showString "GYKeyHash (" . shows (fromSingGYKeyRole (singGYKeyRole @kr)) . showString ") " . shows (keyHashToRawBytesHex kh)
 
 -- | Get corresponding raw bytes.
 keyHashToRawBytes :: GYKeyHash kr -> BS.ByteString
@@ -133,7 +136,7 @@ instance CanSignTx (GYKeyHash kr)
 {- |
 
 >>> LBS8.putStrLn $ Aeson.encode pkh
-"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+"ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
 -}
 instance Aeson.ToJSON (GYKeyHash kr) where
   toJSON = Aeson.toJSON . keyHashToRawBytesHexText
@@ -141,7 +144,7 @@ instance Aeson.ToJSON (GYKeyHash kr) where
 {- |
 
 >>> Aeson.eitherDecode @(GYKeyHash 'GYKeyRolePayment) "\"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d\""
-Right GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+Right (GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d")
 
 Invalid characters:
 
@@ -160,7 +163,7 @@ instance SingGYKeyRoleI kr => Aeson.FromJSON (GYKeyHash kr) where
 {- |
 
 >>> Printf.printf "%s\n" $ pkh
-e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d
+ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81
 -}
 instance Printf.PrintfArg (GYKeyHash kr) where
   formatArg = Printf.formatArg . keyHashToRawBytesHexText
@@ -168,7 +171,7 @@ instance Printf.PrintfArg (GYKeyHash kr) where
 {- |
 
 >>> Csv.toField pkh
-"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+"ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
 -}
 instance Csv.ToField (GYKeyHash kr) where
   toField = keyHashToRawBytesHex
@@ -176,7 +179,7 @@ instance Csv.ToField (GYKeyHash kr) where
 {- |
 
 >>> Csv.runParser $ Csv.parseField @(GYKeyHash 'GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
-Right GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+Right (GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d")
 
 >>> Csv.runParser $ Csv.parseField @(GYKeyHash 'GYKeyRolePayment) "not a payment key hash"
 Left "\"GeniusYield.Types.Hash.keyHashFromRawBytesHex: unable to decode hash from hex string: not a payment key hash, error: invalid character at offset: 0\""
@@ -184,22 +187,25 @@ Left "\"GeniusYield.Types.Hash.keyHashFromRawBytesHex: unable to decode hash fro
 instance Csv.FromField (GYKeyHash kr) where
   parseField = either (fail . show) return . keyHashFromRawBytesHex
 
+{- |
+
+>>> Aeson.encode (Swagger.toSchema (Proxy :: Proxy (GYKeyHash 'GYKeyRolePayment)))
+"{\"description\":\"The hash of a key with role as GYKeyRolePayment\",\"example\":\"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d\",\"format\":\"hex\",\"maxLength\":56,\"minLength\":56,\"type\":\"string\"}"
+-}
 instance SingGYKeyRoleI kr => Swagger.ToSchema (GYKeyHash kr) where
   declareNamedSchema _ =
     pure $
-      Swagger.named ("GYKeyHash (" <> Text.pack (show (fromSingGYKeyRole $ singGYKeyRole @kr) <> ")")) $
+      Swagger.named "GYKeyHash" $
         mempty
           & Swagger.type_
           ?~ Swagger.SwaggerString
             & Swagger.format
           ?~ "hex"
             & Swagger.description
-          ?~ "The hash of a key."
+          ?~ ("The hash of a key with role as " <> Text.pack (show (fromSingGYKeyRole $ singGYKeyRole @kr)))
             & Swagger.example
           ?~ Aeson.toJSON ("e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d" :: Text)
             & Swagger.maxLength
           ?~ 56
             & Swagger.minLength
           ?~ 56
-
---------------------------------------------------------------------------------

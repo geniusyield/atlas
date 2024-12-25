@@ -1,3 +1,8 @@
+## 0.8.0
+
+* Constructor of `GYPubKeyHash` is no longer exported.
+* We define new type `GYKeyHash` and all other key hashes such as `GYPaymentKeyHash` are type synonyms around it.
+
 ## 0.7.0
 
 * Era histories are now cached through entire run of the program whereas protocol parameters are fetched once per epoch. In case you were utilising era summary given by Atlas, note that era end of last era is now set to being unbounded.

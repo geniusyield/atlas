@@ -16,49 +16,27 @@ module GeniusYield.Types.Hash (
   keyHashToRawBytesHexText,
   keyHashFromRawBytes,
   keyHashFromRawBytesHex,
-  GYPaymentKeyHash,
-  paymentKeyHashToApi,
-  paymentKeyHashFromApi,
-  paymentKeyHashToLedger,
-  paymentKeyHashFromLedger,
-  paymentKeyHashFromPlutus,
-  paymentKeyHashToPlutus,
 ) where
 
 import Cardano.Api qualified as Api
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api
-import Cardano.Crypto.DSIGN.Class qualified as Crypto
 import Cardano.Crypto.Hash.Class qualified as Crypto
-import Cardano.Crypto.Seed qualified as Crypto
 import Cardano.Ledger.Keys qualified as Ledger
 import Control.Lens ((?~))
 import Data.Aeson.Types qualified as Aeson
 import Data.ByteString.Base16 qualified as Base16
 import Data.ByteString.Char8 qualified as BS
 import Data.Csv qualified as Csv
-import Data.Either.Combinators (maybeToRight)
-import Data.Hashable (Hashable (..))
 import Data.String (IsString (..))
 import Data.Swagger qualified as Swagger
 import Data.Swagger.Internal.Schema qualified as Swagger
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
-import GeniusYield.Imports (bimap, coerce, (&), (>>>))
+import GeniusYield.Imports (coerce, (&), (>>>))
 import GeniusYield.Types.KeyRole (GYKeyRole (..), GYKeyRoleToLedger, SingGYKeyRole (..), SingGYKeyRoleI (..), fromSingGYKeyRole)
-import GeniusYield.Types.Ledger
-import GeniusYield.Types.PubKeyHash (AsPubKeyHash (fromPubKeyHash, toPubKeyHash), CanSignTx, pubKeyHashFromApi, pubKeyHashFromPlutus, pubKeyHashToApi, pubKeyHashToPlutus)
-import GeniusYield.Types.StakeKeyHash (
-  GYStakeKeyHash,
-  stakeKeyHashFromApi,
-  stakeKeyHashToApi,
- )
-import GeniusYield.Utils (serialiseToBech32WithPrefix)
-import PlutusLedgerApi.V1 qualified as Plutus (Credential (..))
-import PlutusLedgerApi.V1.Crypto qualified as Plutus
-import PlutusTx.Builtins qualified as Plutus
-import PlutusTx.Builtins.Internal qualified as Plutus
+import GeniusYield.Types.PubKeyHash (AsPubKeyHash (fromPubKeyHash, toPubKeyHash), CanSignTx, pubKeyHashFromApi, pubKeyHashToApi)
 import Text.Printf qualified as Printf
 
 {- $setup
@@ -68,14 +46,18 @@ import Text.Printf qualified as Printf
 >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 >>> import qualified Data.Csv                   as Csv
 >>> import qualified Text.Printf                as Printf
+>>> let pkh :: GYKeyHash 'GYKeyRolePayment = "ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
 -}
 
+-- | Hash of a public key corresponding to a given `GYKeyRole`.
 newtype GYKeyHash (kr :: GYKeyRole) = GYKeyHash (Ledger.KeyHash (GYKeyRoleToLedger kr) Ledger.StandardCrypto)
   deriving newtype (Eq, Ord)
 
+-- | Convert to corresponding ledger representation.
 keyHashToLedger :: GYKeyHash kr -> Ledger.KeyHash (GYKeyRoleToLedger kr) Ledger.StandardCrypto
 keyHashToLedger = coerce
 
+-- | Convert from corresponding ledger representation.
 keyHashFromLedger :: Ledger.KeyHash (GYKeyRoleToLedger kr) Ledger.StandardCrypto -> GYKeyHash kr
 keyHashFromLedger = coerce
 
@@ -84,21 +66,28 @@ keyHashFromLedger = coerce
 instance IsString (GYKeyHash kr) where
   fromString = BS.pack >>> keyHashFromRawBytesHex >>> either error id
 
+-- >>> pkh
+-- GYKeyHash (GYKeyRolePayment) "ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
 instance SingGYKeyRoleI kr => Show (GYKeyHash kr) where
   show kh = "GYKeyHash (" <> show (fromSingGYKeyRole (singGYKeyRole @kr)) <> ") " <> show (keyHashToRawBytesHex kh)
 
+-- | Get corresponding raw bytes.
 keyHashToRawBytes :: GYKeyHash kr -> BS.ByteString
 keyHashToRawBytes kh = Crypto.hashToBytes $ Ledger.unKeyHash $ keyHashToLedger kh
 
+-- | Get corresponding raw bytes represented as hex.
 keyHashToRawBytesHex :: GYKeyHash kr -> BS.ByteString
 keyHashToRawBytesHex = keyHashToRawBytes >>> Base16.encode
 
+-- | Get corresponding raw bytes represented as hex text.
 keyHashToRawBytesHexText :: GYKeyHash kr -> Text
 keyHashToRawBytesHexText = keyHashToRawBytesHex >>> Text.decodeUtf8
 
+-- | Decode from raw bytes.
 keyHashFromRawBytes :: BS.ByteString -> Maybe (GYKeyHash kr)
 keyHashFromRawBytes bs = keyHashFromLedger . Ledger.KeyHash <$> Crypto.hashFromBytes bs
 
+-- | Decode from raw bytes represented as hex.
 keyHashFromRawBytesHex :: BS.ByteString -> Either String (GYKeyHash kr)
 keyHashFromRawBytesHex bs =
   case Base16.decode bs of
@@ -107,17 +96,28 @@ keyHashFromRawBytesHex bs =
       Nothing -> Left $ "GeniusYield.Types.Hash.keyHashFromRawBytesHex: unable to decode hash from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
       Just kh -> Right kh
 
+-- | Convert to corresponding API representation.
 type family GYHashToApi (kr :: GYKeyRole) where
   GYHashToApi 'GYKeyRolePayment = Api.Hash Api.PaymentKey
   GYHashToApi 'GYKeyRoleStaking = Api.Hash Api.StakeKey
   GYHashToApi 'GYKeyRoleDRep = Api.Hash Api.DRepKey
 
+{- |
+
+>>> keyHashToApi pkh
+"ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
+-}
 keyHashToApi :: forall kr. SingGYKeyRoleI kr => GYKeyHash kr -> GYHashToApi kr
 keyHashToApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
 
+{- |
+
+>>> keyHashFromApi @'GYKeyRolePayment "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+-}
 keyHashFromApi :: forall kr. SingGYKeyRoleI kr => GYHashToApi kr -> GYKeyHash kr
 keyHashFromApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
@@ -132,7 +132,6 @@ instance CanSignTx (GYKeyHash kr)
 
 {- |
 
->>> let Just pkh = Aeson.decode @GYPaymentKeyHash "\"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d\""
 >>> LBS8.putStrLn $ Aeson.encode pkh
 "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
 -}
@@ -141,12 +140,12 @@ instance Aeson.ToJSON (GYKeyHash kr) where
 
 {- |
 
->>> Aeson.eitherDecode @GYPaymentKeyHash "\"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d\""
+>>> Aeson.eitherDecode @(GYKeyHash 'GYKeyRolePayment) "\"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d\""
 Right GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
 
 Invalid characters:
 
->>> Aeson.eitherDecode @GYPaymentKeyHash "\"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6azzz\""
+>>> Aeson.eitherDecode @(GYKeyHash 'GYKeyRolePayment) "\"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6azzz\""
 Left "Error in $: \"GeniusYield.Types.Hash.keyHashFromRawBytesHex: unable to decode hash from hex string: e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6azzz, error: invalid character at offset: 53\""
 -}
 instance SingGYKeyRoleI kr => Aeson.FromJSON (GYKeyHash kr) where
@@ -160,7 +159,7 @@ instance SingGYKeyRoleI kr => Aeson.FromJSON (GYKeyHash kr) where
 
 {- |
 
->>> Printf.printf "%s\n" $ paymentKeyHashFromApi "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+>>> Printf.printf "%s\n" $ pkh
 e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d
 -}
 instance Printf.PrintfArg (GYKeyHash kr) where
@@ -168,7 +167,7 @@ instance Printf.PrintfArg (GYKeyHash kr) where
 
 {- |
 
->>> Csv.toField @GYPaymentKeyHash "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+>>> Csv.toField pkh
 "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
 -}
 instance Csv.ToField (GYKeyHash kr) where
@@ -176,10 +175,10 @@ instance Csv.ToField (GYKeyHash kr) where
 
 {- |
 
->>> Csv.runParser $ Csv.parseField @GYPaymentKeyHash "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+>>> Csv.runParser $ Csv.parseField @(GYKeyHash 'GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
 Right GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
 
->>> Csv.runParser $ Csv.parseField @GYPaymentKeyHash "not a payment key hash"
+>>> Csv.runParser $ Csv.parseField @(GYKeyHash 'GYKeyRolePayment) "not a payment key hash"
 Left "\"GeniusYield.Types.Hash.keyHashFromRawBytesHex: unable to decode hash from hex string: not a payment key hash, error: invalid character at offset: 0\""
 -}
 instance Csv.FromField (GYKeyHash kr) where
@@ -204,36 +203,3 @@ instance SingGYKeyRoleI kr => Swagger.ToSchema (GYKeyHash kr) where
           ?~ 56
 
 --------------------------------------------------------------------------------
-
-type GYPaymentKeyHash = GYKeyHash 'GYKeyRolePayment
-
-paymentKeyHashFromPlutus :: Plutus.PubKeyHash -> Either PlutusToCardanoError GYPaymentKeyHash
-paymentKeyHashFromPlutus = fmap fromPubKeyHash . pubKeyHashFromPlutus
-
-paymentKeyHashToPlutus :: GYPaymentKeyHash -> Plutus.PubKeyHash
-paymentKeyHashToPlutus = toPubKeyHash >>> pubKeyHashToPlutus
-
-{- |
-
->>> let Just pkh = Aeson.decode @GYPaymentKeyHash "\"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d\""
->>> paymentKeyHashToApi pkh
-"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
--}
-paymentKeyHashToApi :: GYPaymentKeyHash -> Api.Hash Api.PaymentKey
-paymentKeyHashToApi = keyHashToApi
-
-{- |
-
->>> paymentKeyHashFromApi "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
-GYPaymentKeyHash "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
--}
-paymentKeyHashFromApi :: Api.Hash Api.PaymentKey -> GYPaymentKeyHash
-paymentKeyHashFromApi = keyHashFromApi
-
--- | Convert to corresponding ledger representation.
-paymentKeyHashToLedger :: GYPaymentKeyHash -> Ledger.KeyHash Ledger.Payment Ledger.StandardCrypto
-paymentKeyHashToLedger = keyHashToLedger
-
--- | Convert from corresponding ledger representation.
-paymentKeyHashFromLedger :: Ledger.KeyHash Ledger.Payment Ledger.StandardCrypto -> GYPaymentKeyHash
-paymentKeyHashFromLedger = keyHashFromLedger

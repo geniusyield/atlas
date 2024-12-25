@@ -37,18 +37,14 @@ paymentKeyHashFromPlutus = fmap fromPubKeyHash . pubKeyHashFromPlutus
 paymentKeyHashToPlutus :: GYPaymentKeyHash -> Plutus.PubKeyHash
 paymentKeyHashToPlutus = toPubKeyHash >>> pubKeyHashToPlutus
 
-{-# DEPRECATED paymentKeyHashToApi "Use keyHashToApi." #-}
 paymentKeyHashToApi :: GYPaymentKeyHash -> Api.Hash Api.PaymentKey
 paymentKeyHashToApi = keyHashToApi
 
-{-# DEPRECATED paymentKeyHashFromApi "Use keyHashFromApi." #-}
 paymentKeyHashFromApi :: Api.Hash Api.PaymentKey -> GYPaymentKeyHash
 paymentKeyHashFromApi = keyHashFromApi
 
-{-# DEPRECATED paymentKeyHashToLedger "Use keyHashToLedger." #-}
 paymentKeyHashToLedger :: GYPaymentKeyHash -> Ledger.KeyHash Ledger.Payment Ledger.StandardCrypto
 paymentKeyHashToLedger = keyHashToLedger
 
-{-# DEPRECATED paymentKeyHashFromLedger "Use keyHashFromLedger." #-}
 paymentKeyHashFromLedger :: Ledger.KeyHash Ledger.Payment Ledger.StandardCrypto -> GYPaymentKeyHash
 paymentKeyHashFromLedger = keyHashFromLedger

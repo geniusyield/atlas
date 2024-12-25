@@ -135,7 +135,7 @@ library
     GeniusYield.Types.DRep
     GeniusYield.Types.Epoch
     GeniusYield.Types.Era
-    GeniusYield.Types.Hash
+    GeniusYield.Types.KeyHash
     GeniusYield.Types.Key
     GeniusYield.Types.Key.Class
     GeniusYield.Types.KeyRole

@@ -18,7 +18,7 @@ module GeniusYield.Types.PaymentKeyHash (
 import Cardano.Api qualified as Api
 import Cardano.Api.Ledger qualified as Ledger
 import GeniusYield.Imports
-import GeniusYield.Types.Hash
+import GeniusYield.Types.KeyHash
 import GeniusYield.Types.KeyRole
 import GeniusYield.Types.Ledger
 import GeniusYield.Types.PubKeyHash (

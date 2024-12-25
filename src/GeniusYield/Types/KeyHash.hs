@@ -1,11 +1,11 @@
 {- |
-Module      : GeniusYield.Types.Hash
+Module      : GeniusYield.Types.KeyHash
 Copyright   : (c) 2024 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
 -}
-module GeniusYield.Types.Hash (
+module GeniusYield.Types.KeyHash (
   GYKeyHash,
   keyHashToLedger,
   keyHashFromLedger,
@@ -94,9 +94,9 @@ keyHashFromRawBytes bs = keyHashFromLedger . Ledger.KeyHash <$> Crypto.hashFromB
 keyHashFromRawBytesHex :: BS.ByteString -> Either String (GYKeyHash kr)
 keyHashFromRawBytesHex bs =
   case Base16.decode bs of
-    Left e -> Left $ "GeniusYield.Types.Hash.keyHashFromRawBytesHex: unable to decode hash from hex string: " <> BS.unpack bs <> ", error: " <> e
+    Left e -> Left $ "GeniusYield.Types.KeyHash.keyHashFromRawBytesHex: unable to decode hash from hex string: " <> BS.unpack bs <> ", error: " <> e
     Right bs' -> case keyHashFromRawBytes bs' of
-      Nothing -> Left $ "GeniusYield.Types.Hash.keyHashFromRawBytesHex: unable to decode hash from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
+      Nothing -> Left $ "GeniusYield.Types.KeyHash.keyHashFromRawBytesHex: unable to decode hash from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
       Just kh -> Right kh
 
 -- | Convert to corresponding API representation.
@@ -149,7 +149,7 @@ Right (GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b669
 Invalid characters:
 
 >>> Aeson.eitherDecode @(GYKeyHash 'GYKeyRolePayment) "\"e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6azzz\""
-Left "Error in $: \"GeniusYield.Types.Hash.keyHashFromRawBytesHex: unable to decode hash from hex string: e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6azzz, error: invalid character at offset: 53\""
+Left "Error in $: \"GeniusYield.Types.KeyHash.keyHashFromRawBytesHex: unable to decode hash from hex string: e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6azzz, error: invalid character at offset: 53\""
 -}
 instance SingGYKeyRoleI kr => Aeson.FromJSON (GYKeyHash kr) where
   parseJSON =
@@ -182,7 +182,7 @@ instance Csv.ToField (GYKeyHash kr) where
 Right (GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d")
 
 >>> Csv.runParser $ Csv.parseField @(GYKeyHash 'GYKeyRolePayment) "not a payment key hash"
-Left "\"GeniusYield.Types.Hash.keyHashFromRawBytesHex: unable to decode hash from hex string: not a payment key hash, error: invalid character at offset: 0\""
+Left "\"GeniusYield.Types.KeyHash.keyHashFromRawBytesHex: unable to decode hash from hex string: not a payment key hash, error: invalid character at offset: 0\""
 -}
 instance Csv.FromField (GYKeyHash kr) where
   parseField = either (fail . show) return . keyHashFromRawBytesHex

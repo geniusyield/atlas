@@ -19,6 +19,8 @@ import GeniusYield.Types.Datum as X
 import GeniusYield.Types.Epoch as X
 import GeniusYield.Types.Era as X
 import GeniusYield.Types.Key as X
+import GeniusYield.Types.KeyHash as X
+import GeniusYield.Types.KeyRole as X
 import GeniusYield.Types.Ledger as X
 import GeniusYield.Types.Logging as X
 import GeniusYield.Types.Natural as X

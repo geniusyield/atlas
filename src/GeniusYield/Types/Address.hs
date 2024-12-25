@@ -280,7 +280,7 @@ getShelleyAddressPaymentCredential (Api.S.ShelleyAddress _network credential _st
 {- | If an address is a shelley address, then we'll return stake credential, if present, wrapped in `Just` and `Nothing` otherwise.
 
 >>> addressToStakeCredential addr
-Just (GYStakeCredentialByKey (GYStakeKeyHash "1b930e9f7add78a174a21000e989ff551366dcd127028cb2aa39f616"))
+Just (GYStakeCredentialByKey (GYKeyHash (GYKeyRoleStaking) "1b930e9f7add78a174a21000e989ff551366dcd127028cb2aa39f616"))
 >>> addressToStakeCredential addrScript
 Nothing
 >>> addressToStakeCredential addrByron1

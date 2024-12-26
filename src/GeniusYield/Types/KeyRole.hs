@@ -38,7 +38,6 @@ instance SingGYKeyRoleI 'GYKeyRolePayment where singGYKeyRole = SingGYKeyRolePay
 instance SingGYKeyRoleI 'GYKeyRoleStaking where singGYKeyRole = SingGYKeyRoleStaking
 instance SingGYKeyRoleI 'GYKeyRoleDRep where singGYKeyRole = SingGYKeyRoleDRep
 
--- FIXME:
 type family GYKeyRoleToLedger (kr :: GYKeyRole) :: Ledger.KeyRole where
   GYKeyRoleToLedger 'GYKeyRolePayment = Ledger.Payment
   GYKeyRoleToLedger 'GYKeyRoleStaking = Ledger.Staking

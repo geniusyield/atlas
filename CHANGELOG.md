@@ -1,7 +1,8 @@
 ## 0.8.0
 
 * Constructor of `GYPubKeyHash` is no longer exported.
-* We define new type `GYKeyHash` and all other key hashes such as `GYPaymentKeyHash` are type synonyms around it.
+* We define a new type `GYKeyHash kr` and all other key hashes such as `GYPaymentKeyHash` are type synonyms around it.
+* We define a new type `GYCredential kr` and all other credentials such as `GYPaymentCredential` are type synonyms around it. 
 
 ## 0.7.0
 

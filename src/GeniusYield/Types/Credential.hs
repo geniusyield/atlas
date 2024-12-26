@@ -79,6 +79,7 @@ import Text.Printf qualified as Printf
 >>> import GeniusYield.Types.KeyHash
 >>> let pkh :: GYKeyHash 'GYKeyRolePayment = "ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
 >>> let pcred = GYCredentialByKey pkh
+>>> let scred = GYCredentialByScript "464eeee89f05aff787d40045af2a40a83fd96c513197d32fbc54ff02"
 -}
 
 {- | Payment credential.
@@ -161,12 +162,20 @@ stakeCredentialToPlutus = credentialToPlutus
 stakeCredentialToHexText :: GYStakeCredential -> Text
 stakeCredentialToHexText = credentialToHexText
 
+-- | Credential.
 data GYCredential (kr :: GYKeyRole)
   = GYCredentialByKey !(GYKeyHash kr)
   | GYCredentialByScript !GYScriptHash
   deriving stock (Show, Eq, Ord)
 
--- | Get hexadecimal value of credential.
+{- | Get hexadecimal value of credential.
+
+>>> credentialToHexText pcred
+"ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
+
+>>> credentialToHexText scred
+"464eeee89f05aff787d40045af2a40a83fd96c513197d32fbc54ff02"
+-}
 credentialToHexText :: GYCredential kr -> Text
 credentialToHexText =
   \case

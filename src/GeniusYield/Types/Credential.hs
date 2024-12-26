@@ -76,6 +76,7 @@ import Text.Printf qualified as Printf
 >>> :set -XOverloadedStrings -XTypeApplications -XDataKinds
 >>> import qualified Text.Printf                as Printf
 >>> import GeniusYield.Types.KeyRole
+>>> import GeniusYield.Types.KeyHash
 >>> let pkh :: GYKeyHash 'GYKeyRolePayment = "ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
 >>> let pcred = GYCredentialByKey pkh
 -}
@@ -172,9 +173,12 @@ credentialToHexText =
     GYCredentialByKey kh -> keyHashToRawBytesHexText kh
     GYCredentialByScript sh -> Api.serialiseToRawBytesHexText (scriptHashToApi sh)
 
--- >>> Printf.printf "%s\n" $ pcred
+{- |
+>>> Printf.printf "%s\n" $ pcred
+Key credential (GYKeyRolePayment): ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81
+-}
 instance SingGYKeyRoleI kr => Printf.PrintfArg (GYCredential kr) where
-  formatArg (GYCredentialByKey kh) = Printf.formatArg $ "Key credential of role (" <> show (fromSingGYKeyRole $ singGYKeyRole @kr) <> "): " <> Text.unpack (keyHashToRawBytesHexText kh)
+  formatArg (GYCredentialByKey kh) = Printf.formatArg $ "Key credential (" <> show (fromSingGYKeyRole $ singGYKeyRole @kr) <> "): " <> Text.unpack (keyHashToRawBytesHexText kh)
   formatArg (GYCredentialByScript sh) = Printf.formatArg $ "Script credential: " <> Api.serialiseToRawBytesHexText (scriptHashToApi sh)
 
 instance Hashable (GYCredential kr) where

@@ -261,9 +261,9 @@ addressFromPlutus nid addr =
 {- | If an address is a shelley address, then we'll return payment credential wrapped in `Just`, `Nothing` otherwise.
 
 >>> addressToPaymentCredential addr
-Just (GYPaymentCredentialByKey (GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"))
+Just (GYCredentialByKey (GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"))
 >>> addressToPaymentCredential addrScript
-Just (GYPaymentCredentialByScript (GYScriptHash "178155803bc461c5b0b371c779cb481ec7420df0c619cd9860e570d2"))
+Just (GYCredentialByScript (GYScriptHash "178155803bc461c5b0b371c779cb481ec7420df0c619cd9860e570d2"))
 >>> addressToPaymentCredential addrByron1
 Nothing
 >>> addressToPaymentCredential addrByron2
@@ -280,7 +280,7 @@ getShelleyAddressPaymentCredential (Api.S.ShelleyAddress _network credential _st
 {- | If an address is a shelley address, then we'll return stake credential, if present, wrapped in `Just` and `Nothing` otherwise.
 
 >>> addressToStakeCredential addr
-Just (GYStakeCredentialByKey (GYKeyHash (GYKeyRoleStaking) "1b930e9f7add78a174a21000e989ff551366dcd127028cb2aa39f616"))
+Just (GYCredentialByKey (GYKeyHash (GYKeyRoleStaking) "1b930e9f7add78a174a21000e989ff551366dcd127028cb2aa39f616"))
 >>> addressToStakeCredential addrScript
 Nothing
 >>> addressToStakeCredential addrByron1

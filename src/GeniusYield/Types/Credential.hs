@@ -184,23 +184,6 @@ instance SingGYKeyRoleI kr => Printf.PrintfArg (GYCredential kr) where
 instance Hashable (GYCredential kr) where
   hashWithSalt salt cred = hashWithSalt salt $ credentialToHexText cred
 
-{-
--- FIXME: To delete following?
-
-type family GYCredentialToApi (kr :: GYKeyRole) where
-  GYCredentialToApi 'GYKeyRolePayment = Api.PaymentCredential
-  GYCredentialToApi 'GYKeyRoleStaking = Api.StakeCredential
-
-credentialToApi :: forall kr. SingGYKeyRoleI kr => GYCredential kr -> GYCredentialToApi kr
-credentialToApi cr = case (singGYKeyRole @kr) of
-  SingGYKeyRolePayment -> case cr of
-    GYCredentialByKey kh -> Api.PaymentCredentialByKey (keyHashToApi kh)
-    GYCredentialByScript sh -> Api.PaymentCredentialByScript (scriptHashToApi sh)
-  SingGYKeyRoleStaking -> case cr of
-    GYCredentialByKey kh -> Api.StakeCredentialByKey (keyHashToApi kh)
-    GYCredentialByScript sh -> Api.StakeCredentialByScript (scriptHashToApi sh)
--}
-
 credentialToLedger :: GYCredential kr -> Ledger.Credential (GYKeyRoleToLedger kr) Ledger.StandardCrypto
 credentialToLedger (GYCredentialByKey kh) = Ledger.KeyHashObj $ keyHashToLedger kh
 credentialToLedger (GYCredentialByScript sh) = Ledger.ScriptHashObj $ scriptHashToLedger sh

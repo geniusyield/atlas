@@ -94,7 +94,8 @@ pattern GYPaymentCredentialByScript sh = GYCredentialByScript sh
 
 -- | Convert @GY@ type to corresponding type in @cardano-node@ library.
 paymentCredentialToApi :: GYPaymentCredential -> Api.PaymentCredential
-paymentCredentialToApi = credentialToApi
+paymentCredentialToApi (GYPaymentCredentialByKey pkh) = Api.PaymentCredentialByKey (paymentKeyHashToApi pkh)
+paymentCredentialToApi (GYPaymentCredentialByScript sh) = Api.PaymentCredentialByScript (scriptHashToApi sh)
 
 -- | Get @GY@ type from corresponding type in @cardano-node@ library.
 paymentCredentialFromApi :: Api.PaymentCredential -> GYPaymentCredential
@@ -179,6 +180,9 @@ instance SingGYKeyRoleI kr => Printf.PrintfArg (GYCredential kr) where
 instance Hashable (GYCredential kr) where
   hashWithSalt salt cred = hashWithSalt salt $ credentialToHexText cred
 
+{-
+-- FIXME: To delete following?
+
 type family GYCredentialToApi (kr :: GYKeyRole) where
   GYCredentialToApi 'GYKeyRolePayment = Api.PaymentCredential
   GYCredentialToApi 'GYKeyRoleStaking = Api.StakeCredential
@@ -191,6 +195,7 @@ credentialToApi cr = case (singGYKeyRole @kr) of
   SingGYKeyRoleStaking -> case cr of
     GYCredentialByKey kh -> Api.StakeCredentialByKey (keyHashToApi kh)
     GYCredentialByScript sh -> Api.StakeCredentialByScript (scriptHashToApi sh)
+-}
 
 credentialToLedger :: GYCredential kr -> Ledger.Credential (GYKeyRoleToLedger kr) Ledger.StandardCrypto
 credentialToLedger (GYCredentialByKey kh) = Ledger.KeyHashObj $ keyHashToLedger kh

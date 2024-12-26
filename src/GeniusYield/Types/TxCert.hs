@@ -15,7 +15,7 @@ module GeniusYield.Types.TxCert (
 ) where
 
 import GeniusYield.Types.Certificate
-import GeniusYield.Types.Credential (GYStakeCredential (..))
+import GeniusYield.Types.Credential (GYStakeCredential)
 import GeniusYield.Types.Delegatee (GYDelegatee)
 import GeniusYield.Types.TxCert.Internal
 

@@ -6,7 +6,7 @@ Maintainer  : support@geniusyield.co
 Stability   : develop
 -}
 module GeniusYield.Types.PubKeyHash (
-  GYPubKeyHash (..),
+  GYPubKeyHash,
   AsPubKeyHash (..),
   CanSignTx,
   pubKeyHashFromPlutus,

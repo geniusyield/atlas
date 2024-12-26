@@ -1,6 +1,6 @@
 cabal-version:      3.8
 name:               atlas-cardano
-version:            0.7.0
+version:            0.8.0
 synopsis:           Application backend for Plutus smart contracts on Cardano
 description:
   Atlas is an all-in-one, Haskell-native application backend for writing off-chain code for on-chain Plutus smart contracts.
@@ -135,8 +135,10 @@ library
     GeniusYield.Types.DRep
     GeniusYield.Types.Epoch
     GeniusYield.Types.Era
+    GeniusYield.Types.KeyHash
     GeniusYield.Types.Key
     GeniusYield.Types.Key.Class
+    GeniusYield.Types.KeyRole
     GeniusYield.Types.Ledger
     GeniusYield.Types.Logging
     GeniusYield.Types.Natural

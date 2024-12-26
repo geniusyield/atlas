@@ -28,7 +28,9 @@ module GeniusYield.Types.Credential (
   paymentCredentialToBech32,
 
   -- * Stake credential.
-  GYStakeCredential (..),
+  GYStakeCredential,
+  pattern GYStakeCredentialByKey,
+  pattern GYStakeCredentialByScript,
   stakeCredentialToApi,
   stakeCredentialFromApi,
   stakeCredentialToLedger,
@@ -43,18 +45,13 @@ import Cardano.Api.Shelley qualified as Api
 import Data.Hashable (Hashable (..))
 import Data.Text (Text)
 import Data.Text qualified as Text
-import GeniusYield.Imports ((>>>))
 import GeniusYield.Types.KeyHash
 import GeniusYield.Types.KeyRole
 import GeniusYield.Types.PaymentKeyHash (
-  GYPaymentKeyHash,
   paymentKeyHashFromApi,
-  paymentKeyHashFromLedger,
   paymentKeyHashToApi,
-  paymentKeyHashToLedger,
-  paymentKeyHashToPlutus,
  )
-import GeniusYield.Types.PubKeyHash (AsPubKeyHash (fromPubKeyHash, toPubKeyHash), pubKeyHashToPlutus)
+import GeniusYield.Types.PubKeyHash (AsPubKeyHash (toPubKeyHash), pubKeyHashToPlutus)
 import GeniusYield.Types.Script (
   GYScriptHash,
   scriptHashFromApi,
@@ -64,7 +61,6 @@ import GeniusYield.Types.Script (
   scriptHashToPlutus,
   stakeValidatorHashFromApi,
   stakeValidatorHashToApi,
-  stakeValidatorHashToPlutus,
  )
 import GeniusYield.Types.StakeKeyHash (
   GYStakeKeyHash,
@@ -125,15 +121,17 @@ paymentCredentialToBech32 :: GYPaymentCredential -> Text
 paymentCredentialToBech32 (GYPaymentCredentialByKey pkh) = serialiseToBech32WithPrefix "addr_vkh" $ paymentKeyHashToApi pkh
 paymentCredentialToBech32 (GYPaymentCredentialByScript sh) = serialiseToBech32WithPrefix "addr_shared_vkh" $ scriptHashToApi sh
 
--- | Stake credential.
-data GYStakeCredential
-  = GYStakeCredentialByKey !GYStakeKeyHash
-  | GYStakeCredentialByScript !GYScriptHash
-  deriving (Show, Eq, Ord)
+{- | Stake credential.
+@type GYStakeCredential = GYCredential 'GYKeyRoleStaking@
+-}
+type GYStakeCredential = GYCredential 'GYKeyRoleStaking
 
-instance Printf.PrintfArg GYStakeCredential where
-  formatArg (GYStakeCredentialByKey skh) = Printf.formatArg $ "Stake key credential: " <> Api.serialiseToRawBytesHexText (stakeKeyHashToApi skh)
-  formatArg (GYStakeCredentialByScript sh) = Printf.formatArg $ "Stake script credential: " <> Api.serialiseToRawBytesHexText (stakeValidatorHashToApi sh)
+pattern GYStakeCredentialByKey :: GYStakeKeyHash -> GYStakeCredential
+pattern GYStakeCredentialByKey kh = GYCredentialByKey kh
+pattern GYStakeCredentialByScript :: GYScriptHash -> GYStakeCredential
+pattern GYStakeCredentialByScript sh = GYCredentialByScript sh
+
+{-# COMPLETE GYStakeCredentialByKey, GYStakeCredentialByScript #-}
 
 -- | Convert @GY@ type to corresponding type in @cardano-api@ library.
 stakeCredentialToApi :: GYStakeCredential -> Api.StakeCredential
@@ -147,23 +145,19 @@ stakeCredentialFromApi (Api.StakeCredentialByScript sh) = GYStakeCredentialByScr
 
 -- | Convert to corresponding ledger type.
 stakeCredentialToLedger :: GYStakeCredential -> Ledger.Credential Ledger.Staking Ledger.StandardCrypto
-stakeCredentialToLedger = stakeCredentialToApi >>> Api.toShelleyStakeCredential
+stakeCredentialToLedger = credentialToLedger
 
 -- | Convert from corresponding ledger type.
 stakeCredentialFromLedger :: Ledger.Credential Ledger.Staking Ledger.StandardCrypto -> GYStakeCredential
-stakeCredentialFromLedger = Api.fromShelleyStakeCredential >>> stakeCredentialFromApi
+stakeCredentialFromLedger = credentialFromLedger
 
 -- | Convert @GY@ type to corresponding type in @plutus@ library.
 stakeCredentialToPlutus :: GYStakeCredential -> Plutus.Credential
-stakeCredentialToPlutus (GYStakeCredentialByKey pkh) = Plutus.PubKeyCredential (paymentKeyHashToPlutus $ fromPubKeyHash $ toPubKeyHash pkh)
-stakeCredentialToPlutus (GYStakeCredentialByScript sh) = Plutus.ScriptCredential (stakeValidatorHashToPlutus sh)
+stakeCredentialToPlutus = credentialToPlutus
 
 -- | Get hexadecimal value of stake credential.
 stakeCredentialToHexText :: GYStakeCredential -> Text
-stakeCredentialToHexText =
-  \case
-    GYStakeCredentialByKey skh -> Api.serialiseToRawBytesHexText (stakeKeyHashToApi skh)
-    GYStakeCredentialByScript sh -> Api.serialiseToRawBytesHexText (stakeValidatorHashToApi sh)
+stakeCredentialToHexText = credentialToHexText
 
 data GYCredential (kr :: GYKeyRole)
   = GYCredentialByKey !(GYKeyHash kr)

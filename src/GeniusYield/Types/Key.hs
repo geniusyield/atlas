@@ -345,7 +345,7 @@ verificationKeyFromApi = case singGYKeyRole @kr of
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
 
-newtype GYExtendedSigningKey (kr :: GYKeyRole) = GYExtendedSigningKey (Crypto.HD.XPrv)
+newtype GYExtendedSigningKey (kr :: GYKeyRole) = GYExtendedSigningKey Crypto.HD.XPrv
 
 instance SingGYKeyRoleI kr => Show (GYExtendedSigningKey kr) where
   showsPrec d k = showParen (d > 10) $ showString "GYExtendedSigningKey (" . shows (fromSingGYKeyRole (singGYKeyRole @kr)) . showString ") " . shows (extendedSigningKeyToRawBytesHex k)

@@ -2,14 +2,10 @@ module GeniusYield.Test.Privnet.DRep (
   drepTests,
 ) where
 
-import Control.Lens (each, (%~), (&))
-import Control.Monad (when)
-import GeniusYield.Test.Privnet.Asserts (assertEqual)
 import GeniusYield.Test.Privnet.Ctx
 import GeniusYield.Test.Privnet.Setup
 import GeniusYield.TxBuilder
 import GeniusYield.Types
-import GeniusYield.Types.TxCert (mkDRepRegisterationCertificate)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCaseSteps)
 
@@ -33,5 +29,5 @@ exerciseDRep ctx info = do
   txId <- ctxRun ctx fundUser $ do
     txBody <- buildTxBody $ mustHaveCertificate $ mkDRepRegisterationCertificate drepCred Nothing GYTxCertWitnessKey
     gyLogInfo' "" $ "txBody: " <> show txBody
-    signAndSubmitConfirmed txBody
+    submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey drepSKey]
   info $ "Successfully registered drep, with tx id: " <> show txId

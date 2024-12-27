@@ -31,6 +31,17 @@ module GeniusYield.Types.Key (
   verificationKeyFromRawBytes,
   verificationKeyFromRawBytesHex,
 
+  -- * Extended signing key
+  GYExtendedSigningKey,
+  extendedSigningKeyToRawBytes,
+  extendedSigningKeyToRawBytesHex,
+  extendedSigningKeyToRawBytesHexText,
+  extendedSigningKeyFromRawBytes,
+  extendedSigningKeyFromRawBytesHex,
+  GYExtendedSigningKeyToApi,
+  extendedSigningKeyToApi,
+  extendedSigningKeyFromApi,
+
   -- * Payment verification key
   GYPaymentVerificationKey,
   paymentVerificationKeyFromApi,
@@ -88,6 +99,7 @@ module GeniusYield.Types.Key (
 ) where
 
 import Cardano.Api qualified as Api
+import Cardano.Crypto.Wallet qualified as Crypto.HD
 import Cardano.Ledger.Crypto qualified as Ledger
 import Cardano.Ledger.Keys qualified as Ledger
 import Data.Aeson qualified as Aeson
@@ -214,9 +226,9 @@ signingKeyFromRawBytes bs = signingKeyFromLedger <$> Crypto.rawDeserialiseSignKe
 signingKeyFromRawBytesHex :: BS8.ByteString -> Either String (GYSigningKey kr)
 signingKeyFromRawBytesHex bs =
   case BS16.decode bs of
-    Left e -> Left $ "GeniusYield.Types.Key.signingKeyFromRawBytesHex: unable to decode hash from hex string: " <> BS8.unpack bs <> ", error: " <> e
+    Left e -> Left $ "GeniusYield.Types.Key.signingKeyFromRawBytesHex: unable to decode from hex string: " <> BS8.unpack bs <> ", error: " <> e
     Right bs' -> case signingKeyFromRawBytes bs' of
-      Nothing -> Left $ "GeniusYield.Types.Key.signingKeyFromRawBytesHex: unable to decode hash from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
+      Nothing -> Left $ "GeniusYield.Types.Key.signingKeyFromRawBytesHex: unable to decode from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
       Just k -> Right k
 
 type family GYSigningKeyToApi (kr :: GYKeyRole) where
@@ -311,9 +323,9 @@ verificationKeyFromRawBytes bs = verificationKeyFromLedger . Ledger.VKey <$> Cry
 verificationKeyFromRawBytesHex :: BS8.ByteString -> Either String (GYVerificationKey kr)
 verificationKeyFromRawBytesHex bs =
   case BS16.decode bs of
-    Left e -> Left $ "GeniusYield.Types.Key.verificationKeyFromRawBytesHex: unable to decode hash from hex string: " <> BS8.unpack bs <> ", error: " <> e
+    Left e -> Left $ "GeniusYield.Types.Key.verificationKeyFromRawBytesHex: unable to decode from hex string: " <> BS8.unpack bs <> ", error: " <> e
     Right bs' -> case verificationKeyFromRawBytes bs' of
-      Nothing -> Left $ "GeniusYield.Types.Key.verificationKeyFromRawBytesHex: unable to decode hash from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
+      Nothing -> Left $ "GeniusYield.Types.Key.verificationKeyFromRawBytesHex: unable to decode from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
       Just k -> Right k
 
 type family GYVerificationKeyToApi (kr :: GYKeyRole) where
@@ -329,6 +341,61 @@ verificationKeyToApi = case singGYKeyRole @kr of
 
 verificationKeyFromApi :: forall kr. SingGYKeyRoleI kr => GYVerificationKeyToApi kr -> GYVerificationKey kr
 verificationKeyFromApi = case singGYKeyRole @kr of
+  SingGYKeyRolePayment -> coerce
+  SingGYKeyRoleStaking -> coerce
+  SingGYKeyRoleDRep -> coerce
+
+newtype GYExtendedSigningKey (kr :: GYKeyRole) = GYExtendedSigningKey (Crypto.HD.XPrv)
+
+instance SingGYKeyRoleI kr => Show (GYExtendedSigningKey kr) where
+  showsPrec d k = showParen (d > 10) $ showString "GYExtendedSigningKey (" . shows (fromSingGYKeyRole (singGYKeyRole @kr)) . showString ") " . shows (extendedSigningKeyToRawBytesHex k)
+
+instance IsString (GYExtendedSigningKey kr) where
+  fromString = BS8.pack >>> extendedSigningKeyFromRawBytesHex >>> either error id
+
+instance SingGYKeyRoleI kr => Eq (GYExtendedSigningKey kr) where
+  (==) = (==) `on` show
+
+instance SingGYKeyRoleI kr => Ord (GYExtendedSigningKey kr) where
+  compare = compare `on` show
+
+extendedSigningKeyToRawBytes :: GYExtendedSigningKey kr -> BS8.ByteString
+extendedSigningKeyToRawBytes (GYExtendedSigningKey xprv) = Crypto.HD.unXPrv xprv
+
+extendedSigningKeyToRawBytesHex :: GYExtendedSigningKey kr -> BS8.ByteString
+extendedSigningKeyToRawBytesHex = extendedSigningKeyToRawBytes >>> BS16.encode
+
+extendedSigningKeyToRawBytesHexText :: GYExtendedSigningKey kr -> T.Text
+extendedSigningKeyToRawBytesHexText = extendedSigningKeyToRawBytesHex >>> TE.decodeUtf8
+
+-- | Decode from raw bytes.
+extendedSigningKeyFromRawBytes :: BS8.ByteString -> Maybe (GYExtendedSigningKey kr)
+extendedSigningKeyFromRawBytes bs = case GYExtendedSigningKey <$> Crypto.HD.xprv bs of
+  Left _ -> Nothing
+  Right k -> Just k
+
+-- | Decode from raw bytes represented as hex.
+extendedSigningKeyFromRawBytesHex :: BS8.ByteString -> Either String (GYExtendedSigningKey kr)
+extendedSigningKeyFromRawBytesHex bs =
+  case BS16.decode bs of
+    Left e -> Left $ "GeniusYield.Types.Key.extendedSigningKeyFromRawBytesHex: unable to decode from hex string: " <> BS8.unpack bs <> ", error: " <> e
+    Right bs' -> case extendedSigningKeyFromRawBytes bs' of
+      Nothing -> Left $ "GeniusYield.Types.Key.extendedSigningKeyFromRawBytesHex: unable to decode from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
+      Just k -> Right k
+
+type family GYExtendedSigningKeyToApi (kr :: GYKeyRole) where
+  GYExtendedSigningKeyToApi 'GYKeyRolePayment = Api.SigningKey Api.PaymentExtendedKey
+  GYExtendedSigningKeyToApi 'GYKeyRoleStaking = Api.SigningKey Api.StakeExtendedKey
+  GYExtendedSigningKeyToApi 'GYKeyRoleDRep = Api.SigningKey Api.DRepExtendedKey
+
+extendedSigningKeyToApi :: forall kr. SingGYKeyRoleI kr => GYExtendedSigningKey kr -> GYExtendedSigningKeyToApi kr
+extendedSigningKeyToApi = case singGYKeyRole @kr of
+  SingGYKeyRolePayment -> coerce
+  SingGYKeyRoleStaking -> coerce
+  SingGYKeyRoleDRep -> coerce
+
+extendedSigningKeyFromApi :: forall kr. SingGYKeyRoleI kr => GYExtendedSigningKeyToApi kr -> GYExtendedSigningKey kr
+extendedSigningKeyFromApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
@@ -392,18 +459,12 @@ instance ToShelleyWitnessSigningKey GYPaymentSigningKey where
   toShelleyWitnessSigningKey = signingKeyToApi >>> Api.WitnessPaymentKey
 
 -- Handle key for extended signing key
-newtype GYExtendedPaymentSigningKey = GYExtendedPaymentSigningKey (Api.SigningKey Api.PaymentExtendedKey)
-  deriving stock Show
-  deriving newtype IsString
 
-instance Eq GYExtendedPaymentSigningKey where
-  (==) = (==) `on` show
-
-instance Ord GYExtendedPaymentSigningKey where
-  compare = compare `on` show
+-- | @type GYExtendedPaymentSigningKey = GYExtendedSigningKey 'GYKeyRolePayment@
+type GYExtendedPaymentSigningKey = GYExtendedSigningKey 'GYKeyRolePayment
 
 instance ToShelleyWitnessSigningKey GYExtendedPaymentSigningKey where
-  toShelleyWitnessSigningKey (GYExtendedPaymentSigningKey skey) = Api.WitnessPaymentExtendedKey skey
+  toShelleyWitnessSigningKey = extendedSigningKeyToApi >>> Api.WitnessPaymentExtendedKey
 
 {- |
 
@@ -414,7 +475,7 @@ paymentSigningKeyFromApi :: Api.SigningKey Api.PaymentKey -> GYPaymentSigningKey
 paymentSigningKeyFromApi = signingKeyFromApi
 
 extendedPaymentSigningKeyFromApi :: Api.SigningKey Api.PaymentExtendedKey -> GYExtendedPaymentSigningKey
-extendedPaymentSigningKeyFromApi = coerce
+extendedPaymentSigningKeyFromApi = extendedSigningKeyFromApi
 
 {- |
 
@@ -425,7 +486,7 @@ paymentSigningKeyToApi :: GYPaymentSigningKey -> Api.SigningKey Api.PaymentKey
 paymentSigningKeyToApi = signingKeyToApi
 
 extendedPaymentSigningKeyToApi :: GYExtendedPaymentSigningKey -> Api.SigningKey Api.PaymentExtendedKey
-extendedPaymentSigningKeyToApi = coerce
+extendedPaymentSigningKeyToApi = extendedSigningKeyToApi
 
 paymentSigningKeyToLedger :: GYPaymentSigningKey -> Ledger.SignKeyDSIGN Ledger.StandardCrypto
 paymentSigningKeyToLedger = signingKeyToLedger
@@ -459,7 +520,7 @@ readExtendedPaymentSigningKey fp = do
   s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsPaymentExtendedKey) (Api.File fp)
   case s of
     Left err -> fail (show err) --- throws IOError
-    Right x -> return $ GYExtendedPaymentSigningKey x
+    Right x -> return $ extendedSigningKeyFromApi x
 
 -- | Writes a payment signing key to a file.
 writePaymentSigningKey :: FilePath -> GYPaymentSigningKey -> IO ()
@@ -540,19 +601,11 @@ type GYStakeSigningKey = GYSigningKey 'GYKeyRoleStaking
 instance ToShelleyWitnessSigningKey GYStakeSigningKey where
   toShelleyWitnessSigningKey = signingKeyToApi >>> Api.WitnessStakeKey
 
--- Handle key for extended signing key
-newtype GYExtendedStakeSigningKey = GYExtendedStakeSigningKey (Api.SigningKey Api.StakeExtendedKey)
-  deriving stock Show
-  deriving newtype IsString
-
-instance Eq GYExtendedStakeSigningKey where
-  (==) = (==) `on` show
-
-instance Ord GYExtendedStakeSigningKey where
-  compare = compare `on` show
+-- | @type GYExtendedStakeSigningKey = GYEExtendedSigningKey 'GYKeyRoleStaking@
+type GYExtendedStakeSigningKey = GYExtendedSigningKey 'GYKeyRoleStaking
 
 instance ToShelleyWitnessSigningKey GYExtendedStakeSigningKey where
-  toShelleyWitnessSigningKey (GYExtendedStakeSigningKey skey) = Api.WitnessStakeExtendedKey skey
+  toShelleyWitnessSigningKey = extendedSigningKeyToApi >>> Api.WitnessStakeExtendedKey
 
 {- |
 
@@ -563,7 +616,7 @@ stakeSigningKeyFromApi :: Api.SigningKey Api.StakeKey -> GYStakeSigningKey
 stakeSigningKeyFromApi = signingKeyFromApi
 
 extendedStakeSigningKeyFromApi :: Api.SigningKey Api.StakeExtendedKey -> GYExtendedStakeSigningKey
-extendedStakeSigningKeyFromApi = coerce
+extendedStakeSigningKeyFromApi = extendedSigningKeyFromApi
 
 {- |
 
@@ -574,7 +627,7 @@ stakeSigningKeyToApi :: GYStakeSigningKey -> Api.SigningKey Api.StakeKey
 stakeSigningKeyToApi = signingKeyToApi
 
 extendedStakeSigningKeyToApi :: GYExtendedStakeSigningKey -> Api.SigningKey Api.StakeExtendedKey
-extendedStakeSigningKeyToApi = coerce
+extendedStakeSigningKeyToApi = extendedSigningKeyToApi
 
 stakeSigningKeyToLedger :: GYStakeSigningKey -> Ledger.SignKeyDSIGN Ledger.StandardCrypto
 stakeSigningKeyToLedger = signingKeyToLedger
@@ -603,7 +656,7 @@ readExtendedStakeSigningKey fp = do
   s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsStakeExtendedKey) (Api.File fp)
   case s of
     Left err -> fail (show err) --- throws IOError
-    Right x -> return $ GYExtendedStakeSigningKey x
+    Right x -> return $ extendedSigningKeyFromApi x
 
 -- | Writes a stake signing key to a file.
 writeStakeSigningKey :: FilePath -> GYStakeSigningKey -> IO ()

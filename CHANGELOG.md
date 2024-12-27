@@ -5,6 +5,7 @@
   * We define a new type `GYCredential kr` and all other credentials such as `GYPaymentCredential` are type synonyms around it. 
   * Likewise types `GYSigningKey kr`, `GYVerificationKey kr`, `GYExtendedSigningKey kr` are newly introduced and previous relevant key types like `GYPaymentSigningKey` are simply type synonyms.
 * Constructor of `GYPubKeyHash` is no longer exported.
+* `readSomeSigningKey` is removed.
 
 ## 0.7.0
 

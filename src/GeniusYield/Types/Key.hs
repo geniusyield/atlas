@@ -189,7 +189,7 @@ instance (SingGYKeyRoleI kr, Api.SerialiseAsCBOR (GYSigningKeyToApi kr)) => Csv.
 instance Printf.PrintfArg (GYSigningKey kr) where
   formatArg = Printf.formatArg . signingKeyToRawBytesHexText
 
--- TODO: use coerce.
+-- TODO: use coerce, for some reason it's giving weird error.
 signingKeyToLedger :: GYSigningKey kr -> Ledger.SignKeyDSIGN Ledger.StandardCrypto
 signingKeyToLedger (GYSigningKey k) = k
 
@@ -282,8 +282,6 @@ instance (SingGYKeyRoleI kr, Api.SerialiseAsCBOR (GYVerificationKeyToApi kr)) =>
 instance Printf.PrintfArg (GYVerificationKey kr) where
   formatArg = Printf.formatArg . verificationKeyToRawBytesHexText
 
--- FIXME: Give show, isstring instance.
-
 verificationKeyToLedger :: GYVerificationKey kr -> Ledger.VKey (GYKeyRoleToLedger kr) Ledger.StandardCrypto
 verificationKeyToLedger = coerce
 
@@ -370,7 +368,7 @@ paymentVerificationKeyToLedger = coerce
 paymentVerificationKeyRawBytes :: GYPaymentVerificationKey -> BS8.ByteString
 paymentVerificationKeyRawBytes = Api.serialiseToRawBytes . paymentVerificationKeyToApi
 
--- FIXME: Would need revision once we modify GYPubKeyHash.
+-- TODO: Would need revision once we modify GYPubKeyHash.
 pubKeyHash :: GYPaymentVerificationKey -> GYPubKeyHash
 pubKeyHash = verificationKeyHash >>> keyHashToApi >>> pubKeyHashFromApi
 
@@ -486,8 +484,6 @@ GYVerificationKey (GYKeyRolePayment) "0717bc56ed4897c3dde0690e3d9ce61e28a55f520f
 -}
 paymentVerificationKey :: GYPaymentSigningKey -> GYPaymentVerificationKey
 paymentVerificationKey = getVerificationKey
-
--- FIXME:
 
 -- | Generates a new random payment signing key.
 generatePaymentSigningKey :: IO GYPaymentSigningKey

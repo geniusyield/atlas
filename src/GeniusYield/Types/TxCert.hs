@@ -12,11 +12,14 @@ module GeniusYield.Types.TxCert (
   mkStakeAddressRegistrationCertificate,
   mkStakeAddressDeregistrationCertificate,
   mkStakeAddressDelegationCertificate,
+  mkDRepRegisterationCertificate,
 ) where
 
+import GeniusYield.Types.Anchor (GYAnchor)
 import GeniusYield.Types.Certificate
-import GeniusYield.Types.Credential (GYStakeCredential)
+import GeniusYield.Types.Credential (GYCredential, GYStakeCredential)
 import GeniusYield.Types.Delegatee (GYDelegatee)
+import GeniusYield.Types.KeyRole (GYKeyRole (..))
 import GeniusYield.Types.TxCert.Internal
 
 -- | Post conway, newer stake address registration certificate also require a witness.
@@ -34,3 +37,14 @@ mkStakeAddressDeregistrationCertificate sc wit = GYTxCert (GYStakeAddressDeregis
 
 mkStakeAddressDelegationCertificate :: GYStakeCredential -> GYDelegatee -> GYTxCertWitness v -> GYTxCert v
 mkStakeAddressDelegationCertificate sc del wit = GYTxCert (GYStakeAddressDelegationCertificatePB sc del) (Just wit)
+
+{- | Note that delegation certificate requires following preconditions:
+
+1. DRep must not already be registered.
+
+2. Deposit amount should be that given by corresponding protocol parameter.
+
+3. Signature from the corresponding DRep key.
+-}
+mkDRepRegisterationCertificate :: GYCredential 'GYKeyRoleDRep -> Maybe GYAnchor -> GYTxCertWitness v -> GYTxCert v
+mkDRepRegisterationCertificate cred anchor wit = GYTxCert (GYDRepRegistrationCertificatePB cred anchor) (Just wit)

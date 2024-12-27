@@ -6,6 +6,7 @@
   * Likewise types `GYSigningKey kr`, `GYVerificationKey kr`, `GYExtendedSigningKey kr` are newly introduced and previous relevant key types like `GYPaymentSigningKey` are simply type synonyms.
 * Constructor of `GYPubKeyHash` is no longer exported.
 * `readSomeSigningKey` is removed.
+* Adds additional certificates such as those related to governance, drep participation, etc.
 
 ## 0.7.0
 

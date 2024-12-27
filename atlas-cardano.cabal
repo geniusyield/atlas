@@ -366,6 +366,7 @@ test-suite atlas-privnet-tests
   main-is:        atlas-privnet-tests.hs
   other-modules:
     GeniusYield.Test.Privnet.Blueprint
+    GeniusYield.Test.Privnet.DRep
     GeniusYield.Test.Privnet.SimpleScripts
     GeniusYield.Test.Privnet.Stake
     GeniusYield.Test.Privnet.Stake.Key

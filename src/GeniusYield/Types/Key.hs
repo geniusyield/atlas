@@ -18,6 +18,10 @@ module GeniusYield.Types.Key (
   GYSigningKeyToApi,
   signingKeyToApi,
   signingKeyFromApi,
+  generateSigningKey,
+  writeSigningKey,
+  signingKeyToLedgerKeyPair,
+  signingKeyFromLedgerKeyPair,
 
   -- * Verification key
   GYVerificationKey,
@@ -30,6 +34,9 @@ module GeniusYield.Types.Key (
   verificationKeyToRawBytesHexText,
   verificationKeyFromRawBytes,
   verificationKeyFromRawBytesHex,
+  GYVerificationKeyToApi,
+  verificationKeyToApi,
+  verificationKeyFromApi,
 
   -- * Extended signing key
   GYExtendedSigningKey,
@@ -41,6 +48,7 @@ module GeniusYield.Types.Key (
   GYExtendedSigningKeyToApi,
   extendedSigningKeyToApi,
   extendedSigningKeyFromApi,
+  writeExtendedSigningKey,
 
   -- * Payment verification key
   GYPaymentVerificationKey,
@@ -99,6 +107,7 @@ module GeniusYield.Types.Key (
 ) where
 
 import Cardano.Api qualified as Api
+import Cardano.Api.SerialiseTextEnvelope qualified as Api
 import Cardano.Crypto.Wallet qualified as Crypto.HD
 import Cardano.Ledger.Crypto qualified as Ledger
 import Cardano.Ledger.Keys qualified as Ledger
@@ -247,6 +256,36 @@ signingKeyFromApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
+
+instance SingGYKeyRoleI kr => ToShelleyWitnessSigningKey (GYSigningKey kr) where
+  toShelleyWitnessSigningKey (signingKeyToApi -> sk) = case singGYKeyRole @kr of
+    SingGYKeyRolePayment -> Api.WitnessPaymentKey sk
+    SingGYKeyRoleStaking -> Api.WitnessStakeKey sk
+    SingGYKeyRoleDRep -> Api.WitnessDRepKey sk
+
+generateSigningKey :: forall kr. SingGYKeyRoleI kr => IO (GYSigningKey kr)
+generateSigningKey =
+  signingKeyFromApi <$> case singGYKeyRole @kr of
+    SingGYKeyRolePayment -> Api.generateSigningKey (Api.proxyToAsType Proxy)
+    SingGYKeyRoleStaking -> Api.generateSigningKey (Api.proxyToAsType Proxy)
+    SingGYKeyRoleDRep -> Api.generateSigningKey (Api.proxyToAsType Proxy)
+
+writeSigningKey :: forall kr. (SingGYKeyRoleI kr, Api.HasTextEnvelope (GYSigningKeyToApi kr)) => FilePath -> GYSigningKey kr -> IO ()
+writeSigningKey file key = do
+  e <- Api.writeFileTextEnvelope (Api.File file) (Just $ Api.TextEnvelopeDescr $ "Signing Key (" <> show (fromSingGYKeyRole (singGYKeyRole @kr)) <> ")") $ signingKeyToApi key
+  case e of
+    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
+    Right () -> return ()
+
+signingKeyToLedgerKeyPair :: GYSigningKey kr -> TLedger.KeyPair (GYKeyRoleToLedger kr) Ledger.StandardCrypto
+signingKeyToLedgerKeyPair skey =
+  TLedger.KeyPair
+    { TLedger.vKey = verificationKeyToLedger $ getVerificationKey skey
+    , TLedger.sKey = signingKeyToLedger skey
+    }
+
+signingKeyFromLedgerKeyPair :: TLedger.KeyPair (GYKeyRoleToLedger kr) Ledger.StandardCrypto -> GYSigningKey kr
+signingKeyFromLedgerKeyPair = signingKeyFromLedger . TLedger.sKey
 
 newtype GYVerificationKey (kr :: GYKeyRole) = GYVerificationKey (Ledger.VKey (GYKeyRoleToLedger kr) Ledger.StandardCrypto)
   deriving newtype Eq
@@ -401,6 +440,19 @@ extendedSigningKeyFromApi = case singGYKeyRole @kr of
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
 
+instance SingGYKeyRoleI kr => ToShelleyWitnessSigningKey (GYExtendedSigningKey kr) where
+  toShelleyWitnessSigningKey (extendedSigningKeyToApi -> sk) = case singGYKeyRole @kr of
+    SingGYKeyRolePayment -> Api.WitnessPaymentExtendedKey sk
+    SingGYKeyRoleStaking -> Api.WitnessStakeExtendedKey sk
+    SingGYKeyRoleDRep -> Api.WitnessDRepExtendedKey sk
+
+writeExtendedSigningKey :: forall kr. (SingGYKeyRoleI kr, Api.HasTextEnvelope (GYExtendedSigningKeyToApi kr)) => FilePath -> GYExtendedSigningKey kr -> IO ()
+writeExtendedSigningKey file key = do
+  e <- Api.writeFileTextEnvelope (Api.File file) (Just $ Api.TextEnvelopeDescr $ "Extended Signing Key (" <> show (fromSingGYKeyRole (singGYKeyRole @kr)) <> ")") $ extendedSigningKeyToApi key
+  case e of
+    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
+    Right () -> return ()
+
 -------------------------------------------------------------------------------
 -- Payment verification key (public)
 -------------------------------------------------------------------------------
@@ -428,13 +480,13 @@ paymentVerificationKeyFromApi = verificationKeyFromApi
 "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
 -}
 paymentVerificationKeyToApi :: GYPaymentVerificationKey -> Api.VerificationKey Api.PaymentKey
-paymentVerificationKeyToApi = coerce
+paymentVerificationKeyToApi = verificationKeyToApi
 
-paymentVerificationKeyToLedger :: GYPaymentVerificationKey -> Ledger.VKey r Ledger.StandardCrypto
-paymentVerificationKeyToLedger = coerce
+paymentVerificationKeyToLedger :: GYPaymentVerificationKey -> Ledger.VKey Ledger.Payment Ledger.StandardCrypto
+paymentVerificationKeyToLedger = verificationKeyToLedger
 
 paymentVerificationKeyRawBytes :: GYPaymentVerificationKey -> BS8.ByteString
-paymentVerificationKeyRawBytes = Api.serialiseToRawBytes . paymentVerificationKeyToApi
+paymentVerificationKeyRawBytes = verificationKeyToRawBytes
 
 -- TODO: Would need revision once we modify GYPubKeyHash.
 pubKeyHash :: GYPaymentVerificationKey -> GYPubKeyHash
@@ -456,16 +508,8 @@ GYSigningKey (GYKeyRolePayment) "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133
 -}
 type GYPaymentSigningKey = GYSigningKey 'GYKeyRolePayment
 
-instance ToShelleyWitnessSigningKey GYPaymentSigningKey where
-  toShelleyWitnessSigningKey = signingKeyToApi >>> Api.WitnessPaymentKey
-
--- Handle key for extended signing key
-
 -- | @type GYExtendedPaymentSigningKey = GYExtendedSigningKey 'GYKeyRolePayment@
 type GYExtendedPaymentSigningKey = GYExtendedSigningKey 'GYKeyRolePayment
-
-instance ToShelleyWitnessSigningKey GYExtendedPaymentSigningKey where
-  toShelleyWitnessSigningKey = extendedSigningKeyToApi >>> Api.WitnessPaymentExtendedKey
 
 {- |
 
@@ -493,14 +537,10 @@ paymentSigningKeyToLedger :: GYPaymentSigningKey -> Ledger.SignKeyDSIGN Ledger.S
 paymentSigningKeyToLedger = signingKeyToLedger
 
 paymentSigningKeyToLedgerKeyPair :: GYPaymentSigningKey -> TLedger.KeyPair Ledger.Payment Ledger.StandardCrypto
-paymentSigningKeyToLedgerKeyPair skey =
-  TLedger.KeyPair
-    { TLedger.vKey = paymentVerificationKeyToLedger $ paymentVerificationKey skey
-    , TLedger.sKey = paymentSigningKeyToLedger skey
-    }
+paymentSigningKeyToLedgerKeyPair = signingKeyToLedgerKeyPair
 
 paymentSigningKeyFromLedgerKeyPair :: TLedger.KeyPair Ledger.Payment Ledger.StandardCrypto -> GYPaymentSigningKey
-paymentSigningKeyFromLedgerKeyPair = signingKeyFromLedger . TLedger.sKey
+paymentSigningKeyFromLedgerKeyPair = signingKeyFromLedgerKeyPair
 
 -- | Reads a payment signing key from a file.
 readPaymentSigningKey :: FilePath -> IO GYPaymentSigningKey
@@ -525,19 +565,11 @@ readExtendedPaymentSigningKey fp = do
 
 -- | Writes a payment signing key to a file.
 writePaymentSigningKey :: FilePath -> GYPaymentSigningKey -> IO ()
-writePaymentSigningKey file key = do
-  e <- Api.writeFileTextEnvelope (Api.File file) (Just "Payment Signing Key") $ paymentSigningKeyToApi key
-  case e of
-    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
-    Right () -> return ()
+writePaymentSigningKey = writeSigningKey
 
 -- | Writes a extended payment signing key to a file.
 writeExtendedPaymentSigningKey :: FilePath -> GYExtendedPaymentSigningKey -> IO ()
-writeExtendedPaymentSigningKey file key = do
-  e <- Api.writeFileTextEnvelope (Api.File file) (Just "Extended Payment Signing Key") $ extendedPaymentSigningKeyToApi key
-  case e of
-    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
-    Right () -> return ()
+writeExtendedPaymentSigningKey = writeExtendedSigningKey
 
 {- |
 
@@ -549,7 +581,7 @@ paymentVerificationKey = getVerificationKey
 
 -- | Generates a new random payment signing key.
 generatePaymentSigningKey :: IO GYPaymentSigningKey
-generatePaymentSigningKey = paymentSigningKeyFromApi <$> Api.generateSigningKey Api.AsPaymentKey
+generatePaymentSigningKey = generateSigningKey
 
 -------------------------------------------------------------------------------
 -- Stake verification key (public)
@@ -599,14 +631,8 @@ GYSigningKey (GYKeyRoleStaking) "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133
 -}
 type GYStakeSigningKey = GYSigningKey 'GYKeyRoleStaking
 
-instance ToShelleyWitnessSigningKey GYStakeSigningKey where
-  toShelleyWitnessSigningKey = signingKeyToApi >>> Api.WitnessStakeKey
-
 -- | @type GYExtendedStakeSigningKey = GYEExtendedSigningKey 'GYKeyRoleStaking@
 type GYExtendedStakeSigningKey = GYExtendedSigningKey 'GYKeyRoleStaking
-
-instance ToShelleyWitnessSigningKey GYExtendedStakeSigningKey where
-  toShelleyWitnessSigningKey = extendedSigningKeyToApi >>> Api.WitnessStakeExtendedKey
 
 {- |
 
@@ -634,14 +660,10 @@ stakeSigningKeyToLedger :: GYStakeSigningKey -> Ledger.SignKeyDSIGN Ledger.Stand
 stakeSigningKeyToLedger = signingKeyToLedger
 
 stakeSigningKeyToLedgerKeyPair :: GYStakeSigningKey -> TLedger.KeyPair Ledger.Staking Ledger.StandardCrypto
-stakeSigningKeyToLedgerKeyPair skey =
-  TLedger.KeyPair
-    { TLedger.vKey = stakeVerificationKeyToLedger $ stakeVerificationKey skey
-    , TLedger.sKey = stakeSigningKeyToLedger skey
-    }
+stakeSigningKeyToLedgerKeyPair = signingKeyToLedgerKeyPair
 
-stakeSigningKeyFromLedgerKeyPair :: TLedger.KeyPair r Ledger.StandardCrypto -> GYStakeSigningKey
-stakeSigningKeyFromLedgerKeyPair = signingKeyFromLedger . TLedger.sKey
+stakeSigningKeyFromLedgerKeyPair :: TLedger.KeyPair Ledger.Staking Ledger.StandardCrypto -> GYStakeSigningKey
+stakeSigningKeyFromLedgerKeyPair = signingKeyFromLedgerKeyPair
 
 -- | Reads a stake signing key from a file.
 readStakeSigningKey :: FilePath -> IO GYStakeSigningKey
@@ -661,19 +683,11 @@ readExtendedStakeSigningKey fp = do
 
 -- | Writes a stake signing key to a file.
 writeStakeSigningKey :: FilePath -> GYStakeSigningKey -> IO ()
-writeStakeSigningKey file key = do
-  e <- Api.writeFileTextEnvelope (Api.File file) (Just "Stake Signing Key") $ stakeSigningKeyToApi key
-  case e of
-    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
-    Right () -> return ()
+writeStakeSigningKey = writeSigningKey
 
 -- | Writes a extended stake signing key to a file.
 writeExtendedStakeSigningKey :: FilePath -> GYExtendedStakeSigningKey -> IO ()
-writeExtendedStakeSigningKey file key = do
-  e <- Api.writeFileTextEnvelope (Api.File file) (Just "Extended Stake Signing Key") $ extendedStakeSigningKeyToApi key
-  case e of
-    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
-    Right () -> return ()
+writeExtendedStakeSigningKey = writeExtendedSigningKey
 
 {- |
 
@@ -685,7 +699,7 @@ stakeVerificationKey = getVerificationKey
 
 -- | Generates a new random stake signing key.
 generateStakeSigningKey :: IO GYStakeSigningKey
-generateStakeSigningKey = stakeSigningKeyFromApi <$> Api.generateSigningKey Api.AsStakeKey
+generateStakeSigningKey = generateSigningKey
 
 data GYSomeSigningKey = forall a. (ToShelleyWitnessSigningKey a, Show a) => GYSomeSigningKey a
 

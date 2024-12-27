@@ -280,16 +280,17 @@ writeSigningKey file key = do
 
 readSigningKey :: forall kr. (SingGYKeyRoleI kr, Api.HasTextEnvelope (GYSigningKeyToApi kr)) => FilePath -> IO (GYSigningKey kr)
 readSigningKey fp = do
-  s <- Api.readFileTextEnvelope asType (Api.File fp)
+  s <- Api.readFileTextEnvelopeAnyOf asTypes (Api.File fp)
   case s of
     Left err -> fail (show err) --- throws IOError
     Right x -> return (signingKeyFromApi x)
  where
-  asType =
+  asTypes =
     case singGYKeyRole @kr of
-      SingGYKeyRolePayment -> Api.proxyToAsType Proxy
-      SingGYKeyRoleStaking -> Api.proxyToAsType Proxy
-      SingGYKeyRoleDRep -> Api.proxyToAsType Proxy
+      SingGYKeyRolePayment -> [Api.FromSomeType (Api.proxyToAsType Proxy) id, Api.FromSomeType (Api.AsSigningKey Api.AsGenesisUTxOKey) Api.castSigningKey]
+      SingGYKeyRoleStaking -> [Api.FromSomeType (Api.proxyToAsType Proxy) id]
+      -- for stake pool, I'd need to do @[Api.FromSomeType (Api.proxyToAsType Proxy) id, Api.FromSomeType (Api.AsSigningKey Api.AsGenesisDelegateKey) Api.castSigningKey]@
+      SingGYKeyRoleDRep -> [Api.FromSomeType (Api.proxyToAsType Proxy) id]
 
 signingKeyToLedgerKeyPair :: GYSigningKey kr -> TLedger.KeyPair (GYKeyRoleToLedger kr) Ledger.StandardCrypto
 signingKeyToLedgerKeyPair skey =

@@ -6,6 +6,52 @@ Maintainer  : support@geniusyield.co
 Stability   : develop
 -}
 module GeniusYield.Types.Key (
+  -- * Signing key
+  GYSigningKey,
+  signingKeyToLedger,
+  signingKeyFromLedger,
+  signingKeyToRawBytes,
+  signingKeyToRawBytesHex,
+  signingKeyToRawBytesHexText,
+  signingKeyFromRawBytes,
+  signingKeyFromRawBytesHex,
+  GYSigningKeyToApi,
+  signingKeyToApi,
+  signingKeyFromApi,
+  generateSigningKey,
+  writeSigningKey,
+  readSigningKey,
+  signingKeyToLedgerKeyPair,
+  signingKeyFromLedgerKeyPair,
+
+  -- * Verification key
+  GYVerificationKey,
+  verificationKeyToLedger,
+  verificationKeyFromLedger,
+  getVerificationKey,
+  verificationKeyHash,
+  verificationKeyToRawBytes,
+  verificationKeyToRawBytesHex,
+  verificationKeyToRawBytesHexText,
+  verificationKeyFromRawBytes,
+  verificationKeyFromRawBytesHex,
+  GYVerificationKeyToApi,
+  verificationKeyToApi,
+  verificationKeyFromApi,
+
+  -- * Extended signing key
+  GYExtendedSigningKey,
+  extendedSigningKeyToRawBytes,
+  extendedSigningKeyToRawBytesHex,
+  extendedSigningKeyToRawBytesHexText,
+  extendedSigningKeyFromRawBytes,
+  extendedSigningKeyFromRawBytesHex,
+  GYExtendedSigningKeyToApi,
+  extendedSigningKeyToApi,
+  extendedSigningKeyFromApi,
+  writeExtendedSigningKey,
+  readExtendedSigningKey,
+
   -- * Payment verification key
   GYPaymentVerificationKey,
   paymentVerificationKeyFromApi,
@@ -56,13 +102,14 @@ module GeniusYield.Types.Key (
   stakeVerificationKey,
   generateStakeSigningKey,
   GYSomeSigningKey (..),
-  readSomeSigningKey,
   GYSomePaymentSigningKey (..),
   readSomePaymentSigningKey,
   somePaymentSigningKeyToSomeSigningKey,
 ) where
 
 import Cardano.Api qualified as Api
+import Cardano.Api.SerialiseTextEnvelope qualified as Api
+import Cardano.Crypto.Wallet qualified as Crypto.HD
 import Cardano.Ledger.Crypto qualified as Ledger
 import Cardano.Ledger.Keys qualified as Ledger
 import Data.Aeson qualified as Aeson
@@ -75,14 +122,16 @@ import Data.Text.Encoding qualified as TE
 import Test.Cardano.Ledger.Core.KeyPair qualified as TLedger
 import Text.Printf qualified as Printf
 
+import Cardano.Crypto.DSIGN qualified as Crypto
 import GeniusYield.Imports
 import GeniusYield.Types.Key.Class (
   ToShelleyWitnessSigningKey,
   toShelleyWitnessSigningKey,
  )
+import GeniusYield.Types.KeyHash
+import GeniusYield.Types.KeyRole
 import GeniusYield.Types.PaymentKeyHash (
   GYPaymentKeyHash,
-  paymentKeyHashFromApi,
  )
 import GeniusYield.Types.PubKeyHash (
   GYPubKeyHash,
@@ -90,7 +139,6 @@ import GeniusYield.Types.PubKeyHash (
  )
 import GeniusYield.Types.StakeKeyHash (
   GYStakeKeyHash,
-  stakeKeyHashFromApi,
  )
 
 {- $setup
@@ -99,72 +147,197 @@ import GeniusYield.Types.StakeKeyHash (
 >>> import qualified Data.Aeson                 as Aeson
 >>> import qualified Data.ByteString.Lazy.Char8 as LBS8
 >>> import           Data.Either                (isRight)
+>>> import           GeniusYield.Types
 >>> import qualified Text.Printf                as Printf
 -}
 
--------------------------------------------------------------------------------
--- Payment verification key (public)
--------------------------------------------------------------------------------
+{- |
+
+>>> "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290" :: (GYSigningKey 'GYKeyRolePayment)
+GYSigningKey (GYKeyRolePayment) "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
+-}
+newtype GYSigningKey (kr :: GYKeyRole) = GYSigningKey (Ledger.SignKeyDSIGN Ledger.StandardCrypto)
+
+instance SingGYKeyRoleI kr => Show (GYSigningKey kr) where
+  showsPrec d k = showParen (d > 10) $ showString "GYSigningKey (" . shows (fromSingGYKeyRole (singGYKeyRole @kr)) . showString ") " . shows (signingKeyToRawBytesHex k)
+
+instance IsString (GYSigningKey kr) where
+  fromString = BS8.pack >>> signingKeyFromRawBytesHex >>> either error id
+
+instance SingGYKeyRoleI kr => Eq (GYSigningKey kr) where
+  (==) = (==) `on` show
+
+instance SingGYKeyRoleI kr => Ord (GYSigningKey kr) where
+  compare = compare `on` show
 
 {- |
 
->>> "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605" :: GYPaymentVerificationKey
-GYPaymentVerificationKey "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+>>> LBS8.putStrLn $ Aeson.encode ("5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290" :: GYPaymentSigningKey)
+"58205ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
 -}
-newtype GYPaymentVerificationKey = GYPaymentVerificationKey (Api.VerificationKey Api.PaymentKey)
-  deriving stock Show
-  deriving newtype (Eq, IsString)
+instance (SingGYKeyRoleI kr, Api.SerialiseAsCBOR (GYSigningKeyToApi kr)) => Aeson.ToJSON (GYSigningKey kr) where
+  toJSON = Aeson.String . TE.decodeUtf8 . BS16.encode . Api.serialiseToCBOR . signingKeyToApi
 
 {- |
 
->>> paymentVerificationKeyFromApi "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
-GYPaymentVerificationKey "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+>>> Aeson.eitherDecode @GYPaymentSigningKey "\"58205ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290\""
+Right (GYSigningKey (GYKeyRolePayment) "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290")
+
+>>> Aeson.eitherDecode @GYPaymentSigningKey "\"58205ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fceczzz\""
+Left "Error in $: invalid character at offset: 65"
 -}
-paymentVerificationKeyFromApi :: Api.VerificationKey Api.PaymentKey -> GYPaymentVerificationKey
-paymentVerificationKeyFromApi = coerce
+instance (SingGYKeyRoleI kr, Api.SerialiseAsCBOR (GYSigningKeyToApi kr)) => Aeson.FromJSON (GYSigningKey kr) where
+  parseJSON (Aeson.String t) = case BS16.decode $ BS8.pack $ T.unpack t of
+    Left err -> fail err
+    Right bs -> case Api.deserialiseFromCBOR (Api.proxyToAsType Proxy) bs of
+      Left err -> fail $ show err
+      Right skey -> return $ signingKeyFromApi skey
+  parseJSON _ = fail "signing key expected"
+
+instance (SingGYKeyRoleI kr, Api.SerialiseAsCBOR (GYSigningKeyToApi kr)) => Csv.ToField (GYSigningKey kr) where
+  toField = LBS.toStrict . Aeson.encode
+
+instance (SingGYKeyRoleI kr, Api.SerialiseAsCBOR (GYSigningKeyToApi kr)) => Csv.FromField (GYSigningKey kr) where
+  parseField k =
+    case Aeson.decode $ LBS.fromStrict k of
+      Just v -> pure v
+      Nothing -> fail $ "Error Parsing signingKey from CSV: " <> show k
 
 {- |
 
->>> paymentVerificationKeyToApi "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
-"0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+>>> Printf.printf "%s\n" ("5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290" :: GYPaymentSigningKey)
+5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290
 -}
-paymentVerificationKeyToApi :: GYPaymentVerificationKey -> Api.VerificationKey Api.PaymentKey
-paymentVerificationKeyToApi = coerce
+instance Printf.PrintfArg (GYSigningKey kr) where
+  formatArg = Printf.formatArg . signingKeyToRawBytesHexText
 
-paymentVerificationKeyToLedger :: GYPaymentVerificationKey -> Ledger.VKey r Ledger.StandardCrypto
-paymentVerificationKeyToLedger = coerce
+-- TODO: use coerce, for some reason it's giving weird error.
+signingKeyToLedger :: GYSigningKey kr -> Ledger.SignKeyDSIGN Ledger.StandardCrypto
+signingKeyToLedger (GYSigningKey k) = k
 
-paymentVerificationKeyRawBytes :: GYPaymentVerificationKey -> BS8.ByteString
-paymentVerificationKeyRawBytes = Api.serialiseToRawBytes . paymentVerificationKeyToApi
+-- TODO: use coerce.
+signingKeyFromLedger :: Ledger.SignKeyDSIGN Ledger.StandardCrypto -> GYSigningKey kr
+signingKeyFromLedger = GYSigningKey
 
-pubKeyHash :: GYPaymentVerificationKey -> GYPubKeyHash
-pubKeyHash = pubKeyHashFromApi . Api.verificationKeyHash . paymentVerificationKeyToApi
+signingKeyToRawBytes :: GYSigningKey kr -> BS8.ByteString
+signingKeyToRawBytes = signingKeyToLedger >>> Crypto.rawSerialiseSignKeyDSIGN
 
-paymentKeyHash :: GYPaymentVerificationKey -> GYPaymentKeyHash
-paymentKeyHash = paymentKeyHashFromApi . Api.verificationKeyHash . paymentVerificationKeyToApi
+signingKeyToRawBytesHex :: GYSigningKey kr -> BS8.ByteString
+signingKeyToRawBytesHex = signingKeyToRawBytes >>> BS16.encode
+
+signingKeyToRawBytesHexText :: GYSigningKey kr -> T.Text
+signingKeyToRawBytesHexText = signingKeyToRawBytesHex >>> TE.decodeUtf8
+
+-- | Decode from raw bytes.
+signingKeyFromRawBytes :: BS8.ByteString -> Maybe (GYSigningKey kr)
+signingKeyFromRawBytes bs = signingKeyFromLedger <$> Crypto.rawDeserialiseSignKeyDSIGN bs
+
+-- | Decode from raw bytes represented as hex.
+signingKeyFromRawBytesHex :: BS8.ByteString -> Either String (GYSigningKey kr)
+signingKeyFromRawBytesHex bs =
+  case BS16.decode bs of
+    Left e -> Left $ "GeniusYield.Types.Key.signingKeyFromRawBytesHex: unable to decode from hex string: " <> BS8.unpack bs <> ", error: " <> e
+    Right bs' -> case signingKeyFromRawBytes bs' of
+      Nothing -> Left $ "GeniusYield.Types.Key.signingKeyFromRawBytesHex: unable to decode from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
+      Just k -> Right k
+
+type family GYSigningKeyToApi (kr :: GYKeyRole) where
+  GYSigningKeyToApi 'GYKeyRolePayment = Api.SigningKey Api.PaymentKey
+  GYSigningKeyToApi 'GYKeyRoleStaking = Api.SigningKey Api.StakeKey
+  GYSigningKeyToApi 'GYKeyRoleDRep = Api.SigningKey Api.DRepKey
+
+signingKeyToApi :: forall kr. SingGYKeyRoleI kr => GYSigningKey kr -> GYSigningKeyToApi kr
+signingKeyToApi = case singGYKeyRole @kr of
+  SingGYKeyRolePayment -> coerce
+  SingGYKeyRoleStaking -> coerce
+  SingGYKeyRoleDRep -> coerce
+
+signingKeyFromApi :: forall kr. SingGYKeyRoleI kr => GYSigningKeyToApi kr -> GYSigningKey kr
+signingKeyFromApi = case singGYKeyRole @kr of
+  SingGYKeyRolePayment -> coerce
+  SingGYKeyRoleStaking -> coerce
+  SingGYKeyRoleDRep -> coerce
+
+instance SingGYKeyRoleI kr => ToShelleyWitnessSigningKey (GYSigningKey kr) where
+  toShelleyWitnessSigningKey (signingKeyToApi -> sk) = case singGYKeyRole @kr of
+    SingGYKeyRolePayment -> Api.WitnessPaymentKey sk
+    SingGYKeyRoleStaking -> Api.WitnessStakeKey sk
+    SingGYKeyRoleDRep -> Api.WitnessDRepKey sk
+
+generateSigningKey :: forall kr. SingGYKeyRoleI kr => IO (GYSigningKey kr)
+generateSigningKey =
+  signingKeyFromApi <$> case singGYKeyRole @kr of
+    SingGYKeyRolePayment -> Api.generateSigningKey (Api.proxyToAsType Proxy)
+    SingGYKeyRoleStaking -> Api.generateSigningKey (Api.proxyToAsType Proxy)
+    SingGYKeyRoleDRep -> Api.generateSigningKey (Api.proxyToAsType Proxy)
+
+writeSigningKey :: forall kr. (SingGYKeyRoleI kr, Api.HasTextEnvelope (GYSigningKeyToApi kr)) => FilePath -> GYSigningKey kr -> IO ()
+writeSigningKey file key = do
+  e <- Api.writeFileTextEnvelope (Api.File file) (Just $ Api.TextEnvelopeDescr $ "Signing Key (" <> show (fromSingGYKeyRole (singGYKeyRole @kr)) <> ")") $ signingKeyToApi key
+  case e of
+    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
+    Right () -> return ()
+
+readSigningKey :: forall kr. (SingGYKeyRoleI kr, Api.HasTextEnvelope (GYSigningKeyToApi kr)) => FilePath -> IO (GYSigningKey kr)
+readSigningKey fp = do
+  s <- Api.readFileTextEnvelopeAnyOf asTypes (Api.File fp)
+  case s of
+    Left err -> fail (show err) --- throws IOError
+    Right x -> return (signingKeyFromApi x)
+ where
+  asTypes =
+    case singGYKeyRole @kr of
+      SingGYKeyRolePayment -> [Api.FromSomeType (Api.proxyToAsType Proxy) id, Api.FromSomeType (Api.AsSigningKey Api.AsGenesisUTxOKey) Api.castSigningKey]
+      SingGYKeyRoleStaking -> [Api.FromSomeType (Api.proxyToAsType Proxy) id]
+      -- for stake pool, I'd need to do @[Api.FromSomeType (Api.proxyToAsType Proxy) id, Api.FromSomeType (Api.AsSigningKey Api.AsGenesisDelegateKey) Api.castSigningKey]@
+      SingGYKeyRoleDRep -> [Api.FromSomeType (Api.proxyToAsType Proxy) id]
+
+signingKeyToLedgerKeyPair :: GYSigningKey kr -> TLedger.KeyPair (GYKeyRoleToLedger kr) Ledger.StandardCrypto
+signingKeyToLedgerKeyPair skey =
+  TLedger.KeyPair
+    { TLedger.vKey = verificationKeyToLedger $ getVerificationKey skey
+    , TLedger.sKey = signingKeyToLedger skey
+    }
+
+signingKeyFromLedgerKeyPair :: TLedger.KeyPair (GYKeyRoleToLedger kr) Ledger.StandardCrypto -> GYSigningKey kr
+signingKeyFromLedgerKeyPair = signingKeyFromLedger . TLedger.sKey
+
+newtype GYVerificationKey (kr :: GYKeyRole) = GYVerificationKey (Ledger.VKey (GYKeyRoleToLedger kr) Ledger.StandardCrypto)
+  deriving newtype Eq
+
+instance SingGYKeyRoleI kr => Show (GYVerificationKey kr) where
+  showsPrec d k = showParen (d > 10) $ showString "GYVerificationKey (" . shows (fromSingGYKeyRole (singGYKeyRole @kr)) . showString ") " . shows (verificationKeyToRawBytesHex k)
+
+instance IsString (GYVerificationKey kr) where
+  fromString = BS8.pack >>> verificationKeyFromRawBytesHex >>> either error id
 
 {- |
 
 >>> LBS8.putStrLn $ Aeson.encode ("0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605" :: GYPaymentVerificationKey)
 "58200717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
 -}
-instance Aeson.ToJSON GYPaymentVerificationKey where
-  toJSON = Aeson.String . TE.decodeUtf8 . BS16.encode . Api.serialiseToCBOR . paymentVerificationKeyToApi
+instance
+  ( SingGYKeyRoleI kr
+  , Api.SerialiseAsCBOR (GYVerificationKeyToApi kr)
+  ) =>
+  Aeson.ToJSON (GYVerificationKey kr)
+  where
+  toJSON = Aeson.String . TE.decodeUtf8 . BS16.encode . Api.serialiseToCBOR . verificationKeyToApi
 
 {- |
 
 >>> Aeson.eitherDecode @GYPaymentVerificationKey "\"58200717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605\""
-Right (GYPaymentVerificationKey "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605")
+Right (GYVerificationKey (GYKeyRolePayment) "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605")
 
 >>> Aeson.eitherDecode @GYPaymentVerificationKey "\"58200717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193zzz\""
 Left "Error in $: invalid character at offset: 65"
 -}
-instance Aeson.FromJSON GYPaymentVerificationKey where
+instance (SingGYKeyRoleI kr, Api.SerialiseAsCBOR (GYVerificationKeyToApi kr)) => Aeson.FromJSON (GYVerificationKey kr) where
   parseJSON (Aeson.String t) = case BS16.decode $ BS8.pack $ T.unpack t of
     Left err -> fail err
-    Right bs -> case Api.deserialiseFromCBOR (Api.AsVerificationKey Api.AsPaymentKey) bs of
+    Right bs -> case Api.deserialiseFromCBOR (Api.proxyToAsType Proxy) bs of
       Left err -> fail $ show err
-      Right skey -> return $ GYPaymentVerificationKey skey
+      Right skey -> return $ verificationKeyFromApi skey
   parseJSON _ = fail "payment verification key expected"
 
 {- |
@@ -172,8 +345,183 @@ instance Aeson.FromJSON GYPaymentVerificationKey where
 >>> Printf.printf "%s\n" ("0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605" :: GYPaymentVerificationKey)
 0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605
 -}
-instance Printf.PrintfArg GYPaymentVerificationKey where
-  formatArg = Printf.formatArg . Api.serialiseToRawBytesHexText . paymentVerificationKeyToApi
+instance Printf.PrintfArg (GYVerificationKey kr) where
+  formatArg = Printf.formatArg . verificationKeyToRawBytesHexText
+
+verificationKeyToLedger :: GYVerificationKey kr -> Ledger.VKey (GYKeyRoleToLedger kr) Ledger.StandardCrypto
+verificationKeyToLedger = coerce
+
+verificationKeyFromLedger :: Ledger.VKey (GYKeyRoleToLedger kr) Ledger.StandardCrypto -> GYVerificationKey kr
+verificationKeyFromLedger = coerce
+
+getVerificationKey :: GYSigningKey kr -> GYVerificationKey kr
+getVerificationKey = signingKeyToLedger >>> (Ledger.VKey . Crypto.deriveVerKeyDSIGN) >>> verificationKeyFromLedger
+
+verificationKeyHash :: GYVerificationKey kr -> GYKeyHash kr
+verificationKeyHash = keyHashFromLedger . Ledger.hashKey . verificationKeyToLedger
+
+verificationKeyToRawBytes :: GYVerificationKey kr -> BS8.ByteString
+verificationKeyToRawBytes = verificationKeyToLedger >>> (\(Ledger.VKey vk) -> Crypto.rawSerialiseVerKeyDSIGN vk)
+
+verificationKeyToRawBytesHex :: GYVerificationKey kr -> BS8.ByteString
+verificationKeyToRawBytesHex = verificationKeyToRawBytes >>> BS16.encode
+
+verificationKeyToRawBytesHexText :: GYVerificationKey kr -> T.Text
+verificationKeyToRawBytesHexText = verificationKeyToRawBytesHex >>> TE.decodeUtf8
+
+-- | Decode from raw bytes.
+verificationKeyFromRawBytes :: BS8.ByteString -> Maybe (GYVerificationKey kr)
+verificationKeyFromRawBytes bs = verificationKeyFromLedger . Ledger.VKey <$> Crypto.rawDeserialiseVerKeyDSIGN bs
+
+-- | Decode from raw bytes represented as hex.
+verificationKeyFromRawBytesHex :: BS8.ByteString -> Either String (GYVerificationKey kr)
+verificationKeyFromRawBytesHex bs =
+  case BS16.decode bs of
+    Left e -> Left $ "GeniusYield.Types.Key.verificationKeyFromRawBytesHex: unable to decode from hex string: " <> BS8.unpack bs <> ", error: " <> e
+    Right bs' -> case verificationKeyFromRawBytes bs' of
+      Nothing -> Left $ "GeniusYield.Types.Key.verificationKeyFromRawBytesHex: unable to decode from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
+      Just k -> Right k
+
+type family GYVerificationKeyToApi (kr :: GYKeyRole) where
+  GYVerificationKeyToApi 'GYKeyRolePayment = Api.VerificationKey Api.PaymentKey
+  GYVerificationKeyToApi 'GYKeyRoleStaking = Api.VerificationKey Api.StakeKey
+  GYVerificationKeyToApi 'GYKeyRoleDRep = Api.VerificationKey Api.DRepKey
+
+verificationKeyToApi :: forall kr. SingGYKeyRoleI kr => GYVerificationKey kr -> GYVerificationKeyToApi kr
+verificationKeyToApi = case singGYKeyRole @kr of
+  SingGYKeyRolePayment -> coerce
+  SingGYKeyRoleStaking -> coerce
+  SingGYKeyRoleDRep -> coerce
+
+verificationKeyFromApi :: forall kr. SingGYKeyRoleI kr => GYVerificationKeyToApi kr -> GYVerificationKey kr
+verificationKeyFromApi = case singGYKeyRole @kr of
+  SingGYKeyRolePayment -> coerce
+  SingGYKeyRoleStaking -> coerce
+  SingGYKeyRoleDRep -> coerce
+
+-- | Extended signing key.
+newtype GYExtendedSigningKey (kr :: GYKeyRole) = GYExtendedSigningKey Crypto.HD.XPrv
+
+instance SingGYKeyRoleI kr => Show (GYExtendedSigningKey kr) where
+  showsPrec d k = showParen (d > 10) $ showString "GYExtendedSigningKey (" . shows (fromSingGYKeyRole (singGYKeyRole @kr)) . showString ") " . shows (extendedSigningKeyToRawBytesHex k)
+
+instance IsString (GYExtendedSigningKey kr) where
+  fromString = BS8.pack >>> extendedSigningKeyFromRawBytesHex >>> either error id
+
+instance SingGYKeyRoleI kr => Eq (GYExtendedSigningKey kr) where
+  (==) = (==) `on` show
+
+instance SingGYKeyRoleI kr => Ord (GYExtendedSigningKey kr) where
+  compare = compare `on` show
+
+extendedSigningKeyToRawBytes :: GYExtendedSigningKey kr -> BS8.ByteString
+extendedSigningKeyToRawBytes (GYExtendedSigningKey xprv) = Crypto.HD.unXPrv xprv
+
+extendedSigningKeyToRawBytesHex :: GYExtendedSigningKey kr -> BS8.ByteString
+extendedSigningKeyToRawBytesHex = extendedSigningKeyToRawBytes >>> BS16.encode
+
+extendedSigningKeyToRawBytesHexText :: GYExtendedSigningKey kr -> T.Text
+extendedSigningKeyToRawBytesHexText = extendedSigningKeyToRawBytesHex >>> TE.decodeUtf8
+
+-- | Decode from raw bytes.
+extendedSigningKeyFromRawBytes :: BS8.ByteString -> Maybe (GYExtendedSigningKey kr)
+extendedSigningKeyFromRawBytes bs = case GYExtendedSigningKey <$> Crypto.HD.xprv bs of
+  Left _ -> Nothing
+  Right k -> Just k
+
+-- | Decode from raw bytes represented as hex.
+extendedSigningKeyFromRawBytesHex :: BS8.ByteString -> Either String (GYExtendedSigningKey kr)
+extendedSigningKeyFromRawBytesHex bs =
+  case BS16.decode bs of
+    Left e -> Left $ "GeniusYield.Types.Key.extendedSigningKeyFromRawBytesHex: unable to decode from hex string: " <> BS8.unpack bs <> ", error: " <> e
+    Right bs' -> case extendedSigningKeyFromRawBytes bs' of
+      Nothing -> Left $ "GeniusYield.Types.Key.extendedSigningKeyFromRawBytesHex: unable to decode from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
+      Just k -> Right k
+
+type family GYExtendedSigningKeyToApi (kr :: GYKeyRole) where
+  GYExtendedSigningKeyToApi 'GYKeyRolePayment = Api.SigningKey Api.PaymentExtendedKey
+  GYExtendedSigningKeyToApi 'GYKeyRoleStaking = Api.SigningKey Api.StakeExtendedKey
+  GYExtendedSigningKeyToApi 'GYKeyRoleDRep = Api.SigningKey Api.DRepExtendedKey
+
+extendedSigningKeyToApi :: forall kr. SingGYKeyRoleI kr => GYExtendedSigningKey kr -> GYExtendedSigningKeyToApi kr
+extendedSigningKeyToApi = case singGYKeyRole @kr of
+  SingGYKeyRolePayment -> coerce
+  SingGYKeyRoleStaking -> coerce
+  SingGYKeyRoleDRep -> coerce
+
+extendedSigningKeyFromApi :: forall kr. SingGYKeyRoleI kr => GYExtendedSigningKeyToApi kr -> GYExtendedSigningKey kr
+extendedSigningKeyFromApi = case singGYKeyRole @kr of
+  SingGYKeyRolePayment -> coerce
+  SingGYKeyRoleStaking -> coerce
+  SingGYKeyRoleDRep -> coerce
+
+instance SingGYKeyRoleI kr => ToShelleyWitnessSigningKey (GYExtendedSigningKey kr) where
+  toShelleyWitnessSigningKey (extendedSigningKeyToApi -> sk) = case singGYKeyRole @kr of
+    SingGYKeyRolePayment -> Api.WitnessPaymentExtendedKey sk
+    SingGYKeyRoleStaking -> Api.WitnessStakeExtendedKey sk
+    SingGYKeyRoleDRep -> Api.WitnessDRepExtendedKey sk
+
+writeExtendedSigningKey :: forall kr. (SingGYKeyRoleI kr, Api.HasTextEnvelope (GYExtendedSigningKeyToApi kr)) => FilePath -> GYExtendedSigningKey kr -> IO ()
+writeExtendedSigningKey file key = do
+  e <- Api.writeFileTextEnvelope (Api.File file) (Just $ Api.TextEnvelopeDescr $ "Extended Signing Key (" <> show (fromSingGYKeyRole (singGYKeyRole @kr)) <> ")") $ extendedSigningKeyToApi key
+  case e of
+    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
+    Right () -> return ()
+
+readExtendedSigningKey :: forall kr. (SingGYKeyRoleI kr, Api.HasTextEnvelope (GYExtendedSigningKeyToApi kr)) => FilePath -> IO (GYExtendedSigningKey kr)
+readExtendedSigningKey fp = do
+  s <- Api.readFileTextEnvelope asType (Api.File fp)
+  case s of
+    Left err -> fail (show err) --- throws IOError
+    Right x -> return (extendedSigningKeyFromApi x)
+ where
+  asType =
+    case singGYKeyRole @kr of
+      SingGYKeyRolePayment -> Api.proxyToAsType Proxy
+      SingGYKeyRoleStaking -> Api.proxyToAsType Proxy
+      SingGYKeyRoleDRep -> Api.proxyToAsType Proxy
+
+-------------------------------------------------------------------------------
+-- Payment verification key (public)
+-------------------------------------------------------------------------------
+
+{- |
+
+@type GYPaymentVerificationKey = GYVerificationKey 'GYKeyRolePayment@
+
+>>> "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605" :: GYPaymentVerificationKey
+GYVerificationKey (GYKeyRolePayment) "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+-}
+type GYPaymentVerificationKey = GYVerificationKey 'GYKeyRolePayment
+
+{- |
+
+>>> paymentVerificationKeyFromApi "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+GYVerificationKey (GYKeyRolePayment) "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+-}
+paymentVerificationKeyFromApi :: Api.VerificationKey Api.PaymentKey -> GYPaymentVerificationKey
+paymentVerificationKeyFromApi = verificationKeyFromApi
+
+{- |
+
+>>> paymentVerificationKeyToApi "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+"0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+-}
+paymentVerificationKeyToApi :: GYPaymentVerificationKey -> Api.VerificationKey Api.PaymentKey
+paymentVerificationKeyToApi = verificationKeyToApi
+
+paymentVerificationKeyToLedger :: GYPaymentVerificationKey -> Ledger.VKey Ledger.Payment Ledger.StandardCrypto
+paymentVerificationKeyToLedger = verificationKeyToLedger
+
+paymentVerificationKeyRawBytes :: GYPaymentVerificationKey -> BS8.ByteString
+paymentVerificationKeyRawBytes = verificationKeyToRawBytes
+
+-- TODO: Would need revision once we modify GYPubKeyHash.
+pubKeyHash :: GYPaymentVerificationKey -> GYPubKeyHash
+pubKeyHash = verificationKeyHash >>> keyHashToApi >>> pubKeyHashFromApi
+
+paymentKeyHash :: GYPaymentVerificationKey -> GYPaymentKeyHash
+paymentKeyHash = verificationKeyHash
 
 -------------------------------------------------------------------------------
 -- Payment signing key (private)
@@ -181,46 +529,26 @@ instance Printf.PrintfArg GYPaymentVerificationKey where
 
 {- |
 
+@type GYPaymentSigningKey = GYSigningKey 'GYKeyRolePayment@
+
 >>> "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290" :: GYPaymentSigningKey
-GYPaymentSigningKey "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
+GYSigningKey (GYKeyRolePayment) "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
 -}
-newtype GYPaymentSigningKey = GYPaymentSigningKey (Api.SigningKey Api.PaymentKey)
-  deriving stock Show
-  deriving newtype IsString
+type GYPaymentSigningKey = GYSigningKey 'GYKeyRolePayment
 
-instance Eq GYPaymentSigningKey where
-  (==) = (==) `on` show
-
-instance Ord GYPaymentSigningKey where
-  compare = compare `on` show
-
-instance ToShelleyWitnessSigningKey GYPaymentSigningKey where
-  toShelleyWitnessSigningKey (GYPaymentSigningKey skey) = Api.WitnessPaymentKey skey
-
--- Handle key for extended signing key
-newtype GYExtendedPaymentSigningKey = GYExtendedPaymentSigningKey (Api.SigningKey Api.PaymentExtendedKey)
-  deriving stock Show
-  deriving newtype IsString
-
-instance Eq GYExtendedPaymentSigningKey where
-  (==) = (==) `on` show
-
-instance Ord GYExtendedPaymentSigningKey where
-  compare = compare `on` show
-
-instance ToShelleyWitnessSigningKey GYExtendedPaymentSigningKey where
-  toShelleyWitnessSigningKey (GYExtendedPaymentSigningKey skey) = Api.WitnessPaymentExtendedKey skey
+-- | @type GYExtendedPaymentSigningKey = GYExtendedSigningKey 'GYKeyRolePayment@
+type GYExtendedPaymentSigningKey = GYExtendedSigningKey 'GYKeyRolePayment
 
 {- |
 
 >>> paymentSigningKeyFromApi "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
-GYPaymentSigningKey "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
+GYSigningKey (GYKeyRolePayment) "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
 -}
 paymentSigningKeyFromApi :: Api.SigningKey Api.PaymentKey -> GYPaymentSigningKey
-paymentSigningKeyFromApi = coerce
+paymentSigningKeyFromApi = signingKeyFromApi
 
 extendedPaymentSigningKeyFromApi :: Api.SigningKey Api.PaymentExtendedKey -> GYExtendedPaymentSigningKey
-extendedPaymentSigningKeyFromApi = coerce
+extendedPaymentSigningKeyFromApi = extendedSigningKeyFromApi
 
 {- |
 
@@ -228,113 +556,47 @@ extendedPaymentSigningKeyFromApi = coerce
 "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
 -}
 paymentSigningKeyToApi :: GYPaymentSigningKey -> Api.SigningKey Api.PaymentKey
-paymentSigningKeyToApi = coerce
+paymentSigningKeyToApi = signingKeyToApi
 
 extendedPaymentSigningKeyToApi :: GYExtendedPaymentSigningKey -> Api.SigningKey Api.PaymentExtendedKey
-extendedPaymentSigningKeyToApi = coerce
+extendedPaymentSigningKeyToApi = extendedSigningKeyToApi
 
 paymentSigningKeyToLedger :: GYPaymentSigningKey -> Ledger.SignKeyDSIGN Ledger.StandardCrypto
-paymentSigningKeyToLedger = coerce
+paymentSigningKeyToLedger = signingKeyToLedger
 
-paymentSigningKeyToLedgerKeyPair :: GYPaymentSigningKey -> TLedger.KeyPair r Ledger.StandardCrypto
-paymentSigningKeyToLedgerKeyPair skey =
-  TLedger.KeyPair
-    { TLedger.vKey = paymentVerificationKeyToLedger $ paymentVerificationKey skey
-    , TLedger.sKey = paymentSigningKeyToLedger skey
-    }
+paymentSigningKeyToLedgerKeyPair :: GYPaymentSigningKey -> TLedger.KeyPair Ledger.Payment Ledger.StandardCrypto
+paymentSigningKeyToLedgerKeyPair = signingKeyToLedgerKeyPair
 
-paymentSigningKeyFromLedgerKeyPair :: TLedger.KeyPair r Ledger.StandardCrypto -> GYPaymentSigningKey
-paymentSigningKeyFromLedgerKeyPair = coerce . TLedger.sKey
+paymentSigningKeyFromLedgerKeyPair :: TLedger.KeyPair Ledger.Payment Ledger.StandardCrypto -> GYPaymentSigningKey
+paymentSigningKeyFromLedgerKeyPair = signingKeyFromLedgerKeyPair
 
 -- | Reads a payment signing key from a file.
 readPaymentSigningKey :: FilePath -> IO GYPaymentSigningKey
-readPaymentSigningKey fp = do
-  s <- Api.readFileTextEnvelopeAnyOf acceptedTypes (Api.File fp)
-  case s of
-    Left err -> fail (show err) --- throws IOError
-    Right x -> return (GYPaymentSigningKey x)
- where
-  acceptedTypes =
-    [ Api.FromSomeType (Api.AsSigningKey Api.AsGenesisUTxOKey) Api.castSigningKey
-    , Api.FromSomeType (Api.AsSigningKey Api.AsPaymentKey) id
-    ]
+readPaymentSigningKey = readSigningKey
 
 -- | Reads extended payment signing key from file
 readExtendedPaymentSigningKey :: FilePath -> IO GYExtendedPaymentSigningKey
-readExtendedPaymentSigningKey fp = do
-  s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsPaymentExtendedKey) (Api.File fp)
-  case s of
-    Left err -> fail (show err) --- throws IOError
-    Right x -> return $ GYExtendedPaymentSigningKey x
+readExtendedPaymentSigningKey = readExtendedSigningKey
 
 -- | Writes a payment signing key to a file.
 writePaymentSigningKey :: FilePath -> GYPaymentSigningKey -> IO ()
-writePaymentSigningKey file key = do
-  e <- Api.writeFileTextEnvelope (Api.File file) (Just "Payment Signing Key") $ paymentSigningKeyToApi key
-  case e of
-    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
-    Right () -> return ()
+writePaymentSigningKey = writeSigningKey
 
 -- | Writes a extended payment signing key to a file.
 writeExtendedPaymentSigningKey :: FilePath -> GYExtendedPaymentSigningKey -> IO ()
-writeExtendedPaymentSigningKey file key = do
-  e <- Api.writeFileTextEnvelope (Api.File file) (Just "Extended Payment Signing Key") $ extendedPaymentSigningKeyToApi key
-  case e of
-    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
-    Right () -> return ()
+writeExtendedPaymentSigningKey = writeExtendedSigningKey
 
 {- |
 
 >>> paymentVerificationKey "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
-GYPaymentVerificationKey "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+GYVerificationKey (GYKeyRolePayment) "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
 -}
 paymentVerificationKey :: GYPaymentSigningKey -> GYPaymentVerificationKey
-paymentVerificationKey = GYPaymentVerificationKey . Api.getVerificationKey . paymentSigningKeyToApi
-
-{- |
-
->>> LBS8.putStrLn $ Aeson.encode ("5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290" :: GYPaymentSigningKey)
-"58205ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
--}
-instance Aeson.ToJSON GYPaymentSigningKey where
-  toJSON = Aeson.String . TE.decodeUtf8 . BS16.encode . Api.serialiseToCBOR . paymentSigningKeyToApi
-
-{- |
-
->>> Aeson.eitherDecode @GYPaymentSigningKey "\"58205ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290\""
-Right (GYPaymentSigningKey "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290")
-
->>> Aeson.eitherDecode @GYPaymentSigningKey "\"58205ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fceczzz\""
-Left "Error in $: invalid character at offset: 65"
--}
-instance Aeson.FromJSON GYPaymentSigningKey where
-  parseJSON (Aeson.String t) = case BS16.decode $ BS8.pack $ T.unpack t of
-    Left err -> fail err
-    Right bs -> case Api.deserialiseFromCBOR (Api.AsSigningKey Api.AsPaymentKey) bs of
-      Left err -> fail $ show err
-      Right skey -> return $ GYPaymentSigningKey skey
-  parseJSON _ = fail "payment signing key expected"
-
-instance Csv.ToField GYPaymentSigningKey where
-  toField = LBS.toStrict . Aeson.encode
-
-instance Csv.FromField GYPaymentSigningKey where
-  parseField k =
-    case Aeson.decode $ LBS.fromStrict k of
-      Just v -> pure v
-      Nothing -> fail $ "Error Parsing paymentSigningKey from CSV: " <> show k
-
-{- |
-
->>> Printf.printf "%s\n" ("5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290" :: GYPaymentSigningKey)
-5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290
--}
-instance Printf.PrintfArg GYPaymentSigningKey where
-  formatArg = Printf.formatArg . Api.serialiseToRawBytesHexText . paymentSigningKeyToApi
+paymentVerificationKey = getVerificationKey
 
 -- | Generates a new random payment signing key.
 generatePaymentSigningKey :: IO GYPaymentSigningKey
-generatePaymentSigningKey = paymentSigningKeyFromApi <$> Api.generateSigningKey Api.AsPaymentKey
+generatePaymentSigningKey = generateSigningKey
 
 -------------------------------------------------------------------------------
 -- Stake verification key (public)
@@ -342,20 +604,20 @@ generatePaymentSigningKey = paymentSigningKeyFromApi <$> Api.generateSigningKey 
 
 {- |
 
+@type GYStakeVerificationKey = GYVerificationKey 'GYKeyRoleStaking@
+
 >>> "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605" :: GYStakeVerificationKey
-GYStakeVerificationKey "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+GYVerificationKey (GYKeyRoleStaking) "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
 -}
-newtype GYStakeVerificationKey = GYStakeVerificationKey (Api.VerificationKey Api.StakeKey)
-  deriving stock Show
-  deriving newtype (Eq, IsString)
+type GYStakeVerificationKey = GYVerificationKey 'GYKeyRoleStaking
 
 {- |
 
 >>> stakeVerificationKeyFromApi "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
-GYStakeVerificationKey "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+GYVerificationKey (GYKeyRoleStaking) "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
 -}
 stakeVerificationKeyFromApi :: Api.VerificationKey Api.StakeKey -> GYStakeVerificationKey
-stakeVerificationKeyFromApi = coerce
+stakeVerificationKeyFromApi = verificationKeyFromApi
 
 {- |
 
@@ -363,45 +625,13 @@ stakeVerificationKeyFromApi = coerce
 "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
 -}
 stakeVerificationKeyToApi :: GYStakeVerificationKey -> Api.VerificationKey Api.StakeKey
-stakeVerificationKeyToApi = coerce
+stakeVerificationKeyToApi = verificationKeyToApi
 
-stakeVerificationKeyToLedger :: GYStakeVerificationKey -> Ledger.VKey r Ledger.StandardCrypto
-stakeVerificationKeyToLedger = coerce
+stakeVerificationKeyToLedger :: GYStakeVerificationKey -> Ledger.VKey Ledger.Staking Ledger.StandardCrypto
+stakeVerificationKeyToLedger = verificationKeyToLedger
 
 stakeKeyHash :: GYStakeVerificationKey -> GYStakeKeyHash
-stakeKeyHash = stakeKeyHashFromApi . Api.verificationKeyHash . stakeVerificationKeyToApi
-
-{- |
-
->>> LBS8.putStrLn $ Aeson.encode ("0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605" :: GYStakeVerificationKey)
-"58200717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
--}
-instance Aeson.ToJSON GYStakeVerificationKey where
-  toJSON = Aeson.String . TE.decodeUtf8 . BS16.encode . Api.serialiseToCBOR . stakeVerificationKeyToApi
-
-{- |
-
->>> Aeson.eitherDecode @GYStakeVerificationKey "\"58200717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605\""
-Right (GYStakeVerificationKey "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605")
-
->>> Aeson.eitherDecode @GYStakeVerificationKey "\"58200717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193zzz\""
-Left "Error in $: invalid character at offset: 65"
--}
-instance Aeson.FromJSON GYStakeVerificationKey where
-  parseJSON (Aeson.String t) = case BS16.decode $ BS8.pack $ T.unpack t of
-    Left err -> fail err
-    Right bs -> case Api.deserialiseFromCBOR (Api.AsVerificationKey Api.AsStakeKey) bs of
-      Left err -> fail $ show err
-      Right skey -> return $ GYStakeVerificationKey skey
-  parseJSON _ = fail "stake verification key expected"
-
-{- |
-
->>> Printf.printf "%s\n" ("0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605" :: GYStakeVerificationKey)
-0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605
--}
-instance Printf.PrintfArg GYStakeVerificationKey where
-  formatArg = Printf.formatArg . Api.serialiseToRawBytesHexText . stakeVerificationKeyToApi
+stakeKeyHash = verificationKeyHash
 
 -------------------------------------------------------------------------------
 -- Stake signing key (private)
@@ -409,46 +639,26 @@ instance Printf.PrintfArg GYStakeVerificationKey where
 
 {- |
 
+@type GYStakeSigningKey = GYSigningKey 'GYKeyRoleStaking@
+
 >>> "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290" :: GYStakeSigningKey
-GYStakeSigningKey "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
+GYSigningKey (GYKeyRoleStaking) "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
 -}
-newtype GYStakeSigningKey = GYStakeSigningKey (Api.SigningKey Api.StakeKey)
-  deriving stock Show
-  deriving newtype IsString
+type GYStakeSigningKey = GYSigningKey 'GYKeyRoleStaking
 
-instance Eq GYStakeSigningKey where
-  (==) = (==) `on` show
-
-instance Ord GYStakeSigningKey where
-  compare = compare `on` show
-
-instance ToShelleyWitnessSigningKey GYStakeSigningKey where
-  toShelleyWitnessSigningKey (GYStakeSigningKey skey) = Api.WitnessStakeKey skey
-
--- Handle key for extended signing key
-newtype GYExtendedStakeSigningKey = GYExtendedStakeSigningKey (Api.SigningKey Api.StakeExtendedKey)
-  deriving stock Show
-  deriving newtype IsString
-
-instance Eq GYExtendedStakeSigningKey where
-  (==) = (==) `on` show
-
-instance Ord GYExtendedStakeSigningKey where
-  compare = compare `on` show
-
-instance ToShelleyWitnessSigningKey GYExtendedStakeSigningKey where
-  toShelleyWitnessSigningKey (GYExtendedStakeSigningKey skey) = Api.WitnessStakeExtendedKey skey
+-- | @type GYExtendedStakeSigningKey = GYEExtendedSigningKey 'GYKeyRoleStaking@
+type GYExtendedStakeSigningKey = GYExtendedSigningKey 'GYKeyRoleStaking
 
 {- |
 
 >>> stakeSigningKeyFromApi "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
-GYStakeSigningKey "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
+GYSigningKey (GYKeyRoleStaking) "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
 -}
 stakeSigningKeyFromApi :: Api.SigningKey Api.StakeKey -> GYStakeSigningKey
-stakeSigningKeyFromApi = coerce
+stakeSigningKeyFromApi = signingKeyFromApi
 
 extendedStakeSigningKeyFromApi :: Api.SigningKey Api.StakeExtendedKey -> GYExtendedStakeSigningKey
-extendedStakeSigningKeyFromApi = coerce
+extendedStakeSigningKeyFromApi = extendedSigningKeyFromApi
 
 {- |
 
@@ -456,127 +666,52 @@ extendedStakeSigningKeyFromApi = coerce
 "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
 -}
 stakeSigningKeyToApi :: GYStakeSigningKey -> Api.SigningKey Api.StakeKey
-stakeSigningKeyToApi = coerce
+stakeSigningKeyToApi = signingKeyToApi
 
 extendedStakeSigningKeyToApi :: GYExtendedStakeSigningKey -> Api.SigningKey Api.StakeExtendedKey
-extendedStakeSigningKeyToApi = coerce
+extendedStakeSigningKeyToApi = extendedSigningKeyToApi
 
 stakeSigningKeyToLedger :: GYStakeSigningKey -> Ledger.SignKeyDSIGN Ledger.StandardCrypto
-stakeSigningKeyToLedger = coerce
+stakeSigningKeyToLedger = signingKeyToLedger
 
-stakeSigningKeyToLedgerKeyPair :: GYStakeSigningKey -> TLedger.KeyPair r Ledger.StandardCrypto
-stakeSigningKeyToLedgerKeyPair skey =
-  TLedger.KeyPair
-    { TLedger.vKey = stakeVerificationKeyToLedger $ stakeVerificationKey skey
-    , TLedger.sKey = stakeSigningKeyToLedger skey
-    }
+stakeSigningKeyToLedgerKeyPair :: GYStakeSigningKey -> TLedger.KeyPair Ledger.Staking Ledger.StandardCrypto
+stakeSigningKeyToLedgerKeyPair = signingKeyToLedgerKeyPair
 
-stakeSigningKeyFromLedgerKeyPair :: TLedger.KeyPair r Ledger.StandardCrypto -> GYStakeSigningKey
-stakeSigningKeyFromLedgerKeyPair = coerce . TLedger.sKey
+stakeSigningKeyFromLedgerKeyPair :: TLedger.KeyPair Ledger.Staking Ledger.StandardCrypto -> GYStakeSigningKey
+stakeSigningKeyFromLedgerKeyPair = signingKeyFromLedgerKeyPair
 
 -- | Reads a stake signing key from a file.
 readStakeSigningKey :: FilePath -> IO GYStakeSigningKey
-readStakeSigningKey fp = do
-  s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsStakeKey) (Api.File fp)
-  case s of
-    Left err -> fail (show err) --- throws IOError
-    Right x -> return (GYStakeSigningKey x)
+readStakeSigningKey = readSigningKey
 
 -- | Reads extended stake signing key from file
 readExtendedStakeSigningKey :: FilePath -> IO GYExtendedStakeSigningKey
-readExtendedStakeSigningKey fp = do
-  s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsStakeExtendedKey) (Api.File fp)
-  case s of
-    Left err -> fail (show err) --- throws IOError
-    Right x -> return $ GYExtendedStakeSigningKey x
+readExtendedStakeSigningKey = readExtendedSigningKey
 
 -- | Writes a stake signing key to a file.
 writeStakeSigningKey :: FilePath -> GYStakeSigningKey -> IO ()
-writeStakeSigningKey file key = do
-  e <- Api.writeFileTextEnvelope (Api.File file) (Just "Stake Signing Key") $ stakeSigningKeyToApi key
-  case e of
-    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
-    Right () -> return ()
+writeStakeSigningKey = writeSigningKey
 
 -- | Writes a extended stake signing key to a file.
 writeExtendedStakeSigningKey :: FilePath -> GYExtendedStakeSigningKey -> IO ()
-writeExtendedStakeSigningKey file key = do
-  e <- Api.writeFileTextEnvelope (Api.File file) (Just "Extended Stake Signing Key") $ extendedStakeSigningKeyToApi key
-  case e of
-    Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
-    Right () -> return ()
+writeExtendedStakeSigningKey = writeExtendedSigningKey
 
 {- |
 
 >>> stakeVerificationKey "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
-GYStakeVerificationKey "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
+GYVerificationKey (GYKeyRoleStaking) "0717bc56ed4897c3dde0690e3d9ce61e28a55f520fde454f6b5b61305b193605"
 -}
 stakeVerificationKey :: GYStakeSigningKey -> GYStakeVerificationKey
-stakeVerificationKey = GYStakeVerificationKey . Api.getVerificationKey . stakeSigningKeyToApi
-
-{- |
-
->>> LBS8.putStrLn $ Aeson.encode ("5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290" :: GYStakeSigningKey)
-"58205ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
--}
-instance Aeson.ToJSON GYStakeSigningKey where
-  toJSON = Aeson.String . TE.decodeUtf8 . BS16.encode . Api.serialiseToCBOR . stakeSigningKeyToApi
-
-{- |
-
->>> Aeson.eitherDecode @GYStakeSigningKey "\"58205ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290\""
-Right (GYStakeSigningKey "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290")
-
->>> Aeson.eitherDecode @GYStakeSigningKey "\"58205ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fceczzz\""
-Left "Error in $: invalid character at offset: 65"
--}
-instance Aeson.FromJSON GYStakeSigningKey where
-  parseJSON (Aeson.String t) = case BS16.decode $ BS8.pack $ T.unpack t of
-    Left err -> fail err
-    Right bs -> case Api.deserialiseFromCBOR (Api.AsSigningKey Api.AsStakeKey) bs of
-      Left err -> fail $ show err
-      Right skey -> return $ GYStakeSigningKey skey
-  parseJSON _ = fail "stake signing key expected"
-
-instance Csv.ToField GYStakeSigningKey where
-  toField = LBS.toStrict . Aeson.encode
-
-instance Csv.FromField GYStakeSigningKey where
-  parseField k =
-    case Aeson.decode $ LBS.fromStrict k of
-      Just v -> pure v
-      Nothing -> fail $ "Error Parsing stakeSigningKey from CSV: " <> show k
-
-{- |
-
->>> Printf.printf "%s\n" ("5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290" :: GYStakeSigningKey)
-5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290
--}
-instance Printf.PrintfArg GYStakeSigningKey where
-  formatArg = Printf.formatArg . Api.serialiseToRawBytesHexText . stakeSigningKeyToApi
+stakeVerificationKey = getVerificationKey
 
 -- | Generates a new random stake signing key.
 generateStakeSigningKey :: IO GYStakeSigningKey
-generateStakeSigningKey = stakeSigningKeyFromApi <$> Api.generateSigningKey Api.AsStakeKey
+generateStakeSigningKey = generateSigningKey
 
 data GYSomeSigningKey = forall a. (ToShelleyWitnessSigningKey a, Show a) => GYSomeSigningKey a
 
 instance ToShelleyWitnessSigningKey GYSomeSigningKey where
   toShelleyWitnessSigningKey (GYSomeSigningKey skey) = toShelleyWitnessSigningKey skey
-
-readSomeSigningKey :: FilePath -> IO GYSomeSigningKey
-readSomeSigningKey file = do
-  e <-
-    Api.readFileTextEnvelopeAnyOf
-      [ Api.FromSomeType (Api.AsSigningKey Api.AsPaymentKey) $ GYSomeSigningKey . paymentSigningKeyFromApi
-      , Api.FromSomeType (Api.AsSigningKey Api.AsPaymentExtendedKey) $ GYSomeSigningKey . extendedPaymentSigningKeyFromApi
-      , Api.FromSomeType (Api.AsSigningKey Api.AsStakeKey) $ GYSomeSigningKey . stakeSigningKeyFromApi
-      , Api.FromSomeType (Api.AsSigningKey Api.AsStakeExtendedKey) $ GYSomeSigningKey . extendedStakeSigningKeyFromApi
-      ]
-      (Api.File file)
-  case e of
-    Left err -> throwIO $ userError $ show err
-    Right skey -> return skey
 
 data GYSomePaymentSigningKey = AGYPaymentSigningKey !GYPaymentSigningKey | AGYExtendedPaymentSigningKey !GYExtendedPaymentSigningKey
   deriving stock (Eq, Show, Ord)

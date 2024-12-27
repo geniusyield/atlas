@@ -209,7 +209,7 @@ mkTestFor name action =
     logDoc = Clb.ppLog $ Clb.mockInfo mock
     logString = renderString $ layoutPretty options logDoc
 
-mkSimpleWallet :: TL.KeyPair r L.StandardCrypto -> User
+mkSimpleWallet :: TL.KeyPair L.S.Payment L.StandardCrypto -> User
 mkSimpleWallet kp =
   let key = paymentSigningKeyFromLedgerKeyPair kp
    in User'

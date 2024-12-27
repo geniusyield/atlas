@@ -20,6 +20,7 @@ module GeniusYield.Types.Key (
   signingKeyFromApi,
   generateSigningKey,
   writeSigningKey,
+  readSigningKey,
   signingKeyToLedgerKeyPair,
   signingKeyFromLedgerKeyPair,
 
@@ -49,6 +50,7 @@ module GeniusYield.Types.Key (
   extendedSigningKeyToApi,
   extendedSigningKeyFromApi,
   writeExtendedSigningKey,
+  readExtendedSigningKey,
 
   -- * Payment verification key
   GYPaymentVerificationKey,
@@ -277,6 +279,19 @@ writeSigningKey file key = do
     Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
     Right () -> return ()
 
+readSigningKey :: forall kr. (SingGYKeyRoleI kr, Api.HasTextEnvelope (GYSigningKeyToApi kr)) => FilePath -> IO (GYSigningKey kr)
+readSigningKey fp = do
+  s <- Api.readFileTextEnvelope asType (Api.File fp)
+  case s of
+    Left err -> fail (show err) --- throws IOError
+    Right x -> return (signingKeyFromApi x)
+ where
+  asType =
+    case singGYKeyRole @kr of
+      SingGYKeyRolePayment -> Api.proxyToAsType Proxy
+      SingGYKeyRoleStaking -> Api.proxyToAsType Proxy
+      SingGYKeyRoleDRep -> Api.proxyToAsType Proxy
+
 signingKeyToLedgerKeyPair :: GYSigningKey kr -> TLedger.KeyPair (GYKeyRoleToLedger kr) Ledger.StandardCrypto
 signingKeyToLedgerKeyPair skey =
   TLedger.KeyPair
@@ -453,6 +468,19 @@ writeExtendedSigningKey file key = do
     Left (err :: Api.FileError ()) -> throwIO $ userError $ show err
     Right () -> return ()
 
+readExtendedSigningKey :: forall kr. (SingGYKeyRoleI kr, Api.HasTextEnvelope (GYExtendedSigningKeyToApi kr)) => FilePath -> IO (GYExtendedSigningKey kr)
+readExtendedSigningKey fp = do
+  s <- Api.readFileTextEnvelope asType (Api.File fp)
+  case s of
+    Left err -> fail (show err) --- throws IOError
+    Right x -> return (extendedSigningKeyFromApi x)
+ where
+  asType =
+    case singGYKeyRole @kr of
+      SingGYKeyRolePayment -> Api.proxyToAsType Proxy
+      SingGYKeyRoleStaking -> Api.proxyToAsType Proxy
+      SingGYKeyRoleDRep -> Api.proxyToAsType Proxy
+
 -------------------------------------------------------------------------------
 -- Payment verification key (public)
 -------------------------------------------------------------------------------
@@ -544,24 +572,11 @@ paymentSigningKeyFromLedgerKeyPair = signingKeyFromLedgerKeyPair
 
 -- | Reads a payment signing key from a file.
 readPaymentSigningKey :: FilePath -> IO GYPaymentSigningKey
-readPaymentSigningKey fp = do
-  s <- Api.readFileTextEnvelopeAnyOf acceptedTypes (Api.File fp)
-  case s of
-    Left err -> fail (show err) --- throws IOError
-    Right x -> return (paymentSigningKeyFromApi x)
- where
-  acceptedTypes =
-    [ Api.FromSomeType (Api.AsSigningKey Api.AsGenesisUTxOKey) Api.castSigningKey
-    , Api.FromSomeType (Api.AsSigningKey Api.AsPaymentKey) id
-    ]
+readPaymentSigningKey = readSigningKey
 
 -- | Reads extended payment signing key from file
 readExtendedPaymentSigningKey :: FilePath -> IO GYExtendedPaymentSigningKey
-readExtendedPaymentSigningKey fp = do
-  s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsPaymentExtendedKey) (Api.File fp)
-  case s of
-    Left err -> fail (show err) --- throws IOError
-    Right x -> return $ extendedSigningKeyFromApi x
+readExtendedPaymentSigningKey = readExtendedSigningKey
 
 -- | Writes a payment signing key to a file.
 writePaymentSigningKey :: FilePath -> GYPaymentSigningKey -> IO ()
@@ -667,19 +682,11 @@ stakeSigningKeyFromLedgerKeyPair = signingKeyFromLedgerKeyPair
 
 -- | Reads a stake signing key from a file.
 readStakeSigningKey :: FilePath -> IO GYStakeSigningKey
-readStakeSigningKey fp = do
-  s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsStakeKey) (Api.File fp)
-  case s of
-    Left err -> fail (show err) --- throws IOError
-    Right x -> return (stakeSigningKeyFromApi x)
+readStakeSigningKey = readSigningKey
 
 -- | Reads extended stake signing key from file
 readExtendedStakeSigningKey :: FilePath -> IO GYExtendedStakeSigningKey
-readExtendedStakeSigningKey fp = do
-  s <- Api.readFileTextEnvelope (Api.AsSigningKey Api.AsStakeExtendedKey) (Api.File fp)
-  case s of
-    Left err -> fail (show err) --- throws IOError
-    Right x -> return $ extendedSigningKeyFromApi x
+readExtendedStakeSigningKey = readExtendedSigningKey
 
 -- | Writes a stake signing key to a file.
 writeStakeSigningKey :: FilePath -> GYStakeSigningKey -> IO ()

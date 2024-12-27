@@ -251,6 +251,7 @@ library
     cardano-api,
     cardano-api:internal,
     cardano-coin-selection,
+    cardano-crypto,
     cardano-crypto-class,
     cardano-ledger-api,
     cardano-ledger-core:{cardano-ledger-core, testlib},

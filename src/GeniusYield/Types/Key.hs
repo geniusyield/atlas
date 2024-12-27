@@ -102,7 +102,6 @@ module GeniusYield.Types.Key (
   stakeVerificationKey,
   generateStakeSigningKey,
   GYSomeSigningKey (..),
-  readSomeSigningKey,
   GYSomePaymentSigningKey (..),
   readSomePaymentSigningKey,
   somePaymentSigningKeyToSomeSigningKey,
@@ -712,20 +711,6 @@ data GYSomeSigningKey = forall a. (ToShelleyWitnessSigningKey a, Show a) => GYSo
 
 instance ToShelleyWitnessSigningKey GYSomeSigningKey where
   toShelleyWitnessSigningKey (GYSomeSigningKey skey) = toShelleyWitnessSigningKey skey
-
-readSomeSigningKey :: FilePath -> IO GYSomeSigningKey
-readSomeSigningKey file = do
-  e <-
-    Api.readFileTextEnvelopeAnyOf
-      [ Api.FromSomeType (Api.AsSigningKey Api.AsPaymentKey) $ GYSomeSigningKey . paymentSigningKeyFromApi
-      , Api.FromSomeType (Api.AsSigningKey Api.AsPaymentExtendedKey) $ GYSomeSigningKey . extendedPaymentSigningKeyFromApi
-      , Api.FromSomeType (Api.AsSigningKey Api.AsStakeKey) $ GYSomeSigningKey . stakeSigningKeyFromApi
-      , Api.FromSomeType (Api.AsSigningKey Api.AsStakeExtendedKey) $ GYSomeSigningKey . extendedStakeSigningKeyFromApi
-      ]
-      (Api.File file)
-  case e of
-    Left err -> throwIO $ userError $ show err
-    Right skey -> return skey
 
 data GYSomePaymentSigningKey = AGYPaymentSigningKey !GYPaymentSigningKey | AGYExtendedPaymentSigningKey !GYExtendedPaymentSigningKey
   deriving stock (Eq, Show, Ord)

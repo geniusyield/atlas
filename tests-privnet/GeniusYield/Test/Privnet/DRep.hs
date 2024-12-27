@@ -27,7 +27,12 @@ exerciseDRep ctx info = do
   info $ "Generated drep key: " <> show drepSKey <> ", with verification key hash: " <> show drepVKH
   let fundUser = ctxUserF ctx
   txId <- ctxRun ctx fundUser $ do
+    fundAddr <- ownChangeAddress
+    fundBalI <- queryBalance fundAddr
     txBody <- buildTxBody $ mustHaveCertificate $ mkDRepRegisterationCertificate drepCred Nothing GYTxCertWitnessKey
     gyLogInfo' "" $ "txBody: " <> show txBody
-    submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey drepSKey]
+    tid <- submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey drepSKey]
+    fundBalF <- queryBalance fundAddr
+    gyLogInfo' "" $ "Balance lost: " <> show (valueMinus fundBalI fundBalF)
+    pure tid
   info $ "Successfully registered drep, with tx id: " <> show txId

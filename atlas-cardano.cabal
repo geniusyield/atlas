@@ -118,6 +118,7 @@ library
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
+    GeniusYield.Types.Anchor
     GeniusYield.Types.Blueprint
     GeniusYield.Types.Blueprint.Argument
     GeniusYield.Types.Blueprint.Contract

@@ -287,12 +287,20 @@ balanceTxStep
             )
             (0, 0)
             certs
+        (drepDeregsAmt :: Natural, drepRegsAmt :: Natural) =
+          foldl'
+            ( \acc@(!accDeregsAmt, !accRegsAmt) (gyTxCertCertificate' -> cert) -> case cert of
+                GYDRepRegistrationCertificate amt _ _ -> (accDeregsAmt, accRegsAmt + amt)
+                _ -> acc
+            )
+            (0, 0)
+            certs
         -- Extra ada is received from withdrawals and stake credential deregistration.
         adaSource =
           let wdrlsAda = getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls
-           in wdrlsAda + stakeCredDeregsAmt
+           in wdrlsAda + stakeCredDeregsAmt + drepDeregsAmt
         -- Ada lost due to stake credential registration.
-        adaSink = stakeCredRegsAmt
+        adaSink = stakeCredRegsAmt + drepRegsAmt
         collaterals
           | needsCollateral = utxosFromUTxO collateral
           | otherwise = mempty

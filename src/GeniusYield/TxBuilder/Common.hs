@@ -26,7 +26,6 @@ import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Alonzo.Core qualified as Ledger
 import Cardano.Ledger.Conway.PParams qualified as Ledger
 import Cardano.Ledger.Conway.Tx qualified as Ledger
-import Cardano.Ledger.Plutus qualified as Ledger
 import Control.Applicative ((<|>))
 import Control.Lens ((^.))
 import Control.Monad.Except (MonadError (throwError))

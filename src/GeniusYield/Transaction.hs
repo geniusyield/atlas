@@ -61,6 +61,7 @@ module GeniusYield.Transaction (
 ) where
 
 import Cardano.Api qualified as Api
+import Cardano.Api.Experimental qualified as Api
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api
 import Cardano.Api.Shelley qualified as Api.S
@@ -82,7 +83,6 @@ import Cardano.Ledger.Core qualified as Ledger
 import Cardano.Ledger.Crypto (Crypto (..))
 import Cardano.Ledger.Era (Era (..))
 import Cardano.Ledger.Keys.WitVKey (WitVKey (..))
-import Cardano.Ledger.Plutus qualified as Ledger
 import Cardano.Ledger.Shelley.API.Wallet qualified as Shelley
 import Cardano.Slotting.Time (SystemStart)
 import Control.Arrow ((&&&))
@@ -96,6 +96,7 @@ import Data.Foldable (
  )
 import Data.List (delete)
 import Data.Map qualified as Map
+import Data.Maybe (maybeToList)
 import Data.Ratio ((%))
 import Data.Semigroup (Sum (..))
 import Data.Set qualified as Set
@@ -410,7 +411,7 @@ finalizeGYBalancedTx
             GYInReferenceSimpleScript _ s -> getTotalKeysInSimpleScript s <> acc
         estimateKeyWitnessesFromNativeScripts acc _ = acc
 
-    inRefs :: Api.TxInsReference Api.BuildTx ApiEra
+    inRefs :: Api.TxInsReference ApiEra
     inRefs = case inRefs' of
       [] -> Api.TxInsReferenceNone
       _ -> Api.TxInsReference Api.BabbageEraOnwardsConway inRefs'
@@ -506,7 +507,7 @@ finalizeGYBalancedTx
                 foldl'
                   ( \(accCerts, accWits) cert ->
                       let (apiCert, mapiWit) = txCertToApi cert
-                          apiWit = maybe Map.empty (uncurry Map.singleton) mapiWit
+                          apiWit = maybeToList mapiWit
                        in (apiCert : accCerts, accWits <> apiWit)
                   )
                   (mempty, mempty)
@@ -527,6 +528,8 @@ finalizeGYBalancedTx
         , Api.txFee = fee
         , Api.txValidityLowerBound = lb'
         , Api.txValidityUpperBound = ub'
+        , -- Supplemental data feature was added by cardano-api team in this PR: https://github.com/IntersectMBO/cardano-api/pull/640, we can think on making use of it.
+          Api.txSupplementalData = Api.BuildTxWith Api.TxSupplementalDataNone
         , Api.txMetadata = txMetadata
         , Api.txAuxScripts = Api.TxAuxScriptsNone
         , Api.txExtraKeyWits = extra
@@ -586,7 +589,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp _ps utxos body change
         (Just nkeys)
 
   -- We should call `makeTransactionBodyAutoBalance` again with updated values of collaterals so as to get slightly lower fee estimate.
-  Api.BalancedTxBody txBodyContent txBody extraOut _ <-
+  Api.BalancedTxBody txBodyContent (Api.UnsignedTx unsignedLTx) extraOut _ <-
     if collaterals == mempty
       then return bodyBeforeCollUpdate
       else
@@ -622,36 +625,36 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp _ps utxos body change
                 changeAddrApi
                 (Just nkeys)
 
-  let Api.S.ShelleyTx _ ltx = Api.Tx txBody []
-      -- This sums up the ExUnits for all embedded Plutus Scripts anywhere in the transaction:
-      AlonzoScripts.ExUnits
-        { AlonzoScripts.exUnitsSteps = steps
-        , AlonzoScripts.exUnitsMem = mem
-        } = AlonzoTx.totExUnits ltx
-      txSize :: Natural =
-        let
-          -- This low level code is taken verbatim from here: https://github.com/IntersectMBO/cardano-ledger/blob/6db84a7b77e19af58feb2f45dfc50aa70435967b/eras/shelley/impl/src/Cardano/Ledger/Shelley/API/Wallet.hs#L475-L494, as this is what is referred by @cardano-api@ under the hood.
-          -- This does not take into account the bootstrap (byron) witnesses.
-          version = eraProtVerLow @ShelleyBasedConwayEra
-          sigSize = fromIntegral $ sizeSigDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedConwayEra)))
-          dummySig =
-            fromRight
-              (error "corrupt dummy signature")
-              ( CBOR.decodeFullDecoder
-                  version
-                  "dummy signature"
-                  CBOR.decodeSignedDSIGN
-                  (CBOR.serialize version $ LBS.replicate sigSize 0)
-              )
-          vkeySize = fromIntegral $ sizeVerKeyDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedConwayEra)))
-          dummyVKey w =
-            let padding = LBS.replicate paddingSize 0
-                paddingSize = vkeySize - LBS.length sw
-                sw = CBOR.serialize version w
-                keyBytes = CBOR.serialize version $ padding <> sw
-             in fromRight (error "corrupt dummy vkey") (CBOR.decodeFull version keyBytes)
-         in
-          fromInteger $ view sizeTxF $ Shelley.addKeyWitnesses ltx (Set.fromList [WitVKey (dummyVKey x) dummySig | x <- [1 .. nkeys]])
+  let
+    -- This sums up the ExUnits for all embedded Plutus Scripts anywhere in the transaction:
+    AlonzoScripts.ExUnits
+      { AlonzoScripts.exUnitsSteps = steps
+      , AlonzoScripts.exUnitsMem = mem
+      } = AlonzoTx.totExUnits unsignedLTx
+    txSize :: Natural =
+      let
+        -- This low level code is taken verbatim from here: https://github.com/IntersectMBO/cardano-ledger/blob/6db84a7b77e19af58feb2f45dfc50aa70435967b/eras/shelley/impl/src/Cardano/Ledger/Shelley/API/Wallet.hs#L475-L494, as this is what is referred by @cardano-api@ under the hood.
+        -- This does not take into account the bootstrap (byron) witnesses.
+        version = eraProtVerLow @ShelleyBasedConwayEra
+        sigSize = fromIntegral $ sizeSigDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedConwayEra)))
+        dummySig =
+          fromRight
+            (error "corrupt dummy signature")
+            ( CBOR.decodeFullDecoder
+                version
+                "dummy signature"
+                CBOR.decodeSignedDSIGN
+                (CBOR.serialize version $ LBS.replicate sigSize 0)
+            )
+        vkeySize = fromIntegral $ sizeVerKeyDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedConwayEra)))
+        dummyVKey w =
+          let padding = LBS.replicate paddingSize 0
+              paddingSize = vkeySize - LBS.length sw
+              sw = CBOR.serialize version w
+              keyBytes = CBOR.serialize version $ padding <> sw
+           in fromRight (error "corrupt dummy vkey") (CBOR.decodeFull version keyBytes)
+       in
+        fromInteger $ view sizeTxF $ Shelley.addKeyWitnesses unsignedLTx (Set.fromList [WitVKey (dummyVKey x) dummySig | x <- [1 .. nkeys]])
   -- See: Cardano.Ledger.Alonzo.Rules.validateExUnitsTooBigUTxO
   unless (steps <= maxSteps && mem <= maxMemory) $
     Left $
@@ -660,9 +663,9 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp _ps utxos body change
   unless (txSize <= maxTxSize) $
     Left (GYBuildTxSizeTooBig maxTxSize txSize)
 
-  collapsedBody <- first GYBuildTxCollapseExtraOutError $ collapseExtraOut extraOut txBodyContent txBody numSkeletonOuts
+  (Api.UnsignedTx collapsedUnsignedLTx) <- first GYBuildTxCollapseExtraOutError $ collapseExtraOut extraOut txBodyContent (Api.UnsignedTx unsignedLTx) numSkeletonOuts
 
-  first GYBuildTxCborSimplificationError $ simplifyGYTxBodyCbor $ txBodyFromApi collapsedBody
+  first GYBuildTxCborSimplificationError $ getTxBody <$> simplifyTxCbor (txFromLedger collapsedUnsignedLTx)
 
 {- | Collapses the extra out generated in the last step of tx building into
     another change output (If one exists)
@@ -677,16 +680,16 @@ collapseExtraOut ::
   -- | The body content generated by @makeTransactionBodyAutoBalance@.
   Api.TxBodyContent Api.S.BuildTx ApiEra ->
   -- | The body generated by @makeTransactionBodyAutoBalance@.
-  Api.TxBody ApiEra ->
+  Api.UnsignedTx ApiEra ->
   -- | The number of skeleton outputs we don't want to touch.
   Int ->
   -- | The updated body with the collapsed outputs
-  Either Api.S.TxBodyError (Api.TxBody ApiEra)
-collapseExtraOut apiOut@(Api.TxOut _ outVal _ _) bodyContent@Api.TxBodyContent {txOuts} txBody numSkeletonOuts
-  | Api.txOutValueToLovelace outVal == 0 = pure txBody
+  Either Api.S.TxBodyError (Api.UnsignedTx ApiEra)
+collapseExtraOut apiOut@(Api.TxOut _ outVal _ _) bodyContent@Api.TxBodyContent {txOuts} unsignedLTx numSkeletonOuts
+  | Api.txOutValueToLovelace outVal == 0 = pure unsignedLTx
   | otherwise =
       case delete apiOut changeOuts of
-        [] -> pure txBody
+        [] -> pure unsignedLTx
         ((Api.TxOut sOutAddr sOutVal sOutDat sOutRefScript) : remOuts) ->
           let
             nOutVal =
@@ -699,8 +702,10 @@ collapseExtraOut apiOut@(Api.TxOut _ outVal _ _) bodyContent@Api.TxBodyContent {
             -- nOuts == new Outs == The new list of outputs
             nOuts = skeletonOuts ++ remOuts ++ [nOut]
            in
-            Api.S.createAndValidateTransactionBody Api.ShelleyBasedEraConway $
-              bodyContent {Api.txOuts = nOuts}
+            Api.convertTxBodyToUnsignedTx Api.ShelleyBasedEraConway
+              <$> ( Api.S.createTransactionBody Api.ShelleyBasedEraConway $
+                      bodyContent {Api.txOuts = nOuts}
+                  )
  where
   (skeletonOuts, changeOuts) = splitAt numSkeletonOuts txOuts
 

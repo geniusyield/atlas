@@ -13,6 +13,7 @@ module GeniusYield.Types.Tx (
   GYTx,
   txFromApi,
   txToApi,
+  txFromLedger,
   txFromHex,
   txFromHexBS,
   txFromCBOR,
@@ -68,6 +69,8 @@ import PlutusTx.Builtins.Internal qualified as Plutus
 import Text.Printf qualified as Printf
 import Web.HttpApiData qualified as Web
 
+import Cardano.Api.Ledger qualified as Ledger
+import Cardano.Api.Shelley qualified as Api
 import Cardano.Ledger.Core (eraProtVerHigh)
 import GeniusYield.Imports
 import GeniusYield.Types.Era (ApiEra)
@@ -131,6 +134,9 @@ txFromApi = coerce
 
 txToApi :: GYTx -> Api.Tx ApiEra
 txToApi = coerce
+
+txFromLedger :: Ledger.Tx (Api.ShelleyLedgerEra ApiEra) -> GYTx
+txFromLedger = txFromApi . Api.ShelleyTx Api.ShelleyBasedEraConway
 
 instance Web.FromHttpApiData GYTx where
   parseUrlPiece t = first (T.pack . ("Not a tx, error: " ++)) $ txFromHexBS $ TE.encodeUtf8 t

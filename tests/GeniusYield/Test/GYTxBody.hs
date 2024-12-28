@@ -14,7 +14,7 @@ import Test.Tasty.HUnit (
   (@?=),
  )
 
-import Clb.MockConfig (
+import Clb.Config (
   defaultConwayParams,
   defaultSlotConfig,
  )

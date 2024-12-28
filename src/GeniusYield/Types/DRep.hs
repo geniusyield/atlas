@@ -1,5 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
-
 {- |
 Module      : GeniusYield.Types.DRep
 Copyright   : (c) 2024 GYELD GMBH
@@ -14,7 +12,10 @@ module GeniusYield.Types.DRep (
 ) where
 
 import Cardano.Api.Ledger qualified as Ledger
+import GeniusYield.Imports (Natural, Set)
+import GeniusYield.Types.Anchor
 import GeniusYield.Types.Credential (GYCredential, credentialFromLedger, credentialToLedger)
+import GeniusYield.Types.Epoch (GYEpochNo)
 import GeniusYield.Types.KeyRole (GYKeyRole (..))
 
 data GYDRep
@@ -34,3 +35,20 @@ drepFromLedger drep = case drep of
   Ledger.DRepCredential c -> GYDRepCredential $ credentialFromLedger c
   Ledger.DRepAlwaysAbstain -> GYDRepAlwaysAbstain
   Ledger.DRepAlwaysNoConfidence -> GYDRepAlwaysNoConfidence
+
+data DRepState = DRepState
+  { drepExpiry :: !GYEpochNo
+  , drepAnchor :: !(Maybe GYAnchor)
+  , drepDeposit :: !Natural
+  , drepDelegs :: !(Set (GYCredential 'GYKeyRoleStaking))
+  }
+  deriving (Show, Eq, Ord)
+
+-- drepStateToLedger :: DRepState -> Ledger.DRepState Ledger.StandardCrypto
+-- drepStateToLedger DRepState {..} =
+--   Ledger.DRepState
+--     { Ledger.drepExpiry = epochNoToLedger drepExpiry
+--     , Ledger.drepAnchor = anchorToLedger <$> drepAnchor
+--     , Ledger.drepDeposit = drepDeposit
+--     , Ledger.drepDelegs = credentialToLedger <$> drepDelegs
+--     }

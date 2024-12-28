@@ -15,13 +15,11 @@ module GeniusYield.Test.Privnet.Setup (
   mkPrivnetTestFor',
 
   -- * "Cardano.Testnet" re-exports
-  cardanoDefaultTestnetOptions,
   cardanoDefaultTestnetOptionsConway,
   cardanoDefaultTestnetNodeOptions,
   CardanoTestnetOptions (..),
   TestnetNodeOptions (..),
   NodeLoggingFormat (..),
-  NodeConfigurationYaml (..),
 ) where
 
 import Cardano.Api qualified as Api
@@ -41,6 +39,7 @@ import Control.Monad.Trans.Resource (
   MonadResource (liftResourceT),
   resourceForkIO,
  )
+import Data.Default (Default (..))
 import Data.Default.Class qualified as DefaultClass
 import Data.Text qualified as Txt
 import Data.Vector qualified as V
@@ -61,7 +60,8 @@ import Test.Cardano.Ledger.Core.Rational ((%!))
 import Test.Tasty (TestName, TestTree)
 import Test.Tasty.HUnit (testCaseSteps)
 import Testnet.Property.Util
-import Testnet.Types
+import Testnet.Start.Types (GenesisOptions (..))
+import Testnet.Types hiding (shelleyGenesis)
 
 -------------------------------------------------------------------------------
 -- Setup
@@ -75,8 +75,8 @@ The first argument is the log severity filter. Only logs of this severity or hig
 -}
 newtype Setup = Setup (GYLogSeverity -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ())
 
-cardanoDefaultTestnetOptionsConway :: CardanoTestnetOptions
-cardanoDefaultTestnetOptionsConway = cardanoDefaultTestnetOptions {cardanoNodeEra = Api.AnyCardanoEra Api.ConwayEra, cardanoEpochLength = 2000}
+cardanoDefaultTestnetOptionsConway :: (CardanoTestnetOptions, GenesisOptions)
+cardanoDefaultTestnetOptionsConway = (def {cardanoNodeEra = Api.AnyShelleyBasedEra Api.ShelleyBasedEraConway}, def {genesisEpochLength = 2000})
 data PrivnetRuntime = PrivnetRuntime
   { runtimeNodeSocket :: !FilePath
   , runtimeNetworkInfo :: !GYNetworkInfo
@@ -181,8 +181,8 @@ Note that passed @CardanoTestnetOptions@ must imply Conway era.
 Returns continuation on `Setup`, which is essentially a function that performs an action
 given a logging -- function and the action itself (which receives the Privnet Ctx).
 -}
-withPrivnet :: CardanoTestnetOptions -> (Setup -> IO ()) -> IO ()
-withPrivnet testnetOpts setupUser = do
+withPrivnet :: (CardanoTestnetOptions, GenesisOptions) -> (Setup -> IO ()) -> IO ()
+withPrivnet (testnetOpts, genesisOpts) setupUser = do
   -- Based on: https://github.com/IntersectMBO/cardano-node/blob/master/cardano-testnet/src/Testnet/Property/Run.hs
   -- They are using hedgehog (property testing framework) to orchestrate a testnet running in the background
   -- ....for some god forsaken reason
@@ -197,10 +197,10 @@ withPrivnet testnetOpts setupUser = do
 
     TestnetRuntime
       { wallets
-      , poolNodes
+      , testnetNodes
       , testnetMagic
       } <-
-      cardanoTestnet' testnetOpts conf
+      cardanoTestnet' testnetOpts genesisOpts conf
 
     liftIO . STM.atomically $
       STM.writeTMVar
@@ -212,11 +212,10 @@ withPrivnet testnetOpts setupUser = do
             runtimeNodeSocket =
               H'.sprocketSystemName
                 . nodeSprocket
-                . poolRuntime
-                $ head poolNodes
+                $ head testnetNodes
           , runtimeNetworkInfo =
               GYNetworkInfo
-                { gyNetworkEpochSlots = fromIntegral $ cardanoEpochLength testnetOpts
+                { gyNetworkEpochSlots = fromIntegral $ genesisEpochLength genesisOpts
                 , gyNetworkMagic = fromIntegral testnetMagic
                 }
           , runtimeWallets = wallets
@@ -355,11 +354,13 @@ withPrivnet testnetOpts setupUser = do
       setupUser setup
  where
   -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
-  cardanoTestnet' opts conf = do
-    Api.AnyCardanoEra cEra <- pure $ cardanoNodeEra cardanoDefaultTestnetOptions
-    alonzoGenesis <- getDefaultAlonzoGenesis cEra
-    (startTime, shelleyGenesis') <- getDefaultShelleyGenesis opts
-    cardanoTestnet opts conf startTime shelleyGenesis' alonzoGenesis conwayGenesis
+  cardanoTestnet' testnetOptions shelleyOptions conf = do
+    Api.AnyShelleyBasedEra sbe <- pure cardanoNodeEra
+    alonzoGenesis <- getDefaultAlonzoGenesis sbe
+    shelleyGenesis <- getDefaultShelleyGenesis cardanoNodeEra cardanoMaxSupply shelleyOptions
+    cardanoTestnet testnetOptions conf shelleyGenesis alonzoGenesis conwayGenesis
+   where
+    CardanoTestnetOptions {cardanoNodeEra, cardanoMaxSupply} = testnetOptions
 
 -------------------------------------------------------------------------------
 -- Generating users

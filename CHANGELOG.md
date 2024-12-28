@@ -7,6 +7,7 @@
 * Constructor of `GYPubKeyHash` is no longer exported.
 * `readSomeSigningKey` is removed.
 * Adds additional certificates such as those related to governance, drep participation, etc.
+* Tracks node version 10.1.3 and corresponding updated CLB version.
 
 ## 0.7.0
 

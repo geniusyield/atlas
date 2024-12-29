@@ -48,6 +48,7 @@ data GYCertificatePreBuild
   | GYStakeAddressRegistrationDelegationCertificatePB !GYStakeCredential !GYDelegatee
   | GYDRepRegistrationCertificatePB !(GYCredential 'GYKeyRoleDRep) !(Maybe GYAnchor)
   | GYDRepUpdateCertificatePB !(GYCredential 'GYKeyRoleDRep) !(Maybe GYAnchor)
+  | GYDRepUnregistrationCertificatePB !(GYCredential 'GYKeyRoleDRep) !Natural
   deriving stock (Eq, Ord, Show)
 
 -- | Certificate state after populating missing entries from `GYCertificatePreBuild`.
@@ -58,6 +59,7 @@ data GYCertificate
   | GYStakeAddressRegistrationDelegationCertificate !Natural !GYStakeCredential !GYDelegatee
   | GYDRepRegistrationCertificate !Natural !(GYCredential 'GYKeyRoleDRep) !(Maybe GYAnchor)
   | GYDRepUpdateCertificate !(GYCredential 'GYKeyRoleDRep) !(Maybe GYAnchor)
+  | GYDRepUnregistrationCertificate !(GYCredential 'GYKeyRoleDRep) !Natural
   deriving stock (Eq, Ord, Show)
 
 -- FIXME: Unregistration should make use of deposit that was actually used when registering earlier.
@@ -69,6 +71,7 @@ finaliseCert pp = \case
   GYStakeAddressRegistrationDelegationCertificatePB sc del -> GYStakeAddressRegistrationDelegationCertificate ppDep' sc del
   GYDRepRegistrationCertificatePB cred manchor -> GYDRepRegistrationCertificate ppDRepDeposit' cred manchor
   GYDRepUpdateCertificatePB cred manchor -> GYDRepUpdateCertificate cred manchor
+  GYDRepUnregistrationCertificatePB cred dep -> GYDRepUnregistrationCertificate cred dep
  where
   Ledger.Coin ppDep = pp ^. Ledger.ppKeyDepositL
   ppDep' :: Natural = fromIntegral ppDep
@@ -91,6 +94,7 @@ certificateToApi = \case
   GYStakeAddressRegistrationDelegationCertificate dep sc del -> Api.makeStakeAddressAndDRepDelegationCertificate Api.ConwayEraOnwardsConway (f sc) (g del) (fromIntegral dep)
   GYDRepRegistrationCertificate dep cred manchor -> Api.makeDrepRegistrationCertificate (Api.DRepRegistrationRequirements Api.ConwayEraOnwardsConway (credentialToLedger cred) (fromIntegral dep)) (anchorToLedger <$> manchor)
   GYDRepUpdateCertificate cred manchor -> Api.makeDrepUpdateCertificate (Api.DRepUpdateRequirements Api.ConwayEraOnwardsConway (credentialToLedger cred)) (anchorToLedger <$> manchor)
+  GYDRepUnregistrationCertificate cred refund -> Api.makeDrepUnregistrationCertificate (Api.DRepUnregistrationRequirements Api.ConwayEraOnwardsConway (credentialToLedger cred) (fromIntegral refund))
  where
   f = stakeCredentialToApi
   g = delegateeToLedger
@@ -107,6 +111,7 @@ certificateFromApiMaybe (Api.ConwayCertificate _ x) = case x of
   Ledger.ConwayTxCertGov govCert -> case govCert of
     Ledger.ConwayRegDRep cred dep manchor -> Just $ GYDRepRegistrationCertificate (fromIntegral dep) (credentialFromLedger cred) (Ledger.strictMaybeToMaybe (anchorFromLedger <$> manchor))
     Ledger.ConwayUpdateDRep cred manchor -> Just $ GYDRepUpdateCertificate (credentialFromLedger cred) (Ledger.strictMaybeToMaybe (anchorFromLedger <$> manchor))
+    Ledger.ConwayUnRegDRep cred refund -> Just $ GYDRepUnregistrationCertificate (credentialFromLedger cred) (fromIntegral refund)
     _anyOther -> Nothing
   _anyOther -> Nothing
  where
@@ -123,5 +128,6 @@ certificateToStakeCredential = \case
   GYStakeAddressRegistrationDelegationCertificate _ sc _ -> sc
   GYDRepRegistrationCertificate _ cred _ -> castCred cred
   GYDRepUpdateCertificate cred _ -> castCred cred
+  GYDRepUnregistrationCertificate cred _ -> castCred cred
  where
   castCred cred = credentialToLedger cred & Ledger.coerceKeyRole & credentialFromLedger

@@ -2,7 +2,7 @@ module GeniusYield.Test.Privnet.DRep (
   drepTests,
 ) where
 
-import GeniusYield.Test.Privnet.Asserts (assertEqual)
+import GeniusYield.Test.Privnet.Asserts
 import GeniusYield.Test.Privnet.Ctx
 import GeniusYield.Test.Privnet.Setup
 import GeniusYield.TxBuilder
@@ -30,7 +30,7 @@ exerciseDRep ctx info = do
   txId <- ctxRun ctx fundUser $ do
     fundAddr <- ownChangeAddress
     fundBalI <- queryBalance fundAddr
-    txBody <- buildTxBody $ mustHaveCertificate $ mkDRepRegisterationCertificate drepCred Nothing GYTxCertWitnessKey
+    txBody <- buildTxBody $ mustHaveCertificate $ mkDRepRegistrationCertificate drepCred Nothing GYTxCertWitnessKey
     gyLogInfo' "" $ "txBody: " <> show txBody
     tid <- submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey drepSKey]
     fundBalF <- queryBalance fundAddr
@@ -41,7 +41,7 @@ exerciseDRep ctx info = do
   info $ "Successfully registered drep, with tx id: " <> show txId
   info "Updating drep"
   let anchor = GYAnchor (unsafeTextToUrl "https://www.geniusyield.io") (hashAnchorData "we are awesome")
-  (txIdUpd, drepS) <- ctxRun ctx fundUser $ do
+  (txIdUpd, mdrepS) <- ctxRun ctx fundUser $ do
     txBody <- buildTxBody $ mustHaveCertificate $ mkDRepUpdateCertificate drepCred (Just anchor) GYTxCertWitnessKey
     gyLogInfo' "" $ "txBody: " <> show txBody
     tid <- submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey drepSKey]
@@ -49,4 +49,13 @@ exerciseDRep ctx info = do
     gyLogInfo' "" $ "Drep state: " <> show drepS
     pure (tid, drepS)
   info $ "Successfully updated drep, with tx id: " <> show txIdUpd
-  assertEqual "Drep state after update" (Just anchor) (drepS >>= drepAnchor)
+  assertEqual "Drep state after update" (Just anchor) (mdrepS >>= drepAnchor)
+  info $ "Unregistering drep"
+  case mdrepS of
+    Nothing -> assertFailure "Drep state not found"
+    Just drepS -> do
+      txIdUnreg <- ctxRun ctx fundUser $ do
+        txBody <- buildTxBody $ mustHaveCertificate $ mkDRepUnregistrationCertificate drepCred (drepDeposit drepS) GYTxCertWitnessKey
+        gyLogInfo' "" $ "txBody: " <> show txBody
+        submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey drepSKey]
+      info $ "Successfully unregistered drep, with tx id: " <> show txIdUnreg

@@ -12,10 +12,12 @@ module GeniusYield.Types.TxCert (
   mkStakeAddressRegistrationCertificate,
   mkStakeAddressDeregistrationCertificate,
   mkStakeAddressDelegationCertificate,
-  mkDRepRegisterationCertificate,
+  mkDRepRegistrationCertificate,
   mkDRepUpdateCertificate,
+  mkDRepUnregistrationCertificate,
 ) where
 
+import GeniusYield.Imports (Natural)
 import GeniusYield.Types.Anchor (GYAnchor)
 import GeniusYield.Types.Certificate
 import GeniusYield.Types.Credential (GYCredential, GYStakeCredential)
@@ -47,8 +49,8 @@ mkStakeAddressDelegationCertificate sc del wit = GYTxCert (GYStakeAddressDelegat
 
 3. Signature from the corresponding DRep key.
 -}
-mkDRepRegisterationCertificate :: GYCredential 'GYKeyRoleDRep -> Maybe GYAnchor -> GYTxCertWitness v -> GYTxCert v
-mkDRepRegisterationCertificate cred anchor wit = GYTxCert (GYDRepRegistrationCertificatePB cred anchor) (Just wit)
+mkDRepRegistrationCertificate :: GYCredential 'GYKeyRoleDRep -> Maybe GYAnchor -> GYTxCertWitness v -> GYTxCert v
+mkDRepRegistrationCertificate cred anchor wit = GYTxCert (GYDRepRegistrationCertificatePB cred anchor) (Just wit)
 
 {- | Note that update certificate requires following preconditions:
 
@@ -58,3 +60,14 @@ mkDRepRegisterationCertificate cred anchor wit = GYTxCert (GYDRepRegistrationCer
 -}
 mkDRepUpdateCertificate :: GYCredential 'GYKeyRoleDRep -> Maybe GYAnchor -> GYTxCertWitness v -> GYTxCert v
 mkDRepUpdateCertificate cred anchor wit = GYTxCert (GYDRepUpdateCertificatePB cred anchor) (Just wit)
+
+{- | Note that unregistration certificate requires following preconditions:
+
+1. DRep must already be registered.
+
+2. Refund amount should be same as the deposit made by DRep while registration.
+
+3. Signature from the corresponding DRep key.
+-}
+mkDRepUnregistrationCertificate :: GYCredential 'GYKeyRoleDRep -> Natural -> GYTxCertWitness v -> GYTxCert v
+mkDRepUnregistrationCertificate cred refund wit = GYTxCert (GYDRepUnregistrationCertificatePB cred refund) (Just wit)

@@ -9,15 +9,21 @@ module GeniusYield.Types.DRep (
   GYDRep (..),
   drepToLedger,
   drepFromLedger,
+  GYDRepState (..),
+  drepStateToLedger,
+  drepStateFromLedger,
 ) where
 
+import Cardano.Api.Ledger (maybeToStrictMaybe, strictMaybeToMaybe)
 import Cardano.Api.Ledger qualified as Ledger
+import Data.Set qualified as Set
 import GeniusYield.Imports (Natural, Set)
 import GeniusYield.Types.Anchor
 import GeniusYield.Types.Credential (GYCredential, credentialFromLedger, credentialToLedger)
-import GeniusYield.Types.Epoch (GYEpochNo)
+import GeniusYield.Types.Epoch (GYEpochNo, epochNoFromLedger, epochNoToLedger)
 import GeniusYield.Types.KeyRole (GYKeyRole (..))
 
+-- | DRep.
 data GYDRep
   = GYDRepCredential !(GYCredential 'GYKeyRoleDRep)
   | GYDRepAlwaysAbstain
@@ -36,7 +42,8 @@ drepFromLedger drep = case drep of
   Ledger.DRepAlwaysAbstain -> GYDRepAlwaysAbstain
   Ledger.DRepAlwaysNoConfidence -> GYDRepAlwaysNoConfidence
 
-data DRepState = DRepState
+-- | DRep state.
+data GYDRepState = GYDRepState
   { drepExpiry :: !GYEpochNo
   , drepAnchor :: !(Maybe GYAnchor)
   , drepDeposit :: !Natural
@@ -44,11 +51,20 @@ data DRepState = DRepState
   }
   deriving (Show, Eq, Ord)
 
--- drepStateToLedger :: DRepState -> Ledger.DRepState Ledger.StandardCrypto
--- drepStateToLedger DRepState {..} =
---   Ledger.DRepState
---     { Ledger.drepExpiry = epochNoToLedger drepExpiry
---     , Ledger.drepAnchor = anchorToLedger <$> drepAnchor
---     , Ledger.drepDeposit = drepDeposit
---     , Ledger.drepDelegs = credentialToLedger <$> drepDelegs
---     }
+drepStateToLedger :: GYDRepState -> Ledger.DRepState Ledger.StandardCrypto
+drepStateToLedger GYDRepState {..} =
+  Ledger.DRepState
+    { Ledger.drepExpiry = epochNoToLedger drepExpiry
+    , Ledger.drepAnchor = maybeToStrictMaybe drepAnchor
+    , Ledger.drepDeposit = fromIntegral drepDeposit
+    , Ledger.drepDelegs = Set.map credentialToLedger drepDelegs
+    }
+
+drepStateFromLedger :: Ledger.DRepState Ledger.StandardCrypto -> GYDRepState
+drepStateFromLedger Ledger.DRepState {..} =
+  GYDRepState
+    { drepExpiry = epochNoFromLedger drepExpiry
+    , drepAnchor = strictMaybeToMaybe drepAnchor
+    , drepDeposit = fromIntegral drepDeposit
+    , drepDelegs = Set.map credentialFromLedger drepDelegs
+    }

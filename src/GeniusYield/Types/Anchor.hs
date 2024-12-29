@@ -9,6 +9,7 @@ module GeniusYield.Types.Anchor (
   Url,
   textToUrl,
   AnchorData,
+  AnchorDataHash,
   hashAnchorData,
   GYAnchor,
   mkAnchor,
@@ -30,6 +31,9 @@ textToUrl = Ledger.textToUrl 128
 
 -- | Anchor data.
 type AnchorData = ByteString
+
+-- | Hash of anchor data.
+type AnchorDataHash = Ledger.SafeHash Ledger.StandardCrypto Ledger.AnchorData
 
 -- | Hash anchor data.
 hashAnchorData :: AnchorData -> Ledger.SafeHash Ledger.StandardCrypto Ledger.AnchorData

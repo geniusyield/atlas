@@ -292,6 +292,7 @@ balanceTxStep
           foldl'
             ( \acc@(!accDeregsAmt, !accRegsAmt) (gyTxCertCertificate' -> cert) -> case cert of
                 GYDRepRegistrationCertificate amt _ _ -> (accDeregsAmt, accRegsAmt + amt)
+                GYDRepUnregistrationCertificate _ amt -> (accDeregsAmt + amt, accRegsAmt)
                 _ -> acc
             )
             (0, 0)
@@ -374,6 +375,7 @@ finalizeGYBalancedTx
       body
       changeAddr
       unregisteredStakeCredsMap
+      unregisteredDRepCredsMap
       estimateKeyWitnesses
    where
     -- Over-estimate the number of key witnesses required for the transaction.
@@ -516,6 +518,8 @@ finalizeGYBalancedTx
 
     unregisteredStakeCredsMap = Map.fromList [(stakeCredentialToApi sc, fromIntegral amt) | GYStakeAddressDeregistrationCertificate amt sc <- map gyTxCertCertificate' certs]
 
+    unregisteredDRepCredsMap = Map.fromList [(credentialToLedger sc, fromIntegral amt) | GYDRepUnregistrationCertificate sc amt <- map gyTxCertCertificate' certs]
+
     body :: Api.TxBodyContent Api.BuildTx ApiEra
     body =
       Api.TxBodyContent
@@ -559,10 +563,11 @@ makeTransactionBodyAutoBalanceWrapper ::
   Api.S.TxBodyContent Api.S.BuildTx ApiEra ->
   GYAddress ->
   Map.Map Api.StakeCredential Ledger.Coin ->
+  Map.Map (Ledger.Credential Ledger.DRepRole Ledger.StandardCrypto) Ledger.Coin ->
   Word ->
   Int ->
   Either GYBuildTxError GYTxBody
-makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp _ps utxos body changeAddr stakeDelegDeposits nkeys numSkeletonOuts = do
+makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp _ps utxos body changeAddr stakeDelegDeposits drepDelegDeposits nkeys numSkeletonOuts = do
   let poolids = Set.empty -- TODO: This denotes the set of registered stake pools, that are being unregistered in this transaction.
   let Ledger.ExUnits
         { exUnitsSteps = maxSteps
@@ -570,7 +575,6 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp _ps utxos body change
         } = pp ^. Ledger.ppMaxTxExUnitsL
   let maxTxSize = fromIntegral $ pp ^. Ledger.ppMaxTxSizeL
       changeAddrApi :: Api.S.AddressInEra ApiEra = addressToApi' changeAddr
-      drepDelegDeposits = mempty -- TODO: Denotes map of all deposits for drep credentials that are being unregistered in this transaction
 
   -- First we obtain the calculated fees to correct for our collaterals.
   bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ _ (Ledger.Coin feeOld)) <-

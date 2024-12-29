@@ -41,7 +41,7 @@ import GeniusYield.Providers.Blockfrost qualified as Blockfrost
 -- import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
 import GeniusYield.Providers.Kupo qualified as KupoApi
 import GeniusYield.Providers.Maestro qualified as MaestroApi
-import GeniusYield.Providers.Node (nodeStakeAddressInfo)
+import GeniusYield.Providers.Node (nodeGetDRepState, nodeGetDRepsState, nodeStakeAddressInfo)
 import GeniusYield.Providers.Node qualified as Node
 import GeniusYield.ReadJSON (readJSON)
 import GeniusYield.Types
@@ -160,7 +160,7 @@ withCfgProviders
   ns
   f =
     do
-      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetStakePools) <- case cfgCoreProvider of
+      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools) <- case cfgCoreProvider of
         GYNodeKupo path kupoUrl -> do
           let info = nodeConnectInfo path cfgNetworkId
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
@@ -174,6 +174,8 @@ withCfgProviders
             , Node.nodeSubmitTx info
             , KupoApi.kupoAwaitTxConfirmed kEnv
             , nodeStakeAddressInfo info
+            , nodeGetDRepState info
+            , nodeGetDRepsState info
             , Node.nodeStakePools info
             )
         GYMaestro (Confidential apiToken) turboSubmit -> do
@@ -193,6 +195,8 @@ withCfgProviders
             , MaestroApi.maestroSubmitTx (Just True == turboSubmit) maestroApiEnv
             , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
             , MaestroApi.maestroStakeAddressInfo maestroApiEnv
+            , error "Maestro does not support DRep state"
+            , error "Maestro does not support DReps state"
             , MaestroApi.maestroStakePools maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do
@@ -212,6 +216,8 @@ withCfgProviders
             , Blockfrost.blockfrostSubmitTx proj
             , Blockfrost.blockfrostAwaitTxConfirmed proj
             , Blockfrost.blockfrostStakeAddressInfo proj
+            , error "Blockfrost provider does not support DRep state"
+            , error "Blockfrost provider does not support DReps state"
             , Blockfrost.blockfrostStakePools proj
             )
 
@@ -255,6 +261,8 @@ logTiming providers@GYProviders {..} =
     , gyGetParameters = gyGetParameters'
     , gyQueryUTxO = gyQueryUTxO'
     , gyGetStakeAddressInfo = gyGetStakeAddressInfo'
+    , gyGetDRepState = gyGetDRepState'
+    , gyGetDRepsState = gyGetDRepsState'
     , gyLog' = gyLog'
     , gyGetStakePools = gyGetStakePools'
     }
@@ -322,6 +330,12 @@ logTiming providers@GYProviders {..} =
 
   gyGetStakeAddressInfo' :: GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
   gyGetStakeAddressInfo' = wrap "gyGetStakeAddressInfo" . gyGetStakeAddressInfo
+
+  gyGetDRepState' :: GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
+  gyGetDRepState' = wrap "gyGetDRepState" . gyGetDRepState
+
+  gyGetDRepsState' :: Set (GYCredential 'GYKeyRoleDRep) -> IO (Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState))
+  gyGetDRepsState' = wrap "gyGetDRepsState" . gyGetDRepsState
 
 duration :: IO a -> IO (a, NominalDiffTime)
 duration m = do

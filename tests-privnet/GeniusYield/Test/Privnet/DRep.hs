@@ -2,6 +2,7 @@ module GeniusYield.Test.Privnet.DRep (
   drepTests,
 ) where
 
+import GeniusYield.Test.Privnet.Asserts (assertEqual)
 import GeniusYield.Test.Privnet.Ctx
 import GeniusYield.Test.Privnet.Setup
 import GeniusYield.TxBuilder
@@ -13,7 +14,7 @@ drepTests :: Setup -> TestTree
 drepTests setup =
   testGroup
     "drep"
-    [ testCaseSteps "able to register drep" $ \info -> withSetup info setup $ \ctx -> do
+    [ testCaseSteps "able to register, update & unregister drep" $ \info -> withSetup info setup $ \ctx -> do
         exerciseDRep ctx info
     ]
 
@@ -34,5 +35,18 @@ exerciseDRep ctx info = do
     tid <- submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey drepSKey]
     fundBalF <- queryBalance fundAddr
     gyLogInfo' "" $ "Balance lost: " <> show (valueMinus fundBalI fundBalF)
+    drepS <- drepState drepCred
+    gyLogInfo' "" $ "Drep state: " <> show drepS
     pure tid
   info $ "Successfully registered drep, with tx id: " <> show txId
+  info "Updating drep"
+  let anchor = GYAnchor (unsafeTextToUrl "https://www.geniusyield.io") (hashAnchorData "we are awesome")
+  (txIdUpd, drepS) <- ctxRun ctx fundUser $ do
+    txBody <- buildTxBody $ mustHaveCertificate $ mkDRepUpdateCertificate drepCred (Just anchor) GYTxCertWitnessKey
+    gyLogInfo' "" $ "txBody: " <> show txBody
+    tid <- submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey drepSKey]
+    drepS <- drepState drepCred
+    gyLogInfo' "" $ "Drep state: " <> show drepS
+    pure (tid, drepS)
+  info $ "Successfully updated drep, with tx id: " <> show txIdUpd
+  assertEqual "Drep state after update" (Just anchor) (drepS >>= drepAnchor)

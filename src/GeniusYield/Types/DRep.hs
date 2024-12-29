@@ -55,7 +55,7 @@ drepStateToLedger :: GYDRepState -> Ledger.DRepState Ledger.StandardCrypto
 drepStateToLedger GYDRepState {..} =
   Ledger.DRepState
     { Ledger.drepExpiry = epochNoToLedger drepExpiry
-    , Ledger.drepAnchor = maybeToStrictMaybe drepAnchor
+    , Ledger.drepAnchor = maybeToStrictMaybe (anchorToLedger <$> drepAnchor)
     , Ledger.drepDeposit = fromIntegral drepDeposit
     , Ledger.drepDelegs = Set.map credentialToLedger drepDelegs
     }
@@ -64,7 +64,7 @@ drepStateFromLedger :: Ledger.DRepState Ledger.StandardCrypto -> GYDRepState
 drepStateFromLedger Ledger.DRepState {..} =
   GYDRepState
     { drepExpiry = epochNoFromLedger drepExpiry
-    , drepAnchor = strictMaybeToMaybe drepAnchor
+    , drepAnchor = strictMaybeToMaybe (anchorFromLedger <$> drepAnchor)
     , drepDeposit = fromIntegral drepDeposit
     , drepDelegs = Set.map credentialFromLedger drepDelegs
     }

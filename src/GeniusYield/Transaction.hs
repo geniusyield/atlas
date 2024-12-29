@@ -570,7 +570,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp _ps utxos body change
         } = pp ^. Ledger.ppMaxTxExUnitsL
   let maxTxSize = fromIntegral $ pp ^. Ledger.ppMaxTxSizeL
       changeAddrApi :: Api.S.AddressInEra ApiEra = addressToApi' changeAddr
-      drepDelegDeposits = mempty -- TODO:
+      drepDelegDeposits = mempty -- TODO: Denotes map of all deposits for drep credentials that are being unregistered in this transaction
 
   -- First we obtain the calculated fees to correct for our collaterals.
   bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ _ (Ledger.Coin feeOld)) <-

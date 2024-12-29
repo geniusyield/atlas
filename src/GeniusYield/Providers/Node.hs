@@ -10,11 +10,11 @@ module GeniusYield.Providers.Node (
   nodeSubmitTx,
   nodeSlotActions,
   nodeGetParameters,
-
-  -- * Low-level
   nodeGetSlotOfCurrentBlock,
   nodeStakeAddressInfo,
   nodeStakePools,
+  nodeGetDRepState,
+  nodeGetDRepsState,
 
   -- * Auxiliary
   networkIdToLocalNodeConnectInfo,
@@ -26,6 +26,7 @@ import Cardano.Ledger.Coin qualified as Ledger
 import Cardano.Slotting.Time (SystemStart)
 import Control.Exception (throwIO)
 import Data.Map.Strict qualified as Map
+import Data.Maybe (listToMaybe)
 import Data.Set qualified as Set
 import Data.Text qualified as Txt
 import GeniusYield.CardanoApi.Query
@@ -74,6 +75,17 @@ nodeGetParameters info = makeGetParameters (nodeGetProtocolParameters info) (sys
 
 nodeGetProtocolParameters :: Api.LocalNodeConnectInfo -> IO ApiProtocolParameters
 nodeGetProtocolParameters info = queryConwayEra info Api.QueryProtocolParameters
+
+nodeGetDRepState :: Api.LocalNodeConnectInfo -> GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
+nodeGetDRepState info drep = do
+  mcredState <- queryConwayEra info $ Api.QueryDRepState (Set.singleton $ credentialToLedger drep)
+  pure $ listToMaybe $ map snd $ Map.toList $ Map.map drepStateFromLedger mcredState
+
+nodeGetDRepsState :: Api.LocalNodeConnectInfo -> Set.Set (GYCredential 'GYKeyRoleDRep) -> IO (Map.Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState))
+nodeGetDRepsState info dreps = do
+  mcredState <- queryConwayEra info $ Api.QueryDRepState (Set.map credentialToLedger dreps)
+  let gymcredState = Map.foldlWithKey' (\m k v -> Map.insert (credentialFromLedger k) (Just $ drepStateFromLedger v) m) Map.empty mcredState
+  pure $ Set.foldl' (\mapAcc drep -> if Map.member drep mapAcc then mapAcc else Map.insert drep Nothing mapAcc) gymcredState dreps
 
 nodeStakePools :: Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)
 nodeStakePools info = queryConwayEra info Api.QueryStakePools

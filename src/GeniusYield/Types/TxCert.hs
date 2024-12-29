@@ -13,6 +13,7 @@ module GeniusYield.Types.TxCert (
   mkStakeAddressDeregistrationCertificate,
   mkStakeAddressDelegationCertificate,
   mkDRepRegisterationCertificate,
+  mkDRepUpdateCertificate,
 ) where
 
 import GeniusYield.Types.Anchor (GYAnchor)
@@ -48,3 +49,12 @@ mkStakeAddressDelegationCertificate sc del wit = GYTxCert (GYStakeAddressDelegat
 -}
 mkDRepRegisterationCertificate :: GYCredential 'GYKeyRoleDRep -> Maybe GYAnchor -> GYTxCertWitness v -> GYTxCert v
 mkDRepRegisterationCertificate cred anchor wit = GYTxCert (GYDRepRegistrationCertificatePB cred anchor) (Just wit)
+
+{- | Note that update certificate requires following preconditions:
+
+1. DRep must already be registered.
+
+2. Signature from the corresponding DRep key.
+-}
+mkDRepUpdateCertificate :: GYCredential 'GYKeyRoleDRep -> Maybe GYAnchor -> GYTxCertWitness v -> GYTxCert v
+mkDRepUpdateCertificate cred anchor wit = GYTxCert (GYDRepUpdateCertificatePB cred anchor) (Just wit)

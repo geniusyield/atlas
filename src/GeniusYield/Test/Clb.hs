@@ -348,6 +348,10 @@ instance GYTxQueryMonad GYTxMonadClb where
 
   stakeAddressInfo = const $ pure Nothing
 
+  drepState = const $ pure Nothing
+
+  -- Note, we need to define only one of drepState or drepsState unless required for performace reasons as they have default definition in terms of each other.
+
   slotConfig = do
     (zero, len) <- slotConfig'
     return $ simpleSlotConfig zero len

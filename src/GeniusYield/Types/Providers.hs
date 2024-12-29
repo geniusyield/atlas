@@ -96,9 +96,11 @@ import GHC.Stack (withFrozenCallStack)
 import GeniusYield.Imports
 import GeniusYield.TxBuilder.Errors
 import GeniusYield.Types.Address
-import GeniusYield.Types.Credential (GYPaymentCredential)
+import GeniusYield.Types.Credential (GYCredential, GYPaymentCredential)
+import GeniusYield.Types.DRep
 import GeniusYield.Types.Datum
 import GeniusYield.Types.Epoch (GYEpochNo (GYEpochNo))
+import GeniusYield.Types.KeyRole
 import GeniusYield.Types.Logging
 import GeniusYield.Types.ProtocolParameters
 import GeniusYield.Types.Slot
@@ -149,6 +151,8 @@ data GYProviders = GYProviders
   , gyGetParameters :: !GYGetParameters
   , gyQueryUTxO :: !GYQueryUTxO
   , gyGetStakeAddressInfo :: !(GYStakeAddress -> IO (Maybe GYStakeAddressInfo))
+  , gyGetDRepState :: !(GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState))
+  , gyGetDRepsState :: !(Set (GYCredential 'GYKeyRoleDRep) -> IO (Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState)))
   , gyLog' :: !GYLogConfiguration
   , gyGetStakePools :: !(IO (Set Api.S.PoolId))
   }

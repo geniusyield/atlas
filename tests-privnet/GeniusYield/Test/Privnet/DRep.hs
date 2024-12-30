@@ -50,7 +50,7 @@ exerciseDRep ctx info = do
     pure (tid, drepS)
   info $ "Successfully updated drep, with tx id: " <> show txIdUpd
   assertEqual "Drep state after update" (Just anchor) (mdrepS >>= drepAnchor)
-  info $ "Unregistering drep"
+  info "Unregistering drep"
   case mdrepS of
     Nothing -> assertFailure "Drep state not found"
     Just drepS -> do

@@ -55,6 +55,16 @@ source-repository-package
     cardano-testnet
     trace-dispatcher
 
+-- TODO: Temporary, track https://github.com/IntersectMBO/cardano-api/issues/714.
+source-repository-package
+  type: git
+  location: https://github.com/sourabhxyz/cardano-api
+  tag: 7081a82a4c6dd57cc0ab01027a18233d3bca2b3e
+  --sha256: sha256-JGyNbkEkBl69mfMc42Sq4sBwR2IY84aO2WcQihSKdLM=
+  subdir:
+    cardano-api
+    cardano-api-gen
+
 source-repository-package
   type: git
   location: https://github.com/cardano-foundation/cardano-wallet

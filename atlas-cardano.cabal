@@ -118,6 +118,7 @@ library
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
+    GeniusYield.Types.Anchor
     GeniusYield.Types.Blueprint
     GeniusYield.Types.Blueprint.Argument
     GeniusYield.Types.Blueprint.Contract
@@ -189,7 +190,7 @@ library
     auto-update ^>=0.2.1,
     base ^>=4.18.2,
     base16-bytestring ^>=1.0.2,
-    blockfrost-client ^>=0.8.0,
+    blockfrost-client ^>=0.9.1,
     bytestring ^>=0.11.5,
     cache ^>=0.1.3,
     cassava ^>=0.5.3,
@@ -365,6 +366,7 @@ test-suite atlas-privnet-tests
   main-is:        atlas-privnet-tests.hs
   other-modules:
     GeniusYield.Test.Privnet.Blueprint
+    GeniusYield.Test.Privnet.DRep
     GeniusYield.Test.Privnet.SimpleScripts
     GeniusYield.Test.Privnet.Stake
     GeniusYield.Test.Privnet.Stake.Key

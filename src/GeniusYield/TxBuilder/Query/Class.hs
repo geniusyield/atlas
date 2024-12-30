@@ -21,6 +21,7 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (listToMaybe)
 import GHC.Stack (withFrozenCallStack)
 
+import Data.Set qualified as Set
 import GeniusYield.Imports
 import GeniusYield.TxBuilder.Errors
 import GeniusYield.Types
@@ -32,7 +33,7 @@ import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock #-}
+  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock, (drepState | drepsState) #-}
 
   -- | Get the network id
   networkId :: m GYNetworkId
@@ -102,6 +103,16 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
 
   -- | Obtain delegation information for a stake address. Note that in case stake address is not registered, this function should return `Nothing`.
   stakeAddressInfo :: GYStakeAddress -> m (Maybe GYStakeAddressInfo)
+
+  -- | Obtain state of drep.
+  drepState :: GYCredential 'GYKeyRoleDRep -> m (Maybe GYDRepState)
+  drepState drep = do
+    drepsState' <- drepsState $ Set.singleton drep
+    return $ join (Map.lookup drep drepsState')
+
+  -- | Obtain state of dreps.
+  drepsState :: Set.Set (GYCredential 'GYKeyRoleDRep) -> m (Map.Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState))
+  drepsState dreps = Map.fromList <$> traverse (\drep -> (drep,) <$> drepState drep) (Set.toList dreps)
 
   -- | Obtain the slot config for the network.
   --
@@ -181,6 +192,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  drepState = lift . drepState
+  drepsState = lift . drepsState
   slotConfig = lift slotConfig
   slotOfCurrentBlock = lift slotOfCurrentBlock
   logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
@@ -216,6 +229,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  drepState = lift . drepState
+  drepsState = lift . drepsState
   slotConfig = lift slotConfig
   slotOfCurrentBlock = lift slotOfCurrentBlock
   logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
@@ -277,6 +292,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  drepState = lift . drepState
+  drepsState = lift . drepsState
   slotConfig = lift slotConfig
   slotOfCurrentBlock = lift slotOfCurrentBlock
   logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
@@ -312,6 +329,8 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  drepState = lift . drepState
+  drepsState = lift . drepsState
   slotConfig = lift slotConfig
   slotOfCurrentBlock = lift slotOfCurrentBlock
   logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
@@ -347,6 +366,8 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (CPS.WriterT w m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  drepState = lift . drepState
+  drepsState = lift . drepsState
   slotConfig = lift slotConfig
   slotOfCurrentBlock = lift slotOfCurrentBlock
   logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
@@ -382,6 +403,8 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Strict.WriterT w m) whe
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  drepState = lift . drepState
+  drepsState = lift . drepsState
   slotConfig = lift slotConfig
   slotOfCurrentBlock = lift slotOfCurrentBlock
   logMsg ns s = withFrozenCallStack $ lift . logMsg ns s
@@ -417,6 +440,8 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Lazy.WriterT w m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  drepState = lift . drepState
+  drepsState = lift . drepsState
   slotConfig = lift slotConfig
   slotOfCurrentBlock = lift slotOfCurrentBlock
   logMsg ns s = withFrozenCallStack $ lift . logMsg ns s

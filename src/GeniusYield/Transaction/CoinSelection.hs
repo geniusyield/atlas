@@ -28,6 +28,7 @@ import Data.Text.Class (
   ToText (toText),
   fromText,
  )
+import GHC.IsList (fromList)
 
 import Cardano.Api qualified as Api
 import Cardano.Api.Shelley qualified as Api.S
@@ -344,7 +345,7 @@ tokenBundleSizeAssessor maxSize = CWallet.TokenBundleSizeAssessor {..}
 
 toCardanoValue :: CTokenBundle.TokenBundle -> Api.S.Value
 toCardanoValue tb =
-  Api.S.valueFromList $
+  fromList $
     (Api.S.AdaAssetId, coinToQuantity coin)
       : map (bimap toCardanoAssetId toQuantity) bundle
  where

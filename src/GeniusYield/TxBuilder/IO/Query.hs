@@ -130,6 +130,16 @@ instance GYTxQueryMonad GYTxQueryMonadIO where
     providers <- asks envProviders
     ioToQueryMonad $ gyGetStakeAddressInfo providers saddr
 
+  drepState drep = do
+    logMsg mempty GYDebug $ printf "Querying DRep State: %s" drep
+    providers <- asks envProviders
+    ioToQueryMonad $ gyGetDRepState providers drep
+
+  drepsState dreps = do
+    logMsg mempty GYDebug $ printf "Querying DReps State: %s" (show dreps)
+    providers <- asks envProviders
+    ioToQueryMonad $ gyGetDRepsState providers dreps
+
   slotConfig = do
     providers <- asks envProviders
     ioToQueryMonad $ gyGetSlotConfig providers

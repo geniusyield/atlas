@@ -6,6 +6,9 @@
   * Likewise types `GYSigningKey kr`, `GYVerificationKey kr`, `GYExtendedSigningKey kr` are newly introduced and previous relevant key types like `GYPaymentSigningKey` are simply type synonyms.
 * Constructor of `GYPubKeyHash` is no longer exported.
 * `readSomeSigningKey` is removed.
+* Adds additional certificates such as those related to governance, drep participation, etc.
+* Tracks node version 10.1.3 and corresponding updated CLB version.
+* Update default value of `GYAwaitTxParameters` to now have 100 max attempts.
 
 ## 0.7.0
 

@@ -17,6 +17,7 @@ import GeniusYield.Types
 
 import GeniusYield.Test.Privnet.Blueprint qualified
 import GeniusYield.Test.Privnet.Ctx
+import GeniusYield.Test.Privnet.DRep qualified
 import GeniusYield.Test.Privnet.Examples qualified
 import GeniusYield.Test.Privnet.Setup
 import GeniusYield.Test.Privnet.SimpleScripts qualified
@@ -64,4 +65,5 @@ main = do
         , GeniusYield.Test.Privnet.Stake.stakeKeyTests setup
         , GeniusYield.Test.Privnet.Stake.stakeValidatorTests setup
         , GeniusYield.Test.Privnet.SimpleScripts.simpleScriptsTests setup
+        , GeniusYield.Test.Privnet.DRep.drepTests setup
         ]

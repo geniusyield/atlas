@@ -301,7 +301,7 @@ mintingPolicyToApiPlutusScriptWitness s =
 data GYMintScript (u :: PlutusVersion) where
   -- | 'VersionIsGreaterOrEqual' restricts which version scripts can be used in this transaction.
   GYMintScript :: v `VersionIsGreaterOrEqual` u => GYScript v -> GYMintScript u
-  -- | Reference inputs can be only used in V2 transactions.
+  -- | Reference inputs can be only used in V2 & beyond transactions.
   GYMintReference :: v `VersionIsGreaterOrEqual` 'PlutusV2 => !GYTxOutRef -> !(GYScript v) -> GYMintScript v
 
 deriving instance Show (GYMintScript v)

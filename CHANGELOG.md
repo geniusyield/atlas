@@ -8,6 +8,7 @@
 * `readSomeSigningKey` is removed.
 * Adds additional certificates such as those related to governance, drep participation, etc.
 * Tracks node version 10.1.3 and corresponding updated CLB version.
+* Update default value of `GYAwaitTxParameters` to now have 100 max attempts.
 
 ## 0.7.0
 

@@ -268,7 +268,7 @@ data GYAwaitTxParameters = GYAwaitTxParameters
 instance Default GYAwaitTxParameters where
   def =
     GYAwaitTxParameters
-      { maxAttempts = 10
+      { maxAttempts = 100
       , checkInterval = 3_000_000
       , confirmations = 1
       }

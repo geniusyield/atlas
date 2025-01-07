@@ -22,21 +22,14 @@ module GeniusYield.Types.StakePoolId (
 import Cardano.Api qualified as Api
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api
-import Cardano.Ledger.Keys qualified as Ledger
 import Control.Lens ((?~))
 import Data.Aeson.Types qualified as Aeson
-import Data.Csv qualified as Csv
 import Data.Swagger qualified as Swagger
 import Data.Swagger.Internal.Schema qualified as Swagger
 import Data.Text qualified as Text
-import Data.Text.Encoding qualified as Text
 import GeniusYield.Imports
-import GeniusYield.Types.PubKeyHash (
-  AsPubKeyHash (..),
-  pubKeyHashFromLedger,
-  pubKeyHashToLedger,
- )
-import Text.Printf qualified as Printf
+import GeniusYield.Types.KeyHash
+import GeniusYield.Types.KeyRole
 import Web.HttpApiData qualified as Web
 
 {- $setup
@@ -53,14 +46,8 @@ import Web.HttpApiData qualified as Web
 >>> spId :: GYStakePoolId = "c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27"
 -}
 
-newtype GYStakePoolId = GYStakePoolId (Api.Hash Api.StakePoolKey)
-  deriving newtype (Eq, Ord, IsString)
-
-instance Show GYStakePoolId where
-  showsPrec d spId =
-    showParen (d > 10) $
-      showString "unsafeStakePoolIdFromText "
-        . showsPrec 11 (stakePoolIdToText spId)
+-- | @type GYStakePoolId = GYKeyHash 'GYKeyRoleStakePool@
+type GYStakePoolId = GYKeyHash 'GYKeyRoleStakePool
 
 {- |
 
@@ -69,107 +56,28 @@ instance Show GYStakePoolId where
 "c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27"
 -}
 stakePoolIdToApi :: GYStakePoolId -> Api.Hash Api.StakePoolKey
-stakePoolIdToApi = coerce
+stakePoolIdToApi = keyHashToApi
 
 {- |
 
 >>> stakePoolIdFromApi "c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27"
-unsafeStakePoolIdFromText "pool1cjz6kg9a8ug9uk0nc59q60a67c2628ms58rd98gq587jwa2x5qt"
+GYKeyHash (GYKeyRoleStakePool) "c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27"
 -}
 stakePoolIdFromApi :: Api.Hash Api.StakePoolKey -> GYStakePoolId
-stakePoolIdFromApi = coerce
+stakePoolIdFromApi = keyHashFromApi
 
 -- | Convert to corresponding ledger type.
 stakePoolIdToLedger :: GYStakePoolId -> Ledger.KeyHash Ledger.StakePool Ledger.StandardCrypto
-stakePoolIdToLedger = stakePoolIdToApi >>> Api.unStakePoolKeyHash
+stakePoolIdToLedger = keyHashToLedger
 
 -- | Convert from corresponding ledger type.
 stakePoolIdFromLedger :: Ledger.KeyHash Ledger.StakePool Ledger.StandardCrypto -> GYStakePoolId
-stakePoolIdFromLedger = Api.StakePoolKeyHash >>> stakePoolIdFromApi
-
--- >>> fromPubKeyHash @GYStakePoolId (toPubKeyHash spId)
--- unsafeStakePoolIdFromText "pool1cjz6kg9a8ug9uk0nc59q60a67c2628ms58rd98gq587jwa2x5qt"
-instance AsPubKeyHash GYStakePoolId where
-  toPubKeyHash = stakePoolIdToLedger >>> Ledger.coerceKeyRole >>> pubKeyHashFromLedger
-  fromPubKeyHash = pubKeyHashToLedger >>> Ledger.coerceKeyRole >>> stakePoolIdFromLedger
-
-{- |
-
->>> let Just spid = Aeson.decode @GYStakePoolId "\"c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27\""
->>> LBS8.putStrLn $ Aeson.encode spid
-"c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27"
--}
-instance Aeson.ToJSON GYStakePoolId where
-  toJSON = Aeson.toJSON . Api.serialiseToRawBytesHexText . stakePoolIdToApi
-
-{- |
-
->>> Aeson.eitherDecode @GYStakePoolId "\"c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27\""
-Right (unsafeStakePoolIdFromText "pool1cjz6kg9a8ug9uk0nc59q60a67c2628ms58rd98gq587jwa2x5qt")
-
-Invalid characters:
-
->>> Aeson.eitherDecode @GYStakePoolId "\"c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fzzz\""
-Left "Error in $: RawBytesHexErrorBase16DecodeFail \"c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fzzz\" \"invalid character at offset: 53\""
--}
-instance Aeson.FromJSON GYStakePoolId where
-  parseJSON =
-    Aeson.withText "GYStakePoolId" $
-      either
-        (fail . show)
-        (return . GYStakePoolId)
-        . Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsStakePoolKey)
-        . Text.encodeUtf8
-
-{- |
-
->>> Printf.printf "%s\n" $ stakePoolIdFromApi "c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27"
-c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27
--}
-instance Printf.PrintfArg GYStakePoolId where
-  formatArg = Printf.formatArg . Api.serialiseToRawBytesHexText . stakePoolIdToApi
-
-{- |
-
->>> Csv.toField @GYStakePoolId "c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27"
-"c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27"
--}
-instance Csv.ToField GYStakePoolId where
-  toField = Api.serialiseToRawBytesHex . stakePoolIdToApi
-
-{- |
-
->>> Csv.runParser $ Csv.parseField @GYStakePoolId "c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27"
-Right (unsafeStakePoolIdFromText "pool1cjz6kg9a8ug9uk0nc59q60a67c2628ms58rd98gq587jwa2x5qt")
-
->>> Csv.runParser $ Csv.parseField @GYStakePoolId "not a pub stake key hash"
-Left "RawBytesHexErrorBase16DecodeFail \"not a pub stake key hash\" \"invalid character at offset: 0\""
--}
-instance Csv.FromField GYStakePoolId where
-  parseField = either (fail . show) (return . stakePoolIdFromApi) . Api.deserialiseFromRawBytesHex (Api.AsHash Api.AsStakePoolKey)
-
-instance Swagger.ToSchema GYStakePoolId where
-  declareNamedSchema _ =
-    pure $
-      Swagger.named "GYStakePoolId" $
-        mempty
-          & Swagger.type_
-          ?~ Swagger.SwaggerString
-            & Swagger.format
-          ?~ "hex"
-            & Swagger.description
-          ?~ "The hash of a public stake pool key."
-            & Swagger.example
-          ?~ toJSON ("c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27" :: Text)
-            & Swagger.maxLength
-          ?~ 56
-            & Swagger.minLength
-          ?~ 56
+stakePoolIdFromLedger = keyHashFromLedger
 
 {- | Obtain `GYStakePoolId` from bech32 encoding of stake pool id.
 
 >>> stakePoolIdFromTextMaybe "pool1cjz6kg9a8ug9uk0nc59q60a67c2628ms58rd98gq587jwa2x5qt"
-Just (unsafeStakePoolIdFromText "pool1cjz6kg9a8ug9uk0nc59q60a67c2628ms58rd98gq587jwa2x5qt")
+Just (GYKeyHash (GYKeyRoleStakePool) "c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27")
 >>> stakePoolIdFromTextMaybe "c485ab20bd3f105e59f3c50a0d3fbaf615a51f70a1c6d29d00a1fd27"
 Nothing
 -}

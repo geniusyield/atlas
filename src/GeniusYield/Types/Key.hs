@@ -109,6 +109,7 @@ module GeniusYield.Types.Key (
 
 import Cardano.Api qualified as Api
 import Cardano.Api.SerialiseTextEnvelope qualified as Api
+import Cardano.Api.Shelley qualified as Api
 import Cardano.Crypto.Wallet qualified as Crypto.HD
 import Cardano.Ledger.Crypto qualified as Ledger
 import Cardano.Ledger.Keys qualified as Ledger
@@ -245,24 +246,36 @@ type family GYSigningKeyToApi (kr :: GYKeyRole) where
   GYSigningKeyToApi 'GYKeyRolePayment = Api.SigningKey Api.PaymentKey
   GYSigningKeyToApi 'GYKeyRoleStaking = Api.SigningKey Api.StakeKey
   GYSigningKeyToApi 'GYKeyRoleDRep = Api.SigningKey Api.DRepKey
+  GYSigningKeyToApi 'GYKeyRoleStakePool = Api.SigningKey Api.StakePoolKey
+  GYSigningKeyToApi 'GYKeyRoleHotCommittee = Api.SigningKey Api.CommitteeHotKey
+  GYSigningKeyToApi 'GYKeyRoleColdCommittee = Api.SigningKey Api.CommitteeColdKey
 
 signingKeyToApi :: forall kr. SingGYKeyRoleI kr => GYSigningKey kr -> GYSigningKeyToApi kr
 signingKeyToApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
+  SingGYKeyRoleStakePool -> coerce
+  SingGYKeyRoleHotCommittee -> coerce
+  SingGYKeyRoleColdCommittee -> coerce
 
 signingKeyFromApi :: forall kr. SingGYKeyRoleI kr => GYSigningKeyToApi kr -> GYSigningKey kr
 signingKeyFromApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
+  SingGYKeyRoleStakePool -> coerce
+  SingGYKeyRoleHotCommittee -> coerce
+  SingGYKeyRoleColdCommittee -> coerce
 
 instance SingGYKeyRoleI kr => ToShelleyWitnessSigningKey (GYSigningKey kr) where
   toShelleyWitnessSigningKey (signingKeyToApi -> sk) = case singGYKeyRole @kr of
     SingGYKeyRolePayment -> Api.WitnessPaymentKey sk
     SingGYKeyRoleStaking -> Api.WitnessStakeKey sk
     SingGYKeyRoleDRep -> Api.WitnessDRepKey sk
+    SingGYKeyRoleStakePool -> Api.WitnessStakePoolKey sk
+    SingGYKeyRoleHotCommittee -> Api.WitnessCommitteeHotKey sk
+    SingGYKeyRoleColdCommittee -> Api.WitnessCommitteeColdKey sk
 
 generateSigningKey :: forall kr. SingGYKeyRoleI kr => IO (GYSigningKey kr)
 generateSigningKey =
@@ -270,6 +283,9 @@ generateSigningKey =
     SingGYKeyRolePayment -> Api.generateSigningKey (Api.proxyToAsType Proxy)
     SingGYKeyRoleStaking -> Api.generateSigningKey (Api.proxyToAsType Proxy)
     SingGYKeyRoleDRep -> Api.generateSigningKey (Api.proxyToAsType Proxy)
+    SingGYKeyRoleStakePool -> Api.generateSigningKey (Api.proxyToAsType Proxy)
+    SingGYKeyRoleHotCommittee -> Api.generateSigningKey (Api.proxyToAsType Proxy)
+    SingGYKeyRoleColdCommittee -> Api.generateSigningKey (Api.proxyToAsType Proxy)
 
 writeSigningKey :: forall kr. (SingGYKeyRoleI kr, Api.HasTextEnvelope (GYSigningKeyToApi kr)) => FilePath -> GYSigningKey kr -> IO ()
 writeSigningKey file key = do
@@ -289,8 +305,10 @@ readSigningKey fp = do
     case singGYKeyRole @kr of
       SingGYKeyRolePayment -> [Api.FromSomeType (Api.proxyToAsType Proxy) id, Api.FromSomeType (Api.AsSigningKey Api.AsGenesisUTxOKey) Api.castSigningKey]
       SingGYKeyRoleStaking -> [Api.FromSomeType (Api.proxyToAsType Proxy) id]
-      -- for stake pool, I'd need to do @[Api.FromSomeType (Api.proxyToAsType Proxy) id, Api.FromSomeType (Api.AsSigningKey Api.AsGenesisDelegateKey) Api.castSigningKey]@
       SingGYKeyRoleDRep -> [Api.FromSomeType (Api.proxyToAsType Proxy) id]
+      SingGYKeyRoleStakePool -> [Api.FromSomeType (Api.proxyToAsType Proxy) id, Api.FromSomeType (Api.AsSigningKey Api.AsGenesisDelegateKey) Api.castSigningKey]
+      SingGYKeyRoleHotCommittee -> [Api.FromSomeType (Api.proxyToAsType Proxy) id]
+      SingGYKeyRoleColdCommittee -> [Api.FromSomeType (Api.proxyToAsType Proxy) id]
 
 signingKeyToLedgerKeyPair :: GYSigningKey kr -> TLedger.KeyPair (GYKeyRoleToLedger kr) Ledger.StandardCrypto
 signingKeyToLedgerKeyPair skey =
@@ -386,18 +404,27 @@ type family GYVerificationKeyToApi (kr :: GYKeyRole) where
   GYVerificationKeyToApi 'GYKeyRolePayment = Api.VerificationKey Api.PaymentKey
   GYVerificationKeyToApi 'GYKeyRoleStaking = Api.VerificationKey Api.StakeKey
   GYVerificationKeyToApi 'GYKeyRoleDRep = Api.VerificationKey Api.DRepKey
+  GYVerificationKeyToApi 'GYKeyRoleStakePool = Api.VerificationKey Api.StakePoolKey
+  GYVerificationKeyToApi 'GYKeyRoleHotCommittee = Api.VerificationKey Api.CommitteeHotKey
+  GYVerificationKeyToApi 'GYKeyRoleColdCommittee = Api.VerificationKey Api.CommitteeColdKey
 
 verificationKeyToApi :: forall kr. SingGYKeyRoleI kr => GYVerificationKey kr -> GYVerificationKeyToApi kr
 verificationKeyToApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
+  SingGYKeyRoleStakePool -> coerce
+  SingGYKeyRoleHotCommittee -> coerce
+  SingGYKeyRoleColdCommittee -> coerce
 
 verificationKeyFromApi :: forall kr. SingGYKeyRoleI kr => GYVerificationKeyToApi kr -> GYVerificationKey kr
 verificationKeyFromApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
+  SingGYKeyRoleStakePool -> coerce
+  SingGYKeyRoleHotCommittee -> coerce
+  SingGYKeyRoleColdCommittee -> coerce
 
 -- | Extended signing key.
 newtype GYExtendedSigningKey (kr :: GYKeyRole) = GYExtendedSigningKey Crypto.HD.XPrv
@@ -442,24 +469,35 @@ type family GYExtendedSigningKeyToApi (kr :: GYKeyRole) where
   GYExtendedSigningKeyToApi 'GYKeyRolePayment = Api.SigningKey Api.PaymentExtendedKey
   GYExtendedSigningKeyToApi 'GYKeyRoleStaking = Api.SigningKey Api.StakeExtendedKey
   GYExtendedSigningKeyToApi 'GYKeyRoleDRep = Api.SigningKey Api.DRepExtendedKey
+  GYExtendedSigningKeyToApi 'GYKeyRoleHotCommittee = Api.SigningKey Api.CommitteeHotExtendedKey
+  GYExtendedSigningKeyToApi 'GYKeyRoleColdCommittee = Api.SigningKey Api.CommitteeColdExtendedKey
 
 extendedSigningKeyToApi :: forall kr. SingGYKeyRoleI kr => GYExtendedSigningKey kr -> GYExtendedSigningKeyToApi kr
 extendedSigningKeyToApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
+  SingGYKeyRoleStakePool -> error "extendedSigningKeyToApi: Impossible, no API representation for extended stake pool key"
+  SingGYKeyRoleHotCommittee -> coerce
+  SingGYKeyRoleColdCommittee -> coerce
 
 extendedSigningKeyFromApi :: forall kr. SingGYKeyRoleI kr => GYExtendedSigningKeyToApi kr -> GYExtendedSigningKey kr
 extendedSigningKeyFromApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
+  SingGYKeyRoleStakePool -> error "extendedSigningKeyFromApi: Impossible, no API representation for extended stake pool key"
+  SingGYKeyRoleHotCommittee -> coerce
+  SingGYKeyRoleColdCommittee -> coerce
 
 instance SingGYKeyRoleI kr => ToShelleyWitnessSigningKey (GYExtendedSigningKey kr) where
   toShelleyWitnessSigningKey (extendedSigningKeyToApi -> sk) = case singGYKeyRole @kr of
     SingGYKeyRolePayment -> Api.WitnessPaymentExtendedKey sk
     SingGYKeyRoleStaking -> Api.WitnessStakeExtendedKey sk
     SingGYKeyRoleDRep -> Api.WitnessDRepExtendedKey sk
+    SingGYKeyRoleStakePool -> error "toShelleyWitnessSigningKey: Impossible, no API representation for extended stake pool key"
+    SingGYKeyRoleHotCommittee -> Api.WitnessCommitteeHotExtendedKey sk
+    SingGYKeyRoleColdCommittee -> Api.WitnessCommitteeColdExtendedKey sk
 
 writeExtendedSigningKey :: forall kr. (SingGYKeyRoleI kr, Api.HasTextEnvelope (GYExtendedSigningKeyToApi kr)) => FilePath -> GYExtendedSigningKey kr -> IO ()
 writeExtendedSigningKey file key = do
@@ -480,6 +518,9 @@ readExtendedSigningKey fp = do
       SingGYKeyRolePayment -> Api.proxyToAsType Proxy
       SingGYKeyRoleStaking -> Api.proxyToAsType Proxy
       SingGYKeyRoleDRep -> Api.proxyToAsType Proxy
+      SingGYKeyRoleStakePool -> error "readExtendedSigningKey: Impossible, no API representation for extended stake pool key"
+      SingGYKeyRoleHotCommittee -> Api.proxyToAsType Proxy
+      SingGYKeyRoleColdCommittee -> Api.proxyToAsType Proxy
 
 -------------------------------------------------------------------------------
 -- Payment verification key (public)

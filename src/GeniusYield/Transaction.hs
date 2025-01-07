@@ -105,6 +105,7 @@ import GeniusYield.Transaction.CBOR
 import GeniusYield.Transaction.CoinSelection
 import GeniusYield.Transaction.Common
 import GeniusYield.Types
+import GeniusYield.Types.Pool
 import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import GeniusYield.Types.TxCert.Internal
 
@@ -268,6 +269,7 @@ balanceTxStep
     , gyBTxEnvOwnUtxos = ownUtxos
     , gyBTxEnvChangeAddr = changeAddr
     , gyBTxEnvCollateral = collateral
+    , gyBTxEnvPools = pools
     }
   mmint
   wdrls
@@ -297,12 +299,21 @@ balanceTxStep
             )
             (0, 0)
             certs
+        ppDeposit :: Natural = pp ^. Ledger.ppPoolDepositL & fromIntegral
+        (spDeregsAmt :: Natural, spRegsAmt :: Natural) =
+          foldl'
+            ( \acc@(!accDeregsAmt, !accRegsAmt) (gyTxCertCertificate' -> cert) -> case cert of
+                GYStakePoolRegistrationCertificate poolParams -> (accDeregsAmt, if Set.member (stakePoolIdToApi (poolId poolParams)) pools then accRegsAmt else accRegsAmt + ppDeposit)
+                _ -> acc
+            )
+            (0, 0)
+            certs
         -- Extra ada is received from withdrawals and stake credential deregistration.
         adaSource =
           let wdrlsAda = getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls
-           in wdrlsAda + stakeCredDeregsAmt + drepDeregsAmt
+           in wdrlsAda + stakeCredDeregsAmt + drepDeregsAmt + spDeregsAmt
         -- Ada lost due to stake credential registration.
-        adaSink = stakeCredRegsAmt + drepRegsAmt
+        adaSink = stakeCredRegsAmt + drepRegsAmt + spRegsAmt
         collaterals
           | needsCollateral = utxosFromUTxO collateral
           | otherwise = mempty

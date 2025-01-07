@@ -130,6 +130,7 @@ import GeniusYield.TxBuilder.Query.Class
 import GeniusYield.TxBuilder.User
 import GeniusYield.Types
 import GeniusYield.Types.Key.Class (ToShelleyWitnessSigningKey)
+import GeniusYield.Types.TxCert.Internal (GYTxCert (..))
 import PlutusLedgerApi.V1 qualified as Plutus (
   Address,
   DatumHash,
@@ -960,7 +961,8 @@ buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
   ss <- systemStart
   eh <- eraHistory
   pp <- protocolParams
-  let ps = mempty -- This denotes the set of registered stake pools that are being unregistered in current transaction. We don't support this yet.
+  let isRegPool = any (any (\(GYTxCert pb _) -> case pb of GYStakePoolRegistrationCertificatePB _ -> True; _anyOther -> False) . gytxCerts) skeletons
+  ps <- if isRegPool then stakePools else pure mempty -- TODO: For ONLY unregistration case, we can just put those stake pool ids.
   collateral <- ownCollateral
   addrs <- ownAddresses
   change <- ownChangeAddress

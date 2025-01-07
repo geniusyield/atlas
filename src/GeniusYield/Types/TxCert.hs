@@ -15,6 +15,7 @@ module GeniusYield.Types.TxCert (
   mkDRepRegistrationCertificate,
   mkDRepUpdateCertificate,
   mkDRepUnregistrationCertificate,
+  mkStakePoolRegistrationCertificate,
 ) where
 
 import GeniusYield.Imports (Natural)
@@ -23,6 +24,7 @@ import GeniusYield.Types.Certificate
 import GeniusYield.Types.Credential (GYCredential, GYStakeCredential)
 import GeniusYield.Types.Delegatee (GYDelegatee)
 import GeniusYield.Types.KeyRole (GYKeyRole (..))
+import GeniusYield.Types.Pool
 import GeniusYield.Types.TxCert.Internal
 
 -- | Post conway, newer stake address registration certificate also require a witness.
@@ -71,3 +73,16 @@ mkDRepUpdateCertificate cred anchor wit = GYTxCert (GYDRepUpdateCertificatePB cr
 -}
 mkDRepUnregistrationCertificate :: GYCredential 'GYKeyRoleDRep -> Natural -> GYTxCertWitness v -> GYTxCert v
 mkDRepUnregistrationCertificate cred refund wit = GYTxCert (GYDRepUnregistrationCertificatePB cred refund) (Just wit)
+
+{- | Note that stake pool registration certificate requires following preconditions:
+
+1. @poolCost@ must be more than minimum pool cost specified in protocol parameters.
+
+2. Signature from the key corresponding to @poolId@.
+
+3. If registering for the first time, then deposit is also deducted to that given by corresponding protocol parameter.
+-}
+mkStakePoolRegistrationCertificate ::
+  GYPoolParams ->
+  GYTxCert v
+mkStakePoolRegistrationCertificate pp = GYTxCert (GYStakePoolRegistrationCertificatePB pp) (Just GYTxCertWitnessKey)

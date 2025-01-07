@@ -304,6 +304,7 @@ balanceTxStep
           foldl'
             ( \acc@(!accDeregsAmt, !accRegsAmt) (gyTxCertCertificate' -> cert) -> case cert of
                 GYStakePoolRegistrationCertificate poolParams -> (accDeregsAmt, if Set.member (stakePoolIdToApi (poolId poolParams)) pools then accRegsAmt else accRegsAmt + ppDeposit)
+                -- Retirement does not add ADA source.
                 _ -> acc
             )
             (0, 0)

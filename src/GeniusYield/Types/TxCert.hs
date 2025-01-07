@@ -16,6 +16,7 @@ module GeniusYield.Types.TxCert (
   mkDRepUpdateCertificate,
   mkDRepUnregistrationCertificate,
   mkStakePoolRegistrationCertificate,
+  mkStakePoolRetirementCertificate,
 ) where
 
 import GeniusYield.Imports (Natural)
@@ -23,6 +24,8 @@ import GeniusYield.Types.Anchor (GYAnchor)
 import GeniusYield.Types.Certificate
 import GeniusYield.Types.Credential (GYCredential, GYStakeCredential)
 import GeniusYield.Types.Delegatee (GYDelegatee)
+import GeniusYield.Types.Epoch
+import GeniusYield.Types.KeyHash
 import GeniusYield.Types.KeyRole (GYKeyRole (..))
 import GeniusYield.Types.Pool
 import GeniusYield.Types.TxCert.Internal
@@ -86,3 +89,16 @@ mkStakePoolRegistrationCertificate ::
   GYPoolParams ->
   GYTxCert v
 mkStakePoolRegistrationCertificate pp = GYTxCert (GYStakePoolRegistrationCertificatePB pp) (Just GYTxCertWitnessKey)
+
+{- | Note that stake pool retirement certificate requires following preconditions:
+
+1. Signature from the key corresponding to @poolId@.
+
+2. Epoch must be greater than the current epoch and less than or equal to ppEMax after the current epoch.
+
+3. The pool must be registered.
+
+Note that deposit made earlier is returned at epoch transition.
+-}
+mkStakePoolRetirementCertificate :: GYKeyHash 'GYKeyRoleStakePool -> GYEpochNo -> GYTxCert v
+mkStakePoolRetirementCertificate poolId epoch = GYTxCert (GYStakePoolRetirementCertificatePB poolId epoch) (Just GYTxCertWitnessKey)

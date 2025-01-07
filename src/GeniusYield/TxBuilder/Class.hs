@@ -962,7 +962,13 @@ buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
   eh <- eraHistory
   pp <- protocolParams
   let isRegPool = any (any (\(GYTxCert pb _) -> case pb of GYStakePoolRegistrationCertificatePB _ -> True; _anyOther -> False) . gytxCerts) skeletons
-  ps <- if isRegPool then stakePools else pure mempty -- TODO: For ONLY unregistration case, we can just put those stake pool ids.
+  ps <-
+    if isRegPool
+      then
+        stakePools
+      else
+        -- We just add for retiring pools.
+        pure $ foldl' (\acc (GYTxCert pb _) -> case pb of GYStakePoolRetirementCertificatePB spid _ -> Set.insert (stakePoolIdToApi spid) acc; _anyOther -> acc) Set.empty $ concatMap gytxCerts skeletons
   collateral <- ownCollateral
   addrs <- ownAddresses
   change <- ownChangeAddress

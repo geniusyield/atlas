@@ -237,14 +237,14 @@ vrfVerKeyHashToLedger = coerce
 vrfVerKeyHashFromLedger :: Ledger.Hash Ledger.StandardCrypto (Ledger.VerKeyVRF Ledger.StandardCrypto) -> GYVRFVerKeyHash kr
 vrfVerKeyHashFromLedger = coerce
 
--- >>> "ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81" :: (GYVRFVerKeyHash 'GYKeyRoleVRFStakePool)
--- GYVRFVerKeyHash (GYKeyRoleVRFStakePool) "ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
+{- |
+>>> "e132b26f3af1bd2a3d6af837ab09a60742625726415a29ca60d4778ff93da74e" :: (GYVRFVerKeyHash 'GYKeyRoleVRFStakePool)
+GYVRFVerKeyHash (GYKeyRoleVRFStakePool) "e132b26f3af1bd2a3d6af837ab09a60742625726415a29ca60d4778ff93da74e"
+-}
 instance IsString (GYVRFVerKeyHash kr) where
   fromString = BS.pack >>> vrfVerKeyHashFromRawBytesHex >>> either error id
 
 -- TODO: This (Show instance) is not specialised using singletons.
--- >>> pkh
--- GYVRFVerKeyHash (GYKeyRoleVRFStakePool) "ec91ac77b581ba928db86cd91d11e64032450677c6b80748ce0b9a81"
 instance Show (GYVRFVerKeyHash kr) where
   showsPrec d kh = showParen (d > 10) $ showString "GYVRFVerKeyHash (GYKeyRoleVRFStakePool) " . shows (vrfVerKeyHashToRawBytesHex kh)
 

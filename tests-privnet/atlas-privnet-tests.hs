@@ -16,6 +16,7 @@ import GeniusYield.CardanoApi.EraHistory
 import GeniusYield.Types
 
 import GeniusYield.Test.Privnet.Blueprint qualified
+import GeniusYield.Test.Privnet.Committee qualified
 import GeniusYield.Test.Privnet.Ctx
 import GeniusYield.Test.Privnet.DRep qualified
 import GeniusYield.Test.Privnet.Examples qualified
@@ -68,4 +69,5 @@ main = do
         , GeniusYield.Test.Privnet.SimpleScripts.simpleScriptsTests setup
         , GeniusYield.Test.Privnet.DRep.drepTests setup
         , GeniusYield.Test.Privnet.StakePool.stakePoolTests setup
+        , GeniusYield.Test.Privnet.Committee.committeeTests setup
         ]

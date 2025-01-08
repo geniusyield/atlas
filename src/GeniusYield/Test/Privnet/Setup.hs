@@ -24,6 +24,7 @@ module GeniusYield.Test.Privnet.Setup (
 
 import Cardano.Api qualified as Api
 import Cardano.Api.Ledger
+import Cardano.Ledger.Conway.Governance qualified as Ledger
 import Cardano.Ledger.Plutus qualified as Ledger
 import Cardano.Testnet
 import Control.Concurrent (
@@ -33,7 +34,7 @@ import Control.Concurrent (
  )
 import Control.Concurrent.STM qualified as STM
 import Control.Exception (finally)
-import Control.Monad (forever)
+import Control.Monad (forever, replicateM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource (
   MonadResource (liftResourceT),
@@ -41,6 +42,7 @@ import Control.Monad.Trans.Resource (
  )
 import Data.Default (Default (..))
 import Data.Default.Class qualified as DefaultClass
+import Data.Map.Strict qualified as Map
 import Data.Text qualified as Txt
 import Data.Vector qualified as V
 import GeniusYield.Api.TestTokens qualified as GY.TestTokens
@@ -56,7 +58,7 @@ import GeniusYield.TxBuilder
 import GeniusYield.Types
 import Hedgehog qualified as H
 import Hedgehog.Extras.Stock qualified as H'
-import Test.Cardano.Ledger.Core.Rational ((%!))
+import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational, (%!))
 import Test.Tasty (TestName, TestTree)
 import Test.Tasty.HUnit (testCaseSteps)
 import Testnet.Property.Util
@@ -125,51 +127,57 @@ debug :: String -> IO ()
 -- debug = putStrLn
 debug _ = return ()
 
-conwayGenesis :: ConwayGenesis StandardCrypto
-conwayGenesis =
-  let upPParams :: UpgradeConwayPParams Identity
-      upPParams =
-        UpgradeConwayPParams
-          { ucppPoolVotingThresholds = poolVotingThresholds
-          , ucppDRepVotingThresholds = drepVotingThresholds
-          , ucppCommitteeMinSize = 0
-          , ucppCommitteeMaxTermLength = EpochInterval 200
-          , ucppGovActionLifetime = EpochInterval 1 -- One Epoch
-          , ucppGovActionDeposit = Coin 1_000_000
-          , ucppDRepDeposit = Coin 500_000_000
-          , ucppDRepActivity = EpochInterval 100
-          , ucppMinFeeRefScriptCostPerByte = 15 %! 1
-          , ucppPlutusV3CostModel = either (error "Couldn't build PlutusV3 cost models") id $ Ledger.mkCostModel Ledger.PlutusV3 [100788, 420, 1, 1, 1000, 173, 0, 1, 1000, 59957, 4, 1, 11183, 32, 201305, 8356, 4, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 100, 100, 16000, 100, 94375, 32, 132994, 32, 61462, 4, 72010, 178, 0, 1, 22151, 32, 91189, 769, 4, 2, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1, 1000, 42921, 4, 2, 24548, 29498, 38, 1, 898148, 27279, 1, 51775, 558, 1, 39184, 1000, 60594, 1, 141895, 32, 83150, 32, 15299, 32, 76049, 1, 13169, 4, 22100, 10, 28999, 74, 1, 28999, 74, 1, 43285, 552, 1, 44749, 541, 1, 33852, 32, 68246, 32, 72362, 32, 7243, 32, 7391, 32, 11546, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 90434, 519, 0, 1, 74433, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 955506, 213312, 0, 2, 270652, 22588, 4, 1457325, 64566, 4, 20467, 1, 4, 0, 141992, 32, 100788, 420, 1, 1, 81663, 32, 59498, 32, 20142, 32, 24588, 32, 20744, 32, 25933, 32, 24623, 32, 43053543, 10, 53384111, 14333, 10, 43574283, 26308, 10, 16000, 100, 16000, 100, 962335, 18, 2780678, 6, 442008, 1, 52538055, 3756, 18, 267929, 18, 76433006, 8868, 18, 52948122, 18, 1995836, 36, 3227919, 12, 901022, 1, 166917843, 4307, 36, 284546, 36, 158221314, 26549, 36, 74698472, 36, 333849714, 1, 254006273, 72, 2174038, 72, 2261318, 64571, 4, 207616, 8310, 4, 1293828, 28716, 63, 0, 1, 1006041, 43623, 251, 0, 1]
-          }
-      drepVotingThresholds =
-        DRepVotingThresholds
-          { dvtMotionNoConfidence = 67 %! 100
-          , dvtCommitteeNormal = 67 %! 100
-          , dvtCommitteeNoConfidence = 6 %! 10
-          , dvtUpdateToConstitution = 75 %! 100
-          , dvtHardForkInitiation = 6 %! 10
-          , dvtPPNetworkGroup = 67 %! 100
-          , dvtPPEconomicGroup = 67 %! 100
-          , dvtPPTechnicalGroup = 67 %! 100
-          , dvtPPGovGroup = 75 %! 100
-          , dvtTreasuryWithdrawal = 67 %! 100
-          }
-      poolVotingThresholds =
-        PoolVotingThresholds
-          { pvtMotionNoConfidence = commonPoolVotingThreshold
-          , pvtCommitteeNormal = commonPoolVotingThreshold
-          , pvtCommitteeNoConfidence = commonPoolVotingThreshold
-          , pvtHardForkInitiation = commonPoolVotingThreshold
-          , pvtPPSecurityGroup = commonPoolVotingThreshold
-          }
-      commonPoolVotingThreshold = 51 %! 100
-   in ConwayGenesis
-        { cgUpgradePParams = upPParams
-        , cgConstitution = DefaultClass.def
-        , cgCommittee = DefaultClass.def
-        , cgDelegs = mempty
-        , cgInitialDReps = mempty
+conwayGenesis :: CtxCommittee -> ConwayGenesis StandardCrypto
+conwayGenesis ctxCommittee =
+  let
+    upPParams :: UpgradeConwayPParams Identity
+    upPParams =
+      UpgradeConwayPParams
+        { ucppPoolVotingThresholds = poolVotingThresholds
+        , ucppDRepVotingThresholds = drepVotingThresholds
+        , ucppCommitteeMinSize = 0
+        , ucppCommitteeMaxTermLength = EpochInterval 200
+        , ucppGovActionLifetime = EpochInterval 1 -- One Epoch
+        , ucppGovActionDeposit = Coin 1_000_000
+        , ucppDRepDeposit = Coin 500_000_000
+        , ucppDRepActivity = EpochInterval 100
+        , ucppMinFeeRefScriptCostPerByte = 15 %! 1
+        , ucppPlutusV3CostModel = either (error "Couldn't build PlutusV3 cost models") id $ Ledger.mkCostModel Ledger.PlutusV3 [100788, 420, 1, 1, 1000, 173, 0, 1, 1000, 59957, 4, 1, 11183, 32, 201305, 8356, 4, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 100, 100, 16000, 100, 94375, 32, 132994, 32, 61462, 4, 72010, 178, 0, 1, 22151, 32, 91189, 769, 4, 2, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1, 1000, 42921, 4, 2, 24548, 29498, 38, 1, 898148, 27279, 1, 51775, 558, 1, 39184, 1000, 60594, 1, 141895, 32, 83150, 32, 15299, 32, 76049, 1, 13169, 4, 22100, 10, 28999, 74, 1, 28999, 74, 1, 43285, 552, 1, 44749, 541, 1, 33852, 32, 68246, 32, 72362, 32, 7243, 32, 7391, 32, 11546, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 90434, 519, 0, 1, 74433, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 955506, 213312, 0, 2, 270652, 22588, 4, 1457325, 64566, 4, 20467, 1, 4, 0, 141992, 32, 100788, 420, 1, 1, 81663, 32, 59498, 32, 20142, 32, 24588, 32, 20744, 32, 25933, 32, 24623, 32, 43053543, 10, 53384111, 14333, 10, 43574283, 26308, 10, 16000, 100, 16000, 100, 962335, 18, 2780678, 6, 442008, 1, 52538055, 3756, 18, 267929, 18, 76433006, 8868, 18, 52948122, 18, 1995836, 36, 3227919, 12, 901022, 1, 166917843, 4307, 36, 284546, 36, 158221314, 26549, 36, 74698472, 36, 333849714, 1, 254006273, 72, 2174038, 72, 2261318, 64571, 4, 207616, 8310, 4, 1293828, 28716, 63, 0, 1, 1006041, 43623, 251, 0, 1]
         }
+    drepVotingThresholds =
+      DRepVotingThresholds
+        { dvtMotionNoConfidence = 67 %! 100
+        , dvtCommitteeNormal = 67 %! 100
+        , dvtCommitteeNoConfidence = 6 %! 10
+        , dvtUpdateToConstitution = 75 %! 100
+        , dvtHardForkInitiation = 6 %! 10
+        , dvtPPNetworkGroup = 67 %! 100
+        , dvtPPEconomicGroup = 67 %! 100
+        , dvtPPTechnicalGroup = 67 %! 100
+        , dvtPPGovGroup = 75 %! 100
+        , dvtTreasuryWithdrawal = 67 %! 100
+        }
+    poolVotingThresholds =
+      PoolVotingThresholds
+        { pvtMotionNoConfidence = commonPoolVotingThreshold
+        , pvtCommitteeNormal = commonPoolVotingThreshold
+        , pvtCommitteeNoConfidence = commonPoolVotingThreshold
+        , pvtHardForkInitiation = commonPoolVotingThreshold
+        , pvtPPSecurityGroup = commonPoolVotingThreshold
+        }
+    commonPoolVotingThreshold = 51 %! 100
+   in
+    ConwayGenesis
+      { cgUpgradePParams = upPParams
+      , cgConstitution = DefaultClass.def
+      , cgCommittee =
+          Ledger.Committee
+            { Ledger.committeeMembers = Map.map epochNoToLedger $ Map.mapKeys (\sk -> let vkh = verificationKeyHash $ getVerificationKey sk in credentialToLedger $ GYCredentialByKey vkh) $ ctxCommitteeMembers ctxCommittee
+            , Ledger.committeeThreshold = ctxCommitteeThreshold ctxCommittee
+            }
+      , cgDelegs = mempty
+      , cgInitialDReps = mempty
+      }
 
 {- | Spawn a resource managed privnet and do things with it (closing it in the end).
 
@@ -183,6 +191,13 @@ given a logging -- function and the action itself (which receives the Privnet Ct
 -}
 withPrivnet :: (CardanoTestnetOptions, GenesisOptions) -> (Setup -> IO ()) -> IO ()
 withPrivnet (testnetOpts, genesisOpts) setupUser = do
+  coldCommitteeMembers :: [GYSigningKey 'GYKeyRoleColdCommittee] <- replicateM 3 generateSigningKey
+  let ctxCommittee :: CtxCommittee
+      ctxCommittee =
+        CtxCommittee
+          { ctxCommitteeMembers = Map.fromList $ map (,GYEpochNo 100000000) coldCommitteeMembers
+          , ctxCommitteeThreshold = unsafeBoundRational 0.51
+          }
   -- Based on: https://github.com/IntersectMBO/cardano-node/blob/master/cardano-testnet/src/Testnet/Property/Run.hs
   -- They are using hedgehog (property testing framework) to orchestrate a testnet running in the background
   -- ....for some god forsaken reason
@@ -200,7 +215,7 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
       , testnetNodes
       , testnetMagic
       } <-
-      cardanoTestnet' testnetOpts genesisOpts conf
+      cardanoTestnet' testnetOpts genesisOpts conf ctxCommittee
 
     liftIO . STM.atomically $
       STM.writeTMVar
@@ -314,6 +329,7 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
               , ctxAwaitTxConfirmed = localAwaitTxConfirmed
               , ctxQueryUtxos = localQueryUtxo
               , ctxGetParams = localGetParams
+              , ctxCommittee
               }
 
       V.imapM_
@@ -354,11 +370,11 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
       setupUser setup
  where
   -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
-  cardanoTestnet' testnetOptions shelleyOptions conf = do
+  cardanoTestnet' testnetOptions shelleyOptions conf ctxCommittee = do
     Api.AnyShelleyBasedEra sbe <- pure cardanoNodeEra
     alonzoGenesis <- getDefaultAlonzoGenesis sbe
     shelleyGenesis <- getDefaultShelleyGenesis cardanoNodeEra cardanoMaxSupply shelleyOptions
-    cardanoTestnet testnetOptions conf shelleyGenesis alonzoGenesis conwayGenesis
+    cardanoTestnet testnetOptions conf shelleyGenesis alonzoGenesis (conwayGenesis ctxCommittee)
    where
     CardanoTestnetOptions {cardanoNodeEra, cardanoMaxSupply} = testnetOptions
 

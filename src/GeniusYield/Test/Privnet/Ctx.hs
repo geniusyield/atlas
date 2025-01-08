@@ -8,6 +8,7 @@ Stability   : develop
 module GeniusYield.Test.Privnet.Ctx (
   -- * Context
   Ctx (..),
+  CtxCommittee (..),
   ctxNetworkId,
 
   -- * User
@@ -86,6 +87,14 @@ data Ctx = Ctx
   , ctxAwaitTxConfirmed :: !GYAwaitTx
   , ctxQueryUtxos :: !GYQueryUTxO
   , ctxGetParams :: !GYGetParameters
+  , ctxCommittee :: !CtxCommittee
+  }
+
+data CtxCommittee = CtxCommittee
+  { ctxCommitteeMembers :: !(Map (GYSigningKey 'GYKeyRoleColdCommittee) GYEpochNo)
+  -- ^ Committee members with epoch number when each of them expires
+  , ctxCommitteeThreshold :: !UnitInterval
+  -- ^ Threshold of the committee that is necessary for a successful vote
   }
 
 ctxNetworkId :: Ctx -> GYNetworkId

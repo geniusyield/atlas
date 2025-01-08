@@ -184,6 +184,7 @@ import GeniusYield.Types.Providers as X
 import GeniusYield.Types.PubKeyHash as X
 import GeniusYield.Types.Rational as X
 import GeniusYield.Types.Redeemer as X
+import GeniusYield.Types.Reexpose as X
 import GeniusYield.Types.Script as X
 import GeniusYield.Types.Slot as X
 import GeniusYield.Types.SlotConfig as X

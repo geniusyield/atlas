@@ -298,19 +298,19 @@ balanceTxStep
             (0, 0)
             certs
         ppDeposit :: Natural = pp ^. Ledger.ppPoolDepositL & fromIntegral
-        (spDeregsAmt :: Natural, spRegsAmt :: Natural) =
+        spRegsAmt :: Natural =
           foldl'
-            ( \acc@(!accDeregsAmt, !accRegsAmt) (gyTxCertCertificate' -> cert) -> case cert of
-                GYStakePoolRegistrationCertificate poolParams -> (accDeregsAmt, if Set.member (stakePoolIdToApi (poolId poolParams)) pools then accRegsAmt else accRegsAmt + ppDeposit)
+            ( \(!accRegsAmt) (gyTxCertCertificate' -> cert) -> case cert of
+                GYStakePoolRegistrationCertificate poolParams -> (if Set.member (stakePoolIdToApi (poolId poolParams)) pools then accRegsAmt else accRegsAmt + ppDeposit)
                 -- Retirement does not add ADA source.
-                _ -> acc
+                _ -> accRegsAmt
             )
-            (0, 0)
+            0
             certs
         -- Extra ada is received from withdrawals and stake credential deregistration.
         adaSource =
           let wdrlsAda = getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls
-           in wdrlsAda + stakeCredDeregsAmt + drepDeregsAmt + spDeregsAmt
+           in wdrlsAda + stakeCredDeregsAmt + drepDeregsAmt
         -- Ada lost due to stake credential registration.
         adaSink = stakeCredRegsAmt + drepRegsAmt + spRegsAmt
         collaterals

@@ -69,7 +69,6 @@ import Cardano.Crypto.DSIGN (
   sizeSigDSIGN,
   sizeVerKeyDSIGN,
  )
-import Cardano.Ledger.Alonzo.PParams (ppCollateralPercentageL)
 import Cardano.Ledger.Alonzo.PParams qualified as Ledger
 import Cardano.Ledger.Alonzo.Scripts qualified as AlonzoScripts
 import Cardano.Ledger.Alonzo.Tx qualified as AlonzoTx
@@ -105,7 +104,6 @@ import GeniusYield.Transaction.CBOR
 import GeniusYield.Transaction.CoinSelection
 import GeniusYield.Transaction.Common
 import GeniusYield.Types
-import GeniusYield.Types.Pool
 import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import GeniusYield.Types.TxCert.Internal
 

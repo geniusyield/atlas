@@ -11,7 +11,6 @@ Stability   : develop
 module GeniusYield.Test.Privnet.Examples.Gift (tests) where
 
 import Cardano.Api qualified as Api
-import Cardano.Ledger.Alonzo.PParams (ppCollateralPercentageL)
 import Control.Applicative ((<|>))
 import Control.Concurrent (threadDelay)
 import Control.Lens ((.~), (^.))

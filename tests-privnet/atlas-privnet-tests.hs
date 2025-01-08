@@ -22,6 +22,7 @@ import GeniusYield.Test.Privnet.Examples qualified
 import GeniusYield.Test.Privnet.Setup
 import GeniusYield.Test.Privnet.SimpleScripts qualified
 import GeniusYield.Test.Privnet.Stake qualified
+import GeniusYield.Test.Privnet.StakePool qualified
 import GeniusYield.TxBuilder
 
 main :: IO ()
@@ -66,4 +67,5 @@ main = do
         , GeniusYield.Test.Privnet.Stake.stakeValidatorTests setup
         , GeniusYield.Test.Privnet.SimpleScripts.simpleScriptsTests setup
         , GeniusYield.Test.Privnet.DRep.drepTests setup
+        , GeniusYield.Test.Privnet.StakePool.stakePoolTests setup
         ]

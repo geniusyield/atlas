@@ -374,6 +374,7 @@ test-suite atlas-privnet-tests
     GeniusYield.Test.Privnet.Stake.Key
     GeniusYield.Test.Privnet.Stake.Utils
     GeniusYield.Test.Privnet.Stake.Validator
+    GeniusYield.Test.Privnet.StakePool
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:

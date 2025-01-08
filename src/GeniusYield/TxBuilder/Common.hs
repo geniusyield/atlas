@@ -20,7 +20,6 @@ module GeniusYield.TxBuilder.Common (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Ledger (unboundRational)
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Alonzo.Core qualified as Ledger

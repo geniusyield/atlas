@@ -83,7 +83,9 @@ mkDRepUnregistrationCertificate cred refund wit = GYTxCert (GYDRepUnregistration
 
 2. Signature from the key corresponding to @poolId@.
 
-3. If registering for the first time, then deposit is also deducted to that given by corresponding protocol parameter.
+3. If registering for the first time, then deposit is also deducted to that given by corresponding protocol parameter (ppPoolDepositL).
+
+4. Signature from pool owners.
 -}
 mkStakePoolRegistrationCertificate ::
   GYPoolParams ->

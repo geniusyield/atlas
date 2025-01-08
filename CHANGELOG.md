@@ -1,12 +1,12 @@
 ## 0.8.0
 
 * Note that there has been large internal refactoring inside this update, but these are mostly non breaking as we provide pattern & type synonyms to keep earlier behavior. In particular:
-  * We define a new type `GYKeyHash kr` and all other key hashes such as `GYPaymentKeyHash` are type synonyms around it.
+  * We define a new type `GYKeyHash kr` and all other key hashes such as `GYPaymentKeyHash`, `GYStakePoolId` are type synonyms around it.
   * We define a new type `GYCredential kr` and all other credentials such as `GYPaymentCredential` are type synonyms around it. 
   * Likewise types `GYSigningKey kr`, `GYVerificationKey kr`, `GYExtendedSigningKey kr` are newly introduced and previous relevant key types like `GYPaymentSigningKey` are simply type synonyms.
 * Constructor of `GYPubKeyHash` is no longer exported.
 * `readSomeSigningKey` is removed.
-* Adds additional certificates such as those related to governance, drep participation, etc.
+* Adds additional certificates such as those related to governance, drep participation, stake pool registration, etc.
 * Tracks node version 10.1.3 and corresponding updated CLB version.
 * Update default value of `GYAwaitTxParameters` to now have 100 max attempts.
 

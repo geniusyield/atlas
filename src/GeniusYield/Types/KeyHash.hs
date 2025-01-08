@@ -16,6 +16,14 @@ module GeniusYield.Types.KeyHash (
   keyHashToRawBytesHexText,
   keyHashFromRawBytes,
   keyHashFromRawBytesHex,
+  GYVRFVerKeyHash,
+  vrfVerKeyHashToLedger,
+  vrfVerKeyHashFromLedger,
+  vrfVerKeyHashToRawBytes,
+  vrfVerKeyHashToRawBytesHex,
+  vrfVerKeyHashToRawBytesHexText,
+  vrfVerKeyHashFromRawBytes,
+  vrfVerKeyHashFromRawBytesHex,
 ) where
 
 import Cardano.Api qualified as Api
@@ -35,7 +43,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
 import GeniusYield.Imports (coerce, (&), (>>>))
-import GeniusYield.Types.KeyRole (GYKeyRole (..), GYKeyRoleToLedger, SingGYKeyRole (..), SingGYKeyRoleI (..), fromSingGYKeyRole)
+import GeniusYield.Types.KeyRole (GYKeyRole (..), GYKeyRoleToLedger, GYKeyRoleVRF, SingGYKeyRole (..), SingGYKeyRoleI (..), fromSingGYKeyRole)
 import GeniusYield.Types.PubKeyHash (AsPubKeyHash (fromPubKeyHash, toPubKeyHash), CanSignTx, pubKeyHashFromApi, pubKeyHashToApi)
 import Text.Printf qualified as Printf
 
@@ -104,6 +112,9 @@ type family GYHashToApi (kr :: GYKeyRole) where
   GYHashToApi 'GYKeyRolePayment = Api.Hash Api.PaymentKey
   GYHashToApi 'GYKeyRoleStaking = Api.Hash Api.StakeKey
   GYHashToApi 'GYKeyRoleDRep = Api.Hash Api.DRepKey
+  GYHashToApi 'GYKeyRoleStakePool = Api.Hash Api.StakePoolKey
+  GYHashToApi 'GYKeyRoleHotCommittee = Api.Hash Api.CommitteeHotKey
+  GYHashToApi 'GYKeyRoleColdCommittee = Api.Hash Api.CommitteeColdKey
 
 {- |
 
@@ -115,6 +126,9 @@ keyHashToApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
+  SingGYKeyRoleStakePool -> coerce
+  SingGYKeyRoleHotCommittee -> coerce
+  SingGYKeyRoleColdCommittee -> coerce
 
 {- |
 
@@ -126,6 +140,9 @@ keyHashFromApi = case singGYKeyRole @kr of
   SingGYKeyRolePayment -> coerce
   SingGYKeyRoleStaking -> coerce
   SingGYKeyRoleDRep -> coerce
+  SingGYKeyRoleStakePool -> coerce
+  SingGYKeyRoleHotCommittee -> coerce
+  SingGYKeyRoleColdCommittee -> coerce
 
 instance AsPubKeyHash (GYKeyHash kr) where
   toPubKeyHash (GYKeyHash kh) = pubKeyHashFromApi $ coerce $ Ledger.coerceKeyRole kh
@@ -209,3 +226,49 @@ instance SingGYKeyRoleI kr => Swagger.ToSchema (GYKeyHash kr) where
           ?~ 56
             & Swagger.minLength
           ?~ 56
+
+-- | Hash of a public key corresponding to a given `GYKeyRoleVRF`.
+newtype GYVRFVerKeyHash (kr :: GYKeyRoleVRF) = GYVRFVerKeyHash (Ledger.Hash Ledger.StandardCrypto (Ledger.VerKeyVRF Ledger.StandardCrypto))
+  deriving newtype (Eq, Ord)
+
+vrfVerKeyHashToLedger :: GYVRFVerKeyHash kr -> Ledger.Hash Ledger.StandardCrypto (Ledger.VerKeyVRF Ledger.StandardCrypto)
+vrfVerKeyHashToLedger = coerce
+
+vrfVerKeyHashFromLedger :: Ledger.Hash Ledger.StandardCrypto (Ledger.VerKeyVRF Ledger.StandardCrypto) -> GYVRFVerKeyHash kr
+vrfVerKeyHashFromLedger = coerce
+
+{- |
+>>> "e132b26f3af1bd2a3d6af837ab09a60742625726415a29ca60d4778ff93da74e" :: (GYVRFVerKeyHash 'GYKeyRoleVRFStakePool)
+GYVRFVerKeyHash (GYKeyRoleVRFStakePool) "e132b26f3af1bd2a3d6af837ab09a60742625726415a29ca60d4778ff93da74e"
+-}
+instance IsString (GYVRFVerKeyHash kr) where
+  fromString = BS.pack >>> vrfVerKeyHashFromRawBytesHex >>> either error id
+
+-- TODO: This (Show instance) is not specialised using singletons.
+instance Show (GYVRFVerKeyHash kr) where
+  showsPrec d kh = showParen (d > 10) $ showString "GYVRFVerKeyHash (GYKeyRoleVRFStakePool) " . shows (vrfVerKeyHashToRawBytesHex kh)
+
+-- | Get corresponding raw bytes.
+vrfVerKeyHashToRawBytes :: GYVRFVerKeyHash kr -> BS.ByteString
+vrfVerKeyHashToRawBytes kh = Crypto.hashToBytes $ vrfVerKeyHashToLedger kh
+
+-- | Get corresponding raw bytes represented as hex.
+vrfVerKeyHashToRawBytesHex :: GYVRFVerKeyHash kr -> BS.ByteString
+vrfVerKeyHashToRawBytesHex = vrfVerKeyHashToRawBytes >>> Base16.encode
+
+-- | Get corresponding raw bytes represented as hex text.
+vrfVerKeyHashToRawBytesHexText :: GYVRFVerKeyHash kr -> Text
+vrfVerKeyHashToRawBytesHexText = vrfVerKeyHashToRawBytesHex >>> Text.decodeUtf8
+
+-- | Decode from raw bytes.
+vrfVerKeyHashFromRawBytes :: BS.ByteString -> Maybe (GYVRFVerKeyHash kr)
+vrfVerKeyHashFromRawBytes bs = vrfVerKeyHashFromLedger <$> Crypto.hashFromBytes bs
+
+-- | Decode from raw bytes represented as hex.
+vrfVerKeyHashFromRawBytesHex :: BS.ByteString -> Either String (GYVRFVerKeyHash kr)
+vrfVerKeyHashFromRawBytesHex bs =
+  case Base16.decode bs of
+    Left e -> Left $ "GeniusYield.Types.KeyHash.vrfVerKeyHashFromRawBytesHex: unable to decode hash from hex string: " <> BS.unpack bs <> ", error: " <> e
+    Right bs' -> case vrfVerKeyHashFromRawBytes bs' of
+      Nothing -> Left $ "GeniusYield.Types.KeyHash.vrfVerKeyHashFromRawBytesHex: unable to decode hash from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs'
+      Just kh -> Right kh

@@ -69,7 +69,6 @@ import Cardano.Crypto.DSIGN (
   sizeSigDSIGN,
   sizeVerKeyDSIGN,
  )
-import Cardano.Ledger.Alonzo.PParams (ppCollateralPercentageL)
 import Cardano.Ledger.Alonzo.PParams qualified as Ledger
 import Cardano.Ledger.Alonzo.Scripts qualified as AlonzoScripts
 import Cardano.Ledger.Alonzo.Tx qualified as AlonzoTx
@@ -268,6 +267,7 @@ balanceTxStep
     , gyBTxEnvOwnUtxos = ownUtxos
     , gyBTxEnvChangeAddr = changeAddr
     , gyBTxEnvCollateral = collateral
+    , gyBTxEnvPools = pools
     }
   mmint
   wdrls
@@ -297,12 +297,22 @@ balanceTxStep
             )
             (0, 0)
             certs
+        ppDeposit :: Natural = pp ^. Ledger.ppPoolDepositL & fromIntegral
+        spRegsAmt :: Natural =
+          foldl'
+            ( \(!accRegsAmt) (gyTxCertCertificate' -> cert) -> case cert of
+                GYStakePoolRegistrationCertificate poolParams -> (if Set.member (stakePoolIdToApi (poolId poolParams)) pools then accRegsAmt else accRegsAmt + ppDeposit)
+                -- Retirement does not add ADA source.
+                _ -> accRegsAmt
+            )
+            0
+            certs
         -- Extra ada is received from withdrawals and stake credential deregistration.
         adaSource =
           let wdrlsAda = getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls
            in wdrlsAda + stakeCredDeregsAmt + drepDeregsAmt
         -- Ada lost due to stake credential registration.
-        adaSink = stakeCredRegsAmt + drepRegsAmt
+        adaSink = stakeCredRegsAmt + drepRegsAmt + spRegsAmt
         collaterals
           | needsCollateral = utxosFromUTxO collateral
           | otherwise = mempty

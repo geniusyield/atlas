@@ -24,7 +24,7 @@ import GHC.Natural (Natural)
 import GeniusYield.Imports ((&))
 import GeniusYield.Types.Anchor
 import GeniusYield.Types.Credential (
-  GYCredential,
+  GYCredential (GYCredentialByKey),
   GYStakeCredential,
   credentialFromLedger,
   credentialToLedger,
@@ -36,8 +36,11 @@ import GeniusYield.Types.Delegatee (
   delegateeFromLedger,
   delegateeToLedger,
  )
+import GeniusYield.Types.Epoch (GYEpochNo, epochNoFromLedger, epochNoToLedger)
 import GeniusYield.Types.Era
+import GeniusYield.Types.KeyHash
 import GeniusYield.Types.KeyRole
+import GeniusYield.Types.Pool (GYPoolParams (..), poolParamsFromLedger, poolParamsToLedger)
 import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 
 -- | Certificate state before building the transaction.
@@ -49,6 +52,8 @@ data GYCertificatePreBuild
   | GYDRepRegistrationCertificatePB !(GYCredential 'GYKeyRoleDRep) !(Maybe GYAnchor)
   | GYDRepUpdateCertificatePB !(GYCredential 'GYKeyRoleDRep) !(Maybe GYAnchor)
   | GYDRepUnregistrationCertificatePB !(GYCredential 'GYKeyRoleDRep) !Natural
+  | GYStakePoolRegistrationCertificatePB !GYPoolParams
+  | GYStakePoolRetirementCertificatePB !(GYKeyHash 'GYKeyRoleStakePool) !GYEpochNo
   deriving stock (Eq, Ord, Show)
 
 -- | Certificate state after populating missing entries from `GYCertificatePreBuild`.
@@ -60,9 +65,11 @@ data GYCertificate
   | GYDRepRegistrationCertificate !Natural !(GYCredential 'GYKeyRoleDRep) !(Maybe GYAnchor)
   | GYDRepUpdateCertificate !(GYCredential 'GYKeyRoleDRep) !(Maybe GYAnchor)
   | GYDRepUnregistrationCertificate !(GYCredential 'GYKeyRoleDRep) !Natural
+  | GYStakePoolRegistrationCertificate !GYPoolParams
+  | GYStakePoolRetirementCertificate !(GYKeyHash 'GYKeyRoleStakePool) !GYEpochNo
   deriving stock (Eq, Ord, Show)
 
--- FIXME: Unregistration should make use of deposit that was actually used when registering earlier.
+-- FIXME: Stake address unregistration should make use of deposit that was actually used when registering earlier.
 finaliseCert :: ApiProtocolParameters -> GYCertificatePreBuild -> GYCertificate
 finaliseCert pp = \case
   GYStakeAddressRegistrationCertificatePB sc -> GYStakeAddressRegistrationCertificate ppDep' sc
@@ -72,6 +79,8 @@ finaliseCert pp = \case
   GYDRepRegistrationCertificatePB cred manchor -> GYDRepRegistrationCertificate ppDRepDeposit' cred manchor
   GYDRepUpdateCertificatePB cred manchor -> GYDRepUpdateCertificate cred manchor
   GYDRepUnregistrationCertificatePB cred dep -> GYDRepUnregistrationCertificate cred dep
+  GYStakePoolRegistrationCertificatePB poolParams -> GYStakePoolRegistrationCertificate poolParams
+  GYStakePoolRetirementCertificatePB poolId epoch -> GYStakePoolRetirementCertificate poolId epoch
  where
   Ledger.Coin ppDep = pp ^. Ledger.ppKeyDepositL
   ppDep' :: Natural = fromIntegral ppDep
@@ -95,6 +104,8 @@ certificateToApi = \case
   GYDRepRegistrationCertificate dep cred manchor -> Api.makeDrepRegistrationCertificate (Api.DRepRegistrationRequirements Api.ConwayEraOnwardsConway (credentialToLedger cred) (fromIntegral dep)) (anchorToLedger <$> manchor)
   GYDRepUpdateCertificate cred manchor -> Api.makeDrepUpdateCertificate (Api.DRepUpdateRequirements Api.ConwayEraOnwardsConway (credentialToLedger cred)) (anchorToLedger <$> manchor)
   GYDRepUnregistrationCertificate cred refund -> Api.makeDrepUnregistrationCertificate (Api.DRepUnregistrationRequirements Api.ConwayEraOnwardsConway (credentialToLedger cred) (fromIntegral refund))
+  GYStakePoolRegistrationCertificate poolParams -> Api.makeStakePoolRegistrationCertificate (Api.StakePoolRegistrationRequirementsConwayOnwards Api.ConwayEraOnwardsConway (poolParamsToLedger poolParams))
+  GYStakePoolRetirementCertificate poolId epoch -> Api.makeStakePoolRetirementCertificate (Api.StakePoolRetirementRequirementsConwayOnwards Api.ConwayEraOnwardsConway (keyHashToApi poolId) (epochNoToLedger epoch))
  where
   f = stakeCredentialToApi
   g = delegateeToLedger
@@ -113,7 +124,9 @@ certificateFromApiMaybe (Api.ConwayCertificate _ x) = case x of
     Ledger.ConwayUpdateDRep cred manchor -> Just $ GYDRepUpdateCertificate (credentialFromLedger cred) (Ledger.strictMaybeToMaybe (anchorFromLedger <$> manchor))
     Ledger.ConwayUnRegDRep cred refund -> Just $ GYDRepUnregistrationCertificate (credentialFromLedger cred) (fromIntegral refund)
     _anyOther -> Nothing
-  _anyOther -> Nothing
+  Ledger.ConwayTxCertPool poolCert -> case poolCert of
+    Ledger.RegPool poolParams -> Just $ GYStakePoolRegistrationCertificate (poolParamsFromLedger poolParams)
+    Ledger.RetirePool poolId epoch -> Just $ GYStakePoolRetirementCertificate (keyHashFromLedger poolId) (epochNoFromLedger epoch)
  where
   f = stakeCredentialFromLedger
   g = delegateeFromLedger
@@ -129,5 +142,7 @@ certificateToStakeCredential = \case
   GYDRepRegistrationCertificate _ cred _ -> castCred cred
   GYDRepUpdateCertificate cred _ -> castCred cred
   GYDRepUnregistrationCertificate cred _ -> castCred cred
+  GYStakePoolRegistrationCertificate GYPoolParams {poolId} -> castCred $ GYCredentialByKey poolId
+  GYStakePoolRetirementCertificate poolId _ -> castCred $ GYCredentialByKey poolId
  where
   castCred cred = credentialToLedger cred & Ledger.coerceKeyRole & credentialFromLedger

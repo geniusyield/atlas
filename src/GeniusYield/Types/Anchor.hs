@@ -10,9 +10,13 @@ module GeniusYield.Types.Anchor (
   textToUrl,
   unsafeTextToUrl,
   urlToText,
+  urlToLedger,
+  urlFromLedger,
   GYAnchorData,
   GYAnchorDataHash,
   hashAnchorData,
+  anchorDataHashToByteString,
+  anchorDataHashFromByteString,
   GYAnchor (..),
   anchorToLedger,
   anchorFromLedger,
@@ -21,8 +25,16 @@ module GeniusYield.Types.Anchor (
 import GeniusYield.Imports
 
 import Cardano.Api.Ledger qualified as Ledger
+import Cardano.Crypto.Hash.Class qualified as Crypto
+import Cardano.Ledger.SafeHash qualified as Ledger
 import Control.Monad ((>=>))
 import Data.ByteString.Char8 (ByteString)
+
+{- $setup
+
+>>> :set -XOverloadedStrings -XTypeApplications -XDataKinds
+>>> import qualified Data.ByteString.Base16 as BS16
+-}
 
 {- | URL to a JSON payload of metadata. Note that we require URL to be at most 128 bytes.
 >>> textToUrl "https://geniusyield.co"
@@ -43,6 +55,12 @@ unsafeTextToUrl t = fromMaybe (error "textToUrl: failed") $ textToUrl t
 urlToText :: GYUrl -> Text
 urlToText = Ledger.urlToText . coerce
 
+urlToLedger :: GYUrl -> Ledger.Url
+urlToLedger = coerce
+
+urlFromLedger :: Ledger.Url -> GYUrl
+urlFromLedger = coerce
+
 -- | Anchor data.
 type GYAnchorData = ByteString
 
@@ -53,6 +71,24 @@ GYAnchorDataHash (SafeHash "511bc81dde11180838c562c82bb35f3223f46061ebde4a955c27
 newtype GYAnchorDataHash = GYAnchorDataHash (Ledger.SafeHash Ledger.StandardCrypto Ledger.AnchorData)
   deriving stock Show
   deriving newtype (Eq, Ord)
+
+{- | Convert a 'GYAnchorDataHash' to a 'ByteString'.
+>>> let h = hashAnchorData "Hello, World!"
+
+>>> show h
+"GYAnchorDataHash (SafeHash \"511bc81dde11180838c562c82bb35f3223f46061ebde4a955c27b3f489cf1e03\")"
+
+>>> BS16.encode $ anchorDataHashToByteString h
+"511bc81dde11180838c562c82bb35f3223f46061ebde4a955c27b3f489cf1e03"
+
+>>> anchorDataHashFromByteString $ anchorDataHashToByteString h
+Just (GYAnchorDataHash (SafeHash "511bc81dde11180838c562c82bb35f3223f46061ebde4a955c27b3f489cf1e03"))
+-}
+anchorDataHashToByteString :: GYAnchorDataHash -> ByteString
+anchorDataHashToByteString (GYAnchorDataHash l) = Ledger.originalBytes l
+
+anchorDataHashFromByteString :: ByteString -> Maybe GYAnchorDataHash
+anchorDataHashFromByteString bs = GYAnchorDataHash . Ledger.unsafeMakeSafeHash <$> Crypto.hashFromBytes bs
 
 -- | Hash anchor data.
 hashAnchorData :: GYAnchorData -> GYAnchorDataHash

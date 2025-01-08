@@ -15,6 +15,8 @@ module GeniusYield.Types.TxCert (
   mkDRepRegistrationCertificate,
   mkDRepUpdateCertificate,
   mkDRepUnregistrationCertificate,
+  mkStakePoolRegistrationCertificate,
+  mkStakePoolRetirementCertificate,
 ) where
 
 import GeniusYield.Imports (Natural)
@@ -22,7 +24,10 @@ import GeniusYield.Types.Anchor (GYAnchor)
 import GeniusYield.Types.Certificate
 import GeniusYield.Types.Credential (GYCredential, GYStakeCredential)
 import GeniusYield.Types.Delegatee (GYDelegatee)
+import GeniusYield.Types.Epoch
+import GeniusYield.Types.KeyHash
 import GeniusYield.Types.KeyRole (GYKeyRole (..))
+import GeniusYield.Types.Pool
 import GeniusYield.Types.TxCert.Internal
 
 -- | Post conway, newer stake address registration certificate also require a witness.
@@ -71,3 +76,31 @@ mkDRepUpdateCertificate cred anchor wit = GYTxCert (GYDRepUpdateCertificatePB cr
 -}
 mkDRepUnregistrationCertificate :: GYCredential 'GYKeyRoleDRep -> Natural -> GYTxCertWitness v -> GYTxCert v
 mkDRepUnregistrationCertificate cred refund wit = GYTxCert (GYDRepUnregistrationCertificatePB cred refund) (Just wit)
+
+{- | Note that stake pool registration certificate requires following preconditions:
+
+1. @poolCost@ must be more than minimum pool cost specified in protocol parameters.
+
+2. Signature from the key corresponding to @poolId@.
+
+3. If registering for the first time, then deposit is also deducted to that given by corresponding protocol parameter (ppPoolDepositL).
+
+4. Signature from pool owners.
+-}
+mkStakePoolRegistrationCertificate ::
+  GYPoolParams ->
+  GYTxCert v
+mkStakePoolRegistrationCertificate pp = GYTxCert (GYStakePoolRegistrationCertificatePB pp) (Just GYTxCertWitnessKey)
+
+{- | Note that stake pool retirement certificate requires following preconditions:
+
+1. Signature from the key corresponding to @poolId@.
+
+2. Epoch must be greater than the current epoch and less than or equal to ppEMax after the current epoch.
+
+3. The pool must be registered.
+
+Note that deposit made earlier is returned at epoch transition.
+-}
+mkStakePoolRetirementCertificate :: GYKeyHash 'GYKeyRoleStakePool -> GYEpochNo -> GYTxCert v
+mkStakePoolRetirementCertificate poolId epoch = GYTxCert (GYStakePoolRetirementCertificatePB poolId epoch) (Just GYTxCertWitnessKey)

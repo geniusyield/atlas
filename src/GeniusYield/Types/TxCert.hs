@@ -17,6 +17,8 @@ module GeniusYield.Types.TxCert (
   mkDRepUnregistrationCertificate,
   mkStakePoolRegistrationCertificate,
   mkStakePoolRetirementCertificate,
+  mkCommitteeHotKeyAuthCertificate,
+  mkCommitteeColdKeyResignationCertificate,
 ) where
 
 import GeniusYield.Imports (Natural)
@@ -104,3 +106,29 @@ Note that deposit made earlier is returned at epoch transition.
 -}
 mkStakePoolRetirementCertificate :: GYKeyHash 'GYKeyRoleStakePool -> GYEpochNo -> GYTxCert v
 mkStakePoolRetirementCertificate poolId epoch = GYTxCert (GYStakePoolRetirementCertificatePB poolId epoch) (Just GYTxCertWitnessKey)
+
+{- | Note that committee hot key auth certificate requires following preconditions:
+
+1. Cold key must not have resigned from the committee.
+
+2. Should be part of current committee or future committee as dictated by a governance action.
+
+3. Signature from the corresponding cold committee key.
+-}
+mkCommitteeHotKeyAuthCertificate :: GYCredential 'GYKeyRoleColdCommittee -> GYCredential 'GYKeyRoleHotCommittee -> GYTxCert v
+mkCommitteeHotKeyAuthCertificate cold hot = GYTxCert (GYCommitteeHotKeyAuthCertificatePB cold hot) (Just GYTxCertWitnessKey)
+
+{- | Note that committee cold key resignation certificate requires following preconditions:
+
+1. Cold key must not have resigned from the committee.
+
+2. Should be part of current committee or future committee as dictated by a governance action.
+
+3. Signature from the corresponding cold committee key.
+-}
+mkCommitteeColdKeyResignationCertificate ::
+  GYCredential 'GYKeyRoleColdCommittee ->
+  -- | Potential explanation for resignation.
+  Maybe GYAnchor ->
+  GYTxCert v
+mkCommitteeColdKeyResignationCertificate cold anchor = GYTxCert (GYCommitteeColdKeyResignationCertificatePB cold anchor) (Just GYTxCertWitnessKey)

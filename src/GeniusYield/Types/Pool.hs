@@ -7,11 +7,6 @@ Stability   : develop
 -}
 module GeniusYield.Types.Pool (
   GYStakePoolRelay (..),
-  Port (..),
-  DnsName (..),
-  Network (..),
-  BoundedRational (..),
-  UnitInterval,
   GYPoolParams (..),
   poolParamsToLedger,
   poolParamsFromLedger,

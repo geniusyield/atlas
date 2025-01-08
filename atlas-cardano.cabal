@@ -153,6 +153,7 @@ library
     GeniusYield.Types.PubKeyHash
     GeniusYield.Types.Rational
     GeniusYield.Types.Redeemer
+    GeniusYield.Types.Reexpose
     GeniusYield.Types.Script
     GeniusYield.Types.Script.ScriptHash
     GeniusYield.Types.Script.SimpleScript
@@ -368,6 +369,7 @@ test-suite atlas-privnet-tests
   main-is:        atlas-privnet-tests.hs
   other-modules:
     GeniusYield.Test.Privnet.Blueprint
+    GeniusYield.Test.Privnet.Committee
     GeniusYield.Test.Privnet.DRep
     GeniusYield.Test.Privnet.SimpleScripts
     GeniusYield.Test.Privnet.Stake

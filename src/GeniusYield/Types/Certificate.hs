@@ -54,6 +54,8 @@ data GYCertificatePreBuild
   | GYDRepUnregistrationCertificatePB !(GYCredential 'GYKeyRoleDRep) !Natural
   | GYStakePoolRegistrationCertificatePB !GYPoolParams
   | GYStakePoolRetirementCertificatePB !(GYKeyHash 'GYKeyRoleStakePool) !GYEpochNo
+  | GYCommitteeHotKeyAuthCertificatePB !(GYCredential 'GYKeyRoleColdCommittee) !(GYCredential 'GYKeyRoleHotCommittee)
+  | GYCommitteeColdKeyResignationCertificatePB !(GYCredential 'GYKeyRoleColdCommittee) !(Maybe GYAnchor)
   deriving stock (Eq, Ord, Show)
 
 -- | Certificate state after populating missing entries from `GYCertificatePreBuild`.
@@ -67,6 +69,8 @@ data GYCertificate
   | GYDRepUnregistrationCertificate !(GYCredential 'GYKeyRoleDRep) !Natural
   | GYStakePoolRegistrationCertificate !GYPoolParams
   | GYStakePoolRetirementCertificate !(GYKeyHash 'GYKeyRoleStakePool) !GYEpochNo
+  | GYCommitteeHotKeyAuthCertificate !(GYCredential 'GYKeyRoleColdCommittee) !(GYCredential 'GYKeyRoleHotCommittee)
+  | GYCommitteeColdKeyResignationCertificate !(GYCredential 'GYKeyRoleColdCommittee) !(Maybe GYAnchor)
   deriving stock (Eq, Ord, Show)
 
 -- FIXME: Stake address unregistration should make use of deposit that was actually used when registering earlier.
@@ -81,6 +85,8 @@ finaliseCert pp = \case
   GYDRepUnregistrationCertificatePB cred dep -> GYDRepUnregistrationCertificate cred dep
   GYStakePoolRegistrationCertificatePB poolParams -> GYStakePoolRegistrationCertificate poolParams
   GYStakePoolRetirementCertificatePB poolId epoch -> GYStakePoolRetirementCertificate poolId epoch
+  GYCommitteeHotKeyAuthCertificatePB cold hot -> GYCommitteeHotKeyAuthCertificate cold hot
+  GYCommitteeColdKeyResignationCertificatePB cold manchor -> GYCommitteeColdKeyResignationCertificate cold manchor
  where
   Ledger.Coin ppDep = pp ^. Ledger.ppKeyDepositL
   ppDep' :: Natural = fromIntegral ppDep
@@ -106,6 +112,8 @@ certificateToApi = \case
   GYDRepUnregistrationCertificate cred refund -> Api.makeDrepUnregistrationCertificate (Api.DRepUnregistrationRequirements Api.ConwayEraOnwardsConway (credentialToLedger cred) (fromIntegral refund))
   GYStakePoolRegistrationCertificate poolParams -> Api.makeStakePoolRegistrationCertificate (Api.StakePoolRegistrationRequirementsConwayOnwards Api.ConwayEraOnwardsConway (poolParamsToLedger poolParams))
   GYStakePoolRetirementCertificate poolId epoch -> Api.makeStakePoolRetirementCertificate (Api.StakePoolRetirementRequirementsConwayOnwards Api.ConwayEraOnwardsConway (keyHashToApi poolId) (epochNoToLedger epoch))
+  GYCommitteeHotKeyAuthCertificate cold hot -> Api.makeCommitteeHotKeyAuthorizationCertificate (Api.CommitteeHotKeyAuthorizationRequirements Api.ConwayEraOnwardsConway (credentialToLedger cold) (credentialToLedger hot))
+  GYCommitteeColdKeyResignationCertificate cold manchor -> Api.makeCommitteeColdkeyResignationCertificate (Api.CommitteeColdkeyResignationRequirements Api.ConwayEraOnwardsConway (credentialToLedger cold) (anchorToLedger <$> manchor))
  where
   f = stakeCredentialToApi
   g = delegateeToLedger
@@ -123,7 +131,8 @@ certificateFromApiMaybe (Api.ConwayCertificate _ x) = case x of
     Ledger.ConwayRegDRep cred dep manchor -> Just $ GYDRepRegistrationCertificate (fromIntegral dep) (credentialFromLedger cred) (Ledger.strictMaybeToMaybe (anchorFromLedger <$> manchor))
     Ledger.ConwayUpdateDRep cred manchor -> Just $ GYDRepUpdateCertificate (credentialFromLedger cred) (Ledger.strictMaybeToMaybe (anchorFromLedger <$> manchor))
     Ledger.ConwayUnRegDRep cred refund -> Just $ GYDRepUnregistrationCertificate (credentialFromLedger cred) (fromIntegral refund)
-    _anyOther -> Nothing
+    Ledger.ConwayAuthCommitteeHotKey cold hot -> Just $ GYCommitteeHotKeyAuthCertificate (credentialFromLedger cold) (credentialFromLedger hot)
+    Ledger.ConwayResignCommitteeColdKey cold manchor -> Just $ GYCommitteeColdKeyResignationCertificate (credentialFromLedger cold) (Ledger.strictMaybeToMaybe (anchorFromLedger <$> manchor))
   Ledger.ConwayTxCertPool poolCert -> case poolCert of
     Ledger.RegPool poolParams -> Just $ GYStakePoolRegistrationCertificate (poolParamsFromLedger poolParams)
     Ledger.RetirePool poolId epoch -> Just $ GYStakePoolRetirementCertificate (keyHashFromLedger poolId) (epochNoFromLedger epoch)
@@ -144,5 +153,7 @@ certificateToStakeCredential = \case
   GYDRepUnregistrationCertificate cred _ -> castCred cred
   GYStakePoolRegistrationCertificate GYPoolParams {poolId} -> castCred $ GYCredentialByKey poolId
   GYStakePoolRetirementCertificate poolId _ -> castCred $ GYCredentialByKey poolId
+  GYCommitteeHotKeyAuthCertificate cold _ -> castCred cold
+  GYCommitteeColdKeyResignationCertificate cold _ -> castCred cold
  where
   castCred cred = credentialToLedger cred & Ledger.coerceKeyRole & credentialFromLedger

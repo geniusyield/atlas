@@ -88,6 +88,7 @@ import Control.Arrow ((&&&))
 import Control.Lens (view, (^.))
 import Control.Monad.Random
 import Control.Monad.Trans.Except (runExceptT, throwE)
+import Data.Bifunctor qualified
 import Data.ByteString.Lazy qualified as LBS
 import Data.Foldable (
   Foldable (foldMap'),
@@ -165,7 +166,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub sig
   certsFinalised = finaliseTxCert (gyBTxEnvProtocolParams env) <$> certs
 
   step :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
-  step stepStrat = fmap (first GYBuildTxBalancingError) . balanceTxStep env mmint wdrls certsFinalised insOld outsOld stepStrat
+  step stepStrat = fmap (first GYBuildTxBalancingError) . balanceTxStep env mmint wdrls certsFinalised vps insOld outsOld stepStrat
 
   buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError GYTxBody)
   buildTxLoop stepStrat n
@@ -253,6 +254,8 @@ balanceTxStep ::
   [GYTxWdrl v] ->
   -- | certificates
   [GYTxCert' v] ->
+  -- | voting procedures
+  GYTxVotingProcedures v ->
   -- | transaction inputs
   [GYTxInDetailed v] ->
   -- | transaction outputs
@@ -273,12 +276,13 @@ balanceTxStep
   mmint
   wdrls
   certs
+  vps
   ins
   outs
   cstrat =
     let adjustedOuts = map (adjustTxOut (minimumUTxO pp)) outs
         valueMint = maybe mempty fst mmint
-        needsCollateral = valueMint /= mempty || any (isScriptWitness . gyTxInWitness . gyTxInDet) ins || any (isCertScriptWitness . gyTxCertWitness') certs || any (isWdrlScriptWitness . gyTxWdrlWitness) wdrls
+        needsCollateral = valueMint /= mempty || any (isScriptWitness . gyTxInWitness . gyTxInDet) ins || any (isCertScriptWitness . gyTxCertWitness') certs || any (isPlutusScriptWitness . gyTxWdrlWitness) wdrls || any (isPlutusScriptWitness . fst) (Map.elems vps)
         (stakeCredDeregsAmt :: Natural, stakeCredRegsAmt :: Natural) =
           foldl'
             ( \acc@(!accDeregsAmt, !accRegsAmt) (gyTxCertCertificate' -> cert) -> case cert of
@@ -346,10 +350,11 @@ balanceTxStep
     isScriptWitness GYTxInWitnessKey = False
     isScriptWitness GYTxInWitnessScript {} = True
     isScriptWitness GYTxInWitnessSimpleScript {} = False -- Simple (native) scripts don't require collateral.
-    isCertScriptWitness (Just GYTxCertWitnessScript {}) = True
-    isCertScriptWitness _ = False
-    isWdrlScriptWitness GYTxWdrlWitnessScript {} = True
-    isWdrlScriptWitness _ = False
+    isCertScriptWitness (Just p) = isPlutusScriptWitness p
+    isCertScriptWitness Nothing = False
+
+    isPlutusScriptWitness (GYTxBuildWitnessPlutusScript {}) = True
+    isPlutusScriptWitness _ = False
 
 retColSup :: Api.BabbageEraOnwards ApiEra
 retColSup = Api.BabbageEraOnwardsConway
@@ -396,8 +401,9 @@ finalizeGYBalancedTx
       fromIntegral $
         countUnique $
           mapMaybe (extractPaymentPkhFromAddress . utxoAddress) (utxosToList collaterals)
-            <> [apkh | GYTxWdrl {gyTxWdrlWitness = GYTxWdrlWitnessKey, gyTxWdrlStakeAddress = saddr} <- wdrls, let sc = stakeAddressToCredential saddr, Just apkh <- [preferSCByKey sc]]
-            <> [apkh | cert@GYTxCert' {gyTxCertWitness' = Just GYTxCertWitnessKey} <- certs, let sc = certificateToStakeCredential $ gyTxCertCertificate' cert, Just apkh <- [preferSCByKey sc]]
+            <> [apkh | GYTxWdrl {gyTxWdrlWitness = GYTxWdrlWitnessKey, gyTxWdrlStakeAddress = saddr} <- wdrls, let sc = stakeAddressToCredential saddr, Just apkh <- [preferCByKey sc]]
+            <> [apkh | cert@GYTxCert' {gyTxCertWitness' = Just GYTxCertWitnessKey} <- certs, let sc = certificateToStakeCredential $ gyTxCertCertificate' cert, Just apkh <- [preferCByKey sc]]
+            <> [apkh | (a, GYTxBuildWitnessKey) <- Data.Bifunctor.second fst <$> Map.toList vps, Just apkh <- [voterToPKH a]]
             <> estimateKeyWitnessesFromInputs ins
             <> Set.toList signers
      where
@@ -406,8 +412,12 @@ finalizeGYBalancedTx
           GYPaymentCredentialByKey pkh -> Just $ toPubKeyHash pkh
           GYPaymentCredentialByScript _ -> Nothing
 
-      preferSCByKey (GYStakeCredentialByKey pkh) = Just $ toPubKeyHash pkh
-      preferSCByKey _otherwise = Nothing
+      preferCByKey (GYCredentialByKey pkh) = Just $ toPubKeyHash pkh
+      preferCByKey _otherwise = Nothing
+
+      voterToPKH (CommitteeVoter c) = preferCByKey c
+      voterToPKH (DRepVoter c) = preferCByKey c
+      voterToPKH (StakePoolVoter kh) = Just $ toPubKeyHash kh
 
       countUnique :: Ord a => [a] -> Int
       countUnique = Set.size . Set.fromList

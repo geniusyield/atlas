@@ -162,6 +162,8 @@ import GeniusYield.Types.Ada as X
 import GeniusYield.Types.Address as X
 import GeniusYield.Types.Anchor as X
 import GeniusYield.Types.Blueprint as X
+import GeniusYield.Types.BuildScript as X
+import GeniusYield.Types.BuildWitness as X
 import GeniusYield.Types.Certificate as X
 import GeniusYield.Types.Credential as X
 import GeniusYield.Types.DRep as X
@@ -169,6 +171,7 @@ import GeniusYield.Types.Datum as X
 import GeniusYield.Types.Delegatee as X
 import GeniusYield.Types.Epoch as X
 import GeniusYield.Types.Era as X
+import GeniusYield.Types.Governance as X
 import GeniusYield.Types.Key as X
 import GeniusYield.Types.KeyHash as X
 import GeniusYield.Types.KeyRole as X
@@ -180,6 +183,7 @@ import GeniusYield.Types.OpenApi as X
 import GeniusYield.Types.PaymentKeyHash as X
 import GeniusYield.Types.PlutusVersion as X
 import GeniusYield.Types.Pool as X
+import GeniusYield.Types.ProtocolParameters as X
 import GeniusYield.Types.Providers as X
 import GeniusYield.Types.PubKeyHash as X
 import GeniusYield.Types.Rational as X

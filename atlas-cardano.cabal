@@ -36,6 +36,7 @@ common common
     LambdaCase
     MultiWayIf
     OverloadedStrings
+    PatternSynonyms
     RecordWildCards
     RoleAnnotations
     TypeFamilyDependencies
@@ -129,6 +130,8 @@ library
     GeniusYield.Types.Blueprint.Schema
     GeniusYield.Types.Blueprint.TH
     GeniusYield.Types.Blueprint.Validator
+    GeniusYield.Types.BuildScript
+    GeniusYield.Types.BuildWitness
     GeniusYield.Types.Certificate
     GeniusYield.Types.Credential
     GeniusYield.Types.Datum
@@ -136,6 +139,7 @@ library
     GeniusYield.Types.DRep
     GeniusYield.Types.Epoch
     GeniusYield.Types.Era
+    GeniusYield.Types.Governance
     GeniusYield.Types.KeyHash
     GeniusYield.Types.Key
     GeniusYield.Types.Key.Class

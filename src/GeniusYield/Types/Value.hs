@@ -112,6 +112,7 @@ import Web.HttpApiData qualified as Web
 import Data.Either.Combinators (mapLeft)
 import Data.Foldable (for_)
 import Data.Hashable (Hashable (..))
+import GHC.IsList (IsList (fromList))
 import GeniusYield.Types.Ada qualified as Ada
 import GeniusYield.Types.Era
 import GeniusYield.Types.Script
@@ -207,7 +208,7 @@ valueSingleton ac n = valueMake $ Map.singleton ac n
 -- | Convert a 'GYValue' to a Cardano Api 'Api.Value'
 valueToApi :: GYValue -> Api.Value
 valueToApi v =
-  Api.valueFromList
+  fromList
     [ (assetClassToApi ac, Api.Quantity n)
     | (ac, n) <- valueToList v
     ]

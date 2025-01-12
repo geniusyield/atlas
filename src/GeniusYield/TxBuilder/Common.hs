@@ -8,6 +8,7 @@ Stability   : develop
 module GeniusYield.TxBuilder.Common (
   GYTxSkeleton (..),
   GYTxSkeletonRefIns (..),
+  GYTxSkeletonVotingProcedures (..),
   emptyGYTxSkeleton,
   gyTxSkeletonRefInsToList,
   gyTxSkeletonRefInsSet,
@@ -44,7 +45,6 @@ import GeniusYield.Transaction.Common (
 import GeniusYield.TxBuilder.Errors
 import GeniusYield.TxBuilder.Query.Class
 import GeniusYield.Types
-import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 
 -------------------------------------------------------------------------------
 -- Transaction skeleton
@@ -61,15 +61,29 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
   { gytxIns :: ![GYTxIn v]
   , gytxOuts :: ![GYTxOut v]
   , gytxRefIns :: !(GYTxSkeletonRefIns v)
-  , gytxMint :: !(Map (GYMintScript v) (Map GYTokenName Integer, GYRedeemer))
+  , gytxMint :: !(Map (GYBuildScript v) (Map GYTokenName Integer, GYRedeemer))
   , gytxWdrls :: ![GYTxWdrl v]
   , gytxSigs :: !(Set GYPubKeyHash)
   , gytxCerts :: ![GYTxCert v]
   , gytxInvalidBefore :: !(Maybe GYSlot)
   , gytxInvalidAfter :: !(Maybe GYSlot)
   , gytxMetadata :: !(Maybe GYTxMetadata)
+  , gytxVotingProcedures :: !(GYTxSkeletonVotingProcedures v)
   }
   deriving Show
+
+data GYTxSkeletonVotingProcedures :: PlutusVersion -> Type where
+  GYTxSkeletonVotingProceduresNone :: GYTxSkeletonVotingProcedures v
+  GYTxSkeletonVotingProcedures :: VersionIsGreaterOrEqual v 'PlutusV3 => !(GYTxVotingProcedures v) -> GYTxSkeletonVotingProcedures v
+
+deriving instance Show (GYTxSkeletonVotingProcedures v)
+deriving instance Eq (GYTxSkeletonVotingProcedures v)
+
+instance Semigroup (GYTxSkeletonVotingProcedures v) where
+  GYTxSkeletonVotingProcedures a <> GYTxSkeletonVotingProcedures b = GYTxSkeletonVotingProcedures (combineTxVotingProcedures a b)
+  GYTxSkeletonVotingProcedures a <> GYTxSkeletonVotingProceduresNone = GYTxSkeletonVotingProcedures a
+  GYTxSkeletonVotingProceduresNone <> GYTxSkeletonVotingProcedures b = GYTxSkeletonVotingProcedures b
+  GYTxSkeletonVotingProceduresNone <> GYTxSkeletonVotingProceduresNone = GYTxSkeletonVotingProceduresNone
 
 data GYTxSkeletonRefIns :: PlutusVersion -> Type where
   GYTxSkeletonRefIns :: VersionIsGreaterOrEqual v 'PlutusV2 => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
@@ -104,6 +118,7 @@ emptyGYTxSkeleton =
     , gytxInvalidBefore = Nothing
     , gytxInvalidAfter = Nothing
     , gytxMetadata = Nothing
+    , gytxVotingProcedures = GYTxSkeletonVotingProceduresNone
     }
 
 instance Semigroup (GYTxSkeleton v) where
@@ -119,6 +134,7 @@ instance Semigroup (GYTxSkeleton v) where
       , gytxInvalidBefore = combineInvalidBefore (gytxInvalidBefore x) (gytxInvalidBefore y)
       , gytxInvalidAfter = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
       , gytxMetadata = gytxMetadata x <> gytxMetadata y
+      , gytxVotingProcedures = gytxVotingProcedures x <> gytxVotingProcedures y
       }
    where
     -- we keep only one input per utxo to spend
@@ -279,6 +295,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
               gytxInvalidAfter
               gytxSigs
               gytxMetadata
+              (case gytxVotingProcedures of GYTxSkeletonVotingProceduresNone -> mempty; GYTxSkeletonVotingProcedures vp -> vp)
 
       go :: GYUTxOs -> GYTxBuildResult -> [GYTxSkeleton v] -> m (Either GYBuildTxError GYTxBuildResult)
       go _ acc [] = pure $ Right $ reverseResult acc
@@ -301,7 +318,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
 
   In case of insufficient funds failure ('Left' argument):
     We return either 'GYTxBuildFailure' or 'GYTxBuildPartialSuccess'
-    Depending on whether or not any previous transactions were built succesfully.
+    Depending on whether or not any previous transactions were built successfully.
 
   In case of successful build:
     We save the newly built tx body into the existing ones (if any)

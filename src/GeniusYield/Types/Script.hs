@@ -43,8 +43,8 @@ module GeniusYield.Types.Script (
   -- * MintingPolicy
   GYMintingPolicy,
   mintingPolicyId,
+  simpleScriptToPolicyId,
   mintingPolicyVersion,
-  mintingPolicyVersionFromWitness,
   mintingPolicyFromPlutus,
   mintingPolicyFromSerialisedScript,
   mintingPolicyToSerialisedScript,
@@ -54,12 +54,6 @@ module GeniusYield.Types.Script (
   mintingPolicyFromApi,
   mintingPolicyToApiPlutusScriptWitness,
 
-  -- * Witness for Minting Policy
-  GYMintScript (..),
-  mintingPolicyIdFromWitness,
-  gyMintScriptToSerialisedScript,
-  gyMintingScriptWitnessToApiPlutusSW,
-
   -- ** File operations
   writeMintingPolicy,
   readMintingPolicy,
@@ -67,7 +61,6 @@ module GeniusYield.Types.Script (
   -- ** Selectors
   mintingPolicyCurrencySymbol,
   mintingPolicyApiId,
-  mintingPolicyApiIdFromWitness,
 
   -- * MintingPolicyId
   GYMintingPolicyId,
@@ -80,18 +73,12 @@ module GeniusYield.Types.Script (
   -- * StakeValidator
   GYStakeValidator,
   stakeValidatorVersion,
-  stakeValidatorVersionFromWitness,
   stakeValidatorFromPlutus,
   stakeValidatorFromSerialisedScript,
   stakeValidatorToSerialisedScript,
   stakeValidatorToApi,
   stakeValidatorFromApi,
   stakeValidatorToApiPlutusScriptWitness,
-
-  -- * Witness for stake validator
-  GYStakeValScript (..),
-  gyStakeValScriptToSerialisedScript,
-  gyStakeValScriptWitnessToApiPlutusSW,
 
   -- ** Stake validator selectors
   stakeValidatorHash,
@@ -252,16 +239,11 @@ type GYMintingPolicy v = GYScript v
 mintingPolicyVersion :: GYMintingPolicy v -> SingPlutusVersion v
 mintingPolicyVersion = coerce scriptVersion
 
-mintingPolicyVersionFromWitness :: GYMintScript v -> PlutusVersion
-mintingPolicyVersionFromWitness (GYMintScript mp) = fromSingPlutusVersion $ mintingPolicyVersion mp
-mintingPolicyVersionFromWitness (GYMintReference _ s) = fromSingPlutusVersion $ mintingPolicyVersion $ coerce s
-
 mintingPolicyId :: GYMintingPolicy v -> GYMintingPolicyId
 mintingPolicyId = coerce scriptApiHash
 
-mintingPolicyIdFromWitness :: GYMintScript v -> GYMintingPolicyId
-mintingPolicyIdFromWitness (GYMintScript p) = mintingPolicyId p
-mintingPolicyIdFromWitness (GYMintReference _ s) = mintingPolicyId $ coerce s
+simpleScriptToPolicyId :: GYSimpleScript -> GYMintingPolicyId
+simpleScriptToPolicyId s = hashSimpleScript s & scriptHashToApi & coerce & mintingPolicyIdFromApi
 
 mintingPolicyFromPlutus :: forall v a. SingPlutusVersionI v => PlutusTx.CompiledCode a -> GYMintingPolicy v
 mintingPolicyFromPlutus = coerce (scriptFromPlutus @v)
@@ -287,9 +269,6 @@ mintingPolicyCurrencySymbol = coerce scriptPlutusHash
 mintingPolicyApiId :: GYMintingPolicy v -> Api.PolicyId
 mintingPolicyApiId = coerce . mintingPolicyId
 
-mintingPolicyApiIdFromWitness :: GYMintScript v -> Api.PolicyId
-mintingPolicyApiIdFromWitness = coerce . mintingPolicyIdFromWitness
-
 mintingPolicyToApiPlutusScriptWitness ::
   GYMintingPolicy v ->
   Api.ScriptRedeemer ->
@@ -297,41 +276,6 @@ mintingPolicyToApiPlutusScriptWitness ::
   Api.ScriptWitness Api.WitCtxMint ApiEra
 mintingPolicyToApiPlutusScriptWitness s =
   scriptToApiPlutusScriptWitness s Api.NoScriptDatumForMint
-
-data GYMintScript (u :: PlutusVersion) where
-  -- | 'VersionIsGreaterOrEqual' restricts which version scripts can be used in this transaction.
-  GYMintScript :: v `VersionIsGreaterOrEqual` u => GYScript v -> GYMintScript u
-  -- | Reference inputs can be only used in V2 & beyond transactions.
-  GYMintReference :: v `VersionIsGreaterOrEqual` 'PlutusV2 => !GYTxOutRef -> !(GYScript v) -> GYMintScript v
-
-deriving instance Show (GYMintScript v)
-
-instance Eq (GYMintScript v) where
-  GYMintReference r s == GYMintReference r' s' = r == r' && s == s'
-  GYMintScript p == GYMintScript p' = defaultEq p p'
-  _ == _ = False
-
-instance Ord (GYMintScript v) where
-  GYMintReference r s `compare` GYMintReference r' s' = compare r r' <> compare s s'
-  GYMintReference _ _ `compare` _ = LT
-  GYMintScript p `compare` GYMintScript p' = defaultCompare p p'
-  GYMintScript _ `compare` _ = GT
-
-gyMintScriptToSerialisedScript :: GYMintScript u -> Plutus.SerialisedScript
-gyMintScriptToSerialisedScript (GYMintScript mp) = coerce mp & scriptToSerialisedScript & coerce
-gyMintScriptToSerialisedScript (GYMintReference _ s) = scriptToSerialisedScript s & coerce
-
-gyMintingScriptWitnessToApiPlutusSW ::
-  GYMintScript u ->
-  Api.S.ScriptRedeemer ->
-  Api.S.ExecutionUnits ->
-  Api.S.ScriptWitness Api.S.WitCtxMint ApiEra
-gyMintingScriptWitnessToApiPlutusSW (GYMintScript p) = mintingPolicyToApiPlutusScriptWitness p
-gyMintingScriptWitnessToApiPlutusSW (GYMintReference r s) =
-  referenceScriptToApiPlutusScriptWitness
-    r
-    s
-    Api.NoScriptDatumForMint
 
 -- | Writes a minting policy to a file.
 writeMintingPolicy :: FilePath -> GYMintingPolicy v -> IO ()
@@ -447,10 +391,6 @@ type GYStakeValidator v = GYScript v
 stakeValidatorVersion :: GYStakeValidator v -> SingPlutusVersion v
 stakeValidatorVersion = coerce scriptVersion
 
-stakeValidatorVersionFromWitness :: GYStakeValScript v -> PlutusVersion
-stakeValidatorVersionFromWitness (GYStakeValScript mp) = fromSingPlutusVersion $ stakeValidatorVersion mp
-stakeValidatorVersionFromWitness (GYStakeValReference _ s) = fromSingPlutusVersion $ stakeValidatorVersion $ coerce s
-
 stakeValidatorFromPlutus :: forall v a. SingPlutusVersionI v => PlutusTx.CompiledCode a -> GYStakeValidator v
 stakeValidatorFromPlutus = coerce (scriptFromPlutus @v)
 
@@ -476,41 +416,6 @@ stakeValidatorToApiPlutusScriptWitness ::
   Api.ScriptWitness Api.WitCtxStake ApiEra
 stakeValidatorToApiPlutusScriptWitness s =
   scriptToApiPlutusScriptWitness s Api.NoScriptDatumForStake
-
-data GYStakeValScript (u :: PlutusVersion) where
-  -- | 'VersionIsGreaterOrEqual' restricts which version scripts can be used in this transaction.
-  GYStakeValScript :: v `VersionIsGreaterOrEqual` u => GYScript v -> GYStakeValScript u
-  -- | Reference inputs can be only used in V2 transactions.
-  GYStakeValReference :: v `VersionIsGreaterOrEqual` 'PlutusV2 => !GYTxOutRef -> !(GYScript v) -> GYStakeValScript v
-
-deriving instance Show (GYStakeValScript v)
-
-instance Eq (GYStakeValScript v) where
-  GYStakeValReference r s == GYStakeValReference r' s' = r == r' && s == s'
-  GYStakeValScript p == GYStakeValScript p' = defaultEq p p'
-  _ == _ = False
-
-instance Ord (GYStakeValScript v) where
-  GYStakeValReference r s `compare` GYStakeValReference r' s' = compare r r' <> compare s s'
-  GYStakeValReference _ _ `compare` _ = LT
-  GYStakeValScript p `compare` GYStakeValScript p' = defaultCompare p p'
-  GYStakeValScript _ `compare` _ = GT
-
-gyStakeValScriptToSerialisedScript :: GYStakeValScript u -> Plutus.SerialisedScript
-gyStakeValScriptToSerialisedScript (GYStakeValScript mp) = coerce mp & scriptToSerialisedScript & coerce
-gyStakeValScriptToSerialisedScript (GYStakeValReference _ s) = scriptToSerialisedScript s & coerce
-
-gyStakeValScriptWitnessToApiPlutusSW ::
-  GYStakeValScript u ->
-  Api.S.ScriptRedeemer ->
-  Api.S.ExecutionUnits ->
-  Api.S.ScriptWitness Api.S.WitCtxStake ApiEra
-gyStakeValScriptWitnessToApiPlutusSW (GYStakeValScript p) = stakeValidatorToApiPlutusScriptWitness p
-gyStakeValScriptWitnessToApiPlutusSW (GYStakeValReference r s) =
-  referenceScriptToApiPlutusScriptWitness
-    r
-    s
-    Api.NoScriptDatumForStake
 
 stakeValidatorHash :: GYStakeValidator v -> GYScriptHash
 stakeValidatorHash = coerce scriptHash

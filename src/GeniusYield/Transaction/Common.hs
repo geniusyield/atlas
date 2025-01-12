@@ -22,7 +22,9 @@ import Cardano.Ledger.Coin qualified as Ledger
 import GeniusYield.Imports
 import GeniusYield.Transaction.CBOR
 import GeniusYield.Types.Address
+import GeniusYield.Types.BuildScript
 import GeniusYield.Types.Era
+import GeniusYield.Types.Governance (GYTxVotingProcedures)
 import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import GeniusYield.Types.PubKeyHash
 import GeniusYield.Types.Redeemer
@@ -46,7 +48,7 @@ data GYBalancedTx v = GYBalancedTx
   { gybtxIns :: ![GYTxInDetailed v]
   , gybtxCollaterals :: !GYUTxOs
   , gybtxOuts :: ![GYTxOut v]
-  , gybtxMint :: !(Maybe (GYValue, [(GYMintScript v, GYRedeemer)]))
+  , gybtxMint :: !(Maybe (GYValue, [(GYBuildScript v, GYRedeemer)]))
   , gybtxWdrls :: ![GYTxWdrl v]
   , gybtxCerts :: ![GYTxCert' v]
   , gybtxInvalidBefore :: !(Maybe GYSlot)
@@ -54,6 +56,7 @@ data GYBalancedTx v = GYBalancedTx
   , gybtxSigners :: !(Set GYPubKeyHash)
   , gybtxRefIns :: !GYUTxOs
   , gybtxMetadata :: !(Maybe GYTxMetadata)
+  , gybtxVotingProcedures :: !(GYTxVotingProcedures v)
   }
 
 -- | A further detailed version of 'GYTxIn', containing all information about a UTxO.

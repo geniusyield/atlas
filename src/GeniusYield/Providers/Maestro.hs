@@ -50,7 +50,6 @@ import GHC.Natural (wordToNatural)
 import GeniusYield.Imports
 import GeniusYield.Providers.Common
 import GeniusYield.Types
-import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import Maestro.Client.V1 qualified as Maestro
 import Maestro.Client.V1.Accounts qualified as Maestro
 import Maestro.Types.V1 qualified as Maestro

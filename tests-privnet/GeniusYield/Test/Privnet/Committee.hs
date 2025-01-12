@@ -2,12 +2,8 @@ module GeniusYield.Test.Privnet.Committee (
   committeeTests,
 ) where
 
-import Control.Lens ((^.))
 import Data.Map.Strict qualified as Map
-import Data.Maybe (fromMaybe)
-import Data.Set qualified as Set
 import GeniusYield.Imports ((&))
-import GeniusYield.Test.Privnet.Asserts
 import GeniusYield.Test.Privnet.Ctx
 import GeniusYield.Test.Privnet.Setup
 import GeniusYield.TxBuilder

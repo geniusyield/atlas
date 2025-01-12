@@ -25,7 +25,6 @@ import GeniusYield.Types.PubKeyHash (
  )
 import GeniusYield.Types.Redeemer (GYRedeemer, unitRedeemer)
 import GeniusYield.Types.Script (
-  GYMintScript (..),
   mintingPolicyFromApi,
   scriptFromCBOR,
   scriptToApi,
@@ -56,6 +55,7 @@ import GeniusYield.TxBuilder.Class (
   mustHaveRefInput,
   mustMint,
  )
+import GeniusYield.Types.BuildScript
 
 -------------------------------------------------------------------------------
 -- Tests

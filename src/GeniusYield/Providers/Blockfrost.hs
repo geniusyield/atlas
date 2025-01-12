@@ -44,7 +44,6 @@ import Data.Time.Clock.POSIX qualified as Time
 import GeniusYield.Imports
 import GeniusYield.Providers.Common
 import GeniusYield.Types
-import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import GeniusYield.Utils (serialiseToBech32WithPrefix)
 import Money qualified
 import Ouroboros.Consensus.HardFork.History (EraParams (eraGenesisWin))

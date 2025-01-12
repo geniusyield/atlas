@@ -104,7 +104,6 @@ import GeniusYield.Transaction.CBOR
 import GeniusYield.Transaction.CoinSelection
 import GeniusYield.Transaction.Common
 import GeniusYield.Types
-import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import GeniusYield.Types.TxCert.Internal
 
 -- | A container for various network parameters, and user wallet information, used by balancer.
@@ -150,7 +149,7 @@ buildUnsignedTxBody ::
   -- | reference inputs
   GYUTxOs ->
   -- | minted values
-  Maybe (GYValue, [(GYMintScript v, GYRedeemer)]) ->
+  Maybe (GYValue, [(GYBuildScript v, GYRedeemer)]) ->
   -- | withdrawals
   [GYTxWdrl v] ->
   -- | certificates
@@ -159,8 +158,9 @@ buildUnsignedTxBody ::
   Maybe GYSlot ->
   Set GYPubKeyHash ->
   Maybe GYTxMetadata ->
+  GYTxVotingProcedures v ->
   m (Either GYBuildTxError GYTxBody)
-buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata = buildTxLoop cstrat extraLovelaceStart
+buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata vps = buildTxLoop cstrat extraLovelaceStart
  where
   certsFinalised = finaliseTxCert (gyBTxEnvProtocolParams env) <$> certs
 
@@ -226,6 +226,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub sig
             , gybtxSigners = signers
             , gybtxRefIns = refIns
             , gybtxMetadata = mbTxMetadata
+            , gybtxVotingProcedures = vps
             }
           (length outsOld)
 
@@ -374,6 +375,7 @@ finalizeGYBalancedTx
     , gybtxSigners = signers
     , gybtxRefIns = utxosRefInputs
     , gybtxMetadata = mbTxMetadata
+    , gybtxVotingProcedures = vps
     } =
     makeTransactionBodyAutoBalanceWrapper
       collaterals
@@ -477,10 +479,13 @@ finalizeGYBalancedTx
           Api.BuildTxWith $
             Map.fromList
               [ ( mintingPolicyApiIdFromWitness p
-                , gyMintingScriptWitnessToApiPlutusSW
-                    p
-                    (redeemerToApi r)
-                    (Api.ExecutionUnits 0 0)
+                , case p of
+                    GYBuildPlutusScript s ->
+                      gyMintingScriptWitnessToApiPlutusSW
+                        s
+                        (redeemerToApi r)
+                        (Api.ExecutionUnits 0 0)
+                    GYBuildSimpleScript s -> simpleScriptWitnessToApi s
                 )
               | (p, r) <- xs
               ]
@@ -530,6 +535,26 @@ finalizeGYBalancedTx
 
     unregisteredDRepCredsMap = Map.fromList [(credentialToLedger sc, fromIntegral amt) | GYDRepUnregistrationCertificate sc amt <- map gyTxCertCertificate' certs]
 
+    vps' =
+      if vps == mempty
+        then Nothing
+        else
+          let vpsApi =
+                Api.TxVotingProcedures (votingProceduresToLedger (Map.map snd vps)) $
+                  Api.BuildTxWith
+                    ( Map.map fst vps
+                        -- https://github.com/IntersectMBO/cardano-api/issues/722.
+                        & Map.filter
+                          ( \case
+                              GYTxBuildWitnessKey -> False
+                              GYTxBuildWitnessPlutusScript _ _ -> True
+                              GYTxBuildWitnessSimpleScript _ -> True
+                          )
+                        & Map.mapKeys voterToLedger
+                        & Map.map unsafeBuildScriptWitnessToApi
+                    )
+           in Just vpsApi >>= Api.mkFeatured
+
     body :: Api.TxBodyContent Api.BuildTx ApiEra
     body =
       Api.TxBodyContent
@@ -554,9 +579,9 @@ finalizeGYBalancedTx
         , Api.txMintValue = mint
         , Api.txScriptValidity = Api.TxScriptValidityNone
         , Api.txProposalProcedures = Nothing
-        , Api.txVotingProcedures = Nothing
+        , Api.txVotingProcedures = vps'
         , Api.txCurrentTreasuryValue = Nothing -- FIXME:?
-        , Api.txTreasuryDonation = Nothing
+        , Api.txTreasuryDonation = Nothing -- FIXME:?
         }
 
 {- | Wraps around 'Api.makeTransactionBodyAutoBalance' just to verify the final ex units and tx size are within limits.

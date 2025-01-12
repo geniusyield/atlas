@@ -23,7 +23,6 @@ import Data.List.NonEmpty qualified as NE
 import GeniusYield.Imports
 import GeniusYield.Types.Address (GYAddress)
 import GeniusYield.Types.Key
-import GeniusYield.Types.Key.Class (ToShelleyWitnessSigningKey (toShelleyWitnessSigningKey))
 import GeniusYield.Types.PaymentKeyHash (GYPaymentKeyHash)
 import GeniusYield.Types.PubKeyHash (AsPubKeyHash (toPubKeyHash), GYPubKeyHash)
 import GeniusYield.Types.StakeKeyHash (GYStakeKeyHash)

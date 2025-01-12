@@ -7,16 +7,19 @@ Stability   : develop
 -}
 module GeniusYield.Types.TxIn (
   GYTxIn (..),
-  GYInScript (..),
-  GYInSimpleScript (..),
+  GYInScript,
+  pattern GYInScript,
+  pattern GYInReference,
+  GYInSimpleScript,
+  pattern GYInSimpleScript,
+  pattern GYInReferenceSimpleScript,
   inScriptVersion,
   GYTxInWitness (..),
   txInToApi,
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api
-import Data.GADT.Compare (defaultEq)
+import GeniusYield.Types.BuildScript
 import GeniusYield.Types.Datum
 import GeniusYield.Types.Era
 import GeniusYield.Types.PlutusVersion
@@ -49,39 +52,28 @@ data GYTxInWitness v
     GYTxInWitnessSimpleScript !(GYInSimpleScript v)
   deriving stock (Eq, Show)
 
-data GYInScript (u :: PlutusVersion) where
-  -- | 'VersionIsGreaterOrEqual' restricts which version validators can be used in this transaction.
-  GYInScript :: forall u v. v `VersionIsGreaterOrEqual` u => GYScript v -> GYInScript u
-  -- | Reference inputs can be only used in V2 transactions.
-  GYInReference :: forall v. v `VersionIsGreaterOrEqual` 'PlutusV2 => !GYTxOutRef -> !(GYScript v) -> GYInScript v
+type GYInScript = GYBuildPlutusScript
+
+pattern GYInScript :: () => v `VersionIsGreaterOrEqual` u => GYScript v -> GYBuildPlutusScript u
+pattern GYInScript s = GYBuildPlutusScriptInlined s
+
+pattern GYInReference :: () => VersionIsGreaterOrEqual u PlutusV2 => GYTxOutRef -> GYScript u -> GYBuildPlutusScript u
+pattern GYInReference ref s = GYBuildPlutusScriptReference ref s
+
+{-# COMPLETE GYInScript, GYInReference #-}
 
 -- | Returns the 'PlutusVersion' of the given 'GYInScript'.
 inScriptVersion :: GYInScript v -> PlutusVersion
-inScriptVersion (GYInReference _ s) = case scriptVersion s of
-  SingPlutusV3 -> PlutusV3
-  SingPlutusV2 -> PlutusV2
-inScriptVersion (GYInScript v) = case validatorVersion v of
-  SingPlutusV3 -> PlutusV3
-  SingPlutusV2 -> PlutusV2
-  SingPlutusV1 -> PlutusV1
+inScriptVersion = buildPlutusScriptVersion
 
-deriving instance Show (GYInScript v)
+type GYInSimpleScript = GYBuildSimpleScript
 
-instance Eq (GYInScript v) where
-  GYInReference ref1 script1 == GYInReference ref2 script2 = ref1 == ref2 && script1 == script2
-  GYInScript v1 == GYInScript v2 = defaultEq v1 v2
-  _ == _ = False
+pattern GYInSimpleScript :: GYSimpleScript -> GYBuildSimpleScript u
+pattern GYInSimpleScript s = GYBuildSimpleScriptInlined s
+pattern GYInReferenceSimpleScript :: () => VersionIsGreaterOrEqual u PlutusV2 => GYTxOutRef -> GYSimpleScript -> GYBuildSimpleScript u
+pattern GYInReferenceSimpleScript ref s = GYBuildSimpleScriptReference ref s
 
-data GYInSimpleScript (u :: PlutusVersion) where
-  GYInSimpleScript :: !GYSimpleScript -> GYInSimpleScript u
-  GYInReferenceSimpleScript :: v `VersionIsGreaterOrEqual` 'PlutusV2 => !GYTxOutRef -> !GYSimpleScript -> GYInSimpleScript v
-
-deriving instance Show (GYInSimpleScript v)
-
-instance Eq (GYInSimpleScript v) where
-  GYInSimpleScript s1 == GYInSimpleScript s2 = s1 == s2
-  GYInReferenceSimpleScript ref1 s1 == GYInReferenceSimpleScript ref2 s2 = ref1 == ref2 && s1 == s2
-  _ == _ = False
+{-# COMPLETE GYInSimpleScript, GYInReferenceSimpleScript #-}
 
 {- |
 
@@ -106,7 +98,4 @@ txInToApi useInline (GYTxIn oref m) = (txOutRefToApi oref, Api.BuildTxWith $ f m
         (redeemerToApi r)
         (Api.ExecutionUnits 0 0)
   f (GYTxInWitnessSimpleScript v) =
-    Api.ScriptWitness Api.ScriptWitnessForSpending $ Api.SimpleScriptWitness Api.SimpleScriptInConway $ h v
-
-  h (GYInSimpleScript v) = Api.SScript $ simpleScriptToApi v
-  h (GYInReferenceSimpleScript ref s) = Api.SReferenceScript (txOutRefToApi ref) $ Just $ hashSimpleScript' s
+    Api.ScriptWitness Api.ScriptWitnessForSpending $ simpleScriptWitnessToApi v

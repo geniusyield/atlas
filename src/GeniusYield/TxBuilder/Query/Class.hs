@@ -25,7 +25,6 @@ import Data.Set qualified as Set
 import GeniusYield.Imports
 import GeniusYield.TxBuilder.Errors
 import GeniusYield.Types
-import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 
 -------------------------------------------------------------------------------
 -- Class

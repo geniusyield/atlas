@@ -7,7 +7,9 @@ Stability   : develop
 -}
 module GeniusYield.Types.TxCert (
   GYTxCert,
-  GYTxCertWitness (..),
+  GYTxCertWitness,
+  pattern GYTxCertWitnessKey,
+  pattern GYTxCertWitnessScript,
   txCertToApi,
   mkStakeAddressRegistrationCertificate,
   mkStakeAddressDeregistrationCertificate,

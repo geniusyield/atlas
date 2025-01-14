@@ -35,6 +35,7 @@ import Data.List (nubBy)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
+import Data.Maybe (maybeToList)
 import Data.Ratio ((%))
 import Data.Set qualified as Set
 import GeniusYield.Imports
@@ -46,6 +47,7 @@ import GeniusYield.Transaction.Common (
 import GeniusYield.TxBuilder.Errors
 import GeniusYield.TxBuilder.Query.Class
 import GeniusYield.Types
+import GeniusYield.Types.TxCert.Internal (GYTxCert (..))
 
 -------------------------------------------------------------------------------
 -- Transaction skeleton
@@ -246,10 +248,33 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
                     , [(mp, redeemer) | (mp, (_, redeemer)) <- itoList gytxMint]
                     )
 
-        let refIns =
+        let extractReferenceFromWitness :: GYTxBuildWitness v -> Maybe GYTxOutRef
+            extractReferenceFromWitness (GYTxBuildWitnessSimpleScript (GYBuildSimpleScriptReference r _)) = Just r
+            extractReferenceFromWitness (GYTxBuildWitnessPlutusScript (GYBuildPlutusScriptReference r _) _) = Just r
+            extractReferenceFromWitness _anyOther = Nothing
+            gytxVotingProcedures' = case gytxVotingProcedures of GYTxSkeletonVotingProceduresNone -> mempty; GYTxSkeletonVotingProcedures vp -> vp
+            gytxProposalProcedures' = case gytxProposalProcedures of GYTxSkeletonProposalProceduresNone -> mempty; GYTxSkeletonProposalProcedures pps -> pps
+            refIns =
               gyTxSkeletonRefInsToList gytxRefIns
-                <> [r | GYTxIn {gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptReference r _) _ _} <- gytxIns]
-                <> [r | GYBuildPlutusScript (GYBuildPlutusScriptReference r _) <- Map.keys gytxMint]
+                <> [ r
+                   | GYTxIn {gyTxInWitness = wit} <- gytxIns
+                   , r <- case wit of
+                      GYTxInWitnessScript (GYBuildPlutusScriptReference r _) _ _ -> [r]
+                      GYTxInWitnessSimpleScript (GYBuildSimpleScriptReference r _) -> [r]
+                      _anyOther -> []
+                   ]
+                <> [ r
+                   | wit <- Map.keys gytxMint
+                   , r <- case wit of
+                      GYBuildPlutusScript (GYBuildPlutusScriptReference r _) -> [r]
+                      GYBuildSimpleScript (GYBuildSimpleScriptReference r _) -> [r]
+                      _anyOther -> []
+                   ]
+                <> [r | wdrl <- gytxWdrls, r <- maybeToList (extractReferenceFromWitness $ gyTxWdrlWitness wdrl)]
+                <> [r | cert <- gytxCerts, r <- maybeToList (gyTxCertWitness cert >>= extractReferenceFromWitness)]
+                <> [r | votingWit <- map fst (Map.elems gytxVotingProcedures'), r <- maybeToList (extractReferenceFromWitness votingWit)]
+                <> [r | propProc <- gytxProposalProcedures', r <- maybeToList (extractReferenceFromWitness $ snd propProc)]
+
         allRefUtxos <-
           utxosAtTxOutRefs $
             (gyTxInTxOutRef <$> gytxIns)
@@ -312,8 +337,8 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
               gytxInvalidAfter
               gytxSigs
               gytxMetadata
-              (case gytxVotingProcedures of GYTxSkeletonVotingProceduresNone -> mempty; GYTxSkeletonVotingProcedures vp -> vp)
-              (case gytxProposalProcedures of GYTxSkeletonProposalProceduresNone -> mempty; GYTxSkeletonProposalProcedures pps -> pps)
+              gytxVotingProcedures'
+              gytxProposalProcedures'
 
       go :: GYUTxOs -> GYTxBuildResult -> [GYTxSkeleton v] -> m (Either GYBuildTxError GYTxBuildResult)
       go _ acc [] = pure $ Right $ reverseResult acc

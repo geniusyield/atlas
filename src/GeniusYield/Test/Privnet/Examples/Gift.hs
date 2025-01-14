@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE PatternSynonyms #-}
 
 {- |
 Module      : GeniusYield.Test.Privnet.Examples.Gift

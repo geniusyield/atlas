@@ -643,8 +643,7 @@ makeTransactionBodyAutoBalanceWrapper ::
   Word ->
   Int ->
   Either GYBuildTxError GYTxBody
-makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp _ps utxos body changeAddr stakeDelegDeposits drepDelegDeposits nkeys numSkeletonOuts = do
-  let poolids = Set.empty -- TODO: This denotes the set of registered stake pools, that are being unregistered in this transaction.
+makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body changeAddr stakeDelegDeposits drepDelegDeposits nkeys numSkeletonOuts = do
   let Ledger.ExUnits
         { exUnitsSteps = maxSteps
         , exUnitsMem = maxMemory

@@ -1,5 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
-
 {- |
 Module      : GeniusYield.Types.SlotConfig
 Copyright   : (c) 2023 GYELD GMBH

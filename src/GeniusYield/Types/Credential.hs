@@ -1,5 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
-
 {- |
 Module      : GeniusYield.Types.Credential
 Copyright   : (c) 2023 GYELD GMBH

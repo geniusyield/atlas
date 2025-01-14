@@ -1,5 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
-
 module GeniusYield.TxBuilder.User (
   User (..),
   UserCollateral (..),

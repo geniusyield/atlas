@@ -1,5 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
-
 {- |
 Module      : GeniusYield.Test.Utils
 Copyright   : (c) 2023 GYELD GMBH

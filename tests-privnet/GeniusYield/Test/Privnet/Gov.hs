@@ -3,8 +3,9 @@ module GeniusYield.Test.Privnet.Gov (
 ) where
 
 import Control.Lens ((^.))
+import Data.Map.Strict qualified as Map
 import Data.Maybe (fromJust)
-import GeniusYield.Test.Privnet.Asserts
+import GeniusYield.Test.Privnet.Committee
 import GeniusYield.Test.Privnet.Ctx
 import GeniusYield.Test.Privnet.Setup
 import GeniusYield.Test.Privnet.Stake.Utils
@@ -42,3 +43,14 @@ exerciseGov ctx info = do
     gyLogInfo' "" $ "Balance lost: " <> show (valueMinus fundBalI fundBalF)
     pure tid
   info $ "Successfully exercised proposal procedure, with tx id: " <> show txId
+  (_, hotSKey) <- delegateHotKey ctx info newUser
+  txIdVote <- ctxRun ctx newUser $ do
+    fundAddr <- ownChangeAddress
+    fundBalI <- queryBalance fundAddr
+    txBody <- buildTxBody $ mustHaveVotingProcedures @'PlutusV3 (Map.fromList [(CommitteeVoter (GYCredentialByKey $ verificationKeyHash $ getVerificationKey hotSKey), (GYTxBuildWitnessKey, Map.fromList [(GYGovActionId {gaidTxId = txId, gaidIx = 0}, GYVotingProcedure Yes Nothing)]))])
+    gyLogInfo' "" $ "txBody: " <> show txBody
+    tid <- submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey newUser, GYSomeSigningKey hotSKey]
+    fundBalF <- queryBalance fundAddr
+    gyLogInfo' "" $ "Balance lost: " <> show (valueMinus fundBalI fundBalF)
+    pure tid
+  info $ "Successfully voted on the proposal, with tx id: " <> show txIdVote

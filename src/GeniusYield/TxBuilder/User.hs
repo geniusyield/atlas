@@ -22,7 +22,7 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NE
 
 import GeniusYield.Imports
-import GeniusYield.Types (GYCredential (GYCredentialByKey), GYNetworkId (GYTestnetPreprod))
+import GeniusYield.Types (GYCredential (GYCredentialByKey), GYNetworkId)
 import GeniusYield.Types.Address (GYAddress, GYStakeAddress, stakeAddressFromCredential)
 import GeniusYield.Types.Key
 import GeniusYield.Types.PaymentKeyHash (GYPaymentKeyHash)

@@ -56,7 +56,7 @@ tests setup =
                     { gyTxInTxOutRef = ref
                     , gyTxInWitness =
                         GYTxInWitnessScript
-                          (GYInScript @PlutusV2 readOracleValidatorV2)
+                          (GYBuildPlutusScriptInlined @PlutusV2 readOracleValidatorV2)
                           (datumFromPlutusData (d :: ()))
                           unitRedeemer
                     }
@@ -107,7 +107,7 @@ tests setup =
                     { gyTxInTxOutRef = ref
                     , gyTxInWitness =
                         GYTxInWitnessScript
-                          (GYInScript @PlutusV2 readOracleValidatorV2)
+                          (GYBuildPlutusScriptInlined @PlutusV2 readOracleValidatorV2)
                           (datumFromPlutusData (d :: ()))
                           unitRedeemer
                     }

@@ -248,7 +248,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
 
         let refIns =
               gyTxSkeletonRefInsToList gytxRefIns
-                <> [r | GYTxIn {gyTxInWitness = GYTxInWitnessScript (GYInReference r _) _ _} <- gytxIns]
+                <> [r | GYTxIn {gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptReference r _) _ _} <- gytxIns]
                 <> [r | GYBuildPlutusScript (GYBuildPlutusScriptReference r _) <- Map.keys gytxMint]
         allRefUtxos <-
           utxosAtTxOutRefs $

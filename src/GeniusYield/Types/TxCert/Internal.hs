@@ -18,13 +18,13 @@ module GeniusYield.Types.TxCert.Internal (
 import Cardano.Api qualified as Api
 import Data.Functor ((<&>))
 import GeniusYield.Imports ((&))
+import GeniusYield.Types.BuildScript
 import GeniusYield.Types.BuildWitness (GYTxBuildWitness (..), buildWitnessToApi)
 import GeniusYield.Types.Certificate
 import GeniusYield.Types.Credential (stakeCredentialToApi)
 import GeniusYield.Types.Era
 import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import GeniusYield.Types.Redeemer
-import GeniusYield.Types.TxIn (GYInScript)
 
 {- | A transaction certificate.
 
@@ -53,7 +53,7 @@ type GYTxCertWitness v = GYTxBuildWitness v
 pattern GYTxCertWitnessKey :: GYTxCertWitness v
 pattern GYTxCertWitnessKey = GYTxBuildWitnessKey
 
-pattern GYTxCertWitnessScript :: GYInScript v -> GYRedeemer -> GYTxCertWitness v
+pattern GYTxCertWitnessScript :: GYBuildPlutusScript v -> GYRedeemer -> GYTxCertWitness v
 pattern GYTxCertWitnessScript v r = GYTxBuildWitnessPlutusScript v r
 
 txCertToApi ::

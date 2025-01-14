@@ -609,7 +609,7 @@ grabGifts validator = do
                   { gyTxInTxOutRef = oref
                   , gyTxInWitness =
                       GYTxInWitnessScript
-                        (GYInScript validator)
+                        (GYBuildPlutusScriptInlined validator)
                         (datumFromPlutus' od)
                         unitRedeemer
                   }
@@ -638,7 +638,7 @@ grabGiftsRef ref validator = do
                   { gyTxInTxOutRef = oref
                   , gyTxInWitness =
                       GYTxInWitnessScript
-                        (GYInReference ref $ validatorToScript validator)
+                        (GYBuildPlutusScriptReference ref $ validatorToScript validator)
                         (datumFromPlutus' od)
                         unitRedeemer
                   }

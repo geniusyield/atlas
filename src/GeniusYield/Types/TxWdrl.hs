@@ -17,10 +17,10 @@ import Cardano.Api qualified as Api
 import Cardano.Ledger.Coin qualified as Ledger
 import GeniusYield.Imports (Natural)
 import GeniusYield.Types.Address (GYStakeAddress, stakeAddressToApi)
+import GeniusYield.Types.BuildScript
 import GeniusYield.Types.BuildWitness
 import GeniusYield.Types.Era
 import GeniusYield.Types.Redeemer
-import GeniusYield.Types.TxIn (GYInScript)
 
 {- | Transaction withdrawal.
 
@@ -39,7 +39,7 @@ type GYTxWdrlWitness v = GYTxBuildWitness v
 pattern GYTxWdrlWitnessKey :: GYTxWdrlWitness v
 pattern GYTxWdrlWitnessKey = GYTxBuildWitnessKey
 
-pattern GYTxWdrlWitnessScript :: GYInScript v -> GYRedeemer -> GYTxWdrlWitness v
+pattern GYTxWdrlWitnessScript :: GYBuildPlutusScript v -> GYRedeemer -> GYTxWdrlWitness v
 pattern GYTxWdrlWitnessScript v r = GYTxBuildWitnessPlutusScript v r
 
 txWdrlToApi ::

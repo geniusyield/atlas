@@ -862,7 +862,7 @@ skeletonToRefScriptsORefs GYTxSkeleton {gytxIns} = go gytxIns []
   go [] acc = acc
   go (gytxIn : rest) acc = case gyTxInWitness gytxIn of
     GYTxInWitnessScript gyInScript _ _ -> case gyInScript of
-      GYInReference oRef _ -> go rest (oRef : acc)
+      GYBuildPlutusScriptReference oRef _ -> go rest (oRef : acc)
       _anyOtherMatch -> go rest acc
     _anyOtherMatch -> go rest acc
 

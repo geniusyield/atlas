@@ -47,9 +47,9 @@ data GYTxInWitness v
   = -- | Key witness without datum.
     GYTxInWitnessKey
   | -- | Script witness with associated script, datum, and redeemer.
-    GYTxInWitnessScript !(GYInScript v) !GYDatum !GYRedeemer
+    GYTxInWitnessScript !(GYBuildPlutusScript v) !GYDatum !GYRedeemer
   | -- | Simple script witness.
-    GYTxInWitnessSimpleScript !(GYInSimpleScript v)
+    GYTxInWitnessSimpleScript !(GYBuildSimpleScript v)
   deriving stock (Eq, Show)
 
 type GYInScript = GYBuildPlutusScript
@@ -62,8 +62,8 @@ pattern GYInReference ref s = GYBuildPlutusScriptReference ref s
 
 {-# COMPLETE GYInScript, GYInReference #-}
 
--- | Returns the 'PlutusVersion' of the given 'GYInScript'.
-inScriptVersion :: GYInScript v -> PlutusVersion
+-- | Returns the 'PlutusVersion' of the given 'GYBuildPlutusScript'.
+inScriptVersion :: GYBuildPlutusScript v -> PlutusVersion
 inScriptVersion = buildPlutusScriptVersion
 
 type GYInSimpleScript = GYBuildSimpleScript
@@ -91,8 +91,8 @@ txInToApi useInline (GYTxIn oref m) = (txOutRefToApi oref, Api.BuildTxWith $ f m
   f (GYTxInWitnessScript v d r) =
     Api.ScriptWitness Api.ScriptWitnessForSpending $
       ( case v of
-          GYInScript s -> validatorToApiPlutusScriptWitness s
-          GYInReference ref s -> referenceScriptToApiPlutusScriptWitness ref s
+          GYBuildPlutusScriptInlined s -> validatorToApiPlutusScriptWitness s
+          GYBuildPlutusScriptReference ref s -> referenceScriptToApiPlutusScriptWitness ref s
       )
         (if useInline then Api.InlineScriptDatum else Api.ScriptDatumForTxIn $ Just $ datumToApi' d)
         (redeemerToApi r)

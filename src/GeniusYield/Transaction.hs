@@ -443,8 +443,8 @@ finalizeGYBalancedTx
        where
         estimateKeyWitnessesFromNativeScripts acc (gyTxInWitness . gyTxInDet -> GYTxInWitnessSimpleScript gyInSS) =
           case gyInSS of
-            GYInSimpleScript s -> getTotalKeysInSimpleScript s <> acc
-            GYInReferenceSimpleScript _ s -> getTotalKeysInSimpleScript s <> acc
+            GYBuildSimpleScriptInlined s -> getTotalKeysInSimpleScript s <> acc
+            GYBuildSimpleScriptReference _ s -> getTotalKeysInSimpleScript s <> acc
         estimateKeyWitnessesFromNativeScripts acc _ = acc
 
     inRefs :: Api.TxInsReference ApiEra

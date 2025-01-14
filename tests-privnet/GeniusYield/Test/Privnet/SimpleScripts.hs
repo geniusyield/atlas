@@ -44,6 +44,6 @@ exerciseASimpleScript ctx info toUseRefScript = do
     toConsumeUtxo <- ctxRun ctx fundUser $ utxoAtTxOutRef' toConsume
     assertEqual "Reference script must be equal to actual script" (Just $ GYSimpleScript multiSigSimpleScript) (utxoRefScript toConsumeUtxo)
   txIdConsume <- ctxRun ctx fundUser $ do
-    txBodyConsume <- buildTxBody $ mustHaveInput @'PlutusV2 $ GYTxIn toConsume (GYTxInWitnessSimpleScript $ if toUseRefScript then GYInReferenceSimpleScript toConsume multiSigSimpleScript else GYInSimpleScript multiSigSimpleScript)
+    txBodyConsume <- buildTxBody $ mustHaveInput @'PlutusV2 $ GYTxIn toConsume (GYTxInWitnessSimpleScript $ if toUseRefScript then GYBuildSimpleScriptReference toConsume multiSigSimpleScript else GYBuildSimpleScriptInlined multiSigSimpleScript)
     submitTxBodyConfirmed txBodyConsume $ userPaymentSKey <$> [user1, user2, user3]
   info $ "Successfully consumed the simple script, with tx id: " <> show txIdConsume

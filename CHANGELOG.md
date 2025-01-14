@@ -11,6 +11,7 @@
 * Update default value of `GYAwaitTxParameters` to now have 100 max attempts.
 * `GYInScript` and `GYStakeValScript` are now defined as a type synonyms around `GYBuildPlutusScript` whereas `GYMintScript` is a type synonym around `GYBuildScript` which now also includes simple scripts (besides plutus scripts). Pattern synonyms are provided for backwards compatibility. These and related functions such as `stakeValidatorVersionFromWitness`, `gyStakeValScriptToSerialisedScript` are now exported from `GeniusYield.Types.BuildScript` instead of `GeniusYield.Types.Script`.
 * `GYTxWdrlWitness`, `GYTxCertWitness` are now defined as a type synonyms around generic `GYTxBuildWitness` and now also includes simple scripts. Pattern synonyms are provided to maintain backwards compatibility.
+* Adds support for governance actions, namely proposal procedures & voting procedures.
 
 ## 0.7.0
 

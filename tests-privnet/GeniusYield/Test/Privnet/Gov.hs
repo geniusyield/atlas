@@ -43,7 +43,7 @@ exerciseGov ctx info = do
     gyLogInfo' "" $ "Balance lost: " <> show (valueMinus fundBalI fundBalF)
     pure tid
   info $ "Successfully exercised proposal procedure, with tx id: " <> show txId
-  (_, hotSKey) <- delegateHotKey ctx info newUser
+  (_, hotSKey) <- delegateHotKey ctx info newUser 1
   txIdVote <- ctxRun ctx newUser $ do
     fundAddr <- ownChangeAddress
     fundBalI <- queryBalance fundAddr

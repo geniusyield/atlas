@@ -23,13 +23,13 @@ committeeTests setup =
 getColdCred :: GYSigningKey kr -> GYCredential kr
 getColdCred = GYCredentialByKey . verificationKeyHash . getVerificationKey
 
-delegateHotKey :: Ctx -> (String -> IO ()) -> User -> IO (GYSigningKey 'GYKeyRoleColdCommittee, GYSigningKey 'GYKeyRoleHotCommittee)
-delegateHotKey ctx info fundUser = do
+delegateHotKey :: Ctx -> (String -> IO ()) -> User -> Int -> IO (GYSigningKey 'GYKeyRoleColdCommittee, GYSigningKey 'GYKeyRoleHotCommittee)
+delegateHotKey ctx info fundUser ix = do
   info "Generating a hot committee key"
   hotSKey <- generateSigningKey @'GYKeyRoleHotCommittee
   let hotCred = GYCredentialByKey $ verificationKeyHash $ getVerificationKey hotSKey
   info $ "Generated hot key: " <> show hotSKey <> ", with corresponding credential: " <> show hotCred
-  let coldKey = ctxCommittee ctx & ctxCommitteeMembers & Map.findMin & fst
+  let coldKey = ctxCommittee ctx & ctxCommitteeMembers & Map.toList & (!! ix) & fst
       coldCred = getColdCred coldKey
   info $ "Cold key: " <> show coldKey <> ", with corresponding credential: " <> show coldCred
   txId <- ctxRun ctx fundUser $ do
@@ -42,7 +42,7 @@ delegateHotKey ctx info fundUser = do
 exerciseCommittee :: Ctx -> (String -> IO ()) -> IO ()
 exerciseCommittee ctx info = do
   let fundUser = ctxUserF ctx
-  (coldKey, _) <- delegateHotKey ctx info fundUser
+  (coldKey, _) <- delegateHotKey ctx info fundUser 0
   let anchor = GYAnchor (unsafeTextToUrl "https://www.geniusyield.co") (hashAnchorData "we are awesome")
       coldCred = getColdCred coldKey
   info "Resigning cold key"

@@ -237,7 +237,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
 
       helper :: GYUTxOs -> GYTxSkeleton v -> m (Either GYBuildTxError GYTxBody)
       helper ownUtxos' GYTxSkeleton {..} = do
-        let gytxMint' :: Maybe (GYValue, [(GYMintScript v, GYRedeemer)])
+        let gytxMint' :: Maybe (GYValue, [(GYBuildScript v, GYRedeemer)])
             gytxMint'
               | null gytxMint = Nothing
               | otherwise =
@@ -249,7 +249,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
         let refIns =
               gyTxSkeletonRefInsToList gytxRefIns
                 <> [r | GYTxIn {gyTxInWitness = GYTxInWitnessScript (GYInReference r _) _ _} <- gytxIns]
-                <> [r | GYMintReference r _ <- Map.keys gytxMint]
+                <> [r | GYBuildPlutusScript (GYBuildPlutusScriptReference r _) <- Map.keys gytxMint]
         allRefUtxos <-
           utxosAtTxOutRefs $
             (gyTxInTxOutRef <$> gytxIns)

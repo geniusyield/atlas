@@ -156,11 +156,11 @@ gyMintingScriptWitnessToApiPlutusSW (GYBuildPlutusScriptReference r s) =
     s
     Api.NoScriptDatumForMint
 
-mintingPolicyIdFromWitness :: GYMintScript v -> GYMintingPolicyId
+mintingPolicyIdFromWitness :: GYBuildScript v -> GYMintingPolicyId
 mintingPolicyIdFromWitness (GYBuildPlutusScript (GYBuildPlutusScriptInlined s)) = mintingPolicyId s
 mintingPolicyIdFromWitness (GYBuildPlutusScript (GYBuildPlutusScriptReference _ s)) = mintingPolicyId s
 mintingPolicyIdFromWitness (GYBuildSimpleScript (GYBuildSimpleScriptInlined s)) = simpleScriptToPolicyId s
 mintingPolicyIdFromWitness (GYBuildSimpleScript (GYBuildSimpleScriptReference _ s)) = simpleScriptToPolicyId s
 
-mintingPolicyApiIdFromWitness :: GYMintScript v -> Api.PolicyId
+mintingPolicyApiIdFromWitness :: GYBuildScript v -> Api.PolicyId
 mintingPolicyApiIdFromWitness = mintingPolicyIdToApi . mintingPolicyIdFromWitness

@@ -252,7 +252,7 @@ balanceTxStep ::
   (HasCallStack, MonadRandom m) =>
   GYBuildTxEnv ->
   -- | minting
-  Maybe (GYValue, [(GYMintScript v, GYRedeemer)]) ->
+  Maybe (GYValue, [(GYBuildScript v, GYRedeemer)]) ->
   -- | withdrawals
   [GYTxWdrl v] ->
   -- | certificates
@@ -410,8 +410,8 @@ finalizeGYBalancedTx
       fromIntegral $
         countUnique $
           mapMaybe (extractPaymentPkhFromAddress . utxoAddress) (utxosToList collaterals)
-            <> [apkh | GYTxWdrl {gyTxWdrlWitness = GYTxWdrlWitnessKey, gyTxWdrlStakeAddress = saddr} <- wdrls, let sc = stakeAddressToCredential saddr, Just apkh <- [preferCByKey sc]]
-            <> [apkh | cert@GYTxCert' {gyTxCertWitness' = Just GYTxCertWitnessKey} <- certs, let sc = certificateToStakeCredential $ gyTxCertCertificate' cert, Just apkh <- [preferCByKey sc]]
+            <> [apkh | GYTxWdrl {gyTxWdrlWitness = GYTxBuildWitnessKey, gyTxWdrlStakeAddress = saddr} <- wdrls, let sc = stakeAddressToCredential saddr, Just apkh <- [preferCByKey sc]]
+            <> [apkh | cert@GYTxCert' {gyTxCertWitness' = Just GYTxBuildWitnessKey} <- certs, let sc = certificateToStakeCredential $ gyTxCertCertificate' cert, Just apkh <- [preferCByKey sc]]
             <> [apkh | (a, GYTxBuildWitnessKey) <- Data.Bifunctor.second fst <$> Map.toList vps, Just apkh <- [voterToPKH a]]
             <> [apkh | (a, GYTxBuildWitnessKey) <- pps, Just apkh <- [propProcToPKH a]]
             <> estimateKeyWitnessesFromInputs ins

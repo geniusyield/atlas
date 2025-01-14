@@ -30,6 +30,6 @@ mintTestTokens tn amt = do
 
   let txSkeleton =
         mustHaveInput (GYTxIn utxo GYTxInWitnessKey)
-          <> mustMint (GYMintScript policy) unitRedeemer tn amt'
+          <> mustMint (GYBuildPlutusScript $ GYBuildPlutusScriptInlined policy) unitRedeemer tn amt'
 
   return (GYToken (mintingPolicyId policy) tn, txSkeleton)

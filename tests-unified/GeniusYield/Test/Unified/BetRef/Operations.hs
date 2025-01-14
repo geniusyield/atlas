@@ -140,7 +140,7 @@ input brp refScript inputRef dat red =
       { gyTxInTxOutRef = inputRef
       , gyTxInWitness =
           GYTxInWitnessScript
-            (GYInReference refScript $ validatorToScript $ mkBetRefValidator brp)
+            (GYBuildPlutusScriptReference refScript $ validatorToScript $ mkBetRefValidator brp)
             (datumFromPlutusData dat)
             (redeemerFromPlutusData red)
       }

@@ -8,6 +8,8 @@ Stability   : develop
 module GeniusYield.TxBuilder.Common (
   GYTxSkeleton (..),
   GYTxSkeletonRefIns (..),
+  GYTxSkeletonVotingProcedures (..),
+  GYTxSkeletonProposalProcedures (..),
   emptyGYTxSkeleton,
   gyTxSkeletonRefInsToList,
   gyTxSkeletonRefInsSet,
@@ -33,6 +35,7 @@ import Data.List (nubBy)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
+import Data.Maybe (maybeToList)
 import Data.Ratio ((%))
 import Data.Set qualified as Set
 import GeniusYield.Imports
@@ -44,7 +47,7 @@ import GeniusYield.Transaction.Common (
 import GeniusYield.TxBuilder.Errors
 import GeniusYield.TxBuilder.Query.Class
 import GeniusYield.Types
-import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
+import GeniusYield.Types.TxCert.Internal (GYTxCert (..))
 
 -------------------------------------------------------------------------------
 -- Transaction skeleton
@@ -61,15 +64,43 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
   { gytxIns :: ![GYTxIn v]
   , gytxOuts :: ![GYTxOut v]
   , gytxRefIns :: !(GYTxSkeletonRefIns v)
-  , gytxMint :: !(Map (GYMintScript v) (Map GYTokenName Integer, GYRedeemer))
+  , gytxMint :: !(Map (GYBuildScript v) (Map GYTokenName Integer, GYRedeemer))
   , gytxWdrls :: ![GYTxWdrl v]
   , gytxSigs :: !(Set GYPubKeyHash)
   , gytxCerts :: ![GYTxCert v]
   , gytxInvalidBefore :: !(Maybe GYSlot)
   , gytxInvalidAfter :: !(Maybe GYSlot)
   , gytxMetadata :: !(Maybe GYTxMetadata)
+  , gytxVotingProcedures :: !(GYTxSkeletonVotingProcedures v)
+  , gytxProposalProcedures :: !(GYTxSkeletonProposalProcedures v)
   }
   deriving Show
+
+data GYTxSkeletonVotingProcedures :: PlutusVersion -> Type where
+  GYTxSkeletonVotingProceduresNone :: GYTxSkeletonVotingProcedures v
+  GYTxSkeletonVotingProcedures :: VersionIsGreaterOrEqual v 'PlutusV3 => !(GYTxVotingProcedures v) -> GYTxSkeletonVotingProcedures v
+
+deriving instance Show (GYTxSkeletonVotingProcedures v)
+deriving instance Eq (GYTxSkeletonVotingProcedures v)
+
+instance Semigroup (GYTxSkeletonVotingProcedures v) where
+  GYTxSkeletonVotingProcedures a <> GYTxSkeletonVotingProcedures b = GYTxSkeletonVotingProcedures (combineTxVotingProcedures a b)
+  GYTxSkeletonVotingProcedures a <> GYTxSkeletonVotingProceduresNone = GYTxSkeletonVotingProcedures a
+  GYTxSkeletonVotingProceduresNone <> GYTxSkeletonVotingProcedures b = GYTxSkeletonVotingProcedures b
+  GYTxSkeletonVotingProceduresNone <> GYTxSkeletonVotingProceduresNone = GYTxSkeletonVotingProceduresNone
+
+data GYTxSkeletonProposalProcedures :: PlutusVersion -> Type where
+  GYTxSkeletonProposalProceduresNone :: GYTxSkeletonProposalProcedures v
+  GYTxSkeletonProposalProcedures :: VersionIsGreaterOrEqual v 'PlutusV3 => ![(GYProposalProcedurePB, GYTxBuildWitness v)] -> GYTxSkeletonProposalProcedures v
+
+deriving instance Show (GYTxSkeletonProposalProcedures v)
+deriving instance Eq (GYTxSkeletonProposalProcedures v)
+
+instance Semigroup (GYTxSkeletonProposalProcedures v) where
+  GYTxSkeletonProposalProcedures a <> GYTxSkeletonProposalProcedures b = GYTxSkeletonProposalProcedures (a <> b)
+  GYTxSkeletonProposalProcedures a <> GYTxSkeletonProposalProceduresNone = GYTxSkeletonProposalProcedures a
+  GYTxSkeletonProposalProceduresNone <> GYTxSkeletonProposalProcedures b = GYTxSkeletonProposalProcedures b
+  GYTxSkeletonProposalProceduresNone <> GYTxSkeletonProposalProceduresNone = GYTxSkeletonProposalProceduresNone
 
 data GYTxSkeletonRefIns :: PlutusVersion -> Type where
   GYTxSkeletonRefIns :: VersionIsGreaterOrEqual v 'PlutusV2 => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
@@ -104,6 +135,8 @@ emptyGYTxSkeleton =
     , gytxInvalidBefore = Nothing
     , gytxInvalidAfter = Nothing
     , gytxMetadata = Nothing
+    , gytxVotingProcedures = GYTxSkeletonVotingProceduresNone
+    , gytxProposalProcedures = GYTxSkeletonProposalProceduresNone
     }
 
 instance Semigroup (GYTxSkeleton v) where
@@ -119,6 +152,8 @@ instance Semigroup (GYTxSkeleton v) where
       , gytxInvalidBefore = combineInvalidBefore (gytxInvalidBefore x) (gytxInvalidBefore y)
       , gytxInvalidAfter = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
       , gytxMetadata = gytxMetadata x <> gytxMetadata y
+      , gytxVotingProcedures = gytxVotingProcedures x <> gytxVotingProcedures y
+      , gytxProposalProcedures = gytxProposalProcedures x <> gytxProposalProcedures y
       }
    where
     -- we keep only one input per utxo to spend
@@ -204,7 +239,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
 
       helper :: GYUTxOs -> GYTxSkeleton v -> m (Either GYBuildTxError GYTxBody)
       helper ownUtxos' GYTxSkeleton {..} = do
-        let gytxMint' :: Maybe (GYValue, [(GYMintScript v, GYRedeemer)])
+        let gytxMint' :: Maybe (GYValue, [(GYBuildScript v, GYRedeemer)])
             gytxMint'
               | null gytxMint = Nothing
               | otherwise =
@@ -213,10 +248,35 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
                     , [(mp, redeemer) | (mp, (_, redeemer)) <- itoList gytxMint]
                     )
 
-        let refIns =
-              gyTxSkeletonRefInsToList gytxRefIns
-                <> [r | GYTxIn {gyTxInWitness = GYTxInWitnessScript (GYInReference r _) _ _} <- gytxIns]
-                <> [r | GYMintReference r _ <- Map.keys gytxMint]
+        let extractReferenceFromWitness :: GYTxBuildWitness v -> Maybe GYTxOutRef
+            extractReferenceFromWitness (GYTxBuildWitnessSimpleScript (GYBuildSimpleScriptReference r _)) = Just r
+            extractReferenceFromWitness (GYTxBuildWitnessPlutusScript (GYBuildPlutusScriptReference r _) _) = Just r
+            extractReferenceFromWitness _anyOther = Nothing
+            gytxVotingProcedures' = case gytxVotingProcedures of GYTxSkeletonVotingProceduresNone -> mempty; GYTxSkeletonVotingProcedures vp -> vp
+            gytxProposalProcedures' = case gytxProposalProcedures of GYTxSkeletonProposalProceduresNone -> mempty; GYTxSkeletonProposalProcedures pps -> pps
+            refIns =
+              -- We want to filter out the references that are already in the txIns.
+              filter (\oref -> all (\txIn -> gyTxInTxOutRef txIn /= oref) gytxIns) $
+                gyTxSkeletonRefInsToList gytxRefIns
+                  <> [ r
+                     | GYTxIn {gyTxInWitness = wit} <- gytxIns
+                     , r <- case wit of
+                        GYTxInWitnessScript (GYBuildPlutusScriptReference r _) _ _ -> [r]
+                        GYTxInWitnessSimpleScript (GYBuildSimpleScriptReference r _) -> [r]
+                        _anyOther -> []
+                     ]
+                  <> [ r
+                     | wit <- Map.keys gytxMint
+                     , r <- case wit of
+                        GYBuildPlutusScript (GYBuildPlutusScriptReference r _) -> [r]
+                        GYBuildSimpleScript (GYBuildSimpleScriptReference r _) -> [r]
+                        _anyOther -> []
+                     ]
+                  <> [r | wdrl <- gytxWdrls, r <- maybeToList (extractReferenceFromWitness $ gyTxWdrlWitness wdrl)]
+                  <> [r | cert <- gytxCerts, r <- maybeToList (gyTxCertWitness cert >>= extractReferenceFromWitness)]
+                  <> [r | votingWit <- map fst (Map.elems gytxVotingProcedures'), r <- maybeToList (extractReferenceFromWitness votingWit)]
+                  <> [r | propProc <- gytxProposalProcedures', r <- maybeToList (extractReferenceFromWitness $ snd propProc)]
+
         allRefUtxos <-
           utxosAtTxOutRefs $
             (gyTxInTxOutRef <$> gytxIns)
@@ -279,6 +339,8 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
               gytxInvalidAfter
               gytxSigs
               gytxMetadata
+              gytxVotingProcedures'
+              gytxProposalProcedures'
 
       go :: GYUTxOs -> GYTxBuildResult -> [GYTxSkeleton v] -> m (Either GYBuildTxError GYTxBuildResult)
       go _ acc [] = pure $ Right $ reverseResult acc
@@ -301,7 +363,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
 
   In case of insufficient funds failure ('Left' argument):
     We return either 'GYTxBuildFailure' or 'GYTxBuildPartialSuccess'
-    Depending on whether or not any previous transactions were built succesfully.
+    Depending on whether or not any previous transactions were built successfully.
 
   In case of successful build:
     We save the newly built tx body into the existing ones (if any)

@@ -85,6 +85,9 @@ module GeniusYield.TxBuilder.Class (
   mustHaveOutput,
   mustHaveOptionalOutput,
   mustHaveTxMetadata,
+  mustHaveVotingProcedures,
+  mustHaveProposalProcedure,
+  mustHaveProposalProcedures,
   mustMint,
   mustHaveWithdrawal,
   mustHaveCertificate,
@@ -129,7 +132,6 @@ import GeniusYield.TxBuilder.Errors
 import GeniusYield.TxBuilder.Query.Class
 import GeniusYield.TxBuilder.User
 import GeniusYield.Types
-import GeniusYield.Types.Key.Class (ToShelleyWitnessSigningKey)
 import GeniusYield.Types.TxCert.Internal (GYTxCert (..))
 import PlutusLedgerApi.V1 qualified as Plutus (
   Address,
@@ -818,7 +820,16 @@ mustHaveOptionalOutput = maybe mempty $ \o -> emptyGYTxSkeleton {gytxOuts = [o]}
 mustHaveTxMetadata :: Maybe GYTxMetadata -> GYTxSkeleton v
 mustHaveTxMetadata m = emptyGYTxSkeleton {gytxMetadata = m}
 
-mustMint :: GYMintScript v -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkeleton v
+mustHaveVotingProcedures :: VersionIsGreaterOrEqual v 'PlutusV3 => GYTxVotingProcedures v -> GYTxSkeleton v
+mustHaveVotingProcedures vp = emptyGYTxSkeleton {gytxVotingProcedures = GYTxSkeletonVotingProcedures vp}
+
+mustHaveProposalProcedure :: VersionIsGreaterOrEqual v 'PlutusV3 => GYProposalProcedurePB -> GYTxBuildWitness v -> GYTxSkeleton v
+mustHaveProposalProcedure pp w = mustHaveProposalProcedures [(pp, w)]
+
+mustHaveProposalProcedures :: VersionIsGreaterOrEqual v 'PlutusV3 => [(GYProposalProcedurePB, GYTxBuildWitness v)] -> GYTxSkeleton v
+mustHaveProposalProcedures pps = emptyGYTxSkeleton {gytxProposalProcedures = GYTxSkeletonProposalProcedures pps}
+
+mustMint :: GYBuildScript v -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkeleton v
 mustMint _ _ _ 0 = mempty
 mustMint p r tn n = emptyGYTxSkeleton {gytxMint = Map.singleton p (Map.singleton tn n, r)}
 
@@ -851,7 +862,7 @@ skeletonToRefScriptsORefs GYTxSkeleton {gytxIns} = go gytxIns []
   go [] acc = acc
   go (gytxIn : rest) acc = case gyTxInWitness gytxIn of
     GYTxInWitnessScript gyInScript _ _ -> case gyInScript of
-      GYInReference oRef _ -> go rest (oRef : acc)
+      GYBuildPlutusScriptReference oRef _ -> go rest (oRef : acc)
       _anyOtherMatch -> go rest acc
     _anyOtherMatch -> go rest acc
 

@@ -58,7 +58,7 @@ poolParamsToLedger GYPoolParams {..} =
     , Ledger.ppPledge = fromIntegral poolPledge
     , Ledger.ppCost = fromIntegral poolCost
     , Ledger.ppMargin = poolMargin
-    , Ledger.ppRewardAccount = Ledger.RewardAccount nw sc
+    , Ledger.ppRewardAccount = stakeAddressToLedger poolRewardAccount
     , Ledger.ppOwners = Set.map keyHashToLedger poolOwners
     , Ledger.ppRelays = fromList $ relayToLedger <$> poolRelays
     , Ledger.ppMetadata = ms $ anchorToLedgerPoolMetadata <$> poolMetadata
@@ -80,8 +80,6 @@ poolParamsToLedger GYPoolParams {..} =
       , Ledger.pmHash = anchorDataHashToByteString anchorDataHash
       }
   ms = maybeToStrictMaybe
-
-  Api.StakeAddress nw sc = stakeAddressToApi poolRewardAccount
 
 poolParamsFromLedger :: Ledger.PoolParams Ledger.StandardCrypto -> GYPoolParams
 poolParamsFromLedger Ledger.PoolParams {..} =

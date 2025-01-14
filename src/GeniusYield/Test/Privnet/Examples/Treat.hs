@@ -108,7 +108,7 @@ grabTreats validator = do
                   { gyTxInTxOutRef = oref
                   , gyTxInWitness =
                       GYTxInWitnessScript
-                        (GYInScript validator)
+                        (GYBuildPlutusScriptInlined validator)
                         (datumFromPlutus' od)
                         unitRedeemer
                   }

@@ -6,6 +6,8 @@ Maintainer  : support@geniusyield.co
 Stability   : develop
 -}
 module GeniusYield.Types.Key (
+  ToShelleyWitnessSigningKey (..),
+
   -- * Signing key
   GYSigningKey,
   signingKeyToLedger,

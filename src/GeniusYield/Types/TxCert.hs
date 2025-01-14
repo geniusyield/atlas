@@ -7,7 +7,9 @@ Stability   : develop
 -}
 module GeniusYield.Types.TxCert (
   GYTxCert,
-  GYTxCertWitness (..),
+  GYTxCertWitness,
+  pattern GYTxCertWitnessKey,
+  pattern GYTxCertWitnessScript,
   txCertToApi,
   mkStakeAddressRegistrationCertificate,
   mkStakeAddressDeregistrationCertificate,
@@ -23,6 +25,7 @@ module GeniusYield.Types.TxCert (
 
 import GeniusYield.Imports (Natural)
 import GeniusYield.Types.Anchor (GYAnchor)
+import GeniusYield.Types.BuildWitness
 import GeniusYield.Types.Certificate
 import GeniusYield.Types.Credential (GYCredential, GYStakeCredential)
 import GeniusYield.Types.Delegatee (GYDelegatee)
@@ -33,7 +36,7 @@ import GeniusYield.Types.Pool
 import GeniusYield.Types.TxCert.Internal
 
 -- | Post conway, newer stake address registration certificate also require a witness.
-mkStakeAddressRegistrationCertificate :: GYStakeCredential -> GYTxCertWitness v -> GYTxCert v
+mkStakeAddressRegistrationCertificate :: GYStakeCredential -> GYTxBuildWitness v -> GYTxCert v
 mkStakeAddressRegistrationCertificate sc wit = GYTxCert (GYStakeAddressRegistrationCertificatePB sc) (Just wit)
 
 {- | Note that deregistration certificate requires following preconditions:
@@ -42,10 +45,10 @@ mkStakeAddressRegistrationCertificate sc wit = GYTxCert (GYStakeAddressRegistrat
 
 2. The corresponding rewards balance is zero.
 -}
-mkStakeAddressDeregistrationCertificate :: GYStakeCredential -> GYTxCertWitness v -> GYTxCert v
+mkStakeAddressDeregistrationCertificate :: GYStakeCredential -> GYTxBuildWitness v -> GYTxCert v
 mkStakeAddressDeregistrationCertificate sc wit = GYTxCert (GYStakeAddressDeregistrationCertificatePB sc) (Just wit)
 
-mkStakeAddressDelegationCertificate :: GYStakeCredential -> GYDelegatee -> GYTxCertWitness v -> GYTxCert v
+mkStakeAddressDelegationCertificate :: GYStakeCredential -> GYDelegatee -> GYTxBuildWitness v -> GYTxCert v
 mkStakeAddressDelegationCertificate sc del wit = GYTxCert (GYStakeAddressDelegationCertificatePB sc del) (Just wit)
 
 {- | Note that delegation certificate requires following preconditions:
@@ -56,7 +59,7 @@ mkStakeAddressDelegationCertificate sc del wit = GYTxCert (GYStakeAddressDelegat
 
 3. Signature from the corresponding DRep key.
 -}
-mkDRepRegistrationCertificate :: GYCredential 'GYKeyRoleDRep -> Maybe GYAnchor -> GYTxCertWitness v -> GYTxCert v
+mkDRepRegistrationCertificate :: GYCredential 'GYKeyRoleDRep -> Maybe GYAnchor -> GYTxBuildWitness v -> GYTxCert v
 mkDRepRegistrationCertificate cred anchor wit = GYTxCert (GYDRepRegistrationCertificatePB cred anchor) (Just wit)
 
 {- | Note that update certificate requires following preconditions:
@@ -65,7 +68,7 @@ mkDRepRegistrationCertificate cred anchor wit = GYTxCert (GYDRepRegistrationCert
 
 2. Signature from the corresponding DRep key.
 -}
-mkDRepUpdateCertificate :: GYCredential 'GYKeyRoleDRep -> Maybe GYAnchor -> GYTxCertWitness v -> GYTxCert v
+mkDRepUpdateCertificate :: GYCredential 'GYKeyRoleDRep -> Maybe GYAnchor -> GYTxBuildWitness v -> GYTxCert v
 mkDRepUpdateCertificate cred anchor wit = GYTxCert (GYDRepUpdateCertificatePB cred anchor) (Just wit)
 
 {- | Note that unregistration certificate requires following preconditions:
@@ -76,7 +79,7 @@ mkDRepUpdateCertificate cred anchor wit = GYTxCert (GYDRepUpdateCertificatePB cr
 
 3. Signature from the corresponding DRep key.
 -}
-mkDRepUnregistrationCertificate :: GYCredential 'GYKeyRoleDRep -> Natural -> GYTxCertWitness v -> GYTxCert v
+mkDRepUnregistrationCertificate :: GYCredential 'GYKeyRoleDRep -> Natural -> GYTxBuildWitness v -> GYTxCert v
 mkDRepUnregistrationCertificate cred refund wit = GYTxCert (GYDRepUnregistrationCertificatePB cred refund) (Just wit)
 
 {- | Note that stake pool registration certificate requires following preconditions:
@@ -92,7 +95,7 @@ mkDRepUnregistrationCertificate cred refund wit = GYTxCert (GYDRepUnregistration
 mkStakePoolRegistrationCertificate ::
   GYPoolParams ->
   GYTxCert v
-mkStakePoolRegistrationCertificate pp = GYTxCert (GYStakePoolRegistrationCertificatePB pp) (Just GYTxCertWitnessKey)
+mkStakePoolRegistrationCertificate pp = GYTxCert (GYStakePoolRegistrationCertificatePB pp) (Just GYTxBuildWitnessKey)
 
 {- | Note that stake pool retirement certificate requires following preconditions:
 
@@ -105,7 +108,7 @@ mkStakePoolRegistrationCertificate pp = GYTxCert (GYStakePoolRegistrationCertifi
 Note that deposit made earlier is returned at epoch transition.
 -}
 mkStakePoolRetirementCertificate :: GYKeyHash 'GYKeyRoleStakePool -> GYEpochNo -> GYTxCert v
-mkStakePoolRetirementCertificate poolId epoch = GYTxCert (GYStakePoolRetirementCertificatePB poolId epoch) (Just GYTxCertWitnessKey)
+mkStakePoolRetirementCertificate poolId epoch = GYTxCert (GYStakePoolRetirementCertificatePB poolId epoch) (Just GYTxBuildWitnessKey)
 
 {- | Note that committee hot key auth certificate requires following preconditions:
 
@@ -116,7 +119,7 @@ mkStakePoolRetirementCertificate poolId epoch = GYTxCert (GYStakePoolRetirementC
 3. Signature from the corresponding cold committee key.
 -}
 mkCommitteeHotKeyAuthCertificate :: GYCredential 'GYKeyRoleColdCommittee -> GYCredential 'GYKeyRoleHotCommittee -> GYTxCert v
-mkCommitteeHotKeyAuthCertificate cold hot = GYTxCert (GYCommitteeHotKeyAuthCertificatePB cold hot) (Just GYTxCertWitnessKey)
+mkCommitteeHotKeyAuthCertificate cold hot = GYTxCert (GYCommitteeHotKeyAuthCertificatePB cold hot) (Just GYTxBuildWitnessKey)
 
 {- | Note that committee cold key resignation certificate requires following preconditions:
 
@@ -131,4 +134,4 @@ mkCommitteeColdKeyResignationCertificate ::
   -- | Potential explanation for resignation.
   Maybe GYAnchor ->
   GYTxCert v
-mkCommitteeColdKeyResignationCertificate cold anchor = GYTxCert (GYCommitteeColdKeyResignationCertificatePB cold anchor) (Just GYTxCertWitnessKey)
+mkCommitteeColdKeyResignationCertificate cold anchor = GYTxCert (GYCommitteeColdKeyResignationCertificatePB cold anchor) (Just GYTxBuildWitnessKey)

@@ -52,7 +52,7 @@ guessRefInputRun refInputORef consumeRef guess = do
             { gyTxInTxOutRef = consumeRef
             , gyTxInWitness =
                 GYTxInWitnessScript
-                  (GYInScript gyGuessRefInputDatumValidator)
+                  (GYBuildPlutusScriptInlined gyGuessRefInputDatumValidator)
                   (datumFromPlutusData ())
                   (redeemerFromPlutusData redeemer)
             }

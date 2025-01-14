@@ -42,7 +42,7 @@ tests setup =
           txBodyMint <-
             buildTxBody $
               mustHaveInput (GYTxIn utxoAsParam GYTxInWitnessKey)
-                <> mustMint (GYMintReference refScript policyAsScript) unitRedeemer tn amt
+                <> mustMint (GYBuildPlutusScript $ GYBuildPlutusScriptReference refScript policyAsScript) unitRedeemer tn amt
           signAndSubmitConfirmed_ txBodyMint
 
         -- wait a tiny bit.

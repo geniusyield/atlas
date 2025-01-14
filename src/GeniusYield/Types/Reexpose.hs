@@ -11,6 +11,9 @@ module GeniusYield.Types.Reexpose (
   Network (..),
   BoundedRational (..),
   UnitInterval,
+  ProtVer (..),
+  module X,
 ) where
 
 import Cardano.Ledger.BaseTypes
+import Cardano.Ledger.Binary.Version as X

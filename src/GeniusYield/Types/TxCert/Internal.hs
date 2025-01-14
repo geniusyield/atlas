@@ -9,19 +9,22 @@ module GeniusYield.Types.TxCert.Internal (
   GYTxCert (..),
   GYTxCert' (..),
   finaliseTxCert,
-  GYTxCertWitness (..),
+  GYTxCertWitness,
+  pattern GYTxCertWitnessKey,
+  pattern GYTxCertWitnessScript,
   txCertToApi,
 ) where
 
 import Cardano.Api qualified as Api
 import Data.Functor ((<&>))
 import GeniusYield.Imports ((&))
+import GeniusYield.Types.BuildScript
+import GeniusYield.Types.BuildWitness (GYTxBuildWitness (..), buildWitnessToApi)
 import GeniusYield.Types.Certificate
 import GeniusYield.Types.Credential (stakeCredentialToApi)
 import GeniusYield.Types.Era
 import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import GeniusYield.Types.Redeemer
-import GeniusYield.Types.Script
 
 {- | A transaction certificate.
 
@@ -32,37 +35,28 @@ Note that witness is not required for registering a stake address and for moving
 -}
 data GYTxCert v = GYTxCert
   { gyTxCertCertificate :: !GYCertificatePreBuild
-  , gyTxCertWitness :: !(Maybe (GYTxCertWitness v))
+  , gyTxCertWitness :: !(Maybe (GYTxBuildWitness v))
   }
   deriving (Eq, Show)
 
 data GYTxCert' v = GYTxCert'
   { gyTxCertCertificate' :: !GYCertificate
-  , gyTxCertWitness' :: !(Maybe (GYTxCertWitness v))
+  , gyTxCertWitness' :: !(Maybe (GYTxBuildWitness v))
   }
   deriving (Eq, Show)
 
 finaliseTxCert :: ApiProtocolParameters -> GYTxCert v -> GYTxCert' v
 finaliseTxCert pp (GYTxCert cert wit) = GYTxCert' (finaliseCert pp cert) wit
 
--- | Represents witness type and associated information for a certificate.
-data GYTxCertWitness v
-  = -- | Key witness.
-    GYTxCertWitnessKey
-  | -- | Script witness with associated script and redeemer.
-    GYTxCertWitnessScript !(GYStakeValScript v) !GYRedeemer
-  deriving stock (Eq, Show)
+type GYTxCertWitness v = GYTxBuildWitness v
+
+pattern GYTxCertWitnessKey :: GYTxCertWitness v
+pattern GYTxCertWitnessKey = GYTxBuildWitnessKey
+
+pattern GYTxCertWitnessScript :: GYBuildPlutusScript v -> GYRedeemer -> GYTxCertWitness v
+pattern GYTxCertWitnessScript v r = GYTxBuildWitnessPlutusScript v r
 
 txCertToApi ::
   GYTxCert' v ->
   (Api.Certificate ApiEra, Maybe (Api.StakeCredential, Api.Witness Api.WitCtxStake ApiEra))
-txCertToApi (GYTxCert' cert wit) = (certificateToApi cert, wit <&> (\wit' -> (certificateToStakeCredential cert & stakeCredentialToApi, f wit')))
- where
-  f :: GYTxCertWitness v -> Api.Witness Api.WitCtxStake ApiEra
-  f GYTxCertWitnessKey = Api.KeyWitness Api.KeyWitnessForStakeAddr
-  f (GYTxCertWitnessScript v r) =
-    Api.ScriptWitness Api.ScriptWitnessForStakeAddr $
-      gyStakeValScriptWitnessToApiPlutusSW
-        v
-        (redeemerToApi r)
-        (Api.ExecutionUnits 0 0)
+txCertToApi (GYTxCert' cert wit) = (certificateToApi cert, wit <&> (\wit' -> (certificateToStakeCredential cert & stakeCredentialToApi, buildWitnessToApi wit')))

@@ -1,5 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
-
 {- |
 Module      : GeniusYield.Test.Utils
 Copyright   : (c) 2023 GYELD GMBH
@@ -218,7 +216,7 @@ mintTestAssets tokens = do
     buildTxBody @PlutusV2 $
       foldMap
         ( \(tk, amt) ->
-            mustMint (GYMintScript $ fakePolicy tk) unitRedeemer (fakeCoinName tk) $ toInteger amt
+            mustMint (GYBuildPlutusScript $ GYBuildPlutusScriptInlined $ fakePolicy tk) unitRedeemer (fakeCoinName tk) $ toInteger amt
         )
         tokens
   signAndSubmitConfirmed_ txBody

@@ -20,6 +20,7 @@ import GeniusYield.Test.Privnet.Committee qualified
 import GeniusYield.Test.Privnet.Ctx
 import GeniusYield.Test.Privnet.DRep qualified
 import GeniusYield.Test.Privnet.Examples qualified
+import GeniusYield.Test.Privnet.Gov qualified
 import GeniusYield.Test.Privnet.Setup
 import GeniusYield.Test.Privnet.SimpleScripts qualified
 import GeniusYield.Test.Privnet.Stake qualified
@@ -70,4 +71,5 @@ main = do
         , GeniusYield.Test.Privnet.DRep.drepTests setup
         , GeniusYield.Test.Privnet.StakePool.stakePoolTests setup
         , GeniusYield.Test.Privnet.Committee.committeeTests setup
+        , GeniusYield.Test.Privnet.Gov.govTests setup
         ]

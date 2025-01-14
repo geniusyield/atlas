@@ -32,7 +32,6 @@ import Data.Text qualified as Txt
 import GeniusYield.CardanoApi.Query
 import GeniusYield.Providers.Common (SubmitTxException (SubmitTxException), makeLastEraEndUnbounded)
 import GeniusYield.Types
-import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import Ouroboros.Network.Protocol.LocalTxSubmission.Type (SubmitResult (..))
 
 -------------------------------------------------------------------------------

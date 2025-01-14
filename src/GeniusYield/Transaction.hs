@@ -74,6 +74,7 @@ import Cardano.Ledger.Alonzo.Scripts qualified as AlonzoScripts
 import Cardano.Ledger.Alonzo.Tx qualified as AlonzoTx
 import Cardano.Ledger.Binary qualified as CBOR
 import Cardano.Ledger.Binary.Crypto qualified as CBOR
+import Cardano.Ledger.Conway.PParams qualified as Ledger
 import Cardano.Ledger.Core (
   EraTx (sizeTxF),
   eraProtVerLow,
@@ -88,6 +89,7 @@ import Control.Arrow ((&&&))
 import Control.Lens (view, (^.))
 import Control.Monad.Random
 import Control.Monad.Trans.Except (runExceptT, throwE)
+import Data.Bifunctor qualified
 import Data.ByteString.Lazy qualified as LBS
 import Data.Foldable (
   Foldable (foldMap'),
@@ -104,7 +106,6 @@ import GeniusYield.Transaction.CBOR
 import GeniusYield.Transaction.CoinSelection
 import GeniusYield.Transaction.Common
 import GeniusYield.Types
-import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import GeniusYield.Types.TxCert.Internal
 
 -- | A container for various network parameters, and user wallet information, used by balancer.
@@ -150,7 +151,7 @@ buildUnsignedTxBody ::
   -- | reference inputs
   GYUTxOs ->
   -- | minted values
-  Maybe (GYValue, [(GYMintScript v, GYRedeemer)]) ->
+  Maybe (GYValue, [(GYBuildScript v, GYRedeemer)]) ->
   -- | withdrawals
   [GYTxWdrl v] ->
   -- | certificates
@@ -159,13 +160,15 @@ buildUnsignedTxBody ::
   Maybe GYSlot ->
   Set GYPubKeyHash ->
   Maybe GYTxMetadata ->
+  GYTxVotingProcedures v ->
+  [(GYProposalProcedurePB, GYTxBuildWitness v)] ->
   m (Either GYBuildTxError GYTxBody)
-buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata = buildTxLoop cstrat extraLovelaceStart
+buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata vps pps = buildTxLoop cstrat extraLovelaceStart
  where
   certsFinalised = finaliseTxCert (gyBTxEnvProtocolParams env) <$> certs
 
   step :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
-  step stepStrat = fmap (first GYBuildTxBalancingError) . balanceTxStep env mmint wdrls certsFinalised insOld outsOld stepStrat
+  step stepStrat = fmap (first GYBuildTxBalancingError) . balanceTxStep env mmint wdrls certsFinalised vps pps insOld outsOld stepStrat
 
   buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError GYTxBody)
   buildTxLoop stepStrat n
@@ -226,6 +229,8 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub sig
             , gybtxSigners = signers
             , gybtxRefIns = refIns
             , gybtxMetadata = mbTxMetadata
+            , gybtxVotingProcedures = vps
+            , gybtxProposalProcedures = pps
             }
           (length outsOld)
 
@@ -247,11 +252,15 @@ balanceTxStep ::
   (HasCallStack, MonadRandom m) =>
   GYBuildTxEnv ->
   -- | minting
-  Maybe (GYValue, [(GYMintScript v, GYRedeemer)]) ->
+  Maybe (GYValue, [(GYBuildScript v, GYRedeemer)]) ->
   -- | withdrawals
   [GYTxWdrl v] ->
   -- | certificates
   [GYTxCert' v] ->
+  -- | voting procedures
+  GYTxVotingProcedures v ->
+  -- | proposal procedures
+  [(GYProposalProcedurePB, GYTxBuildWitness v)] ->
   -- | transaction inputs
   [GYTxInDetailed v] ->
   -- | transaction outputs
@@ -272,12 +281,14 @@ balanceTxStep
   mmint
   wdrls
   certs
+  vps
+  pps
   ins
   outs
   cstrat =
     let adjustedOuts = map (adjustTxOut (minimumUTxO pp)) outs
         valueMint = maybe mempty fst mmint
-        needsCollateral = valueMint /= mempty || any (isScriptWitness . gyTxInWitness . gyTxInDet) ins || any (isCertScriptWitness . gyTxCertWitness') certs || any (isWdrlScriptWitness . gyTxWdrlWitness) wdrls
+        needsCollateral = valueMint /= mempty || any (isScriptWitness . gyTxInWitness . gyTxInDet) ins || any (isCertScriptWitness . gyTxCertWitness') certs || any (isPlutusScriptWitness . gyTxWdrlWitness) wdrls || any (isPlutusScriptWitness . fst) (Map.elems vps)
         (stakeCredDeregsAmt :: Natural, stakeCredRegsAmt :: Natural) =
           foldl'
             ( \acc@(!accDeregsAmt, !accRegsAmt) (gyTxCertCertificate' -> cert) -> case cert of
@@ -307,12 +318,14 @@ balanceTxStep
             )
             0
             certs
+        govActionDeposit :: Natural = pp ^. Ledger.ppGovActionDepositL & fromIntegral
+        govActionsAmt :: Natural = fromIntegral (length pps) * govActionDeposit
         -- Extra ada is received from withdrawals and stake credential deregistration.
         adaSource =
           let wdrlsAda = getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls
            in wdrlsAda + stakeCredDeregsAmt + drepDeregsAmt
         -- Ada lost due to stake credential registration.
-        adaSink = stakeCredRegsAmt + drepRegsAmt + spRegsAmt
+        adaSink = stakeCredRegsAmt + drepRegsAmt + spRegsAmt + govActionsAmt
         collaterals
           | needsCollateral = utxosFromUTxO collateral
           | otherwise = mempty
@@ -345,10 +358,11 @@ balanceTxStep
     isScriptWitness GYTxInWitnessKey = False
     isScriptWitness GYTxInWitnessScript {} = True
     isScriptWitness GYTxInWitnessSimpleScript {} = False -- Simple (native) scripts don't require collateral.
-    isCertScriptWitness (Just GYTxCertWitnessScript {}) = True
-    isCertScriptWitness _ = False
-    isWdrlScriptWitness GYTxWdrlWitnessScript {} = True
-    isWdrlScriptWitness _ = False
+    isCertScriptWitness (Just p) = isPlutusScriptWitness p
+    isCertScriptWitness Nothing = False
+
+    isPlutusScriptWitness GYTxBuildWitnessPlutusScript {} = True
+    isPlutusScriptWitness _ = False
 
 retColSup :: Api.BabbageEraOnwards ApiEra
 retColSup = Api.BabbageEraOnwardsConway
@@ -374,6 +388,8 @@ finalizeGYBalancedTx
     , gybtxSigners = signers
     , gybtxRefIns = utxosRefInputs
     , gybtxMetadata = mbTxMetadata
+    , gybtxVotingProcedures = vps
+    , gybtxProposalProcedures = pps
     } =
     makeTransactionBodyAutoBalanceWrapper
       collaterals
@@ -394,8 +410,10 @@ finalizeGYBalancedTx
       fromIntegral $
         countUnique $
           mapMaybe (extractPaymentPkhFromAddress . utxoAddress) (utxosToList collaterals)
-            <> [apkh | GYTxWdrl {gyTxWdrlWitness = GYTxWdrlWitnessKey, gyTxWdrlStakeAddress = saddr} <- wdrls, let sc = stakeAddressToCredential saddr, Just apkh <- [preferSCByKey sc]]
-            <> [apkh | cert@GYTxCert' {gyTxCertWitness' = Just GYTxCertWitnessKey} <- certs, let sc = certificateToStakeCredential $ gyTxCertCertificate' cert, Just apkh <- [preferSCByKey sc]]
+            <> [apkh | GYTxWdrl {gyTxWdrlWitness = GYTxBuildWitnessKey, gyTxWdrlStakeAddress = saddr} <- wdrls, let sc = stakeAddressToCredential saddr, Just apkh <- [preferCByKey sc]]
+            <> [apkh | cert@GYTxCert' {gyTxCertWitness' = Just GYTxBuildWitnessKey} <- certs, let sc = certificateToStakeCredential $ gyTxCertCertificate' cert, Just apkh <- [preferCByKey sc]]
+            <> [apkh | (a, GYTxBuildWitnessKey) <- Data.Bifunctor.second fst <$> Map.toList vps, Just apkh <- [voterToPKH a]]
+            <> [apkh | (a, GYTxBuildWitnessKey) <- pps, Just apkh <- [propProcToPKH a]]
             <> estimateKeyWitnessesFromInputs ins
             <> Set.toList signers
      where
@@ -404,8 +422,14 @@ finalizeGYBalancedTx
           GYPaymentCredentialByKey pkh -> Just $ toPubKeyHash pkh
           GYPaymentCredentialByScript _ -> Nothing
 
-      preferSCByKey (GYStakeCredentialByKey pkh) = Just $ toPubKeyHash pkh
-      preferSCByKey _otherwise = Nothing
+      preferCByKey (GYCredentialByKey pkh) = Just $ toPubKeyHash pkh
+      preferCByKey _otherwise = Nothing
+
+      voterToPKH (CommitteeVoter c) = preferCByKey c
+      voterToPKH (DRepVoter c) = preferCByKey c
+      voterToPKH (StakePoolVoter kh) = Just $ toPubKeyHash kh
+
+      propProcToPKH GYProposalProcedurePB {propProcPBReturnAddr} = stakeAddressToCredential propProcPBReturnAddr & preferCByKey
 
       countUnique :: Ord a => [a] -> Int
       countUnique = Set.size . Set.fromList
@@ -419,8 +443,8 @@ finalizeGYBalancedTx
        where
         estimateKeyWitnessesFromNativeScripts acc (gyTxInWitness . gyTxInDet -> GYTxInWitnessSimpleScript gyInSS) =
           case gyInSS of
-            GYInSimpleScript s -> getTotalKeysInSimpleScript s <> acc
-            GYInReferenceSimpleScript _ s -> getTotalKeysInSimpleScript s <> acc
+            GYBuildSimpleScriptInlined s -> getTotalKeysInSimpleScript s <> acc
+            GYBuildSimpleScriptReference _ s -> getTotalKeysInSimpleScript s <> acc
         estimateKeyWitnessesFromNativeScripts acc _ = acc
 
     inRefs :: Api.TxInsReference ApiEra
@@ -477,10 +501,13 @@ finalizeGYBalancedTx
           Api.BuildTxWith $
             Map.fromList
               [ ( mintingPolicyApiIdFromWitness p
-                , gyMintingScriptWitnessToApiPlutusSW
-                    p
-                    (redeemerToApi r)
-                    (Api.ExecutionUnits 0 0)
+                , case p of
+                    GYBuildPlutusScript s ->
+                      gyMintingScriptWitnessToApiPlutusSW
+                        s
+                        (redeemerToApi r)
+                        (Api.ExecutionUnits 0 0)
+                    GYBuildSimpleScript s -> simpleScriptWitnessToApi s
                 )
               | (p, r) <- xs
               ]
@@ -530,6 +557,45 @@ finalizeGYBalancedTx
 
     unregisteredDRepCredsMap = Map.fromList [(credentialToLedger sc, fromIntegral amt) | GYDRepUnregistrationCertificate sc amt <- map gyTxCertCertificate' certs]
 
+    vps' =
+      if vps == mempty
+        then Nothing
+        else
+          let vpsApi =
+                Api.TxVotingProcedures (votingProceduresToLedger (Map.map snd vps)) $
+                  Api.BuildTxWith
+                    ( Map.map fst vps
+                        -- https://github.com/IntersectMBO/cardano-api/issues/722.
+                        & Map.filter
+                          ( \case
+                              GYTxBuildWitnessKey -> False
+                              GYTxBuildWitnessPlutusScript _ _ -> True
+                              GYTxBuildWitnessSimpleScript _ -> True
+                          )
+                        & Map.mapKeys voterToLedger
+                        & Map.map unsafeBuildScriptWitnessToApi
+                    )
+           in Just vpsApi >>= Api.mkFeatured
+    pps' =
+      if pps == mempty
+        then Nothing
+        else
+          let ppsApi =
+                Api.mkTxProposalProcedures
+                  ( map
+                      ( \(propProc, wit) ->
+                          let propProc' = completeProposalProcedure propProc (pp ^. Ledger.ppGovActionDepositL & fromIntegral) & propProcToLedger
+                           in ( propProc'
+                              , case wit of
+                                  GYTxBuildWitnessKey -> Nothing
+                                  w@(GYTxBuildWitnessPlutusScript _ _) -> Just $ unsafeBuildScriptWitnessToApi w
+                                  w@(GYTxBuildWitnessSimpleScript _) -> Just $ unsafeBuildScriptWitnessToApi w
+                              )
+                      )
+                      pps
+                  )
+           in Just ppsApi >>= Api.mkFeatured
+
     body :: Api.TxBodyContent Api.BuildTx ApiEra
     body =
       Api.TxBodyContent
@@ -553,10 +619,10 @@ finalizeGYBalancedTx
         , Api.txUpdateProposal = Api.TxUpdateProposalNone
         , Api.txMintValue = mint
         , Api.txScriptValidity = Api.TxScriptValidityNone
-        , Api.txProposalProcedures = Nothing
-        , Api.txVotingProcedures = Nothing
+        , Api.txProposalProcedures = pps'
+        , Api.txVotingProcedures = vps'
         , Api.txCurrentTreasuryValue = Nothing -- FIXME:?
-        , Api.txTreasuryDonation = Nothing
+        , Api.txTreasuryDonation = Nothing -- FIXME:?
         }
 
 {- | Wraps around 'Api.makeTransactionBodyAutoBalance' just to verify the final ex units and tx size are within limits.
@@ -577,8 +643,7 @@ makeTransactionBodyAutoBalanceWrapper ::
   Word ->
   Int ->
   Either GYBuildTxError GYTxBody
-makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp _ps utxos body changeAddr stakeDelegDeposits drepDelegDeposits nkeys numSkeletonOuts = do
-  let poolids = Set.empty -- TODO: This denotes the set of registered stake pools, that are being unregistered in this transaction.
+makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body changeAddr stakeDelegDeposits drepDelegDeposits nkeys numSkeletonOuts = do
   let Ledger.ExUnits
         { exUnitsSteps = maxSteps
         , exUnitsMem = maxMemory

@@ -30,7 +30,7 @@ exerciseDRep ctx info = do
   txId <- ctxRun ctx fundUser $ do
     fundAddr <- ownChangeAddress
     fundBalI <- queryBalance fundAddr
-    txBody <- buildTxBody $ mustHaveCertificate $ mkDRepRegistrationCertificate drepCred Nothing GYTxCertWitnessKey
+    txBody <- buildTxBody $ mustHaveCertificate $ mkDRepRegistrationCertificate drepCred Nothing GYTxBuildWitnessKey
     gyLogInfo' "" $ "txBody: " <> show txBody
     tid <- submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey drepSKey]
     fundBalF <- queryBalance fundAddr
@@ -40,9 +40,9 @@ exerciseDRep ctx info = do
     pure tid
   info $ "Successfully registered drep, with tx id: " <> show txId
   info "Updating drep"
-  let anchor = GYAnchor (unsafeTextToUrl "https://www.geniusyield.io") (hashAnchorData "we are awesome")
+  let anchor = GYAnchor (unsafeTextToUrl "https://www.geniusyield.co") (hashAnchorData "we are awesome")
   (txIdUpd, mdrepS) <- ctxRun ctx fundUser $ do
-    txBody <- buildTxBody $ mustHaveCertificate $ mkDRepUpdateCertificate drepCred (Just anchor) GYTxCertWitnessKey
+    txBody <- buildTxBody $ mustHaveCertificate $ mkDRepUpdateCertificate drepCred (Just anchor) GYTxBuildWitnessKey
     gyLogInfo' "" $ "txBody: " <> show txBody
     tid <- submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey drepSKey]
     drepS <- drepState drepCred
@@ -55,7 +55,7 @@ exerciseDRep ctx info = do
     Nothing -> assertFailure "Drep state not found"
     Just drepS -> do
       txIdUnreg <- ctxRun ctx fundUser $ do
-        txBody <- buildTxBody $ mustHaveCertificate $ mkDRepUnregistrationCertificate drepCred (drepDeposit drepS) GYTxCertWitnessKey
+        txBody <- buildTxBody $ mustHaveCertificate $ mkDRepUnregistrationCertificate drepCred (drepDeposit drepS) GYTxBuildWitnessKey
         gyLogInfo' "" $ "txBody: " <> show txBody
         submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey drepSKey]
       info $ "Successfully unregistered drep, with tx id: " <> show txIdUnreg

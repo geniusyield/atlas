@@ -1,3 +1,7 @@
+## 0.8.1
+
+* Add combined stake address registration and delegation certificate.
+
 ## 0.8.0
 
 * Note that there has been large internal refactoring inside this update, but these are mostly non breaking as we provide pattern & type synonyms to keep earlier behavior. In particular:

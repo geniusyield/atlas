@@ -130,6 +130,7 @@ module GeniusYield.Types (
   -- | Cost in the amount of lovelace ber byte.
   CoinPerByte (..),
   ppCoinsPerUTxOByteL,
+  ppGovActionDepositL,
 ) where
 
 import Cardano.Ledger.Api (
@@ -158,6 +159,7 @@ import Cardano.Ledger.Api (
   ppRhoL,
   ppTauL,
  )
+import Cardano.Ledger.Conway.PParams (ppGovActionDepositL)
 import GeniusYield.Types.Ada as X
 import GeniusYield.Types.Address as X
 import GeniusYield.Types.Anchor as X

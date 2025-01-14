@@ -9,6 +9,7 @@ module GeniusYield.TxBuilder.Common (
   GYTxSkeleton (..),
   GYTxSkeletonRefIns (..),
   GYTxSkeletonVotingProcedures (..),
+  GYTxSkeletonProposalProcedures (..),
   emptyGYTxSkeleton,
   gyTxSkeletonRefInsToList,
   gyTxSkeletonRefInsSet,

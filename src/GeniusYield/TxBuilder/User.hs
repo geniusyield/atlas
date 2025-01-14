@@ -7,6 +7,7 @@ module GeniusYield.TxBuilder.User (
   userPkh,
   userPaymentPkh,
   userStakePkh,
+  userStakeAddress,
   userVKey,
   userPaymentVKey,
   userPaymentSKey',
@@ -21,7 +22,8 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NE
 
 import GeniusYield.Imports
-import GeniusYield.Types.Address (GYAddress)
+import GeniusYield.Types (GYCredential (GYCredentialByKey), GYNetworkId (GYTestnetPreprod))
+import GeniusYield.Types.Address (GYAddress, GYStakeAddress, stakeAddressFromCredential)
 import GeniusYield.Types.Key
 import GeniusYield.Types.PaymentKeyHash (GYPaymentKeyHash)
 import GeniusYield.Types.PubKeyHash (AsPubKeyHash (toPubKeyHash), GYPubKeyHash)
@@ -72,6 +74,9 @@ userPaymentPkh = paymentKeyHash . paymentVerificationKey . userPaymentSKey
 
 userStakePkh :: User -> Maybe GYStakeKeyHash
 userStakePkh = fmap (stakeKeyHash . stakeVerificationKey) . userStakeSKey
+
+userStakeAddress :: GYNetworkId -> User -> Maybe GYStakeAddress
+userStakeAddress nid u = userStakePkh u >>= \skh -> Just $ stakeAddressFromCredential nid $ GYCredentialByKey skh
 
 userCollateralDumb :: User -> Maybe (GYTxOutRef, Bool)
 userCollateralDumb User {userCollateral} =

@@ -61,7 +61,7 @@ exerciseStakePool ctx info = do
   assertBool "Stake pool not found" $ Set.member (stakePoolIdToApi stakePoolVKH) sps
   info $ "Successfully registered stakePool, with tx id: " <> show txId
   info "Updating stakePool"
-  let anchor = GYAnchor (unsafeTextToUrl "https://www.geniusyield.io") (hashAnchorData "we are awesome")
+  let anchor = GYAnchor (unsafeTextToUrl "https://www.geniusyield.co") (hashAnchorData "we are awesome")
       poolParams' = poolParams {poolMetadata = Just anchor}
   txIdUpd <- ctxRun ctx fundUser $ do
     txBody <- buildTxBody $ mustHaveCertificate $ mkStakePoolRegistrationCertificate poolParams'

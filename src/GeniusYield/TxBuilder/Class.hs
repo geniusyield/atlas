@@ -86,6 +86,8 @@ module GeniusYield.TxBuilder.Class (
   mustHaveOptionalOutput,
   mustHaveTxMetadata,
   mustHaveVotingProcedures,
+  mustHaveProposalProcedure,
+  mustHaveProposalProcedures,
   mustMint,
   mustHaveWithdrawal,
   mustHaveCertificate,
@@ -820,6 +822,12 @@ mustHaveTxMetadata m = emptyGYTxSkeleton {gytxMetadata = m}
 
 mustHaveVotingProcedures :: VersionIsGreaterOrEqual v 'PlutusV3 => GYTxVotingProcedures v -> GYTxSkeleton v
 mustHaveVotingProcedures vp = emptyGYTxSkeleton {gytxVotingProcedures = GYTxSkeletonVotingProcedures vp}
+
+mustHaveProposalProcedure :: VersionIsGreaterOrEqual v 'PlutusV3 => GYProposalProcedurePB -> GYTxBuildWitness v -> GYTxSkeleton v
+mustHaveProposalProcedure pp w = mustHaveProposalProcedures [(pp, w)]
+
+mustHaveProposalProcedures :: VersionIsGreaterOrEqual v 'PlutusV3 => [(GYProposalProcedurePB, GYTxBuildWitness v)] -> GYTxSkeleton v
+mustHaveProposalProcedures pps = emptyGYTxSkeleton {gytxProposalProcedures = GYTxSkeletonProposalProcedures pps}
 
 mustMint :: GYBuildScript v -> GYRedeemer -> GYTokenName -> Integer -> GYTxSkeleton v
 mustMint _ _ _ 0 = mempty

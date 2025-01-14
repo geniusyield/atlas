@@ -35,7 +35,7 @@ exerciseCommittee ctx info = do
     submitTxBodyConfirmed txBody [GYSomeSigningKey $ userPaymentSKey fundUser, GYSomeSigningKey coldKey]
   info $ "Successfully authorized hot key, with tx id: " <> show txId
 
-  let anchor = GYAnchor (unsafeTextToUrl "https://www.geniusyield.io") (hashAnchorData "we are awesome")
+  let anchor = GYAnchor (unsafeTextToUrl "https://www.geniusyield.co") (hashAnchorData "we are awesome")
   info "Resigning cold key"
   txIdUnreg <- ctxRun ctx fundUser $ do
     txBody <- buildTxBody $ mustHaveCertificate $ mkCommitteeColdKeyResignationCertificate coldCred (Just anchor)

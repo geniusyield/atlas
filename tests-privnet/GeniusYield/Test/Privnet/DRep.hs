@@ -40,7 +40,7 @@ exerciseDRep ctx info = do
     pure tid
   info $ "Successfully registered drep, with tx id: " <> show txId
   info "Updating drep"
-  let anchor = GYAnchor (unsafeTextToUrl "https://www.geniusyield.io") (hashAnchorData "we are awesome")
+  let anchor = GYAnchor (unsafeTextToUrl "https://www.geniusyield.co") (hashAnchorData "we are awesome")
   (txIdUpd, mdrepS) <- ctxRun ctx fundUser $ do
     txBody <- buildTxBody $ mustHaveCertificate $ mkDRepUpdateCertificate drepCred (Just anchor) GYTxCertWitnessKey
     gyLogInfo' "" $ "txBody: " <> show txBody

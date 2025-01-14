@@ -14,6 +14,7 @@ module GeniusYield.Types.TxCert (
   mkStakeAddressRegistrationCertificate,
   mkStakeAddressDeregistrationCertificate,
   mkStakeAddressDelegationCertificate,
+  mkStakeAddressCombinedRegistrationAndDelegationCertificate,
   mkDRepRegistrationCertificate,
   mkDRepUpdateCertificate,
   mkDRepUnregistrationCertificate,
@@ -50,6 +51,10 @@ mkStakeAddressDeregistrationCertificate sc wit = GYTxCert (GYStakeAddressDeregis
 
 mkStakeAddressDelegationCertificate :: GYStakeCredential -> GYDelegatee -> GYTxBuildWitness v -> GYTxCert v
 mkStakeAddressDelegationCertificate sc del wit = GYTxCert (GYStakeAddressDelegationCertificatePB sc del) (Just wit)
+
+-- | Rules for combined registration and delegation certificate are same as for individual registration and delegation certificates.
+mkStakeAddressCombinedRegistrationAndDelegationCertificate :: GYStakeCredential -> GYDelegatee -> GYTxBuildWitness v -> GYTxCert v
+mkStakeAddressCombinedRegistrationAndDelegationCertificate sc del wit = GYTxCert (GYStakeAddressRegistrationDelegationCertificatePB sc del) (Just wit)
 
 {- | Note that delegation certificate requires following preconditions:
 

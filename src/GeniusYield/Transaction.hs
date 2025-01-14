@@ -429,7 +429,7 @@ finalizeGYBalancedTx
       voterToPKH (DRepVoter c) = preferCByKey c
       voterToPKH (StakePoolVoter kh) = Just $ toPubKeyHash kh
 
-      propProcToPKH (GYProposalProcedurePB {propProcPBReturnAddr}) = stakeAddressToCredential propProcPBReturnAddr & preferCByKey
+      propProcToPKH GYProposalProcedurePB {propProcPBReturnAddr} = stakeAddressToCredential propProcPBReturnAddr & preferCByKey
 
       countUnique :: Ord a => [a] -> Int
       countUnique = Set.size . Set.fromList

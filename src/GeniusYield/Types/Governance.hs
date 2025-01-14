@@ -144,7 +144,7 @@ data GYProposalProcedure = GYProposalProcedure
   deriving stock (Show, Eq, Ord)
 
 completeProposalProcedure :: GYProposalProcedurePB -> Natural -> GYProposalProcedure
-completeProposalProcedure (GYProposalProcedurePB {..}) dep =
+completeProposalProcedure GYProposalProcedurePB {..} dep =
   GYProposalProcedure
     { propProcDeposit = dep
     , propProcReturnAddr = propProcPBReturnAddr
@@ -153,7 +153,7 @@ completeProposalProcedure (GYProposalProcedurePB {..}) dep =
     }
 
 propProcToLedger :: GYProposalProcedure -> Ledger.ProposalProcedure Consensus.StandardConway
-propProcToLedger (GYProposalProcedure {..}) =
+propProcToLedger GYProposalProcedure {..} =
   Ledger.ProposalProcedure
     { Ledger.pProcDeposit = fromIntegral propProcDeposit
     , Ledger.pProcReturnAddr = stakeAddressToLedger propProcReturnAddr
@@ -168,7 +168,7 @@ data GYConstitution = GYConstitution
   deriving stock (Eq, Ord, Show)
 
 constitutionToLedger :: GYConstitution -> Ledger.Constitution Consensus.StandardConway
-constitutionToLedger (GYConstitution {..}) = Ledger.Constitution (anchorToLedger constitutionAnchor) (maybeToStrictMaybe $ scriptHashToLedger <$> constitutionScript)
+constitutionToLedger GYConstitution {..} = Ledger.Constitution (anchorToLedger constitutionAnchor) (maybeToStrictMaybe $ scriptHashToLedger <$> constitutionScript)
 
 data GYGovAction
   = ParameterChange

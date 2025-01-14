@@ -23,8 +23,9 @@ import GeniusYield.Imports
 import GeniusYield.Transaction.CBOR
 import GeniusYield.Types.Address
 import GeniusYield.Types.BuildScript
+import GeniusYield.Types.BuildWitness
 import GeniusYield.Types.Era
-import GeniusYield.Types.Governance (GYTxVotingProcedures)
+import GeniusYield.Types.Governance (GYProposalProcedurePB, GYTxVotingProcedures)
 import GeniusYield.Types.ProtocolParameters (ApiProtocolParameters)
 import GeniusYield.Types.PubKeyHash
 import GeniusYield.Types.Redeemer
@@ -57,6 +58,7 @@ data GYBalancedTx v = GYBalancedTx
   , gybtxRefIns :: !GYUTxOs
   , gybtxMetadata :: !(Maybe GYTxMetadata)
   , gybtxVotingProcedures :: !(GYTxVotingProcedures v)
+  , gybtxProposalProcedures :: ![(GYProposalProcedurePB, GYTxBuildWitness v)]
   }
 
 -- | A further detailed version of 'GYTxIn', containing all information about a UTxO.

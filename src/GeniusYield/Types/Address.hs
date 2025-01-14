@@ -41,6 +41,7 @@ module GeniusYield.Types.Address (
   stakeAddressFromTextMaybe,
   unsafeStakeAddressFromText,
   stakeAddressToText,
+  stakeAddressToLedger,
   stakeAddressCredential,
   stakeAddressToCredential,
   stakeAddressFromCredential,
@@ -89,6 +90,8 @@ import PlutusTx.Prelude qualified as PlutusTx
 import Text.Printf qualified as Printf
 import Web.HttpApiData qualified as Web
 
+import Cardano.Api.Address qualified as Api
+import Cardano.Ledger.Api qualified as Ledger
 import GeniusYield.Imports
 import GeniusYield.Types.Credential (
   GYPaymentCredential,
@@ -665,6 +668,9 @@ unsafeStakeAddressFromText t =
 -}
 stakeAddressToText :: GYStakeAddress -> Text.Text
 stakeAddressToText = Api.serialiseAddress . stakeAddressToApi
+
+stakeAddressToLedger :: GYStakeAddress -> Ledger.RewardAccount Ledger.StandardCrypto
+stakeAddressToLedger (stakeAddressToApi -> Api.StakeAddress nw sc) = Ledger.RewardAccount nw sc
 
 {-# DEPRECATED stakeAddressCredential "Use stakeAddressToCredential." #-}
 

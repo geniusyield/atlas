@@ -152,6 +152,7 @@ balanceTxStepTests =
           []
           []
           mempty
+          mempty
           []
           []
           GYRandomImproveMultiAsset
@@ -165,6 +166,7 @@ balanceTxStepTests =
           []
           []
           mempty
+          mempty
           []
           []
           GYRandomImproveMultiAsset
@@ -177,6 +179,7 @@ balanceTxStepTests =
           (Just (valueSingleton (mockAsset "A") 100, []))
           []
           []
+          mempty
           mempty
           []
           []

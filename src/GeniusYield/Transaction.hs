@@ -74,6 +74,7 @@ import Cardano.Ledger.Alonzo.Scripts qualified as AlonzoScripts
 import Cardano.Ledger.Alonzo.Tx qualified as AlonzoTx
 import Cardano.Ledger.Binary qualified as CBOR
 import Cardano.Ledger.Binary.Crypto qualified as CBOR
+import Cardano.Ledger.Conway.PParams qualified as Ledger
 import Cardano.Ledger.Core (
   EraTx (sizeTxF),
   eraProtVerLow,
@@ -160,13 +161,14 @@ buildUnsignedTxBody ::
   Set GYPubKeyHash ->
   Maybe GYTxMetadata ->
   GYTxVotingProcedures v ->
+  [(GYProposalProcedurePB, GYTxBuildWitness v)] ->
   m (Either GYBuildTxError GYTxBody)
-buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata vps = buildTxLoop cstrat extraLovelaceStart
+buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata vps pps = buildTxLoop cstrat extraLovelaceStart
  where
   certsFinalised = finaliseTxCert (gyBTxEnvProtocolParams env) <$> certs
 
   step :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
-  step stepStrat = fmap (first GYBuildTxBalancingError) . balanceTxStep env mmint wdrls certsFinalised vps insOld outsOld stepStrat
+  step stepStrat = fmap (first GYBuildTxBalancingError) . balanceTxStep env mmint wdrls certsFinalised vps pps insOld outsOld stepStrat
 
   buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError GYTxBody)
   buildTxLoop stepStrat n
@@ -228,6 +230,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub sig
             , gybtxRefIns = refIns
             , gybtxMetadata = mbTxMetadata
             , gybtxVotingProcedures = vps
+            , gybtxProposalProcedures = pps
             }
           (length outsOld)
 
@@ -256,6 +259,8 @@ balanceTxStep ::
   [GYTxCert' v] ->
   -- | voting procedures
   GYTxVotingProcedures v ->
+  -- | proposal procedures
+  [(GYProposalProcedurePB, GYTxBuildWitness v)] ->
   -- | transaction inputs
   [GYTxInDetailed v] ->
   -- | transaction outputs
@@ -277,6 +282,7 @@ balanceTxStep
   wdrls
   certs
   vps
+  pps
   ins
   outs
   cstrat =
@@ -312,12 +318,14 @@ balanceTxStep
             )
             0
             certs
+        govActionDeposit :: Natural = pp ^. Ledger.ppGovActionDepositL & fromIntegral
+        govActionsAmt :: Natural = fromIntegral (length pps) * govActionDeposit
         -- Extra ada is received from withdrawals and stake credential deregistration.
         adaSource =
           let wdrlsAda = getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls
            in wdrlsAda + stakeCredDeregsAmt + drepDeregsAmt
         -- Ada lost due to stake credential registration.
-        adaSink = stakeCredRegsAmt + drepRegsAmt + spRegsAmt
+        adaSink = stakeCredRegsAmt + drepRegsAmt + spRegsAmt + govActionsAmt
         collaterals
           | needsCollateral = utxosFromUTxO collateral
           | otherwise = mempty
@@ -353,7 +361,7 @@ balanceTxStep
     isCertScriptWitness (Just p) = isPlutusScriptWitness p
     isCertScriptWitness Nothing = False
 
-    isPlutusScriptWitness (GYTxBuildWitnessPlutusScript {}) = True
+    isPlutusScriptWitness GYTxBuildWitnessPlutusScript {} = True
     isPlutusScriptWitness _ = False
 
 retColSup :: Api.BabbageEraOnwards ApiEra
@@ -381,6 +389,7 @@ finalizeGYBalancedTx
     , gybtxRefIns = utxosRefInputs
     , gybtxMetadata = mbTxMetadata
     , gybtxVotingProcedures = vps
+    , gybtxProposalProcedures = pps
     } =
     makeTransactionBodyAutoBalanceWrapper
       collaterals
@@ -404,6 +413,7 @@ finalizeGYBalancedTx
             <> [apkh | GYTxWdrl {gyTxWdrlWitness = GYTxWdrlWitnessKey, gyTxWdrlStakeAddress = saddr} <- wdrls, let sc = stakeAddressToCredential saddr, Just apkh <- [preferCByKey sc]]
             <> [apkh | cert@GYTxCert' {gyTxCertWitness' = Just GYTxCertWitnessKey} <- certs, let sc = certificateToStakeCredential $ gyTxCertCertificate' cert, Just apkh <- [preferCByKey sc]]
             <> [apkh | (a, GYTxBuildWitnessKey) <- Data.Bifunctor.second fst <$> Map.toList vps, Just apkh <- [voterToPKH a]]
+            <> [apkh | (a, GYTxBuildWitnessKey) <- pps, Just apkh <- [propProcToPKH a]]
             <> estimateKeyWitnessesFromInputs ins
             <> Set.toList signers
      where
@@ -418,6 +428,8 @@ finalizeGYBalancedTx
       voterToPKH (CommitteeVoter c) = preferCByKey c
       voterToPKH (DRepVoter c) = preferCByKey c
       voterToPKH (StakePoolVoter kh) = Just $ toPubKeyHash kh
+
+      propProcToPKH (GYProposalProcedurePB {propProcPBReturnAddr}) = stakeAddressToCredential propProcPBReturnAddr & preferCByKey
 
       countUnique :: Ord a => [a] -> Int
       countUnique = Set.size . Set.fromList
@@ -564,6 +576,25 @@ finalizeGYBalancedTx
                         & Map.map unsafeBuildScriptWitnessToApi
                     )
            in Just vpsApi >>= Api.mkFeatured
+    pps' =
+      if pps == mempty
+        then Nothing
+        else
+          let ppsApi =
+                Api.mkTxProposalProcedures
+                  ( map
+                      ( \(propProc, wit) ->
+                          let propProc' = completeProposalProcedure propProc (pp ^. Ledger.ppGovActionDepositL & fromIntegral) & propProcToLedger
+                           in ( propProc'
+                              , case wit of
+                                  GYTxBuildWitnessKey -> Nothing
+                                  w@(GYTxBuildWitnessPlutusScript _ _) -> Just $ unsafeBuildScriptWitnessToApi w
+                                  w@(GYTxBuildWitnessSimpleScript _) -> Just $ unsafeBuildScriptWitnessToApi w
+                              )
+                      )
+                      pps
+                  )
+           in Just ppsApi >>= Api.mkFeatured
 
     body :: Api.TxBodyContent Api.BuildTx ApiEra
     body =
@@ -588,7 +619,7 @@ finalizeGYBalancedTx
         , Api.txUpdateProposal = Api.TxUpdateProposalNone
         , Api.txMintValue = mint
         , Api.txScriptValidity = Api.TxScriptValidityNone
-        , Api.txProposalProcedures = Nothing
+        , Api.txProposalProcedures = pps'
         , Api.txVotingProcedures = vps'
         , Api.txCurrentTreasuryValue = Nothing -- FIXME:?
         , Api.txTreasuryDonation = Nothing -- FIXME:?

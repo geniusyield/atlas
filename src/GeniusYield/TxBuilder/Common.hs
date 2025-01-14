@@ -69,6 +69,7 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
   , gytxInvalidAfter :: !(Maybe GYSlot)
   , gytxMetadata :: !(Maybe GYTxMetadata)
   , gytxVotingProcedures :: !(GYTxSkeletonVotingProcedures v)
+  , gytxProposalProcedures :: !(GYTxSkeletonProposalProcedures v)
   }
   deriving Show
 
@@ -84,6 +85,19 @@ instance Semigroup (GYTxSkeletonVotingProcedures v) where
   GYTxSkeletonVotingProcedures a <> GYTxSkeletonVotingProceduresNone = GYTxSkeletonVotingProcedures a
   GYTxSkeletonVotingProceduresNone <> GYTxSkeletonVotingProcedures b = GYTxSkeletonVotingProcedures b
   GYTxSkeletonVotingProceduresNone <> GYTxSkeletonVotingProceduresNone = GYTxSkeletonVotingProceduresNone
+
+data GYTxSkeletonProposalProcedures :: PlutusVersion -> Type where
+  GYTxSkeletonProposalProceduresNone :: GYTxSkeletonProposalProcedures v
+  GYTxSkeletonProposalProcedures :: VersionIsGreaterOrEqual v 'PlutusV3 => ![(GYProposalProcedurePB, GYTxBuildWitness v)] -> GYTxSkeletonProposalProcedures v
+
+deriving instance Show (GYTxSkeletonProposalProcedures v)
+deriving instance Eq (GYTxSkeletonProposalProcedures v)
+
+instance Semigroup (GYTxSkeletonProposalProcedures v) where
+  GYTxSkeletonProposalProcedures a <> GYTxSkeletonProposalProcedures b = GYTxSkeletonProposalProcedures (a <> b)
+  GYTxSkeletonProposalProcedures a <> GYTxSkeletonProposalProceduresNone = GYTxSkeletonProposalProcedures a
+  GYTxSkeletonProposalProceduresNone <> GYTxSkeletonProposalProcedures b = GYTxSkeletonProposalProcedures b
+  GYTxSkeletonProposalProceduresNone <> GYTxSkeletonProposalProceduresNone = GYTxSkeletonProposalProceduresNone
 
 data GYTxSkeletonRefIns :: PlutusVersion -> Type where
   GYTxSkeletonRefIns :: VersionIsGreaterOrEqual v 'PlutusV2 => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
@@ -119,6 +133,7 @@ emptyGYTxSkeleton =
     , gytxInvalidAfter = Nothing
     , gytxMetadata = Nothing
     , gytxVotingProcedures = GYTxSkeletonVotingProceduresNone
+    , gytxProposalProcedures = GYTxSkeletonProposalProceduresNone
     }
 
 instance Semigroup (GYTxSkeleton v) where
@@ -135,6 +150,7 @@ instance Semigroup (GYTxSkeleton v) where
       , gytxInvalidAfter = combineInvalidAfter (gytxInvalidAfter x) (gytxInvalidAfter y)
       , gytxMetadata = gytxMetadata x <> gytxMetadata y
       , gytxVotingProcedures = gytxVotingProcedures x <> gytxVotingProcedures y
+      , gytxProposalProcedures = gytxProposalProcedures x <> gytxProposalProcedures y
       }
    where
     -- we keep only one input per utxo to spend
@@ -296,6 +312,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
               gytxSigs
               gytxMetadata
               (case gytxVotingProcedures of GYTxSkeletonVotingProceduresNone -> mempty; GYTxSkeletonVotingProcedures vp -> vp)
+              (case gytxProposalProcedures of GYTxSkeletonProposalProceduresNone -> mempty; GYTxSkeletonProposalProcedures pps -> pps)
 
       go :: GYUTxOs -> GYTxBuildResult -> [GYTxSkeleton v] -> m (Either GYBuildTxError GYTxBuildResult)
       go _ acc [] = pure $ Right $ reverseResult acc

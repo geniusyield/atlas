@@ -58,10 +58,10 @@ resolveSigningRequirement :: User -> Maybe GYScriptHash -> [GYSomeSigningKey]
 resolveSigningRequirement User' {..} mstakeValHash = GYSomeSigningKey userPaymentSKey' : ([userStakeSKey' & fromJust & GYSomeSigningKey | isNothing mstakeValHash])
 
 resolveCertWitness :: Bool -> GYTxBuildWitness 'PlutusV2
-resolveCertWitness isScript = if not isScript then GYTxBuildWitnessKey else GYTxBuildWitnessPlutusScript (GYStakeValScript aStakeValidator) unitRedeemer
+resolveCertWitness isScript = if not isScript then GYTxBuildWitnessKey else GYTxBuildWitnessPlutusScript (GYBuildPlutusScriptInlined aStakeValidator) unitRedeemer
 
 resolveWdrlWitness :: Bool -> GYTxBuildWitness 'PlutusV2
-resolveWdrlWitness isScript = if not isScript then GYTxBuildWitnessKey else GYTxBuildWitnessPlutusScript (GYStakeValScript aStakeValidator) unitRedeemer
+resolveWdrlWitness isScript = if not isScript then GYTxBuildWitnessKey else GYTxBuildWitnessPlutusScript (GYBuildPlutusScriptInlined aStakeValidator) unitRedeemer
 
 -- This will check if we are able to register a stake credential without it's witness.
 registerStakeCredentialSteps :: GYCoinSelectionStrategy -> User -> Maybe GYScriptHash -> (String -> IO ()) -> Ctx -> IO ()

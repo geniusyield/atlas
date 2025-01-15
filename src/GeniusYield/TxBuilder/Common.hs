@@ -35,7 +35,7 @@ import Data.List (nubBy)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
-import Data.Maybe (maybeToList)
+import Data.Maybe (isNothing, maybeToList)
 import Data.Ratio ((%))
 import Data.Set qualified as Set
 import GeniusYield.Imports
@@ -300,9 +300,13 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
               checkDatumMatch _ GYTxInWitnessKey = True
               checkDatumMatch _ GYTxInWitnessSimpleScript {} = True
               checkDatumMatch ud (GYTxInWitnessScript _ wd _) = case ud of
-                GYOutDatumNone -> False
-                GYOutDatumHash h -> h == hashDatum wd
-                GYOutDatumInline uid -> uid == wd
+                GYOutDatumNone -> isNothing wd
+                GYOutDatumHash h -> case wd of
+                  Nothing -> False
+                  Just wd' -> h == hashDatum wd'
+                GYOutDatumInline uid -> case wd of
+                  Nothing -> True
+                  Just wd' -> uid == wd'
 
         -- This operation is `O(n)` where `n` denotes the number of UTxOs in `ownUtxos'`.
         let totalRefScriptSize = foldl' (\acc GYUTxO {..} -> acc + maybe 0 scriptSize utxoRefScript) 0 $ refInsUtxos <> map utxoFromTxInDetailed gyTxInsDetailed

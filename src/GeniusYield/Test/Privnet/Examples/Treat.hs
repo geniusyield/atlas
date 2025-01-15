@@ -109,7 +109,7 @@ grabTreats validator = do
                   , gyTxInWitness =
                       GYTxInWitnessScript
                         (GYBuildPlutusScriptInlined validator)
-                        (datumFromPlutus' od)
+                        (Just $ datumFromPlutus' od)
                         unitRedeemer
                   }
             | (oref, (_addr, _value, od)) <- itoList datums

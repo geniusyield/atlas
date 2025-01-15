@@ -41,10 +41,10 @@ blueprintTests setup =
           (\e -> if isTxBodyErrorAutoBalance e then pure () else throwError e)
           $ asUser user
           $ do
-            void $ buildTxBody $ mustHaveInput @'PlutusV3 $ GYTxIn oref (GYTxInWitnessScript (GYBuildPlutusScriptInlined val) dat unsatRedeemer)
+            void $ buildTxBody $ mustHaveInput @'PlutusV3 $ GYTxIn oref (GYTxInWitnessScript (GYBuildPlutusScriptInlined val) (Just dat) unsatRedeemer)
         lg "Successfully failed to consume from blueprint script for unsatisfying redeemer"
         tid <- asUser user $ do
-          txBody <- buildTxBody $ mustHaveInput @'PlutusV3 $ GYTxIn oref (GYTxInWitnessScript (GYBuildPlutusScriptInlined val) dat satRedeemer)
+          txBody <- buildTxBody $ mustHaveInput @'PlutusV3 $ GYTxIn oref (GYTxInWitnessScript (GYBuildPlutusScriptInlined val) (Just dat) satRedeemer)
           signAndSubmitConfirmed txBody
         lg $ "Successfully consumed from blueprint script, with tx id: " <> show tid
     ]

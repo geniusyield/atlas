@@ -57,7 +57,7 @@ tests setup =
                     , gyTxInWitness =
                         GYTxInWitnessScript
                           (GYBuildPlutusScriptInlined @PlutusV2 readOracleValidatorV2)
-                          (datumFromPlutusData (d :: ()))
+                          (Just $ datumFromPlutusData (d :: ()))
                           unitRedeemer
                     }
               | (ref, (_, _, d)) <- Map.toList datums
@@ -108,7 +108,7 @@ tests setup =
                     , gyTxInWitness =
                         GYTxInWitnessScript
                           (GYBuildPlutusScriptInlined @PlutusV2 readOracleValidatorV2)
-                          (datumFromPlutusData (d :: ()))
+                          (Just $ datumFromPlutusData (d :: ()))
                           unitRedeemer
                     }
               | (ref, (_, _, d)) <- Map.toList datums

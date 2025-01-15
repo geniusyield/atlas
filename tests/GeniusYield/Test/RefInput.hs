@@ -53,7 +53,7 @@ guessRefInputRun refInputORef consumeRef guess = do
             , gyTxInWitness =
                 GYTxInWitnessScript
                   (GYBuildPlutusScriptInlined gyGuessRefInputDatumValidator)
-                  (datumFromPlutusData ())
+                  (Just $ datumFromPlutusData ())
                   (redeemerFromPlutusData redeemer)
             }
           <> mustHaveRefInput refInputORef

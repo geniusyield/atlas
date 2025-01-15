@@ -46,8 +46,8 @@ data GYTxIn v = GYTxIn
 data GYTxInWitness v
   = -- | Key witness without datum.
     GYTxInWitnessKey
-  | -- | Script witness with associated script, datum, and redeemer.
-    GYTxInWitnessScript !(GYBuildPlutusScript v) !GYDatum !GYRedeemer
+  | -- | Script witness with associated script, datum, and redeemer. Datum can be omitted if it is inlined in the input or if it's not needed under PlutusV3 (or beyond) script.
+    GYTxInWitnessScript !(GYBuildPlutusScript v) !(Maybe GYDatum) !GYRedeemer
   | -- | Simple script witness.
     GYTxInWitnessSimpleScript !(GYBuildSimpleScript v)
   deriving stock (Eq, Show)
@@ -88,13 +88,13 @@ txInToApi useInline (GYTxIn oref m) = (txOutRefToApi oref, Api.BuildTxWith $ f m
  where
   f :: GYTxInWitness v -> Api.Witness Api.WitCtxTxIn ApiEra
   f GYTxInWitnessKey = Api.KeyWitness Api.KeyWitnessForSpending
-  f (GYTxInWitnessScript v d r) =
+  f (GYTxInWitnessScript v md r) =
     Api.ScriptWitness Api.ScriptWitnessForSpending $
       ( case v of
           GYBuildPlutusScriptInlined s -> validatorToApiPlutusScriptWitness s
           GYBuildPlutusScriptReference ref s -> referenceScriptToApiPlutusScriptWitness ref s
       )
-        (if useInline then Api.InlineScriptDatum else Api.ScriptDatumForTxIn $ Just $ datumToApi' d)
+        (if useInline then Api.InlineScriptDatum else Api.ScriptDatumForTxIn $ datumToApi' <$> md)
         (redeemerToApi r)
         (Api.ExecutionUnits 0 0)
   f (GYTxInWitnessSimpleScript v) =

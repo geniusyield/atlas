@@ -610,7 +610,7 @@ grabGifts validator = do
                   , gyTxInWitness =
                       GYTxInWitnessScript
                         (GYBuildPlutusScriptInlined validator)
-                        (datumFromPlutus' od)
+                        (Just $ datumFromPlutus' od)
                         unitRedeemer
                   }
             | (oref, (_addr, _value, od)) <- itoList datums
@@ -639,7 +639,7 @@ grabGiftsRef ref validator = do
                   , gyTxInWitness =
                       GYTxInWitnessScript
                         (GYBuildPlutusScriptReference ref $ validatorToScript validator)
-                        (datumFromPlutus' od)
+                        (Just $ datumFromPlutus' od)
                         unitRedeemer
                   }
             | (oref, (_addr, _value, od)) <- itoList datums

@@ -64,7 +64,7 @@ sendAndConsume Wallets {w1, w2} amt = withWalletBalancesCheckSimple [w1 := value
     txBody <-
       buildTxBody @PlutusV1 . mustHaveInput $
         GYTxIn
-          { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) unitDatum unitRedeemer
+          { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) (Just unitDatum) unitRedeemer
           , gyTxInTxOutRef = txOutRefFromTuple (txId, 0)
           }
     signAndSubmitConfirmed_ txBody
@@ -81,7 +81,7 @@ sendAndContinue Wallets {w1, w2} amt = withWalletBalancesCheckSimple [w1 := valu
         mconcat
           [ mustHaveInput $
               GYTxIn
-                { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) unitDatum unitRedeemer
+                { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) (Just unitDatum) unitRedeemer
                 , gyTxInTxOutRef = txOutRefFromTuple (txId, 0)
                 }
           , mustHaveOutput $ mkGYTxOut target amt unitDatum
@@ -97,7 +97,7 @@ selfConsume Wallets {w1} amt = withWalletBalancesCheckSimple [w1 := mempty] $ do
     consumeBody <-
       buildTxBody @PlutusV1 . mustHaveInput $
         GYTxIn
-          { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) unitDatum unitRedeemer
+          { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) (Just unitDatum) unitRedeemer
           , gyTxInTxOutRef = txOutRefFromTuple (txId, 0)
           }
     signAndSubmitConfirmed_ consumeBody
@@ -113,7 +113,7 @@ selfContinue Wallets {w1} amt = withWalletBalancesCheckSimple [w1 := valueNegate
         mconcat
           [ mustHaveInput $
               GYTxIn
-                { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) unitDatum unitRedeemer
+                { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) (Just unitDatum) unitRedeemer
                 , gyTxInTxOutRef = txOutRefFromTuple (txId, 0)
                 }
           , mustHaveOutput $ mkGYTxOut target amt unitDatum
@@ -134,7 +134,7 @@ selfPartialConsume lovelaceConf TestInfo {testWallets = Wallets {w1}, testGoldAs
           mconcat
             [ mustHaveInput $
                 GYTxIn
-                  { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) unitDatum unitRedeemer
+                  { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) (Just unitDatum) unitRedeemer
                   , gyTxInTxOutRef = txOutRefFromTuple (txId, 0)
                   }
             , mustHaveOutput $ mkGYTxOut target partialAmt unitDatum

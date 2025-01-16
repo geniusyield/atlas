@@ -1,3 +1,8 @@
+## 0.10.0
+
+* Support of extended keys in `runGYTxMonadIO`.
+* Don't throw error for querying DRep state in case of Maestro/BF provider.
+
 ## 0.9.0
 
 * When spending an input, datum is now optional since it is not required to be specified in case it's inlined or not needed by associated Plutus script.

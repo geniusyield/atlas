@@ -409,8 +409,8 @@ instance GYTxUserQueryMonad GYTxMonadClb where
         Just (ref, _) -> return ref
 
 instance GYTxMonad GYTxMonadClb where
-  signTxBody = signTxBodyImpl . asks $ userPaymentSKey . clbEnvWallet
-  signTxBodyWithStake = signTxBodyWithStakeImpl $ asks ((,) . userPaymentSKey . clbEnvWallet) <*> asks (userStakeSKey . clbEnvWallet)
+  signTxBody = signTxBodyImpl . asks $ AGYPaymentSigningKey . userPaymentSKey . clbEnvWallet
+  signTxBodyWithStake = signTxBodyWithStakeImpl $ asks ((,) . AGYPaymentSigningKey . userPaymentSKey . clbEnvWallet) <*> asks (fmap AGYStakeSigningKey . userStakeSKey . clbEnvWallet)
   submitTx tx = do
     let txBody = getTxBody tx
     dumpBody txBody

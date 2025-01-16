@@ -165,7 +165,15 @@ ctxRunGame :: Ctx -> GYTxGameMonadIO a -> IO a
 ctxRunGame ctx = runGYTxGameMonadIO (ctxNetworkId ctx) (ctxProviders ctx)
 
 ctxRun :: Ctx -> User -> GYTxMonadIO a -> IO a
-ctxRun ctx User' {..} = runGYTxMonadIO (ctxNetworkId ctx) (ctxProviders ctx) userPaymentSKey' userStakeSKey' [userAddr] userAddr Nothing
+ctxRun ctx User' {..} =
+  runGYTxMonadIO
+    (ctxNetworkId ctx)
+    (ctxProviders ctx)
+    (AGYPaymentSigningKey userPaymentSKey')
+    (AGYStakeSigningKey <$> userStakeSKey')
+    [userAddr]
+    userAddr
+    Nothing
 
 ctxRunQuery :: Ctx -> GYTxQueryMonadIO a -> IO a
 ctxRunQuery ctx = runGYTxQueryMonadIO (ctxNetworkId ctx) (ctxProviders ctx)

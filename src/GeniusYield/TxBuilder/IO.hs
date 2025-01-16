@@ -59,8 +59,8 @@ newtype GYTxMonadIO a = GYTxMonadIO (GYTxIOEnv -> GYTxBuilderMonadIO a)
 data GYTxIOEnv = GYTxIOEnv
   { envNid :: !GYNetworkId
   , envProviders :: !GYProviders
-  , envPaymentSKey :: !GYPaymentSigningKey
-  , envStakeSKey :: !(Maybe GYStakeSigningKey)
+  , envPaymentSKey :: !GYSomePaymentSigningKey
+  , envStakeSKey :: !(Maybe GYSomeStakeSigningKey)
   }
 
 -- INTERNAL USAGE ONLY
@@ -95,9 +95,9 @@ runGYTxMonadIO ::
   -- | Provider.
   GYProviders ->
   -- | Payment signing key of the wallet
-  GYPaymentSigningKey ->
+  GYSomePaymentSigningKey ->
   -- | Stake signing key of the wallet (optional)
-  Maybe GYStakeSigningKey ->
+  Maybe GYSomeStakeSigningKey ->
   -- | Addresses belonging to wallet.
   [GYAddress] ->
   -- | Change address.
@@ -176,8 +176,8 @@ instance GYTxGameMonad GYTxGameMonadIO where
       runGYTxMonadIO
         nid
         providers
-        userPaymentSKey
-        userStakeSKey
+        (AGYPaymentSigningKey userPaymentSKey)
+        (AGYStakeSigningKey <$> userStakeSKey)
         (NE.toList userAddresses)
         userChangeAddress
         (userCollateralDumb u)

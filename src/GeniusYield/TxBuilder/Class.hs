@@ -249,10 +249,14 @@ class GYTxBuilderMonad m => GYTxMonad m where
   -- by the identified transaction.
   awaitTxConfirmed' :: GYAwaitTxParameters -> GYTxId -> m ()
 
-signTxBodyImpl :: GYTxMonad m => m GYPaymentSigningKey -> GYTxBody -> m GYTx
+signTxBodyImpl :: GYTxMonad m => m GYSomePaymentSigningKey -> GYTxBody -> m GYTx
 signTxBodyImpl kM txBody = signGYTxBody txBody . (: []) <$> kM
 
-signTxBodyWithStakeImpl :: GYTxMonad m => m (GYPaymentSigningKey, Maybe GYStakeSigningKey) -> GYTxBody -> m GYTx
+signTxBodyWithStakeImpl ::
+  GYTxMonad m =>
+  m (GYSomePaymentSigningKey, Maybe GYSomeStakeSigningKey) ->
+  GYTxBody ->
+  m GYTx
 signTxBodyWithStakeImpl kM txBody = (\(pKey, sKey) -> signGYTxBody txBody $ GYSomeSigningKey pKey : maybeToList (GYSomeSigningKey <$> sKey)) <$> kM
 
 -- | Class of monads that can simulate a "game" between different users interacting with transactions.

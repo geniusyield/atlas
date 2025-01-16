@@ -37,6 +37,7 @@
                   cabal = {}  ;
                   hlint = {};
                   haskell-language-server = {};
+                  fourmolu = {};
                 };
                 # Non-Haskell shell tools go here
                 shell.buildInputs = with pkgs; [

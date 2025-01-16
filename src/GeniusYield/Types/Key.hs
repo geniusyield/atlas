@@ -107,6 +107,9 @@ module GeniusYield.Types.Key (
   GYSomePaymentSigningKey (..),
   readSomePaymentSigningKey,
   somePaymentSigningKeyToSomeSigningKey,
+  GYSomeStakeSigningKey (..),
+  readSomeStakeSigningKey,
+  someStakeSigningKeyToSomeSigningKey,
 ) where
 
 import Cardano.Api qualified as Api
@@ -756,8 +759,23 @@ data GYSomeSigningKey = forall a. (ToShelleyWitnessSigningKey a, Show a) => GYSo
 instance ToShelleyWitnessSigningKey GYSomeSigningKey where
   toShelleyWitnessSigningKey (GYSomeSigningKey skey) = toShelleyWitnessSigningKey skey
 
-data GYSomePaymentSigningKey = AGYPaymentSigningKey !GYPaymentSigningKey | AGYExtendedPaymentSigningKey !GYExtendedPaymentSigningKey
+data GYSomePaymentSigningKey
+  = AGYPaymentSigningKey !GYPaymentSigningKey
+  | AGYExtendedPaymentSigningKey !GYExtendedPaymentSigningKey
   deriving stock (Eq, Show, Ord)
+
+instance ToShelleyWitnessSigningKey GYSomePaymentSigningKey where
+  toShelleyWitnessSigningKey (AGYPaymentSigningKey key) = toShelleyWitnessSigningKey key
+  toShelleyWitnessSigningKey (AGYExtendedPaymentSigningKey key) = toShelleyWitnessSigningKey key
+
+data GYSomeStakeSigningKey
+  = AGYStakeSigningKey !GYStakeSigningKey
+  | AGYExtendedStakeSigningKey !GYExtendedStakeSigningKey
+  deriving stock (Eq, Show, Ord)
+
+instance ToShelleyWitnessSigningKey GYSomeStakeSigningKey where
+  toShelleyWitnessSigningKey (AGYStakeSigningKey key) = toShelleyWitnessSigningKey key
+  toShelleyWitnessSigningKey (AGYExtendedStakeSigningKey key) = toShelleyWitnessSigningKey key
 
 readSomePaymentSigningKey :: FilePath -> IO GYSomePaymentSigningKey
 readSomePaymentSigningKey file = do
@@ -771,6 +789,22 @@ readSomePaymentSigningKey file = do
     Left err -> throwIO $ userError $ show err
     Right skey -> return skey
 
+readSomeStakeSigningKey :: FilePath -> IO GYSomeStakeSigningKey
+readSomeStakeSigningKey file = do
+  e <-
+    Api.readFileTextEnvelopeAnyOf
+      [ Api.FromSomeType (Api.AsSigningKey Api.AsStakeKey) $ AGYStakeSigningKey . stakeSigningKeyFromApi
+      , Api.FromSomeType (Api.AsSigningKey Api.AsStakeExtendedKey) $ AGYExtendedStakeSigningKey . extendedStakeSigningKeyFromApi
+      ]
+      (Api.File file)
+  case e of
+    Left err -> throwIO $ userError $ show err
+    Right skey -> return skey
+
 somePaymentSigningKeyToSomeSigningKey :: GYSomePaymentSigningKey -> GYSomeSigningKey
 somePaymentSigningKeyToSomeSigningKey (AGYPaymentSigningKey key) = GYSomeSigningKey key
 somePaymentSigningKeyToSomeSigningKey (AGYExtendedPaymentSigningKey key) = GYSomeSigningKey key
+
+someStakeSigningKeyToSomeSigningKey :: GYSomeStakeSigningKey -> GYSomeSigningKey
+someStakeSigningKeyToSomeSigningKey (AGYStakeSigningKey key) = GYSomeSigningKey key
+someStakeSigningKeyToSomeSigningKey (AGYExtendedStakeSigningKey key) = GYSomeSigningKey key

@@ -27,6 +27,7 @@ module GeniusYield.Types.TxOutRef (
 import Cardano.Api qualified as Api
 import Codec.CBOR.Read qualified as CBOR
 import Codec.CBOR.Term qualified as CBOR
+import Codec.CBOR.Write qualified as CBOR
 import Control.Lens ((?~))
 import Data.Aeson qualified as Aeson
 import Data.Attoparsec.ByteString.Char8 qualified as Atto
@@ -254,6 +255,23 @@ instance Aeson.FromJSON GYTxOutRefCbor where
     case Web.parseUrlPiece t of
       Left err -> fail $ T.unpack err
       Right ref -> return ref
+
+instance Aeson.ToJSON GYTxOutRefCbor where
+    toJSON (GYTxOutRefCbor gyTxOutRef) =
+        let Api.TxIn txId (Api.TxIx txIx) = GeniusYield.Types.TxOutRef.txOutRefToApi gyTxOutRef
+            someInt = 0 -- NOTE(jaredponn) January 27, 2025: I don't think the
+                        -- value of this int matters, it just needs to be some int.
+        in Aeson.String
+            $ TE.decodeASCII
+            $ Base16.encode
+            $ CBOR.toStrictByteString
+            $ CBOR.encodeTerm
+            $ CBOR.TList
+                [ CBOR.TList
+                    [ CBOR.TBytes $ Api.serialiseToRawBytes txId
+                    , CBOR.TInt $ fromIntegral txIx]
+                , CBOR.TInt someInt
+                ]
 
 -------------------------------------------------------------------------------
 -- swagger schema

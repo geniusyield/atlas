@@ -1,3 +1,7 @@
+## 0.11.0
+
+* Allows reference scripts to be of version greater than the minimum supported constrained version of `GYTxSkeleton`. Thanks [@SeungheonOh](https://github.com/SeungheonOh) for finding [this bug](https://github.com/geniusyield/atlas/issues/404)! Please visit the linked issue for more details.
+
 ## 0.10.0
 
 * Support of extended keys in `runGYTxMonadIO`.

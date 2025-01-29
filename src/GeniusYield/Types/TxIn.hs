@@ -57,7 +57,7 @@ type GYInScript = GYBuildPlutusScript
 pattern GYInScript :: () => v `VersionIsGreaterOrEqual` u => GYScript v -> GYBuildPlutusScript u
 pattern GYInScript s = GYBuildPlutusScriptInlined s
 
-pattern GYInReference :: () => VersionIsGreaterOrEqual u PlutusV2 => GYTxOutRef -> GYScript u -> GYBuildPlutusScript u
+pattern GYInReference :: () => (v `VersionIsGreaterOrEqual` u, u `VersionIsGreaterOrEqual` PlutusV2, v `VersionIsGreaterOrEqual` PlutusV2) => GYTxOutRef -> GYScript v -> GYBuildPlutusScript u
 pattern GYInReference ref s = GYBuildPlutusScriptReference ref s
 
 {-# COMPLETE GYInScript, GYInReference #-}

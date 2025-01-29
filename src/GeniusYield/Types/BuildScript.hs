@@ -56,18 +56,20 @@ deriving instance Ord (GYBuildScript v)
 data GYBuildPlutusScript (u :: PlutusVersion) where
   -- | 'VersionIsGreaterOrEqual' restricts which version validators can be used in this transaction.
   GYBuildPlutusScriptInlined :: forall u v. v `VersionIsGreaterOrEqual` u => GYScript v -> GYBuildPlutusScript u
-  -- | Reference inputs can be only used in V2 transactions.
-  GYBuildPlutusScriptReference :: forall v. v `VersionIsGreaterOrEqual` 'PlutusV2 => !GYTxOutRef -> !(GYScript v) -> GYBuildPlutusScript v
+  -- | Reference inputs can be only used in V2 & beyond transactions.
+  --
+  -- Constraint @v `VersionIsGreaterOrEqual` 'PlutusV2@ is redundant but is there to guide GHC as it doesn't know that @v >= u@ and @u >= 'PlutusV2@ imply that @v >= 'PlutusV2@.
+  GYBuildPlutusScriptReference :: forall u v. (v `VersionIsGreaterOrEqual` u, u `VersionIsGreaterOrEqual` 'PlutusV2, v `VersionIsGreaterOrEqual` 'PlutusV2) => !GYTxOutRef -> !(GYScript v) -> GYBuildPlutusScript u
 
 deriving instance Show (GYBuildPlutusScript v)
 
 instance Eq (GYBuildPlutusScript v) where
-  GYBuildPlutusScriptReference ref1 script1 == GYBuildPlutusScriptReference ref2 script2 = ref1 == ref2 && script1 == script2
+  GYBuildPlutusScriptReference ref1 script1 == GYBuildPlutusScriptReference ref2 script2 = ref1 == ref2 && eqScript script1 script2
   GYBuildPlutusScriptInlined v1 == GYBuildPlutusScriptInlined v2 = defaultEq v1 v2
   _ == _ = False
 
 instance Ord (GYBuildPlutusScript v) where
-  GYBuildPlutusScriptReference r s `compare` GYBuildPlutusScriptReference r' s' = compare r r' <> compare s s'
+  GYBuildPlutusScriptReference r s `compare` GYBuildPlutusScriptReference r' s' = compare r r' <> compareScript s s'
   GYBuildPlutusScriptReference _ _ `compare` _ = LT
   GYBuildPlutusScriptInlined p `compare` GYBuildPlutusScriptInlined p' = defaultCompare p p'
   GYBuildPlutusScriptInlined _ `compare` _ = GT
@@ -111,7 +113,7 @@ type GYStakeValScript v = GYBuildPlutusScript v
 pattern GYStakeValScript :: () => VersionIsGreaterOrEqual v u => GYScript v -> GYBuildPlutusScript u
 pattern GYStakeValScript s = GYBuildPlutusScriptInlined s
 
-pattern GYStakeValReference :: () => VersionIsGreaterOrEqual u PlutusV2 => GYTxOutRef -> GYScript u -> GYBuildPlutusScript u
+pattern GYStakeValReference :: () => (v `VersionIsGreaterOrEqual` u, u `VersionIsGreaterOrEqual` PlutusV2, v `VersionIsGreaterOrEqual` PlutusV2) => GYTxOutRef -> GYScript v -> GYBuildPlutusScript u
 pattern GYStakeValReference r s = GYBuildPlutusScriptReference r s
 
 {-# COMPLETE GYStakeValScript, GYStakeValReference #-}
@@ -141,7 +143,7 @@ type GYMintScript v = GYBuildScript v
 pattern GYMintScript :: () => VersionIsGreaterOrEqual v u => GYScript v -> GYBuildScript u
 pattern GYMintScript s = GYBuildPlutusScript (GYBuildPlutusScriptInlined s)
 
-pattern GYMintReference :: () => VersionIsGreaterOrEqual u PlutusV2 => GYTxOutRef -> GYScript u -> GYBuildScript u
+pattern GYMintReference :: () => (v `VersionIsGreaterOrEqual` u, u `VersionIsGreaterOrEqual` PlutusV2, v `VersionIsGreaterOrEqual` PlutusV2) => GYTxOutRef -> GYScript v -> GYBuildScript u
 pattern GYMintReference r s = GYBuildPlutusScript (GYBuildPlutusScriptReference r s)
 
 gyMintingScriptWitnessToApiPlutusSW ::

@@ -640,14 +640,14 @@ grabGifts validator = do
         Just $
           mconcat
             [ mustHaveInput
-              GYTxIn
-                { gyTxInTxOutRef = oref
-                , gyTxInWitness =
-                    GYTxInWitnessScript
-                      (GYBuildPlutusScriptInlined validator)
-                      (Just $ datumFromPlutus' od)
-                      unitRedeemer
-                }
+                GYTxIn
+                  { gyTxInTxOutRef = oref
+                  , gyTxInWitness =
+                      GYTxInWitnessScript
+                        (GYBuildPlutusScriptInlined validator)
+                        (Just $ datumFromPlutus' od)
+                        unitRedeemer
+                  }
             | (oref, (_addr, _value, od)) <- itoList datums
             ]
 
@@ -670,14 +670,14 @@ grabGiftsRef ref validator = do
         Just $
           mconcat
             [ mustHaveInput
-              GYTxIn
-                { gyTxInTxOutRef = oref
-                , gyTxInWitness =
-                    GYTxInWitnessScript
-                      (GYBuildPlutusScriptReference ref $ validatorToScript validator)
-                      (Just $ datumFromPlutus' od)
-                      unitRedeemer
-                }
+                GYTxIn
+                  { gyTxInTxOutRef = oref
+                  , gyTxInWitness =
+                      GYTxInWitnessScript
+                        (GYBuildPlutusScriptReference ref $ validatorToScript validator)
+                        (Just $ datumFromPlutus' od)
+                        unitRedeemer
+                  }
             | (oref, (_addr, _value, od)) <- itoList datums
             ]
 

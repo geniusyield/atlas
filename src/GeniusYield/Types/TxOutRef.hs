@@ -27,6 +27,7 @@ module GeniusYield.Types.TxOutRef (
 import Cardano.Api qualified as Api
 import Codec.CBOR.Read qualified as CBOR
 import Codec.CBOR.Term qualified as CBOR
+import Codec.CBOR.Write qualified as CBOR
 import Control.Lens ((?~))
 import Data.Aeson qualified as Aeson
 import Data.Attoparsec.ByteString.Char8 qualified as Atto
@@ -254,6 +255,35 @@ instance Aeson.FromJSON GYTxOutRefCbor where
     case Web.parseUrlPiece t of
       Left err -> fail $ T.unpack err
       Right ref -> return ref
+
+{- | Warning: this JSON instance does not satisfy
+@JSON --> 'GYTxOutRefCbor' --> JSON === id@ since some information in the hex
+encoded CBOR string is lost when going from @'GYTxOutRefCbor'@ to @JSON@.
+
+In practise, this shouldn't be an issue -- see
+<https://github.com/geniusyield/atlas/issues/399#issuecomment-2618617724>
+for details.
+-}
+instance Aeson.ToJSON GYTxOutRefCbor where
+  toJSON (GYTxOutRefCbor gyTxOutRef) =
+    let Api.TxIn txId (Api.TxIx txIx) = GeniusYield.Types.TxOutRef.txOutRefToApi gyTxOutRef
+        -- NOTE(jaredponn) January 27, 2025: the
+        -- value of this int doesn't matter when it is decoded
+        -- with the 'Aeson.FromJSON' instance, so we may pick
+        -- any value -- in particular, we choose 0.
+        someInt = 0
+     in Aeson.String $
+          TE.decodeASCII $
+            Base16.encode $
+              CBOR.toStrictByteString $
+                CBOR.encodeTerm $
+                  CBOR.TList
+                    [ CBOR.TList
+                        [ CBOR.TBytes $ Api.serialiseToRawBytes txId
+                        , CBOR.TInt $ fromIntegral txIx
+                        ]
+                    , CBOR.TInt someInt
+                    ]
 
 -------------------------------------------------------------------------------
 -- swagger schema

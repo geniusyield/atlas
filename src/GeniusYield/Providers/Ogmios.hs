@@ -12,6 +12,7 @@ module GeniusYield.Providers.Ogmios (
   OgmiosProviderException (..),
   ogmiosSubmitTx,
   ogmiosProtocolParameters,
+  ogmiosGetSlotOfCurrentBlock,
 ) where
 
 import Cardano.Api qualified as Api
@@ -84,10 +85,6 @@ data OgmiosProviderException
     OgmiosApiError !Text !ClientError
   | -- | Received error response.
     OgmiosErrorResponse !Text !Value
-  | -- TODO: Is OgmiosAbsurdResponse needed?
-
-    -- | Received an absurd response from Ogmios. This shouldn't ever happen.
-    OgmiosAbsurdResponse !Text
   deriving stock (Eq, Show)
   deriving anyclass Exception
 
@@ -103,6 +100,7 @@ handleOgmiosError locationInfo =
     -- `OgmiosResponse` would likely be `Right` as in case of error, we are in `ClientError` case. We need to make use of something like `WithStatus` for `OgmiosErrorResponse` to be actually useful.
     (`reduceOgmiosResponse` (throwIO . OgmiosErrorResponse locationInfo))
 
+{-# INLINEABLE reduceOgmiosResponse #-}
 reduceOgmiosResponse :: Applicative f => OgmiosResponse a -> (Value -> f a) -> f a
 reduceOgmiosResponse res e = case response res of
   Left err -> e err
@@ -152,6 +150,7 @@ newtype TxSubmissionResponse = TxSubmissionResponse
 
 submitTx :: OgmiosRequest GYTx -> ClientM (OgmiosResponse TxSubmissionResponse)
 protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolParameters)
+tip :: OgmiosRequest OgmiosTip -> ClientM (OgmiosResponse OgmiosTipResponse)
 
 data OgmiosPP = OgmiosPP
 
@@ -159,9 +158,19 @@ instance ToJSONRPC OgmiosPP where
   toMethod = const "queryLedgerState/protocolParameters"
   toParams = const Nothing
 
-type OgmiosApi = ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse) :<|> ReqBody '[JSON] (OgmiosRequest OgmiosPP) :> Post '[JSON] (OgmiosResponse ProtocolParameters)
+data OgmiosTip = OgmiosTip
 
-submitTx :<|> protocolParams = client @OgmiosApi Proxy
+instance ToJSONRPC OgmiosTip where
+  toMethod = const "queryLedgerState/tip"
+  toParams = const Nothing
+
+newtype OgmiosTipResponse = OgmiosTipResponse {slot :: GYSlot}
+  deriving stock (Show, Generic)
+  deriving anyclass FromJSON
+
+type OgmiosApi = ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse) :<|> ReqBody '[JSON] (OgmiosRequest OgmiosPP) :> Post '[JSON] (OgmiosResponse ProtocolParameters) :<|> ReqBody '[JSON] (OgmiosRequest OgmiosTip) :> Post '[JSON] (OgmiosResponse OgmiosTipResponse)
+
+submitTx :<|> protocolParams :<|> tip = client @OgmiosApi Proxy
 
 -- | Submit a transaction to the node via Ogmios.
 ogmiosSubmitTx :: OgmiosApiEnv -> GYSubmitTx
@@ -366,3 +375,14 @@ ogmiosProtocolParameters env = do
  where
   errPath = "GeniusYield.Providers.Ogmios.ogmiosProtocolParameters: "
   fn = "ogmiosProtocolParameters"
+
+-- | Get slot of current block.
+ogmiosGetSlotOfCurrentBlock :: OgmiosApiEnv -> IO GYSlot
+ogmiosGetSlotOfCurrentBlock env = do
+  OgmiosTipResponse s <-
+    handleOgmiosError fn
+      <=< runOgmiosClient env
+      $ tip (OgmiosRequest OgmiosTip)
+  pure s
+ where
+  fn = "ogmiosGetSlotOfCurrentBlock"

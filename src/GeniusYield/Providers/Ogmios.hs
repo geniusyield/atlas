@@ -13,11 +13,13 @@ module GeniusYield.Providers.Ogmios (
   ogmiosSubmitTx,
   ogmiosProtocolParameters,
   ogmiosGetSlotOfCurrentBlock,
+  ogmiosStakePools,
 ) where
 
 import Cardano.Api qualified as Api
 import Cardano.Api.Ledger qualified as Api.L
 import Cardano.Api.Ledger qualified as Ledger
+import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Alonzo.PParams qualified as Ledger
 import Cardano.Ledger.Conway.PParams (
   ConwayPParams (..),
@@ -30,6 +32,7 @@ import Data.Aeson (Value (Null), encode, object, withObject, (.:), (.=))
 import Data.Char (toLower)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (listToMaybe)
+import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Word (Word16, Word32, Word64)
 import Deriving.Aeson
@@ -148,10 +151,6 @@ newtype TxSubmissionResponse = TxSubmissionResponse
   deriving stock (Show, Generic)
   deriving anyclass FromJSON
 
-submitTx :: OgmiosRequest GYTx -> ClientM (OgmiosResponse TxSubmissionResponse)
-protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolParameters)
-tip :: OgmiosRequest OgmiosTip -> ClientM (OgmiosResponse OgmiosTipResponse)
-
 data OgmiosPP = OgmiosPP
 
 instance ToJSONRPC OgmiosPP where
@@ -168,9 +167,22 @@ newtype OgmiosTipResponse = OgmiosTipResponse {slot :: GYSlot}
   deriving stock (Show, Generic)
   deriving anyclass FromJSON
 
-type OgmiosApi = ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse) :<|> ReqBody '[JSON] (OgmiosRequest OgmiosPP) :> Post '[JSON] (OgmiosResponse ProtocolParameters) :<|> ReqBody '[JSON] (OgmiosRequest OgmiosTip) :> Post '[JSON] (OgmiosResponse OgmiosTipResponse)
+data OgmiosStakePools = OgmiosStakePools
 
-submitTx :<|> protocolParams :<|> tip = client @OgmiosApi Proxy
+instance ToJSONRPC OgmiosStakePools where
+  toMethod = const "queryLedgerState/stakePools"
+  toParams = const Nothing
+
+type OgmiosStakePoolsResponse = Map GYStakePoolIdBech32 Value
+
+submitTx :: OgmiosRequest GYTx -> ClientM (OgmiosResponse TxSubmissionResponse)
+protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolParameters)
+tip :: OgmiosRequest OgmiosTip -> ClientM (OgmiosResponse OgmiosTipResponse)
+stakePools :: OgmiosRequest OgmiosStakePools -> ClientM (OgmiosResponse OgmiosStakePoolsResponse)
+
+type OgmiosApi = ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse) :<|> ReqBody '[JSON] (OgmiosRequest OgmiosPP) :> Post '[JSON] (OgmiosResponse ProtocolParameters) :<|> ReqBody '[JSON] (OgmiosRequest OgmiosTip) :> Post '[JSON] (OgmiosResponse OgmiosTipResponse) :<|> ReqBody '[JSON] (OgmiosRequest OgmiosStakePools) :> Post '[JSON] (OgmiosResponse OgmiosStakePoolsResponse)
+
+submitTx :<|> protocolParams :<|> tip :<|> stakePools = client @OgmiosApi Proxy
 
 -- | Submit a transaction to the node via Ogmios.
 ogmiosSubmitTx :: OgmiosApiEnv -> GYSubmitTx
@@ -386,3 +398,10 @@ ogmiosGetSlotOfCurrentBlock env = do
   pure s
  where
   fn = "ogmiosGetSlotOfCurrentBlock"
+
+ogmiosStakePools :: OgmiosApiEnv -> IO (Set.Set Api.S.PoolId)
+ogmiosStakePools env = do
+  sps <- handleOgmiosError fn <=< runOgmiosClient env $ stakePools (OgmiosRequest OgmiosStakePools)
+  pure $ Set.map (stakePoolIdToApi . stakePoolIdFromBech32) $ Map.keysSet sps
+ where
+  fn = "ogmiosStakePools"

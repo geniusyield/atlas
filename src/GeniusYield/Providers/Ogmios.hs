@@ -16,6 +16,7 @@ module GeniusYield.Providers.Ogmios (
   ogmiosStakePools,
   ogmiosGetDRepsState,
   ogmiosStakeAddressInfo,
+  ogmiosStartTime,
 ) where
 
 import Cardano.Api.Ledger qualified as Api.L
@@ -27,12 +28,14 @@ import Cardano.Ledger.Conway.PParams (
   THKD (..),
  )
 import Cardano.Ledger.Plutus qualified as Ledger
+import Cardano.Slotting.Time qualified as CTime
 import Control.Monad ((<=<))
 import Data.Aeson (Value (Null), object, withArray, withObject, (.:), (.:?), (.=))
 import Data.Map.Strict qualified as Map
 import Data.Maybe (listToMaybe)
 import Data.Set qualified as Set
 import Data.Text qualified as Text
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Deriving.Aeson
 import GHC.Int (Int64)
 import GeniusYield.Imports
@@ -256,12 +259,18 @@ data OgmiosStakeAddressInfo = OgmiosStakeAddressInfo
   deriving stock (Show, Eq, Generic)
   deriving anyclass FromJSON
 
+data OgmiosStartTime = OgmiosStartTime
+instance ToJSONRPC OgmiosStartTime where
+  toMethod = const "queryNetwork/startTime"
+  toParams = const Nothing
+
 submitTx :: OgmiosRequest GYTx -> ClientM (OgmiosResponse TxSubmissionResponse)
 protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolParameters)
 tip :: OgmiosRequest OgmiosTip -> ClientM (OgmiosResponse OgmiosTipResponse)
 stakePools :: OgmiosRequest OgmiosStakePools -> ClientM (OgmiosResponse OgmiosStakePoolsResponse)
 drepState :: OgmiosRequest (Set.Set (GYCredential 'GYKeyRoleDRep)) -> ClientM (OgmiosResponse [OgmiosDRepStateResponse])
 stakeAddressInfo :: OgmiosRequest GYStakeAddress -> ClientM (OgmiosResponse (Map Text OgmiosStakeAddressInfo))
+startTime :: OgmiosRequest OgmiosStartTime -> ClientM (OgmiosResponse GYTime)
 
 type OgmiosApi =
   ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse)
@@ -270,8 +279,9 @@ type OgmiosApi =
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosStakePools) :> Post '[JSON] (OgmiosResponse OgmiosStakePoolsResponse)
     :<|> ReqBody '[JSON] (OgmiosRequest (Set.Set (GYCredential 'GYKeyRoleDRep))) :> Post '[JSON] (OgmiosResponse [OgmiosDRepStateResponse])
     :<|> ReqBody '[JSON] (OgmiosRequest GYStakeAddress) :> Post '[JSON] (OgmiosResponse (Map Text OgmiosStakeAddressInfo))
+    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosStartTime) :> Post '[JSON] (OgmiosResponse GYTime)
 
-submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState :<|> stakeAddressInfo = client @OgmiosApi Proxy
+submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState :<|> stakeAddressInfo :<|> startTime = client @OgmiosApi Proxy
 
 -- | Submit a transaction to the node via Ogmios.
 ogmiosSubmitTx :: OgmiosApiEnv -> GYSubmitTx
@@ -526,3 +536,10 @@ ogmiosStakeAddressInfo env addr = do
   pure $ listToMaybe $ map (\OgmiosStakeAddressInfo {..} -> GYStakeAddressInfo {gyStakeAddressInfoDelegatedPool = delegate & poolId & stakePoolIdFromBech32 & Just, gyStakeAddressInfoAvailableRewards = asAdaAda rewards & asLovelaceLovelace}) $ Map.elems mstakeAddressInfo
  where
   fn = "ogmiosStakeAddressInfo"
+
+ogmiosStartTime :: OgmiosApiEnv -> IO CTime.SystemStart
+ogmiosStartTime env = do
+  gytime <- handleOgmiosError fn <=< runOgmiosClient env $ startTime (OgmiosRequest OgmiosStartTime)
+  pure $ CTime.SystemStart $ posixSecondsToUTCTime $ timeToPOSIX gytime
+ where
+  fn = "ogmiosStartTime"

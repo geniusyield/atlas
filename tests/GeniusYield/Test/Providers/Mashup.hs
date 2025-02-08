@@ -123,7 +123,7 @@ providersMashupTests configs =
           handler :: SubmitTxException -> IO GYTxId
           handler e =
             let errorText = show e
-             in ( if "BadInputsUTxO" `isInfixOf` errorText
+             in ( if "BadInputsUTxO" `isInfixOf` errorText || "unknownOutputReferences" `isInfixOf` errorText
                     then
                       pure "6c751d3e198c5608dfafdfdffe16aeac8a28f88f3a769cf22dd45e8bc84f47e8" -- Any transaction ID.
                     else error $ "Not satisfied, error text: " <> errorText

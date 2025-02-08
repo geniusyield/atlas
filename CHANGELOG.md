@@ -1,3 +1,9 @@
+## 0.10.1
+
+* Adds support of Ogmios-Kupo provider, see section on providers at https://atlas-app.io/getting-started/endpoints.
+* `ToJSON` instance for `GYTxOutRefCbor`.
+* New `GeniusYield.Debug` module to perform Atlas's operation from repl.
+
 ## 0.10.0
 
 * Support of extended keys in `runGYTxMonadIO`.

@@ -1,8 +1,12 @@
-## 0.10.1
+## 0.11.1
 
 * Adds support of Ogmios-Kupo provider, see section on providers at https://atlas-app.io/getting-started/endpoints.
 * `ToJSON` instance for `GYTxOutRefCbor`.
 * New `GeniusYield.Debug` module to perform Atlas's operation from repl.
+
+## 0.11.0
+
+* Allows reference scripts to be of version greater than the minimum supported constrained version of `GYTxSkeleton`. Thanks [@SeungheonOh](https://github.com/SeungheonOh) for finding [this bug](https://github.com/geniusyield/atlas/issues/404)! Please visit the linked issue for more details.
 
 ## 0.10.0
 

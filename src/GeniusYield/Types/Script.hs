@@ -98,9 +98,12 @@ module GeniusYield.Types.Script (
 
   -- * Script
   GYScript,
+  eqScript,
+  compareScript,
   scriptHash,
   hashScript,
   scriptVersion,
+  scriptVersion',
   validatorToScript,
   mintingPolicyToScript,
   stakeValidatorToScript,
@@ -445,6 +448,14 @@ data GYScript (v :: PlutusVersion)
       !(Api.PlutusScript (PlutusVersionToApi v))
       !Api.ScriptHash
 
+-- | Heterogeneous script equality. Preferably use `Eq` instance when possible.
+eqScript :: GYScript u -> GYScript v -> Bool
+eqScript s1 s2 = scriptVersion' s1 == scriptVersion' s2 && scriptHash s1 == scriptHash s2
+
+-- | Heterogeneous script comparison. Preferably use `Ord` instance when possible.
+compareScript :: GYScript u -> GYScript v -> Ordering
+compareScript s1 s2 = compare (scriptVersion' s1) (scriptVersion' s2) <> compare (scriptHash s1) (scriptHash s2)
+
 {- | Equality and comparison are on script hash.
 
 As hash is cryptographicly strong, and 'GYScript' constructor is not
@@ -503,6 +514,9 @@ scriptToSerialisedScript script =
 
 scriptVersion :: GYScript v -> SingPlutusVersion v
 scriptVersion (GYScript v _ _) = v
+
+scriptVersion' :: GYScript v -> PlutusVersion
+scriptVersion' s = scriptVersion s & fromSingPlutusVersion
 
 scriptToApi :: GYScript v -> Api.PlutusScript (PlutusVersionToApi v)
 scriptToApi (GYScript _ api _) = api

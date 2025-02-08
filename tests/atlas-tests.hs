@@ -24,6 +24,7 @@ import GeniusYield.Test.CoinSelection (coinSelectionTests)
 import GeniusYield.Test.Config (configTests)
 import GeniusYield.Test.FeeTracking (feeTrackingTests)
 import GeniusYield.Test.GYTxBody (gyTxBodyTests)
+import GeniusYield.Test.GYTxOutRefCbor (gyTxOutRefCborTests)
 import GeniusYield.Test.GYTxSkeleton (gyTxSkeletonTests)
 import GeniusYield.Test.Providers (providersTests)
 import GeniusYield.Test.RefInput (refInputTests)
@@ -79,6 +80,7 @@ main = do
       , gyTxBodyTests
       , configTests
       , gyTxSkeletonTests
+      , gyTxOutRefCborTests
       , refInputTests
       , feeTrackingTests
       , stakeTests (head configs)

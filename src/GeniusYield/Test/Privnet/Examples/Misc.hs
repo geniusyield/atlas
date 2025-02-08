@@ -40,7 +40,7 @@ tests setup =
 
         ctxRun ctx (ctxUser2 ctx) $ do
           txBodyMint <-
-            buildTxBody $
+            buildTxBody @'PlutusV2 $
               mustHaveInput (GYTxIn utxoAsParam GYTxInWitnessKey)
                 <> mustMint (GYBuildPlutusScript $ GYBuildPlutusScriptReference refScript policyAsScript) unitRedeemer tn amt
           signAndSubmitConfirmed_ txBodyMint

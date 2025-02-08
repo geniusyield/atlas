@@ -15,6 +15,7 @@ module GeniusYield.Providers.Ogmios (
   ogmiosGetSlotOfCurrentBlock,
   ogmiosStakePools,
   ogmiosGetDRepsState,
+  ogmiosStakeAddressInfo,
 ) where
 
 import Cardano.Api.Ledger qualified as Api.L
@@ -29,6 +30,7 @@ import Cardano.Ledger.Plutus qualified as Ledger
 import Control.Monad ((<=<))
 import Data.Aeson (Value (Null), object, withArray, withObject, (.:), (.:?), (.=))
 import Data.Map.Strict qualified as Map
+import Data.Maybe (listToMaybe)
 import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Deriving.Aeson
@@ -38,7 +40,7 @@ import GeniusYield.Providers.Common (
   SubmitTxException (..),
   newServantClientEnv,
  )
-import GeniusYield.Types
+import GeniusYield.Types hiding (poolId)
 import Maestro.Types.V1 (AsAda (..), AsBytes, AsLovelace (..), CostModel, EpochNo, LowerFirst, MaestroRational, MemoryCpuWith, MinFeeReferenceScripts, ProtocolParametersUpdateStakePool, ProtocolVersion)
 import Maestro.Types.V1 qualified as Maestro
 import Servant.API (
@@ -236,11 +238,30 @@ instance {-# OVERLAPPING #-} FromJSON [OgmiosDRepStateResponse] where
             ogDRepStateAnchor <- o .:? "metadata"
             pure $ OgmiosDRepStateResponse {..}
 
+instance ToJSONRPC GYStakeAddress where
+  toMethod = const "queryLedgerState/rewardAccountSummaries"
+  toParams (stakeAddressToCredential -> sc) = Just $ case sc of
+    GYCredentialByKey kh -> object ["keys" .= [kh]]
+    GYCredentialByScript sh -> object ["scripts" .= [sh]]
+
+newtype PoolId = PoolId
+  { poolId :: GYStakePoolIdBech32
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "pool", LowerFirst]] PoolId
+data OgmiosStakeAddressInfo = OgmiosStakeAddressInfo
+  { delegate :: PoolId
+  , rewards :: AsAda
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass FromJSON
+
 submitTx :: OgmiosRequest GYTx -> ClientM (OgmiosResponse TxSubmissionResponse)
 protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolParameters)
 tip :: OgmiosRequest OgmiosTip -> ClientM (OgmiosResponse OgmiosTipResponse)
 stakePools :: OgmiosRequest OgmiosStakePools -> ClientM (OgmiosResponse OgmiosStakePoolsResponse)
 drepState :: OgmiosRequest (Set.Set (GYCredential 'GYKeyRoleDRep)) -> ClientM (OgmiosResponse [OgmiosDRepStateResponse])
+stakeAddressInfo :: OgmiosRequest GYStakeAddress -> ClientM (OgmiosResponse (Map Text OgmiosStakeAddressInfo))
 
 type OgmiosApi =
   ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse)
@@ -248,8 +269,9 @@ type OgmiosApi =
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosTip) :> Post '[JSON] (OgmiosResponse OgmiosTipResponse)
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosStakePools) :> Post '[JSON] (OgmiosResponse OgmiosStakePoolsResponse)
     :<|> ReqBody '[JSON] (OgmiosRequest (Set.Set (GYCredential 'GYKeyRoleDRep))) :> Post '[JSON] (OgmiosResponse [OgmiosDRepStateResponse])
+    :<|> ReqBody '[JSON] (OgmiosRequest GYStakeAddress) :> Post '[JSON] (OgmiosResponse (Map Text OgmiosStakeAddressInfo))
 
-submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState = client @OgmiosApi Proxy
+submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState :<|> stakeAddressInfo = client @OgmiosApi Proxy
 
 -- | Submit a transaction to the node via Ogmios.
 ogmiosSubmitTx :: OgmiosApiEnv -> GYSubmitTx
@@ -497,3 +519,10 @@ ogmiosGetDRepsState env dreps = do
   pure $ Set.foldl' (\mapAcc drep -> if Map.member drep mapAcc then mapAcc else Map.insert drep Nothing mapAcc) filteredFoundStates dreps
  where
   fn = "ogmiosGetDRepsState"
+
+ogmiosStakeAddressInfo :: OgmiosApiEnv -> GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
+ogmiosStakeAddressInfo env addr = do
+  mstakeAddressInfo <- handleOgmiosError fn <=< runOgmiosClient env $ stakeAddressInfo (OgmiosRequest addr)
+  pure $ listToMaybe $ map (\OgmiosStakeAddressInfo {..} -> GYStakeAddressInfo {gyStakeAddressInfoDelegatedPool = delegate & poolId & stakePoolIdFromBech32 & Just, gyStakeAddressInfoAvailableRewards = asAdaAda rewards & asLovelaceLovelace}) $ Map.elems mstakeAddressInfo
+ where
+  fn = "ogmiosStakeAddressInfo"

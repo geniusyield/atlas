@@ -207,11 +207,11 @@ jobs:
     - name: Generate documentation (cabal haddock)
       run: cabal haddock --html --hyperlink-source --haddock-options="--use-unicode" --haddock-quickjump
     - name: Upload haddock documentation
-      uses: actions/upload-pages-artifact@v1.0.8
+      uses: actions/upload-pages-artifact@v3.0.1
       with:
         path: ./dist-newstyle/build/x86_64-linux/ghc-9.6.5/${{env.ATLAS_VERSION}}/doc/html/atlas-cardano/
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: source-distribution-file
+        name: source-distribution-file-${{ matrix.runs-on }}
         path: ./dist-newstyle/sdist/${{env.ATLAS_VERSION}}.tar.gz

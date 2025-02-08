@@ -16,6 +16,7 @@ module GeniusYield.GYConfig (
   coreProviderIO,
   findMaestroTokenAndNetId,
   isNodeKupo,
+  isOgmiosKupo,
   isMaestro,
   isBlockfrost,
 ) where
@@ -43,6 +44,7 @@ import GeniusYield.Providers.Kupo qualified as KupoApi
 import GeniusYield.Providers.Maestro qualified as MaestroApi
 import GeniusYield.Providers.Node (nodeGetDRepState, nodeGetDRepsState, nodeStakeAddressInfo)
 import GeniusYield.Providers.Node qualified as Node
+import GeniusYield.Providers.Ogmios qualified as OgmiosApi
 import GeniusYield.ReadJSON (readJSON)
 import GeniusYield.Types
 
@@ -67,6 +69,7 @@ The supported providers. The options are:
 In JSON format, this essentially corresponds to:
 
 = { socketPath: FilePath, kupoUrl: string }
+| { ogmiosUrl: string, kupoUrl: string }
 | { maestroToken: string, turboSubmit: boolean }
 | { blockfrostKey: string }
 
@@ -74,6 +77,7 @@ The constructor tags don't need to appear in the JSON.
 -}
 data GYCoreProviderInfo
   = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text}
+  | GYOgmiosKupo {cpiOgmiosUrl :: !Text, cpiKupoUrl :: !Text}
   | GYMaestro {cpiMaestroToken :: !(Confidential Text), cpiTurboSubmit :: !(Maybe Bool)}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock Show
@@ -92,6 +96,10 @@ coreProviderIO = readJSON
 isNodeKupo :: GYCoreProviderInfo -> Bool
 isNodeKupo GYNodeKupo {} = True
 isNodeKupo _ = False
+
+isOgmiosKupo :: GYCoreProviderInfo -> Bool
+isOgmiosKupo GYOgmiosKupo {} = True
+isOgmiosKupo _ = False
 
 isMaestro :: GYCoreProviderInfo -> Bool
 isMaestro GYMaestro {} = True
@@ -177,6 +185,28 @@ withCfgProviders
             , nodeGetDRepState info
             , nodeGetDRepsState info
             , Node.nodeStakePools info
+            )
+        GYOgmiosKupo ogmiosUrl kupoUrl -> do
+          oEnv <- OgmiosApi.newOgmiosApiEnv $ Text.unpack ogmiosUrl
+          kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
+          ogmiosSlotActions <- makeSlotActions slotCachingTime $ OgmiosApi.ogmiosGetSlotOfCurrentBlock oEnv
+          ogmiosGetParams <-
+            makeGetParameters
+              (OgmiosApi.ogmiosProtocolParameters oEnv)
+              (OgmiosApi.ogmiosStartTime oEnv)
+              (OgmiosApi.ogmiosEraSummaries oEnv)
+              (OgmiosApi.ogmiosGetSlotOfCurrentBlock oEnv)
+          pure
+            ( ogmiosGetParams
+            , ogmiosSlotActions
+            , KupoApi.kupoQueryUtxo kEnv
+            , KupoApi.kupoLookupDatum kEnv
+            , OgmiosApi.ogmiosSubmitTx oEnv
+            , KupoApi.kupoAwaitTxConfirmed kEnv
+            , OgmiosApi.ogmiosStakeAddressInfo oEnv
+            , OgmiosApi.ogmiosGetDRepState oEnv
+            , OgmiosApi.ogmiosGetDRepsState oEnv
+            , OgmiosApi.ogmiosStakePools oEnv
             )
         GYMaestro (Confidential apiToken) turboSubmit -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId

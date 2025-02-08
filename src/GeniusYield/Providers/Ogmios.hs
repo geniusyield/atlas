@@ -15,6 +15,7 @@ module GeniusYield.Providers.Ogmios (
   ogmiosGetSlotOfCurrentBlock,
   ogmiosStakePools,
   ogmiosGetDRepsState,
+  ogmiosGetDRepState,
   ogmiosStakeAddressInfo,
   ogmiosStartTime,
   ogmiosEraSummaries,
@@ -544,6 +545,11 @@ ogmiosGetDRepsState env dreps = do
   pure $ Set.foldl' (\mapAcc drep -> if Map.member drep mapAcc then mapAcc else Map.insert drep Nothing mapAcc) filteredFoundStates dreps
  where
   fn = "ogmiosGetDRepsState"
+
+ogmiosGetDRepState :: OgmiosApiEnv -> GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
+ogmiosGetDRepState env drep = do
+  drepStates <- ogmiosGetDRepsState env $ Set.singleton drep
+  pure $ join $ Map.lookup drep drepStates
 
 ogmiosStakeAddressInfo :: OgmiosApiEnv -> GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
 ogmiosStakeAddressInfo env addr = do

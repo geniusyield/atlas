@@ -14,9 +14,9 @@ module GeniusYield.Providers.Ogmios (
   ogmiosProtocolParameters,
   ogmiosGetSlotOfCurrentBlock,
   ogmiosStakePools,
+  ogmiosGetDRepsState,
 ) where
 
-import Cardano.Api qualified as Api
 import Cardano.Api.Ledger qualified as Api.L
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api.S
@@ -26,41 +26,25 @@ import Cardano.Ledger.Conway.PParams (
   THKD (..),
  )
 import Cardano.Ledger.Plutus qualified as Ledger
-import Control.Concurrent (threadDelay)
 import Control.Monad ((<=<))
-import Data.Aeson (Value (Null), encode, object, withObject, (.:), (.=))
-import Data.Char (toLower)
+import Data.Aeson (Value (Null), object, withObject, (.:), (.:?), (.=))
 import Data.Map.Strict qualified as Map
-import Data.Maybe (listToMaybe)
 import Data.Set qualified as Set
 import Data.Text qualified as Text
-import Data.Word (Word16, Word32, Word64)
 import Deriving.Aeson
 import GHC.Int (Int64)
 import GeniusYield.Imports
 import GeniusYield.Providers.Common (
   SubmitTxException (..),
-  datumFromCBOR,
-  extractAssetClass,
   newServantClientEnv,
  )
 import GeniusYield.Types
-import GeniusYield.Types qualified as GYTypes (PlutusVersion (..))
-import GeniusYield.Types.Script (GYAnyScript (..))
-import Maestro.Types.V1 (AsAda, AsBytes, CostModel, EpochNo, LowerFirst, MaestroRational, MemoryCpuWith, MinFeeReferenceScripts, ProtocolParametersUpdateStakePool, ProtocolVersion)
+import Maestro.Types.V1 (AsAda (..), AsBytes, AsLovelace (..), CostModel, EpochNo, LowerFirst, MaestroRational, MemoryCpuWith, MinFeeReferenceScripts, ProtocolParametersUpdateStakePool, ProtocolVersion)
 import Maestro.Types.V1 qualified as Maestro
 import Servant.API (
-  Capture,
-  Get,
-  Header,
-  Headers (getResponse),
   JSON,
   Post,
-  QueryFlag,
-  QueryParam,
   ReqBody,
-  ResponseHeader (Header),
-  lookupResponseHeader,
   (:>),
   type (:<|>) (..),
  )
@@ -72,6 +56,18 @@ import Servant.Client (
   runClientM,
  )
 import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational)
+
+{- $setup
+
+>>> :set -XOverloadedStrings -XTypeApplications
+>>> import qualified Cardano.Api                as Api
+>>> import qualified Data.Aeson                 as Aeson
+>>> import qualified Data.ByteString.Char8      as BS8
+>>> import qualified Data.ByteString.Lazy.Char8 as LBS8
+>>> import qualified Data.Csv                   as Csv
+>>> import qualified Text.Printf                as Printf
+>>> import qualified Web.HttpApiData            as Web
+-}
 
 newtype OgmiosApiEnv = OgmiosApiEnv ClientEnv
 
@@ -175,14 +171,86 @@ instance ToJSONRPC OgmiosStakePools where
 
 type OgmiosStakePoolsResponse = Map GYStakePoolIdBech32 Value
 
+instance ToJSONRPC (Set.Set (GYCredential 'GYKeyRoleDRep)) where
+  toMethod = const "queryLedgerState/delegateRepresentatives"
+  toParams creds =
+    let (scriptCreds, keyCreds) =
+          Set.foldl'
+            ( \(!scriptCredsAcc, !keyCredsAcc) -> \case
+                GYCredentialByKey kh -> (scriptCredsAcc, kh : keyCredsAcc)
+                GYCredentialByScript sh -> (sh : scriptCredsAcc, keyCredsAcc)
+            )
+            (mempty, mempty)
+            creds
+     in Just $ object ["scripts" .= scriptCreds, "keys" .= keyCreds]
+
+newtype AsEpoch = AsEpoch
+  { asEpochEpoch :: Natural
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "asEpoch", LowerFirst]] AsEpoch
+
+data OgmiosMetadata = OgmiosMetadata
+  { metadataUrl :: !GYUrl
+  , metadataHash :: !GYAnchorDataHash
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "metadata", LowerFirst]] OgmiosMetadata
+
+data OgmiosDRepStateResponse = OgmiosDRepStateResponse
+  { ogDRepStateDeposit :: !AsAda
+  , ogDRepStateMandate :: !AsEpoch
+  , ogDRepStateCred :: !(GYCredential 'GYKeyRoleDRep)
+  , ogDRepStateDelegs :: !(Set (GYCredential 'GYKeyRoleStaking))
+  , ogDRepStateAnchor :: !(Maybe OgmiosMetadata)
+  }
+  deriving stock Show
+
+data OgCredType = OgCredTypeVerificationKey | OgCredTypeScript
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving FromJSON via CustomJSON '[ConstructorTagModifier '[StripPrefix "OgCredType", LowerFirst]] OgCredType
+
+-- >>> Aeson.eitherDecode @OgmiosDRepStateResponse "{\"type\":\"registered\",\"from\":\"verificationKey\",\"id\":\"08b4c887d44668d5c0fde508d8363c0c2cdfea6f3ff4faefb05bd935\",\"mandate\":{\"epoch\":188},\"deposit\":{\"ada\":{\"lovelace\":500000000}},\"stake\":{\"ada\":{\"lovelace\":5121462841}},\"metadata\":{\"url\":\"https://raw.githubusercontent.com/UPTODATE-DEV/dRep/main/Cardano%20Africa%20C.jsonld\",\"hash\":\"d63edeb7d4b2398103dfc3db3ab409feebd88a1373402b59f8b38a2048b92fb1\"},\"delegators\":[{\"from\":\"verificationKey\",\"credential\":\"822622b7f80e4556c9fd5478e1003efd3a14ca20c11fba4c4a84ab4d\"},{\"from\":\"verificationKey\",\"credential\":\"aeb4548104cc2f404a81f77408c00f5f7ca38aa71add0ac6f7f4048c\"}]}"
+-- Right (OgmiosDRepStateResponse {ogDRepStateDeposit = AsAda {asAdaAda = AsLovelace {asLovelaceLovelace = 500000000}}, ogDRepStateMandate = AsEpoch {asEpochEpoch = 188}, ogDRepStateCred = GYCredentialByKey (GYKeyHash (GYKeyRoleDRep) "08b4c887d44668d5c0fde508d8363c0c2cdfea6f3ff4faefb05bd935"), ogDRepStateDelegs = fromList [GYCredentialByKey (GYKeyHash (GYKeyRoleStaking) "822622b7f80e4556c9fd5478e1003efd3a14ca20c11fba4c4a84ab4d"),GYCredentialByKey (GYKeyHash (GYKeyRoleStaking) "aeb4548104cc2f404a81f77408c00f5f7ca38aa71add0ac6f7f4048c")], ogDRepStateAnchor = Just (OgmiosMetadata {metadataUrl = GYUrl (Url {urlToText = "https://raw.githubusercontent.com/UPTODATE-DEV/dRep/main/Cardano%20Africa%20C.jsonld"}), metadataHash = GYAnchorDataHash (SafeHash "d63edeb7d4b2398103dfc3db3ab409feebd88a1373402b59f8b38a2048b92fb1")})})
+--
+-- >>> Aeson.eitherDecode @(OgmiosResponse [OgmiosDRepStateResponse]) "{\"jsonrpc\":\"2.0\",\"method\":\"queryLedgerState/delegateRepresentatives\",\"result\":[{\"type\":\"registered\",\"from\":\"verificationKey\",\"id\":\"03ccae794affbe27a5f5f74da6266002db11daa6ae446aea783b972d\",\"mandate\":{\"epoch\":214},\"deposit\":{\"ada\":{\"lovelace\":500000000}},\"stake\":{\"ada\":{\"lovelace\":36452103822}},\"delegators\":[{\"from\":\"verificationKey\",\"credential\":\"053560b718fc0983281ac64fd56449b744a38b067bfccee6a4a2f403\"},{\"from\":\"verificationKey\",\"credential\":\"5a3f8c1b91adc65e2faf7fee12dcd9fce630703f99a09df6a331b9ea\"},{\"from\":\"verificationKey\",\"credential\":\"7c30635e2d876b90c1d505851683201081e122fd6ac665d0c36c8593\"},{\"from\":\"verificationKey\",\"credential\":\"9e22d4e534f80dfbd5d23ab6f21a53999f0a2e97f83926d56f9ec3eb\"},{\"from\":\"verificationKey\",\"credential\":\"bcac8a19f17801a28c2a352be936018ec96b67c147a5030218810896\"},{\"from\":\"verificationKey\",\"credential\":\"d0f4075a0ab29c0f71c8310f0b3151fbfee6fdc2de910e2f3471455a\"}]}]}"
+-- Right (OgmiosResponse {response = Right [OgmiosDRepStateResponse {ogDRepStateDeposit = AsAda {asAdaAda = AsLovelace {asLovelaceLovelace = 500000000}}, ogDRepStateMandate = AsEpoch {asEpochEpoch = 214}, ogDRepStateCred = GYCredentialByKey (GYKeyHash (GYKeyRoleDRep) "03ccae794affbe27a5f5f74da6266002db11daa6ae446aea783b972d"), ogDRepStateDelegs = fromList [GYCredentialByKey (GYKeyHash (GYKeyRoleStaking) "053560b718fc0983281ac64fd56449b744a38b067bfccee6a4a2f403"),GYCredentialByKey (GYKeyHash (GYKeyRoleStaking) "5a3f8c1b91adc65e2faf7fee12dcd9fce630703f99a09df6a331b9ea"),GYCredentialByKey (GYKeyHash (GYKeyRoleStaking) "7c30635e2d876b90c1d505851683201081e122fd6ac665d0c36c8593"),GYCredentialByKey (GYKeyHash (GYKeyRoleStaking) "9e22d4e534f80dfbd5d23ab6f21a53999f0a2e97f83926d56f9ec3eb"),GYCredentialByKey (GYKeyHash (GYKeyRoleStaking) "bcac8a19f17801a28c2a352be936018ec96b67c147a5030218810896"),GYCredentialByKey (GYKeyHash (GYKeyRoleStaking) "d0f4075a0ab29c0f71c8310f0b3151fbfee6fdc2de910e2f3471455a")], ogDRepStateAnchor = Nothing}]})
+instance FromJSON OgmiosDRepStateResponse where
+  parseJSON = withObject "OgmiosDRepStateResponse" $ \o -> do
+    ogDRepStateDeposit <- o .: "deposit"
+    ogDRepStateMandate <- o .: "mandate"
+    credType <- o .: "from"
+    ogDRepStateCred <- case credType of
+      OgCredTypeVerificationKey -> GYCredentialByKey <$> o .: "id"
+      OgCredTypeScript -> GYCredentialByScript <$> o .: "id"
+    ogDRepStateDelegs <- do
+      delegs <- o .: "delegators"
+      Set.fromList
+        <$> traverse
+          ( \d -> do
+              delegCredType <- d .: "from"
+              case delegCredType of
+                OgCredTypeVerificationKey -> GYCredentialByKey <$> d .: "credential"
+                OgCredTypeScript -> GYCredentialByScript <$> d .: "credential"
+          )
+          delegs
+    ogDRepStateAnchor <- o .:? "metadata"
+    pure $ OgmiosDRepStateResponse {..}
+
 submitTx :: OgmiosRequest GYTx -> ClientM (OgmiosResponse TxSubmissionResponse)
 protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolParameters)
 tip :: OgmiosRequest OgmiosTip -> ClientM (OgmiosResponse OgmiosTipResponse)
 stakePools :: OgmiosRequest OgmiosStakePools -> ClientM (OgmiosResponse OgmiosStakePoolsResponse)
+drepState :: OgmiosRequest (Set.Set (GYCredential 'GYKeyRoleDRep)) -> ClientM (OgmiosResponse [OgmiosDRepStateResponse])
 
-type OgmiosApi = ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse) :<|> ReqBody '[JSON] (OgmiosRequest OgmiosPP) :> Post '[JSON] (OgmiosResponse ProtocolParameters) :<|> ReqBody '[JSON] (OgmiosRequest OgmiosTip) :> Post '[JSON] (OgmiosResponse OgmiosTipResponse) :<|> ReqBody '[JSON] (OgmiosRequest OgmiosStakePools) :> Post '[JSON] (OgmiosResponse OgmiosStakePoolsResponse)
+type OgmiosApi =
+  ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse)
+    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosPP) :> Post '[JSON] (OgmiosResponse ProtocolParameters)
+    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosTip) :> Post '[JSON] (OgmiosResponse OgmiosTipResponse)
+    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosStakePools) :> Post '[JSON] (OgmiosResponse OgmiosStakePoolsResponse)
+    :<|> ReqBody '[JSON] (OgmiosRequest (Set.Set (GYCredential 'GYKeyRoleDRep))) :> Post '[JSON] (OgmiosResponse [OgmiosDRepStateResponse])
 
-submitTx :<|> protocolParams :<|> tip :<|> stakePools = client @OgmiosApi Proxy
+submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState = client @OgmiosApi Proxy
 
 -- | Submit a transaction to the node via Ogmios.
 ogmiosSubmitTx :: OgmiosApiEnv -> GYSubmitTx
@@ -405,3 +473,27 @@ ogmiosStakePools env = do
   pure $ Set.map (stakePoolIdToApi . stakePoolIdFromBech32) $ Map.keysSet sps
  where
   fn = "ogmiosStakePools"
+
+ogmiosGetDRepsState :: OgmiosApiEnv -> Set.Set (GYCredential 'GYKeyRoleDRep) -> IO (Map.Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState))
+ogmiosGetDRepsState env dreps = do
+  drepStates <- handleOgmiosError fn <=< runOgmiosClient env $ drepState (OgmiosRequest dreps)
+  let foundStates =
+        Map.fromList $
+          map
+            ( \s ->
+                ( ogDRepStateCred s
+                , Just $
+                    GYDRepState
+                      { drepExpiry = ogDRepStateMandate s & asEpochEpoch & (GYEpochNo . fromIntegral)
+                      , drepAnchor =
+                          let man = ogDRepStateAnchor s
+                           in man >>= \an -> Just $ GYAnchor (metadataUrl an) (metadataHash an)
+                      , drepDeposit = ogDRepStateDeposit s & asAdaAda & asLovelaceLovelace
+                      , drepDelegs = ogDRepStateDelegs s
+                      }
+                )
+            )
+            drepStates
+  pure $ Set.foldl' (\mapAcc drep -> if Map.member drep mapAcc then mapAcc else Map.insert drep Nothing mapAcc) foundStates dreps
+ where
+  fn = "ogmiosGetDRepsState"

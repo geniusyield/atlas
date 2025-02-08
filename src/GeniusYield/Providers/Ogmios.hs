@@ -17,8 +17,10 @@ module GeniusYield.Providers.Ogmios (
   ogmiosGetDRepsState,
   ogmiosStakeAddressInfo,
   ogmiosStartTime,
+  ogmiosEraSummaries,
 ) where
 
+import Cardano.Api qualified as Api
 import Cardano.Api.Ledger qualified as Api.L
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api.S
@@ -28,24 +30,28 @@ import Cardano.Ledger.Conway.PParams (
   THKD (..),
  )
 import Cardano.Ledger.Plutus qualified as Ledger
+import Cardano.Slotting.Slot qualified as CSlot
 import Cardano.Slotting.Time qualified as CTime
 import Control.Monad ((<=<))
 import Data.Aeson (Value (Null), object, withArray, withObject, (.:), (.:?), (.=))
 import Data.Map.Strict qualified as Map
-import Data.Maybe (listToMaybe)
+import Data.Maybe (fromJust, listToMaybe)
 import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
+import Data.Word (Word64)
 import Deriving.Aeson
 import GHC.Int (Int64)
 import GeniusYield.Imports
 import GeniusYield.Providers.Common (
   SubmitTxException (..),
   newServantClientEnv,
+  parseEraHist,
  )
 import GeniusYield.Types hiding (poolId)
-import Maestro.Types.V1 (AsAda (..), AsBytes, AsLovelace (..), CostModel, EpochNo, LowerFirst, MaestroRational, MemoryCpuWith, MinFeeReferenceScripts, ProtocolParametersUpdateStakePool, ProtocolVersion)
+import Maestro.Types.V1 (AsAda (..), AsBytes, AsLovelace (..), CostModel, EpochNo, EpochSize, EpochSlotLength, EraBound, LowerFirst, MaestroRational, MemoryCpuWith, MinFeeReferenceScripts, ProtocolParametersUpdateStakePool, ProtocolVersion)
 import Maestro.Types.V1 qualified as Maestro
+import Ouroboros.Consensus.HardFork.History qualified as Ouroboros
 import Servant.API (
   JSON,
   Post,
@@ -83,6 +89,8 @@ data OgmiosProviderException
     OgmiosApiError !Text !ClientError
   | -- | Received error response.
     OgmiosErrorResponse !Text !Value
+  | -- | The API returned an unexpected number of era summaries.
+    OgmiosIncorrectEraHistoryLength ![EraSummary]
   deriving stock (Eq, Show)
   deriving anyclass Exception
 
@@ -264,6 +272,11 @@ instance ToJSONRPC OgmiosStartTime where
   toMethod = const "queryNetwork/startTime"
   toParams = const Nothing
 
+data OgmiosEraSummaries = OgmiosEraSummaries
+instance ToJSONRPC OgmiosEraSummaries where
+  toMethod = const "queryLedgerState/eraSummaries"
+  toParams = const Nothing
+
 submitTx :: OgmiosRequest GYTx -> ClientM (OgmiosResponse TxSubmissionResponse)
 protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolParameters)
 tip :: OgmiosRequest OgmiosTip -> ClientM (OgmiosResponse OgmiosTipResponse)
@@ -271,6 +284,7 @@ stakePools :: OgmiosRequest OgmiosStakePools -> ClientM (OgmiosResponse OgmiosSt
 drepState :: OgmiosRequest (Set.Set (GYCredential 'GYKeyRoleDRep)) -> ClientM (OgmiosResponse [OgmiosDRepStateResponse])
 stakeAddressInfo :: OgmiosRequest GYStakeAddress -> ClientM (OgmiosResponse (Map Text OgmiosStakeAddressInfo))
 startTime :: OgmiosRequest OgmiosStartTime -> ClientM (OgmiosResponse GYTime)
+eraSummaries :: OgmiosRequest OgmiosEraSummaries -> ClientM (OgmiosResponse [EraSummary])
 
 type OgmiosApi =
   ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse)
@@ -280,8 +294,9 @@ type OgmiosApi =
     :<|> ReqBody '[JSON] (OgmiosRequest (Set.Set (GYCredential 'GYKeyRoleDRep))) :> Post '[JSON] (OgmiosResponse [OgmiosDRepStateResponse])
     :<|> ReqBody '[JSON] (OgmiosRequest GYStakeAddress) :> Post '[JSON] (OgmiosResponse (Map Text OgmiosStakeAddressInfo))
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosStartTime) :> Post '[JSON] (OgmiosResponse GYTime)
+    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosEraSummaries) :> Post '[JSON] (OgmiosResponse [EraSummary])
 
-submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState :<|> stakeAddressInfo :<|> startTime = client @OgmiosApi Proxy
+submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState :<|> stakeAddressInfo :<|> startTime :<|> eraSummaries = client @OgmiosApi Proxy
 
 -- | Submit a transaction to the node via Ogmios.
 ogmiosSubmitTx :: OgmiosApiEnv -> GYSubmitTx
@@ -543,3 +558,49 @@ ogmiosStartTime env = do
   pure $ CTime.SystemStart $ posixSecondsToUTCTime $ timeToPOSIX gytime
  where
   fn = "ogmiosStartTime"
+
+data EraParameters = EraParameters
+  { eraParametersEpochLength :: !EpochSize
+  , eraParametersSlotLength :: !EpochSlotLength
+  , eraParametersSafeZone :: !(Maybe Word64)
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "eraParameters", LowerFirst]] EraParameters
+
+data EraSummary = EraSummary
+  { eraSummaryStart :: !EraBound
+  -- ^ Start of this era.
+  , eraSummaryEnd :: !(Maybe EraBound)
+  -- ^ End of this era.
+  , eraSummaryParameters :: !EraParameters
+  -- ^ Parameters of this era.
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "eraSummary", LowerFirst]] EraSummary
+
+-- Largely similar to how we handle for Maestro.
+ogmiosEraSummaries :: OgmiosApiEnv -> IO Api.EraHistory
+ogmiosEraSummaries env = do
+  eraSumms <- handleOgmiosError fn <=< runOgmiosClient env $ eraSummaries (OgmiosRequest OgmiosEraSummaries)
+  maybe (throwIO $ OgmiosIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms
+ where
+  mkBound Maestro.EraBound {eraBoundEpoch, eraBoundSlot, eraBoundTime} =
+    Ouroboros.Bound
+      { boundTime = CTime.RelativeTime $ Maestro.eraBoundTimeSeconds eraBoundTime
+      , boundSlot = CSlot.SlotNo $ fromIntegral eraBoundSlot
+      , boundEpoch = CSlot.EpochNo $ fromIntegral eraBoundEpoch
+      }
+  mkEraParams EraParameters {eraParametersEpochLength, eraParametersSlotLength, eraParametersSafeZone} =
+    Ouroboros.EraParams
+      { eraEpochSize = CSlot.EpochSize $ fromIntegral eraParametersEpochLength
+      , eraSlotLength = CTime.mkSlotLength $ Maestro.epochSlotLengthMilliseconds eraParametersSlotLength / 1000
+      , eraSafeZone = Ouroboros.StandardSafeZone $ fromJust eraParametersSafeZone
+      , eraGenesisWin = fromIntegral $ fromJust eraParametersSafeZone -- TODO: Get it from provider? It is supposed to be 3k/f where k is security parameter (at present 2160) and f is active slot coefficient. Usually ledger set the safe zone size such that it guarantees at least k blocks...
+      }
+  mkEra EraSummary {eraSummaryStart, eraSummaryEnd, eraSummaryParameters} =
+    Ouroboros.EraSummary
+      { eraStart = mkBound eraSummaryStart
+      , eraEnd = maybe Ouroboros.EraUnbounded (Ouroboros.EraEnd . mkBound) eraSummaryEnd
+      , eraParams = mkEraParams eraSummaryParameters
+      }
+  fn = "ogmiosEraSummaries"

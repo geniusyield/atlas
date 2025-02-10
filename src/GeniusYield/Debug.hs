@@ -1,17 +1,17 @@
 module GeniusYield.Debug (
-  coreConfigIO
-  , startDebugCps
-  , testCps
-  , stopDebugCps
-  , eval'
-  , GYNetworkId (..)
+  coreConfigIO,
+  startDebugCps,
+  testCps,
+  stopDebugCps,
+  eval',
+  GYNetworkId (..),
 ) where
 
-import Control.Concurrent (MVar, newEmptyMVar, forkIO, putMVar, readMVar, takeMVar)
-import GeniusYield.Types (GYProviders, GYNetworkId (..))
+import Control.Concurrent (MVar, forkIO, newEmptyMVar, putMVar, readMVar, takeMVar)
+import Control.Monad (void)
 import GeniusYield.GYConfig (GYCoreConfig, coreConfigIO, withCfgProviders)
 import GeniusYield.TxBuilder (GYTxGameMonadIO, runGYTxGameMonadIO)
-import Control.Monad (void)
+import GeniusYield.Types (GYNetworkId (..), GYProviders)
 
 {-
 

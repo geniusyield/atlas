@@ -30,3 +30,4 @@ blockfrost-config.json
 secrets/
 .vscode
 tests/mock-blueprints/complex-blueprint-rt.json
+log.txt

@@ -70,6 +70,7 @@ library
     GeniusYield.Api.TestTokens
     GeniusYield.CardanoApi.EraHistory
     GeniusYield.CardanoApi.Query
+    GeniusYield.Debug
     GeniusYield.Examples.Common
     GeniusYield.Examples.Gift
     GeniusYield.Examples.Limbo

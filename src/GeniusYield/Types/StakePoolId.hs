@@ -153,6 +153,9 @@ instance FromJSON GYStakePoolIdBech32 where
       Just stakePoolId -> return $ GYStakePoolIdBech32 stakePoolId
       Nothing -> fail "cannot deserialise stake pool id"
 
+instance Aeson.FromJSONKey GYStakePoolIdBech32 where
+  fromJSONKey = Aeson.FromJSONKeyTextParser (either (fail . Text.unpack) pure . Web.parseUrlPiece)
+
 {- |
 
 >>> Aeson.encode (Swagger.toSchema (Proxy :: Proxy GYStakePoolIdBech32))

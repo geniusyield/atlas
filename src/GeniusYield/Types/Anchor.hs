@@ -42,7 +42,7 @@ GYUrl (Url {urlToText = "https://geniusyield.co"})
 -}
 newtype GYUrl = GYUrl Ledger.Url
   deriving stock Show
-  deriving newtype (Eq, Ord)
+  deriving newtype (Eq, Ord, FromJSON, ToJSON)
 
 -- | Convert a 'Text' to a 'GYUrl' checking that it is at most 128 bytes in the process.
 textToUrl :: MonadFail m => Text -> m GYUrl
@@ -70,7 +70,7 @@ GYAnchorDataHash (SafeHash "511bc81dde11180838c562c82bb35f3223f46061ebde4a955c27
 -}
 newtype GYAnchorDataHash = GYAnchorDataHash (Ledger.SafeHash Ledger.StandardCrypto Ledger.AnchorData)
   deriving stock Show
-  deriving newtype (Eq, Ord)
+  deriving newtype (Eq, Ord, FromJSON, ToJSON)
 
 {- | Convert a 'GYAnchorDataHash' to a 'ByteString'.
 >>> let h = hashAnchorData "Hello, World!"

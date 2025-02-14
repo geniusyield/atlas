@@ -32,6 +32,19 @@ providersMashupTests configs =
         delayBySecond
         dats <- forM configs $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> fromJust <$> gyLookupDatum "a7ed3e81ef2e98a85c8d5649ed6344b7f7b36a31103ab18395ef4e80b8cac565" -- A datum hash seen at always fail script's address.
         assertBool "Datums are not all equal" $ allEqual dats
+    , testCase "Fetching constitution" $ do
+        let supportedProviders =
+              filter
+                ( \(cfgCoreProvider -> cp) -> case cp of
+                    GYMaestro {} -> False
+                    GYBlockfrost {} -> False
+                    _anyOther -> True
+                )
+                configs
+        constitutions <- forM supportedProviders $ \config -> withCfgProviders config mempty $ \GYProviders {..} -> do
+          gyGetConstitution
+        print constitutions
+        assertBool "Constitutions are not all equal" $ allEqual constitutions
     , testCase "Parameters" $ do
         paramsList <- forM configs $ \config -> withCfgProviders config mempty $ \provider -> do
           delayBySecond

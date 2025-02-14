@@ -10,6 +10,9 @@ module GeniusYield.Providers.Blockfrost (
   blockfrostSubmitTx,
   blockfrostAwaitTxConfirmed,
   blockfrostStakeAddressInfo,
+  blockfrostDRepState,
+  blockfrostDRepsState,
+  blockfrostConstitution,
   networkIdToProject,
 ) where
 
@@ -582,6 +585,19 @@ blockfrostStakeAddressInfo p saddr = do
                 , gyStakeAddressInfoAvailableRewards = fromInteger $ lovelacesToInteger $ Blockfrost._accountInfoWithdrawableAmount accInfo
                 }
           else Nothing
+
+-------------------------------------------------------------------------------
+-- Governance
+-------------------------------------------------------------------------------
+
+blockfrostDRepState :: Blockfrost.Project -> GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
+blockfrostDRepState _p _c = error "Blockfrost SDK does not support fetching the DRep state"
+
+blockfrostDRepsState :: Blockfrost.Project -> Set.Set (GYCredential 'GYKeyRoleDRep) -> IO (Map.Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState))
+blockfrostDRepsState _p _cs = error "Blockfrost SDK does not support fetching the DReps state"
+
+blockfrostConstitution :: Blockfrost.Project -> IO GYConstitution
+blockfrostConstitution = error "Blockfrost does not support fetching the constitution"
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions

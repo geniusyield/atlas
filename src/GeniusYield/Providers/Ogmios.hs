@@ -19,6 +19,7 @@ module GeniusYield.Providers.Ogmios (
   ogmiosStakeAddressInfo,
   ogmiosStartTime,
   ogmiosEraSummaries,
+  ogmiosConstitution,
 ) where
 
 import Cardano.Api qualified as Api
@@ -205,6 +206,9 @@ data OgmiosMetadata = OgmiosMetadata
   deriving stock (Eq, Show, Generic)
   deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "metadata", LowerFirst]] OgmiosMetadata
 
+anchorFromOgmiosMetadata :: OgmiosMetadata -> GYAnchor
+anchorFromOgmiosMetadata OgmiosMetadata {..} = GYAnchor metadataUrl metadataHash
+
 data OgmiosDRepStateResponse = OgmiosDRepStateResponse
   { ogDRepStateDeposit :: !AsAda
   , ogDRepStateMandate :: !AsEpoch
@@ -278,6 +282,24 @@ instance ToJSONRPC OgmiosEraSummaries where
   toMethod = const "queryLedgerState/eraSummaries"
   toParams = const Nothing
 
+data OgmiosConstitution = OgmiosConstitution
+instance ToJSONRPC OgmiosConstitution where
+  toMethod = const "queryLedgerState/constitution"
+  toParams = const Nothing
+
+newtype AsHash = AsHash
+  { asHashHash :: GYScriptHash
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "asHash", LowerFirst]] AsHash
+
+data OgmiosConstitutionResponse = OgmiosConstitutionResponse
+  { metadata :: !OgmiosMetadata
+  , guardrails :: !(Maybe AsHash)
+  }
+  deriving stock (Show, Generic)
+  deriving anyclass FromJSON
+
 submitTx :: OgmiosRequest GYTx -> ClientM (OgmiosResponse TxSubmissionResponse)
 protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolParameters)
 tip :: OgmiosRequest OgmiosTip -> ClientM (OgmiosResponse OgmiosTipResponse)
@@ -286,6 +308,7 @@ drepState :: OgmiosRequest (Set.Set (GYCredential 'GYKeyRoleDRep)) -> ClientM (O
 stakeAddressInfo :: OgmiosRequest GYStakeAddress -> ClientM (OgmiosResponse (Map Text OgmiosStakeAddressInfo))
 startTime :: OgmiosRequest OgmiosStartTime -> ClientM (OgmiosResponse GYTime)
 eraSummaries :: OgmiosRequest OgmiosEraSummaries -> ClientM (OgmiosResponse [EraSummary])
+constitution :: OgmiosRequest OgmiosConstitution -> ClientM (OgmiosResponse OgmiosConstitutionResponse)
 
 type OgmiosApi =
   ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse)
@@ -296,8 +319,9 @@ type OgmiosApi =
     :<|> ReqBody '[JSON] (OgmiosRequest GYStakeAddress) :> Post '[JSON] (OgmiosResponse (Map Text OgmiosStakeAddressInfo))
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosStartTime) :> Post '[JSON] (OgmiosResponse GYTime)
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosEraSummaries) :> Post '[JSON] (OgmiosResponse [EraSummary])
+    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosConstitution) :> Post '[JSON] (OgmiosResponse OgmiosConstitutionResponse)
 
-submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState :<|> stakeAddressInfo :<|> startTime :<|> eraSummaries = client @OgmiosApi Proxy
+submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState :<|> stakeAddressInfo :<|> startTime :<|> eraSummaries :<|> constitution = client @OgmiosApi Proxy
 
 -- | Submit a transaction to the node via Ogmios.
 ogmiosSubmitTx :: OgmiosApiEnv -> GYSubmitTx
@@ -534,7 +558,7 @@ ogmiosGetDRepsState env dreps = do
                       { drepExpiry = ogDRepStateMandate s & asEpochEpoch & (GYEpochNo . fromIntegral)
                       , drepAnchor =
                           let man = ogDRepStateAnchor s
-                           in man >>= \an -> Just $ GYAnchor (metadataUrl an) (metadataHash an)
+                           in man >>= \an -> Just $ anchorFromOgmiosMetadata an
                       , drepDeposit = ogDRepStateDeposit s & asAdaAda & asLovelaceLovelace
                       , drepDelegs = ogDRepStateDelegs s
                       }
@@ -610,3 +634,10 @@ ogmiosEraSummaries env = do
       , eraParams = mkEraParams eraSummaryParameters
       }
   fn = "ogmiosEraSummaries"
+
+ogmiosConstitution :: OgmiosApiEnv -> IO GYConstitution
+ogmiosConstitution env = do
+  OgmiosConstitutionResponse {..} <- handleOgmiosError fn <=< runOgmiosClient env $ constitution (OgmiosRequest OgmiosConstitution)
+  pure $ GYConstitution {constitutionAnchor = anchorFromOgmiosMetadata metadata, constitutionScript = asHashHash <$> guardrails}
+ where
+  fn = "ogmiosConstitution"

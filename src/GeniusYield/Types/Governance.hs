@@ -30,6 +30,7 @@ module GeniusYield.Types.Governance (
   propProcToLedger,
   GYConstitution (..),
   constitutionToLedger,
+  constitutionFromLedger,
   GYGovAction (..),
   govActionToLedger,
 ) where
@@ -50,7 +51,7 @@ import GeniusYield.Types.Epoch (GYEpochNo, epochNoToLedger)
 import GeniusYield.Types.KeyHash
 import GeniusYield.Types.KeyRole (GYKeyRole (..))
 import GeniusYield.Types.Reexpose (ProtVer, UnitInterval)
-import GeniusYield.Types.Script (GYScriptHash, scriptHashToLedger)
+import GeniusYield.Types.Script (GYScriptHash, scriptHashFromLedger, scriptHashToLedger)
 import GeniusYield.Types.Tx (GYTxId, txIdFromApi, txIdToApi)
 import Ouroboros.Consensus.Shelley.Eras qualified as Consensus
 
@@ -169,6 +170,9 @@ data GYConstitution = GYConstitution
 
 constitutionToLedger :: GYConstitution -> Ledger.Constitution Consensus.StandardConway
 constitutionToLedger GYConstitution {..} = Ledger.Constitution (anchorToLedger constitutionAnchor) (maybeToStrictMaybe $ scriptHashToLedger <$> constitutionScript)
+
+constitutionFromLedger :: Ledger.Constitution Consensus.StandardConway -> GYConstitution
+constitutionFromLedger (Ledger.Constitution a s) = GYConstitution (anchorFromLedger a) (strictMaybeToMaybe $ scriptHashFromLedger <$> s)
 
 data GYGovAction
   = ParameterChange

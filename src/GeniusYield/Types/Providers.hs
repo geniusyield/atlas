@@ -100,6 +100,7 @@ import GeniusYield.Types.Credential (GYCredential, GYPaymentCredential)
 import GeniusYield.Types.DRep
 import GeniusYield.Types.Datum
 import GeniusYield.Types.Epoch (GYEpochNo (GYEpochNo))
+import GeniusYield.Types.Governance (GYConstitution)
 import GeniusYield.Types.KeyRole
 import GeniusYield.Types.Logging
 import GeniusYield.Types.ProtocolParameters
@@ -155,6 +156,7 @@ data GYProviders = GYProviders
   , gyGetDRepsState :: !(Set (GYCredential 'GYKeyRoleDRep) -> IO (Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState)))
   , gyLog' :: !GYLogConfiguration
   , gyGetStakePools :: !(IO (Set Api.S.PoolId))
+  , gyGetConstitution :: !(IO GYConstitution)
   }
 
 gyGetSlotOfCurrentBlock :: GYProviders -> IO GYSlot

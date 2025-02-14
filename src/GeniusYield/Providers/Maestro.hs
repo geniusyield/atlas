@@ -21,6 +21,7 @@ module GeniusYield.Providers.Maestro (
   maestroUtxosAtAddressesWithDatums,
   maestroUtxosAtPaymentCredentialsWithDatums,
   maestroStakeAddressInfo,
+  maestroConstitution,
 ) where
 
 import Cardano.Api qualified as Api
@@ -651,3 +652,10 @@ maestroStakeAddressInfo env saddr = do
                 , gyStakeAddressInfoAvailableRewards = fromIntegral $ Maestro.accountInfoRewardsAvailable accInfo
                 }
           else Nothing
+
+-------------------------------------------------------------------------------
+-- Governance
+-------------------------------------------------------------------------------
+
+maestroConstitution :: Maestro.MaestroEnv 'Maestro.V1 -> IO GYConstitution
+maestroConstitution = error "Maestro does not support fetching the constitution"

@@ -198,7 +198,7 @@ data GYGovAction
   | UpdateCommittee
       -- | Previous governance action id of `UpdateCommittee` or `NoConfidence` type
       !(Maybe GYGovActionId)
-      -- | Constitutional Committe members to be removed
+      -- | Constitutional committee members to be removed
       !(Set (GYCredential 'GYKeyRoleColdCommittee))
       -- | Constitutional committee members to be added
       !(Map (GYCredential 'GYKeyRoleColdCommittee) GYEpochNo)

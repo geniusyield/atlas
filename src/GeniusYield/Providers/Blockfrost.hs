@@ -10,6 +10,7 @@ module GeniusYield.Providers.Blockfrost (
   blockfrostSubmitTx,
   blockfrostAwaitTxConfirmed,
   blockfrostStakeAddressInfo,
+  blockfrostConstitution,
   networkIdToProject,
 ) where
 
@@ -582,6 +583,13 @@ blockfrostStakeAddressInfo p saddr = do
                 , gyStakeAddressInfoAvailableRewards = fromInteger $ lovelacesToInteger $ Blockfrost._accountInfoWithdrawableAmount accInfo
                 }
           else Nothing
+
+-------------------------------------------------------------------------------
+-- Governance
+-------------------------------------------------------------------------------
+
+blockfrostConstitution :: Blockfrost.Project -> IO GYConstitution
+blockfrostConstitution = error "Blockfrost does not support fetching the constitution"
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions

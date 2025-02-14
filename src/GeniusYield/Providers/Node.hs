@@ -15,6 +15,7 @@ module GeniusYield.Providers.Node (
   nodeStakePools,
   nodeGetDRepState,
   nodeGetDRepsState,
+  nodeConstitution,
 
   -- * Auxiliary
   networkIdToLocalNodeConnectInfo,

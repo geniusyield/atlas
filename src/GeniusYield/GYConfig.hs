@@ -227,8 +227,8 @@ withCfgProviders
             , MaestroApi.maestroSubmitTx (Just True == turboSubmit) maestroApiEnv
             , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
             , MaestroApi.maestroStakeAddressInfo maestroApiEnv
-            , const (pure Nothing) -- Maestro does not support DRep state
-            , const (pure mempty) -- Maestro does not support DReps state
+            , MaestroApi.maestroDRepState maestroApiEnv
+            , MaestroApi.maestroDRepsState maestroApiEnv
             , MaestroApi.maestroStakePools maestroApiEnv
             , MaestroApi.maestroConstitution maestroApiEnv
             )
@@ -249,8 +249,8 @@ withCfgProviders
             , Blockfrost.blockfrostSubmitTx proj
             , Blockfrost.blockfrostAwaitTxConfirmed proj
             , Blockfrost.blockfrostStakeAddressInfo proj
-            , const (pure Nothing) -- "Blockfrost provider does not support DRep state"
-            , const (pure mempty) -- "Blockfrost provider does not support DReps state"
+            , Blockfrost.blockfrostDRepState proj
+            , Blockfrost.blockfrostDRepsState proj
             , Blockfrost.blockfrostStakePools proj
             , Blockfrost.blockfrostConstitution proj
             )

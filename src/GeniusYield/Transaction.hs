@@ -288,7 +288,7 @@ balanceTxStep
   cstrat =
     let adjustedOuts = map (adjustTxOut (minimumUTxO pp)) outs
         valueMint = maybe mempty fst mmint
-        needsCollateral = valueMint /= mempty || any (isScriptWitness . gyTxInWitness . gyTxInDet) ins || any (isCertScriptWitness . gyTxCertWitness') certs || any (isPlutusScriptWitness . gyTxWdrlWitness) wdrls || any (isPlutusScriptWitness . fst) (Map.elems vps)
+        needsCollateral = valueMint /= mempty || any (isScriptWitness . gyTxInWitness . gyTxInDet) ins || any (isCertScriptWitness . gyTxCertWitness') certs || any (isPlutusScriptWitness . gyTxWdrlWitness) wdrls || any (isPlutusScriptWitness . fst) (Map.elems vps) || any (isPlutusScriptWitness . snd) pps
         (stakeCredDeregsAmt :: Natural, stakeCredRegsAmt :: Natural) =
           foldl'
             ( \acc@(!accDeregsAmt, !accRegsAmt) (gyTxCertCertificate' -> cert) -> case cert of

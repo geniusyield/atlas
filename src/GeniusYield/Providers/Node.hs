@@ -15,6 +15,7 @@ module GeniusYield.Providers.Node (
   nodeStakePools,
   nodeGetDRepState,
   nodeGetDRepsState,
+  nodeConstitution,
 
   -- * Auxiliary
   networkIdToLocalNodeConnectInfo,
@@ -85,6 +86,9 @@ nodeGetDRepsState info dreps = do
   mcredState <- queryConwayEra info $ Api.QueryDRepState (Set.map credentialToLedger dreps)
   let gymcredState = Map.foldlWithKey' (\m k v -> Map.insert (credentialFromLedger k) (Just $ drepStateFromLedger v) m) Map.empty mcredState
   pure $ Set.foldl' (\mapAcc drep -> if Map.member drep mapAcc then mapAcc else Map.insert drep Nothing mapAcc) gymcredState dreps
+
+nodeConstitution :: Api.LocalNodeConnectInfo -> IO GYConstitution
+nodeConstitution info = constitutionFromLedger <$> queryConwayEra info Api.QueryConstitution
 
 nodeStakePools :: Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)
 nodeStakePools info = queryConwayEra info Api.QueryStakePools

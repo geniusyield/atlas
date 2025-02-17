@@ -230,6 +230,7 @@ ctxProviders ctx =
     , gyGetDRepState = nodeGetDRepState (ctxInfo ctx)
     , gyGetDRepsState = nodeGetDRepsState (ctxInfo ctx)
     , gyGetStakePools = nodeStakePools (ctxInfo ctx)
+    , gyGetConstitution = nodeConstitution (ctxInfo ctx)
     }
 
 -- | Function to find for the first locked output in the given `GYTxBody` at the given `GYAddress`.

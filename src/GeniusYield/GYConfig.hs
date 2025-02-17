@@ -168,7 +168,7 @@ withCfgProviders
   ns
   f =
     do
-      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools) <- case cfgCoreProvider of
+      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution) <- case cfgCoreProvider of
         GYNodeKupo path kupoUrl -> do
           let info = nodeConnectInfo path cfgNetworkId
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
@@ -185,6 +185,7 @@ withCfgProviders
             , nodeGetDRepState info
             , nodeGetDRepsState info
             , Node.nodeStakePools info
+            , Node.nodeConstitution info
             )
         GYOgmiosKupo ogmiosUrl kupoUrl -> do
           oEnv <- OgmiosApi.newOgmiosApiEnv $ Text.unpack ogmiosUrl
@@ -207,6 +208,7 @@ withCfgProviders
             , OgmiosApi.ogmiosGetDRepState oEnv
             , OgmiosApi.ogmiosGetDRepsState oEnv
             , OgmiosApi.ogmiosStakePools oEnv
+            , OgmiosApi.ogmiosConstitution oEnv
             )
         GYMaestro (Confidential apiToken) turboSubmit -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
@@ -225,9 +227,10 @@ withCfgProviders
             , MaestroApi.maestroSubmitTx (Just True == turboSubmit) maestroApiEnv
             , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
             , MaestroApi.maestroStakeAddressInfo maestroApiEnv
-            , const (pure Nothing) -- Maestro does not support DRep state
-            , const (pure mempty) -- Maestro does not support DReps state
+            , MaestroApi.maestroDRepState maestroApiEnv
+            , MaestroApi.maestroDRepsState maestroApiEnv
             , MaestroApi.maestroStakePools maestroApiEnv
+            , MaestroApi.maestroConstitution maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
@@ -246,9 +249,10 @@ withCfgProviders
             , Blockfrost.blockfrostSubmitTx proj
             , Blockfrost.blockfrostAwaitTxConfirmed proj
             , Blockfrost.blockfrostStakeAddressInfo proj
-            , const (pure Nothing) -- "Blockfrost provider does not support DRep state"
-            , const (pure mempty) -- "Blockfrost provider does not support DReps state"
+            , Blockfrost.blockfrostDRepState proj
+            , Blockfrost.blockfrostDRepsState proj
             , Blockfrost.blockfrostStakePools proj
+            , Blockfrost.blockfrostConstitution proj
             )
 
       bracket (mkLogEnv ns cfgLogging) closeScribes $ \logEnv -> do
@@ -295,6 +299,7 @@ logTiming providers@GYProviders {..} =
     , gyGetDRepsState = gyGetDRepsState'
     , gyLog' = gyLog'
     , gyGetStakePools = gyGetStakePools'
+    , gyGetConstitution = gyGetConstitution'
     }
  where
   wrap :: String -> IO a -> IO a
@@ -366,6 +371,9 @@ logTiming providers@GYProviders {..} =
 
   gyGetDRepsState' :: Set (GYCredential 'GYKeyRoleDRep) -> IO (Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState))
   gyGetDRepsState' = wrap "gyGetDRepsState" . gyGetDRepsState
+
+  gyGetConstitution' :: IO GYConstitution
+  gyGetConstitution' = wrap "gyGetConstitution" gyGetConstitution
 
 duration :: IO a -> IO (a, NominalDiffTime)
 duration m = do

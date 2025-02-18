@@ -419,7 +419,7 @@ selectRandom i selectionFilter =
  where
   lookupAndRemoveEntry :: u -> Maybe ((u, GYValue), UTxOIndex u)
   lookupAndRemoveEntry u =
-    (\b -> ((u, b), delete u i)) <$> Map.lookup u (universe i)
+    (\v -> ((u, v), delete u i)) <$> Map.lookup u (universe i)
 
   selectionSet :: Set u
   selectionSet = case selectionFilter of

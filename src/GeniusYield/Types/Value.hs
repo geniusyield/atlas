@@ -33,6 +33,7 @@ module GeniusYield.Types.Value (
 
   -- ** Arithmetic
   valueMinus,
+  valueMonus,
   valueNegate,
   valuePositive,
   valueNonNegative,
@@ -46,6 +47,7 @@ module GeniusYield.Types.Value (
 
   -- ** Lookup
   valueAssetClass,
+  valueAssetPresent,
 
   -- ** Splitting
   valueSplitAda,
@@ -378,9 +380,27 @@ instance Swagger.ToSchema GYValue where
 -- Arithmetic
 -------------------------------------------------------------------------------
 
--- | Substracts the second 'GYValue' from the first one. AssetClass by AssetClass.
+{- | Subtracts the second 'GYValue' from the first one (asset class by asset class). Note that zero entries are filtered for.
+
+>>> valueFromList [(GYLovelace, 100)] `valueMinus` valueFromList [(GYLovelace, 200)]
+valueFromList [(GYLovelace,-100)]
+
+>>> valueFromList [(GYLovelace, 100)] `valueMinus` valueFromList [(GYLovelace, 100)]
+valueFromList []
+-}
 valueMinus :: GYValue -> GYValue -> GYValue
 valueMinus x y = x <> valueNegate y
+
+{- | Subtracts the second 'GYValue' from the first one (asset class by asset class). However, this differs from 'valueMinus' in that it filters out negative amounts (zero amounts are already filtered by 'valueMinus').
+
+>>> valueFromList [(GYLovelace, 100)] `valueMonus` valueFromList [(GYLovelace, 200)]
+valueFromList []
+
+>>> valueFromList [(GYLovelace, 100)] `valueMonus` valueFromList [(GYLovelace, 50)]
+valueFromList [(GYLovelace,50)]
+-}
+valueMonus :: GYValue -> GYValue -> GYValue
+valueMonus x y = valueMinus x y & GYValue . Map.filter (> 0) . valueToMap
 
 -- | Returns the given 'GYValue' with all amounts negated.
 valueNegate :: GYValue -> GYValue
@@ -416,6 +436,9 @@ valueSplitAda (GYValue m) = (Map.findWithDefault 0 GYLovelace m, GYValue (Map.de
 -- | Returns the amount of a 'GYAssetClass' contained in the given 'GYValue'.
 valueAssetClass :: GYValue -> GYAssetClass -> Integer
 valueAssetClass (GYValue m) ac = Map.findWithDefault 0 ac m
+
+valueAssetPresent :: GYValue -> GYAssetClass -> Bool
+valueAssetPresent v ac = valueAssetClass v ac > 0
 
 {- | Split a 'GYValue' into its positive and negative components. The first element of
   the pair is the positive components of the value. The second element is the negative component.

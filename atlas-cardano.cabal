@@ -108,7 +108,11 @@ library
     GeniusYield.Transaction
     GeniusYield.Transaction.CBOR
     GeniusYield.Transaction.CoinSelection
+    GeniusYield.Transaction.CoinSelection.Balance
     GeniusYield.Transaction.CoinSelection.Types
+    GeniusYield.Transaction.CoinSelection.UTxOIndex.Internal
+    GeniusYield.Transaction.CoinSelection.UTxOIndex
+    GeniusYield.Transaction.CoinSelection.UTxOSelection
     GeniusYield.Transaction.Common
     GeniusYield.TxBuilder
     GeniusYield.TxBuilder.Class
@@ -208,6 +212,8 @@ library
     data-default-class ^>=0.1.2,
     deriving-aeson ^>=0.2.9,
     either ^>=5.0.2,
+    extra,
+    generic-lens,
     hashable ^>=1.4.7,
     hedgehog ^>=1.4,
     hedgehog-extras ^>=0.6.5,
@@ -220,6 +226,7 @@ library
     katip ^>=0.8.8,
     lens ^>=5.2.3,
     MonadRandom ^>=0.6,
+    monoidmap,
     mtl ^>=2.3.1,
     network-uri ^>=2.6.4,
     postgresql-simple ^>=0.7.0,

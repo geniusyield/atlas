@@ -106,9 +106,9 @@ data SelectionConstraints v = SelectionConstraints
   deriving Generic
 
 -- | Specifies all parameters that are specific to a given selection.
-data SelectionParams = SelectionParams
+data SelectionParams f = SelectionParams
   { outputsToCover ::
-      ![(GYAddress, GYValue)]
+      !(f (GYAddress, GYValue))
   -- ^ The complete set of outputs to be covered.
   -- TODO: Shall I be changing it's representation to say GYTxOut v? Or just GYValue?
   , utxoAvailable ::
@@ -214,17 +214,17 @@ data UTxOBalanceSufficiencyInfo = UTxOBalanceSufficiencyInfo
 
 -- | Computes the balance of UTxO entries available for selection.
 computeUTxOBalanceAvailable ::
-  SelectionParams -> GYValue
+  SelectionParams f -> GYValue
 computeUTxOBalanceAvailable =
   UTxOSelection.availableBalance . view #utxoAvailable
 
 -- | Computes the balance of UTxO entries required to be selected.
 computeUTxOBalanceRequired ::
-  SelectionParams -> GYValue
+  Foldable f => SelectionParams f -> GYValue
 computeUTxOBalanceRequired = fst . computeDeficitInOut
 
 computeBalanceInOut ::
-  SelectionParams -> (GYValue, GYValue)
+  Foldable f => SelectionParams f -> (GYValue, GYValue)
 computeBalanceInOut params =
   (balanceIn, balanceOut)
  where
@@ -237,7 +237,7 @@ computeBalanceInOut params =
       <> F.foldMap snd (view #outputsToCover params)
 
 computeDeficitInOut ::
-  SelectionParams -> (GYValue, GYValue)
+  Foldable f => SelectionParams f -> (GYValue, GYValue)
 computeDeficitInOut params =
   (deficitIn, deficitOut)
  where
@@ -253,7 +253,7 @@ computeDeficitInOut params =
 See 'UTxOBalanceSufficiency'.
 -}
 computeUTxOBalanceSufficiency ::
-  SelectionParams -> UTxOBalanceSufficiency
+  Foldable f => SelectionParams f -> UTxOBalanceSufficiency
 computeUTxOBalanceSufficiency = sufficiency . computeUTxOBalanceSufficiencyInfo
 
 {- | Computes information about the UTxO balance sufficiency.
@@ -261,7 +261,7 @@ computeUTxOBalanceSufficiency = sufficiency . computeUTxOBalanceSufficiencyInfo
 See 'UTxOBalanceSufficiencyInfo'.
 -}
 computeUTxOBalanceSufficiencyInfo ::
-  SelectionParams -> UTxOBalanceSufficiencyInfo
+  Foldable f => SelectionParams f -> UTxOBalanceSufficiencyInfo
 computeUTxOBalanceSufficiencyInfo params =
   UTxOBalanceSufficiencyInfo {available, required, difference, sufficiency}
  where
@@ -282,7 +282,7 @@ The balance of available UTxO entries is sufficient if (and only if) it
 is greater than or equal to the required balance.
 -}
 isUTxOBalanceSufficient ::
-  SelectionParams -> Bool
+  Foldable f => SelectionParams f -> Bool
 isUTxOBalanceSufficient params =
   case computeUTxOBalanceSufficiency params of
     UTxOBalanceSufficient -> True
@@ -530,7 +530,7 @@ data UnableToConstructChangeError = UnableToConstructChangeError
   }
   deriving (Generic, Eq, Show)
 
-type PerformSelection m v =
+type PerformSelection m f v =
   SelectionConstraints v ->
-  SelectionParams ->
+  SelectionParams f ->
   m (Either SelectionBalanceError SelectionResult)

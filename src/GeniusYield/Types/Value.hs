@@ -39,6 +39,7 @@ module GeniusYield.Types.Value (
   valueNonNegative,
   valueGreaterOrEqual,
   valueGreater,
+  valueLessOrEqual,
 
   -- ** Unions & Intersections
   valueUnionWith,
@@ -51,6 +52,8 @@ module GeniusYield.Types.Value (
 
   -- ** Splitting
   valueSplitAda,
+  valueAda,
+  valueNonAda,
   valueSplitSign,
 
   -- ** Predicates
@@ -422,6 +425,10 @@ valueGreaterOrEqual v w = valueNonNegative $ v `valueMinus` w
 valueGreater :: GYValue -> GYValue -> Bool
 valueGreater v w = valuePositive $ v `valueMinus` w
 
+-- | Checks if all amounts of the first 'GYValue' are less than the second 'GYValue'.
+valueLessOrEqual :: GYValue -> GYValue -> Bool
+valueLessOrEqual v w = valueGreaterOrEqual w v
+
 {- | Splits a 'GYValue' into the lovelace amount and the rest of it's components.
 
 >>> valueSplitAda $ valueFromLovelace 100
@@ -432,6 +439,14 @@ valueGreater v w = valuePositive $ v `valueMinus` w
 -}
 valueSplitAda :: GYValue -> (Integer, GYValue)
 valueSplitAda (GYValue m) = (Map.findWithDefault 0 GYLovelace m, GYValue (Map.delete GYLovelace m))
+
+-- | Get the lovelace amount from a 'GYValue'.
+valueAda :: GYValue -> Integer
+valueAda = fst . valueSplitAda
+
+-- | Removes the lovelace amount from a 'GYValue'.
+valueNonAda :: GYValue -> GYValue
+valueNonAda = snd . valueSplitAda
 
 -- | Returns the amount of a 'GYAssetClass' contained in the given 'GYValue'.
 valueAssetClass :: GYValue -> GYAssetClass -> Integer

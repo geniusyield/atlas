@@ -76,56 +76,15 @@ source-repository-package
 package postgresql-libpq
   flags: +use-pkg-config
 
+
+-- Temporary until latest version is available on Hackage (or CHaP for that matter). Track https://github.com/IntersectMBO/cardano-addresses/issues/294.
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/cardano-addresses
+  tag: d611632fc3d616d5b4038a70f864bf2613c125d0
+  --sha256: sha256-v0q8qHdI6LKc8mP43QZt3UGdTNDQXE0aF6QapvZsTvU=
+
 ------ Following is mostly from @cardano-wallet@'s @cabal.project@ file. -------
-
---------------------------------------------------------------------------------
--- BEGIN Cardano Addresses Dependency
-
-source-repository-package
-    type: git
-    location: https://github.com/IntersectMBO/cardano-addresses
-    tag: 2bca06deaa60e54a5322ac757387d744bf043367
-    --sha256: 1y1mzfly7jac40b9g4xc078rcm5zqhc3xxv77kwxi10yph1jwq7z
-    subdir: command-line
-            core
-
--- Normally cabal won't apply ghc-options which we specify to build packages
--- to their "regular" dependencies.
--- However, the dependencies declared using the `source-repository-package`
--- pragma are an exception to this rule.
--- This is why we need to manually control options that are applied to the
--- `cardano-addresses` package by declaring them explicitly here.
-package cardano-addresses-cli
-    ghc-options:
-        -Wwarn=deprecations
-
-package cardano-addresses
-    ghc-options:
-        -Wwarn=incomplete-uni-patterns
--- END Cardano Addresses Dependency
---------------------------------------------------------------------------------
-
-source-repository-package
-    type: git
-    location: https://github.com/input-output-hk/cardano-sl-x509
-    tag: a91add165152fa36f08e95fafe7da24f1dba4690
-    --sha256: 1ia8vlqghis92cla8qmqa6kh8f3jn29b01fshyk5hmgy5373s684
-
-source-repository-package
-    type: git
-    location: https://github.com/cardano-foundation/cardano-wallet-client.git
-    tag: 353412ca621dc28af53e4a19795338b19bab1b7b
-    --sha256: 04q58c82wy6x9nkwqbvcxbv6s61fx08h5kf62sb511aqp08id4bb
-    subdir: generated
-
-source-repository-package
-    type: git
-    location: https://github.com/cardano-foundation/cardano-wallet-agda
-    tag: f3479b501a2efe50bcf1ee0d09bc2d1325a982e7
-    --sha256: 10d6k7mw1zw9vpzz8dhb52vfmj2rshsk225nvyl8nrc94fr627kz
-    subdir:
-      lib/customer-deposit-wallet-pure
-      lib/cardano-wallet-read
 
 --------------------------------------------------------------------------------
 -- BEGIN Constraints tweaking section

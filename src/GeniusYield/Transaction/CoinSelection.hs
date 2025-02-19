@@ -15,6 +15,10 @@ module GeniusYield.Transaction.CoinSelection (
   selectInputs,
 ) where
 
+import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Ledger.Binary qualified as CBOR
+import Cardano.Ledger.Conway (Conway)
+import Cardano.Ledger.Conway.Core (eraProtVerHigh)
 import Control.Monad.Random (MonadRandom)
 import Control.Monad.Trans.Except (
   ExceptT (ExceptT),
@@ -24,58 +28,21 @@ import Data.ByteString qualified as BS
 import Data.Default (Default (def))
 import Data.Map qualified as Map
 import Data.Set qualified as S
-import Data.Text.Class (
-  ToText (toText),
-  fromText,
- )
-import GHC.IsList (fromList)
-
-import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api.S
-import Cardano.CoinSelection.Balance qualified as CBalance
-import Cardano.CoinSelection.Context qualified as CCoinSelection
-import Cardano.Ledger.Binary qualified as CBOR
-import Cardano.Ledger.Conway (Conway)
-
-import Cardano.CoinSelection.Size qualified as CWallet
-import Cardano.CoinSelection.UTxOIndex qualified as CWallet
-import Cardano.CoinSelection.UTxOSelection qualified as CWallet
-import Cardano.Wallet.Primitive.Types.Address qualified as CWallet
-import Cardano.Wallet.Primitive.Types.AssetId qualified as CTokenBundle
-import Cardano.Wallet.Primitive.Types.AssetName qualified as CWallet
-import Cardano.Wallet.Primitive.Types.Coin qualified as CWallet
-import Cardano.Wallet.Primitive.Types.Hash qualified as CWallet
-import Cardano.Wallet.Primitive.Types.TokenBundle qualified as CTokenBundle
-import Cardano.Wallet.Primitive.Types.TokenMap qualified as CWTokenMap
-import Cardano.Wallet.Primitive.Types.TokenPolicyId qualified as CWallet
-import Cardano.Wallet.Primitive.Types.TokenQuantity qualified as CWallet
-import Cardano.Wallet.Primitive.Types.Tx.Constraints qualified as CWallet
-
-import Cardano.Ledger.Conway.Core (eraProtVerHigh)
+import GHC.Word (Word64)
 import GeniusYield.Imports
+import GeniusYield.Transaction.CoinSelection.Balance
+import GeniusYield.Transaction.CoinSelection.UTxOIndex (UTxOIndex)
+import GeniusYield.Transaction.CoinSelection.UTxOIndex qualified as UTxOIndex
+import GeniusYield.Transaction.CoinSelection.UTxOSelection qualified as UTxOSelection
 import GeniusYield.Transaction.Common
 import GeniusYield.Types
 import GeniusYield.Utils
-
-type GYCoinSelectionContext :: PlutusVersion -> Type
-data GYCoinSelectionContext v
-
-type WalletUTxO = GYTxOutRef
 
 {- Note: The vast majority of partial functions in this module are fine since they are localized.
 
 Essentially, they are supposed to work on trusted inputs and outputs. As such, we should pay more
 attention in the input and output sites and ensure they are indeed constructed/deconstructed properly.
 -}
-
-{-
-TODO:
-- What should "max length address" be?
-- Can we simply use a stripped down 'GYTxIn' for wallet utxo? maybe just GYTxOutRef even.
--}
-instance CCoinSelection.SelectionContext (GYCoinSelectionContext v) where
-  type Address (GYCoinSelectionContext v) = CWallet.Address
-  type UTxO (GYCoinSelectionContext v) = WalletUTxO
 
 data GYCoinSelectionEnv v = GYCoinSelectionEnv
   { existingInputs :: ![GYTxInDetailed v]
@@ -189,19 +156,19 @@ selectInputs
     , adaSink
     }
   cstrat = do
-    CBalance.SelectionResult
+    SelectionResult
       { inputsSelected
       , changeGenerated
       } <-
-      modifyException fromCWalletBalancingError
+      modifyException fromWalletBalancingError
         . ExceptT
-        $ CBalance.performSelection @_ @(GYCoinSelectionContext v)
+        $ performSelection
           selectionConstraints
           selectionParams
     let inRefs = S.fromList $ gyTxInTxOutRef . gyTxInDet <$> existingInputs
         changeOuts =
           map
-            (\(fromTokenBundle -> tokenChange) -> GYTxOut changeAddr tokenChange Nothing Nothing)
+            (\tokenChange -> GYTxOut changeAddr tokenChange Nothing Nothing)
             changeGenerated
         foldHelper acc (txIn, _)
           | txIn `S.member` inRefs = acc
@@ -216,55 +183,52 @@ selectInputs
     pure (addIns, changeOuts)
    where
     selectionConstraints =
-      CBalance.SelectionConstraints
+      SelectionConstraints
         { tokenBundleSizeAssessor =
-            tokenBundleSizeAssessor $
-              CWallet.TxSize maxValueSize
+            tokenBundleSizeAssessor' maxValueSize
         , computeMinimumAdaQuantity = \addr tkMap -> do
             -- This function is ran for generated change outputs which do not have datum & reference script.
             -- This first parameter can actually be ignored as it will always be @toCWalletAddress changeAddr@.
-            CWallet.Coin $
-              minimumUTxOF
-                GYTxOut
-                  { gyTxOutAddress = fromCWalletAddress addr
-                  , gyTxOutValue = fromTokenMap tkMap
-                  , gyTxOutDatum = Nothing
-                  , gyTxOutRefS = Nothing
-                  }
+            minimumUTxOF
+              GYTxOut
+                { gyTxOutAddress = addr
+                , gyTxOutValue = tkMap
+                , gyTxOutDatum = Nothing
+                , gyTxOutRefS = Nothing
+                }
         , {- This field essentially takes care of tx fees.
 
           For simplicity, we simply use the extraLovelace parameter.
           -}
-          computeMinimumCost = const $ CWallet.Coin extraLovelace
-        , maximumOutputAdaQuantity = CWallet.txOutMaxCoin
-        , maximumOutputTokenQuantity = CWallet.txOutMaxTokenQuantity
-        , maximumLengthChangeAddress = toCWalletAddress changeAddr -- Since our change address is fixed.
-        , nullAddress = CWallet.Address ""
+          computeMinimumCost = const extraLovelace
+        , maximumOutputAdaQuantity = 45_000_000_000_000_000
+        , maximumOutputTokenQuantity = fromIntegral $ maxBound @Word64
+        , changeAddress = changeAddr
+        , nullAddress = addressFromCredential GYMainnet (GYCredentialByKey "00000000000000000000000000000000000000000000000000000000") Nothing
         }
     selectionParams =
-      CBalance.SelectionParams
-        { assetsToMint = toTokenMap mintedVal
-        , assetsToBurn = toTokenMap burnedVal
-        , extraCoinSource = CWallet.Coin adaSource
-        , extraCoinSink = CWallet.Coin adaSink
-        , outputsToCover = map (bimap toCWalletAddress toTokenBundle) requiredOutputs
-        , utxoAvailable = CWallet.fromIndexPair (ownUtxosIndex, existingInpsIndex) -- `fromIndexPair` would actually make first element to be @ownUtxosIndex `UTxOIndex.difference` existingInpsIndex@.
+      SelectionParams
+        { assetsToMint = mintedVal
+        , assetsToBurn = burnedVal
+        , extraCoinSource = adaSource
+        , extraCoinSink = adaSink
+        , outputsToCover = requiredOutputs
+        , utxoAvailable = UTxOSelection.fromIndexPair (ownUtxosIndex, existingInpsIndex) -- `fromIndexPair` would actually make first element to be @ownUtxosIndex `UTxOIndex.difference` existingInpsIndex@.
         , selectionStrategy = case cstrat of
-            GYRandomImproveMultiAsset -> CBalance.SelectionStrategyOptimal
-            _ -> CBalance.SelectionStrategyMinimal
+            GYRandomImproveMultiAsset -> SelectionStrategyOptimal
+            _ -> SelectionStrategyMinimal
         }
     (mintedVal, burnedVal) = valueSplitSign mintValue
     ownUtxosIndex = utxosToUtxoIndex ownUtxos
     existingInpsIndex = txInDetailedToUtxoIndex existingInputs
 
-computeTokenBundleSerializedLengthBytes :: CTokenBundle.TokenBundle -> CWallet.TxSize
+computeTokenBundleSerializedLengthBytes :: GYValue -> Natural
 computeTokenBundleSerializedLengthBytes =
-  CWallet.TxSize
-    . safeCast
+  safeCast
     . BS.length
     . CBOR.serialize' (eraProtVerHigh @Conway)
     . Api.S.toMaryValue
-    . toCardanoValue
+    . valueToApi
  where
   safeCast :: Int -> Natural
   safeCast = fromIntegral
@@ -327,97 +291,34 @@ utxoAsPubKeyInp GYUTxO {utxoRef, utxoAddress, utxoValue, utxoOutDatum, utxoRefSc
     , gyTxInDetScriptRef = utxoRefScript
     }
 
-tokenBundleSizeAssessor :: CWallet.TxSize -> CWallet.TokenBundleSizeAssessor
-tokenBundleSizeAssessor maxSize = CWallet.TokenBundleSizeAssessor {..}
+tokenBundleSizeAssessor' :: Natural -> ValueSizeAssessor
+tokenBundleSizeAssessor' maxSize = assessTokenBundleSize
  where
   assessTokenBundleSize tb
     | serializedLengthBytes <= maxSize =
-        CWallet.TokenBundleSizeWithinLimit
+        ValueSizeWithinLimit
     | otherwise =
-        CWallet.TokenBundleSizeExceedsLimit
+        ValueSizeExceedsLimit
    where
-    serializedLengthBytes :: CWallet.TxSize
     serializedLengthBytes = computeTokenBundleSerializedLengthBytes tb
 
-toCardanoValue :: CTokenBundle.TokenBundle -> Api.S.Value
-toCardanoValue tb =
-  fromList $
-    (Api.S.AdaAssetId, coinToQuantity coin)
-      : map (bimap toCardanoAssetId toQuantity) bundle
- where
-  (coin, bundle) = CTokenBundle.toFlatList tb
-  toCardanoAssetId (CTokenBundle.AssetId pid name) =
-    Api.S.AssetId (toCardanoPolicyId pid) (toCardanoAssetName name)
+utxosToUtxoIndex :: GYUTxOs -> UTxOIndex UTxO
+utxosToUtxoIndex = UTxOIndex.fromSequence . map utxoToTuple . utxosToList
 
-  toCardanoAssetName :: CWallet.AssetName -> Api.S.AssetName
-  toCardanoAssetName (CWallet.UnsafeAssetName tn) =
-    either (\e -> error $ "toCardanoValue: unable to deserialise, error: " <> show e) id $
-      Api.S.deserialiseFromRawBytes Api.S.AsAssetName tn
-
-  coinToQuantity = fromIntegral . CWallet.unCoin
-  toQuantity = fromIntegral . CWallet.unTokenQuantity
-
-toCardanoPolicyId :: CWallet.TokenPolicyId -> Api.S.PolicyId
-toCardanoPolicyId (CWallet.UnsafeTokenPolicyId (CWallet.Hash pid)) =
-  either (\e -> error $ "toCardanoPolicyId: unable to deserialise, error: " <> show e) id $
-    Api.S.deserialiseFromRawBytes Api.S.AsPolicyId pid
-
-toTokenMap :: GYValue -> CWTokenMap.TokenMap
-toTokenMap value =
-  CWTokenMap.fromFlatList $
-    map
-      (\(ac, n) -> (toWalletAssetId ac, CWallet.TokenQuantity $ fromIntegral n))
-      (valueToList value)
-
-fromTokenMap :: CWTokenMap.TokenMap -> GYValue
-fromTokenMap =
-  valueFromList
-    . map (bimap fromWalletAssetId (\(CWallet.TokenQuantity n) -> toInteger n))
-    . CWTokenMap.toFlatList
-
-toWalletAssetId :: GYAssetClass -> CTokenBundle.AssetId
-toWalletAssetId GYLovelace = error "toWalletAssetId: unable to deserialize"
-toWalletAssetId tkn@(GYToken policyId (GYTokenName tokenName)) = CTokenBundle.AssetId tokenPolicy nTokenName
- where
-  tokenPolicy = either (customError tkn) id $ fromText $ mintingPolicyIdToText policyId
-  nTokenName = either (customError tkn) id $ CWallet.fromByteString tokenName
-  customError t = error $ printf "toWalletAssetId: unable to deserialize \n %s" t
-
-fromWalletAssetId :: CTokenBundle.AssetId -> GYAssetClass
-fromWalletAssetId (CTokenBundle.AssetId tokenPolicy nTokenName) = GYToken policyId tkName
- where
-  policyId = fromRight customError $ mintingPolicyIdFromText $ toText tokenPolicy
-  tkName = fromMaybe customError $ tokenNameFromBS $ CWallet.unAssetName nTokenName
-  customError = error "fromWalletAssetId: unable to deserialize"
-
-toTokenBundle :: GYValue -> CTokenBundle.TokenBundle
-toTokenBundle v = CTokenBundle.fromCoin coins `CTokenBundle.add` CTokenBundle.fromTokenMap (toTokenMap tokens)
- where
-  coins = fromMaybe customError $ CWallet.fromIntegralMaybe lov
-  (lov, tokens) = valueSplitAda v
-  customError = error "toTokenBundle: unable to deserialize"
-
-fromTokenBundle :: CTokenBundle.TokenBundle -> GYValue
-fromTokenBundle (CTokenBundle.TokenBundle (CWallet.Coin n) tkMap) = valueFromLovelace (toInteger n) <> fromTokenMap tkMap
-
-utxosToUtxoIndex :: GYUTxOs -> CWallet.UTxOIndex WalletUTxO
-utxosToUtxoIndex = CWallet.fromSequence . map utxoToTuple . utxosToList
-
-utxoToTuple :: GYUTxO -> (WalletUTxO, CTokenBundle.TokenBundle)
+utxoToTuple :: GYUTxO -> (UTxO, GYValue)
 utxoToTuple
   GYUTxO
     { utxoRef
-    , utxoAddress
     , utxoValue
     } = (wUtxo, bundle)
    where
     wUtxo = utxoRef
-    bundle = toTokenBundle utxoValue
+    bundle = utxoValue
 
-txInDetailedToUtxoIndex :: [GYTxInDetailed v] -> CWallet.UTxOIndex WalletUTxO
-txInDetailedToUtxoIndex = CWallet.fromSequence . map txInDetailedToTuple
+txInDetailedToUtxoIndex :: [GYTxInDetailed v] -> UTxOIndex UTxO
+txInDetailedToUtxoIndex = UTxOIndex.fromSequence . map txInDetailedToTuple
 
-txInDetailedToTuple :: GYTxInDetailed v -> (WalletUTxO, CTokenBundle.TokenBundle)
+txInDetailedToTuple :: GYTxInDetailed v -> (UTxO, GYValue)
 txInDetailedToTuple
   GYTxInDetailed
     { gyTxInDet
@@ -425,19 +326,11 @@ txInDetailedToTuple
     } = (wUtxo, bundle)
    where
     wUtxo = gyTxInTxOutRef gyTxInDet
-    bundle = toTokenBundle gyTxInDetValue
+    bundle = gyTxInDetValue
 
-toCWalletAddress :: GYAddress -> CWallet.Address
-toCWalletAddress = CWallet.Address . Api.serialiseToRawBytes . addressToApi
-
-fromCWalletAddress :: CWallet.Address -> GYAddress
-fromCWalletAddress (CWallet.Address bs) = either customError addressFromApi $ Api.deserialiseFromRawBytes Api.AsAddressAny bs
- where
-  customError e = error $ "fromCWalletAddress: unable to deserialize, error: " <> show e
-
-fromCWalletBalancingError :: CBalance.SelectionBalanceError ctx -> GYBalancingError
-fromCWalletBalancingError (CBalance.BalanceInsufficient (CBalance.BalanceInsufficientError _ _ delta)) =
-  GYBalancingErrorInsufficientFunds $ fromTokenBundle delta
-fromCWalletBalancingError (CBalance.UnableToConstructChange (CBalance.UnableToConstructChangeError _ n)) =
-  GYBalancingErrorChangeShortFall $ CWallet.unCoin n
-fromCWalletBalancingError CBalance.EmptyUTxO = GYBalancingErrorEmptyOwnUTxOs
+fromWalletBalancingError :: SelectionBalanceError -> GYBalancingError
+fromWalletBalancingError (BalanceInsufficient (BalanceInsufficientError _ _ delta)) =
+  GYBalancingErrorInsufficientFunds delta
+fromWalletBalancingError (UnableToConstructChange (UnableToConstructChangeError _ n)) =
+  GYBalancingErrorChangeShortFall n
+fromWalletBalancingError EmptyUTxO = GYBalancingErrorEmptyOwnUTxOs

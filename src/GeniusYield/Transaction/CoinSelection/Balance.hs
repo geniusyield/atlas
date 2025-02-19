@@ -12,7 +12,17 @@ Stability   : develop
 Largely a simplified version of [@Cardano.CoinSelection.Balance@](https://github.com/cardano-foundation/cardano-wallet/blob/master/lib/coin-selection/lib/Cardano/CoinSelection/Balance.hs).
 -}
 module GeniusYield.Transaction.CoinSelection.Balance (
-
+  UTxO,
+  ValueSizeAssessment (..),
+  ValueSizeAssessor,
+  SelectionStrategy (..),
+  SelectionConstraints (..),
+  SelectionParams (..),
+  SelectionResult (..),
+  SelectionBalanceError (..),
+  BalanceInsufficientError (..),
+  UnableToConstructChangeError (..),
+  performSelection,
 ) where
 
 import Cardano.Numeric.Util (equipartitionNatural, padCoalesce, partitionNatural)

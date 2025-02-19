@@ -15,23 +15,13 @@ module GeniusYield.Transaction.CoinSelection.Balance (
 
 ) where
 
-import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api.S
-import Cardano.Ledger.Binary qualified as CBOR
-import Cardano.Ledger.Conway.Core (eraProtVerHigh)
 import Cardano.Numeric.Util (equipartitionNatural, padCoalesce, partitionNatural)
 import Control.Monad.Extra (
   andM,
   (<=<),
  )
 import Control.Monad.Random (MonadRandom)
-import Control.Monad.Trans.Except (
-  ExceptT (ExceptT),
-  except,
- )
 import Data.Bifunctor qualified
-import Data.ByteString qualified as BS
-import Data.Default (Default (def))
 import Data.Either.Extra (
   maybeToEither,
  )
@@ -48,22 +38,13 @@ import Data.Map qualified as Map
 import Data.Monoid (Sum (..))
 import Data.Ord (comparing)
 import Data.Ratio ((%))
-import Data.Semigroup (mtimesDefault)
-import Data.Set qualified as S
 import Data.Set qualified as Set
-import Data.Text.Class (
-  ToText (toText),
-  fromText,
- )
-import GHC.IsList (fromList)
 import GeniusYield.Imports
 import GeniusYield.Transaction.CoinSelection.UTxOIndex (SelectionFilter (..), UTxOIndex)
 import GeniusYield.Transaction.CoinSelection.UTxOIndex qualified as UTxOIndex
 import GeniusYield.Transaction.CoinSelection.UTxOSelection (IsUTxOSelection, UTxOSelection, UTxOSelectionNonEmpty)
 import GeniusYield.Transaction.CoinSelection.UTxOSelection qualified as UTxOSelection
-import GeniusYield.Transaction.Common
 import GeniusYield.Types
-import GeniusYield.Utils
 
 type UTxO = GYTxOutRef
 
@@ -1935,40 +1916,42 @@ equipartitionAssets (valueSplitAda -> (adaC, nonAdaVal)) count = NE.zipWith f (e
  where
   f adaCP nonAdaValP = valueFromLovelace (fromIntegral adaCP) <> nonAdaValP
 
-  -- \| Partitions a token map into 'n' smaller maps, where the asset sets of the
-  --   resultant maps are disjoint.
-  --
-  -- In the resultant maps, the smallest asset set size and largest asset set
-  -- size will differ by no more than 1.
-  --
-  -- The quantities of each asset are unchanged.
-  equipartitionNonAdaAssets ::
-    GYValue -> -- without lovelace
-    -- \^ The token map to be partitioned.
-    NonEmpty a ->
-    -- \^ Represents the number of portions in which to partition the token map.
-    NonEmpty GYValue -- without lovelace
-    -- \^ The partitioned maps.
-  equipartitionNonAdaAssets m mapCount =
-    valueFromList <$> NE.unfoldr generateChunk (assetCounts, valueToList m)
+{- | Partitions a token map into 'n' smaller maps, where the asset sets of the
+  resultant maps are disjoint.
+
+In the resultant maps, the smallest asset set size and largest asset set
+size will differ by no more than 1.
+
+The quantities of each asset are unchanged.
+-}
+equipartitionNonAdaAssets ::
+  -- | The token map to be partitioned.
+  GYValue -> -- without lovelace
+
+  -- | Represents the number of portions in which to partition the token map.
+  NonEmpty a ->
+  -- | The partitioned maps.
+  NonEmpty GYValue -- without lovelace
+equipartitionNonAdaAssets m mapCount =
+  valueFromList <$> NE.unfoldr generateChunk (assetCounts, valueToList m)
+ where
+  -- The total number of assets.
+  assetCount :: Int
+  assetCount = valueTotalAssets m
+
+  -- How many asset quantities to include in each chunk.
+  assetCounts :: NonEmpty Int
+  assetCounts =
+    fromIntegral @Natural @Int
+      <$> equipartitionNatural (fromIntegral @Int @Natural assetCount) mapCount
+
+  -- Generates a single chunk of asset quantities.
+  generateChunk :: (NonEmpty Int, [aq]) -> ([aq], Maybe (NonEmpty Int, [aq]))
+  generateChunk (c :| mcs, aqs) = case NE.nonEmpty mcs of
+    Just cs -> (prefix, Just (cs, suffix))
+    Nothing -> (aqs, Nothing)
    where
-    -- The total number of assets.
-    assetCount :: Int
-    assetCount = valueTotalAssets m
-
-    -- How many asset quantities to include in each chunk.
-    assetCounts :: NonEmpty Int
-    assetCounts =
-      fromIntegral @Natural @Int
-        <$> equipartitionNatural (fromIntegral @Int @Natural assetCount) mapCount
-
-    -- Generates a single chunk of asset quantities.
-    generateChunk :: (NonEmpty Int, [aq]) -> ([aq], Maybe (NonEmpty Int, [aq]))
-    generateChunk (c :| mcs, aqs) = case NE.nonEmpty mcs of
-      Just cs -> (prefix, Just (cs, suffix))
-      Nothing -> (aqs, Nothing)
-     where
-      (prefix, suffix) = L.splitAt c aqs
+    (prefix, suffix) = L.splitAt c aqs
 
 equipartitionQuantitiesWithUpperBound ::
   GYValue ->
@@ -1982,64 +1965,70 @@ equipartitionQuantitiesWithUpperBound (valueSplitAda -> (adaC, nonAdaVal)) maxQu
   cs = equipartitionNatural (fromIntegral adaC) ms
   ms = equipartitionNonAdaQuantitiesWithUpperBound nonAdaVal maxQuantity
   f adaCP nonAdaValP = valueFromLovelace (fromIntegral adaCP) <> nonAdaValP
-  -- \| Partitions a token map into 'n' smaller maps, where the quantity of each
-  --   token is equipartitioned across the resultant maps, with the goal that no
-  --   token quantity in any of the resultant maps exceeds the given upper bound.
-  --
-  -- The value 'n' is computed automatically, and is the minimum value required
-  -- to achieve the goal that no token quantity in any of the resulting maps
-  -- exceeds the maximum allowable token quantity.
-  equipartitionNonAdaQuantitiesWithUpperBound ::
-    GYValue -> -- Denotes without lovelace
-    Natural ->
-    -- \^ Maximum allowable token quantity.
-    NonEmpty GYValue -- Denotes without lovelace
-  -- \^ The partitioned maps.
-  equipartitionNonAdaQuantitiesWithUpperBound m maxQuantity
-    | maxQuantity == 0 =
-        maxQuantityZeroError
-    | currentMaxQuantity <= maxQuantity =
-        m :| []
-    | otherwise =
-        equipartitionNonAdaQuantities m (() :| replicate extraPartCount ())
-   where
-    currentMaxQuantity = maximumQuantity m
-    maximumQuantity val = valueToMap val & Map.elems & maximum & fromIntegral
-    extraPartCount :: Int
-    extraPartCount = floor $ pred currentMaxQuantity % maxQuantity
 
-    maxQuantityZeroError =
-      error $
-        unwords
-          [ "equipartitionQuantitiesWithUpperBound:"
-          , "the maximum allowable token quantity cannot be zero."
-          ]
-  -- \| Partitions a token map into 'n' smaller maps, where the quantity of each
-  --   token is equipartitioned across the resultant maps.
-  --
-  -- In the resultant maps, the smallest quantity and largest quantity of a given
-  -- token will differ by no more than 1.
-  --
-  -- The resultant list is sorted into ascending order when maps are compared
-  -- with the 'leq' function.
-  equipartitionNonAdaQuantities ::
-    GYValue -> -- without lovelace
-    -- \^ The map to be partitioned.
-    NonEmpty a ->
-    -- \^ Represents the number of portions in which to partition the map.
-    NonEmpty GYValue -- without lovelace
-  -- \^ The partitioned maps.
-  equipartitionNonAdaQuantities m count =
-    F.foldl' accumulate (mempty <$ count) (valueToList m)
-   where
-    accumulate ::
-      NonEmpty GYValue ->
-      (GYAssetClass, Integer) ->
-      NonEmpty GYValue
-    accumulate maps (asset, quantity) =
-      NE.zipWith (<>) maps $
-        valueSingleton asset . fromIntegral
-          <$> equipartitionNatural (fromIntegral quantity) count
+{- | Partitions a token map into 'n' smaller maps, where the quantity of each
+  token is equipartitioned across the resultant maps, with the goal that no
+  token quantity in any of the resultant maps exceeds the given upper bound.
+
+The value 'n' is computed automatically, and is the minimum value required
+to achieve the goal that no token quantity in any of the resulting maps
+exceeds the maximum allowable token quantity.
+-}
+equipartitionNonAdaQuantitiesWithUpperBound ::
+  GYValue -> -- Denotes without lovelace
+
+  -- | Maximum allowable token quantity.
+  Natural ->
+  -- | The partitioned maps.
+  NonEmpty GYValue -- Denotes without lovelace
+equipartitionNonAdaQuantitiesWithUpperBound m maxQuantity
+  | maxQuantity == 0 =
+      maxQuantityZeroError
+  | currentMaxQuantity <= maxQuantity =
+      m :| []
+  | otherwise =
+      equipartitionNonAdaQuantities m (() :| replicate extraPartCount ())
+ where
+  currentMaxQuantity = maximumQuantity m
+  maximumQuantity val = valueToMap val & Map.elems & maximum & fromIntegral
+  extraPartCount :: Int
+  extraPartCount = floor $ pred currentMaxQuantity % maxQuantity
+
+  maxQuantityZeroError =
+    error $
+      unwords
+        [ "equipartitionNonAdaQuantitiesWithUpperBound:"
+        , "the maximum allowable token quantity cannot be zero."
+        ]
+
+{- | Partitions a token map into 'n' smaller maps, where the quantity of each
+  token is equipartitioned across the resultant maps.
+
+In the resultant maps, the smallest quantity and largest quantity of a given
+token will differ by no more than 1.
+
+The resultant list is sorted into ascending order when maps are compared
+with the 'leq' function.
+-}
+equipartitionNonAdaQuantities ::
+  -- | The map to be partitioned.
+  GYValue -> -- without lovelace
+
+  -- | Represents the number of portions in which to partition the map.
+  NonEmpty a ->
+  -- | The partitioned maps.
+  NonEmpty GYValue -- without lovelace
+equipartitionNonAdaQuantities m count =
+  F.foldl' accumulate (mempty <$ count) (valueToList m)
+ where
+  accumulate ::
+    NonEmpty GYValue ->
+    (GYAssetClass, Integer) ->
+    NonEmpty GYValue
+  accumulate maps (asset, quantity) =
+    NE.zipWith (<>) maps $
+      valueSingleton asset . fromIntegral
+        <$> equipartitionNatural (fromIntegral quantity) count
 
 {- | Splits bundles with excessive asset counts into smaller bundles.
 

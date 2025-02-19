@@ -60,10 +60,7 @@ import GeniusYield.Utils
 type GYCoinSelectionContext :: PlutusVersion -> Type
 data GYCoinSelectionContext v
 
-newtype WalletUTxO = WalletUTxO
-  { txIn :: GYTxOutRef
-  }
-  deriving (Eq, Generic, Ord, Show)
+type WalletUTxO = GYTxOutRef
 
 {- Note: The vast majority of partial functions in this module are fine since they are localized.
 
@@ -206,7 +203,7 @@ selectInputs
           map
             (\(fromTokenBundle -> tokenChange) -> GYTxOut changeAddr tokenChange Nothing Nothing)
             changeGenerated
-        foldHelper acc (WalletUTxO {txIn}, _)
+        foldHelper acc (txIn, _)
           | txIn `S.member` inRefs = acc
           | otherwise = case utxosLookup txIn ownUtxos of
               {- Invariant: The balancer should only select inputs from 'existingInputs' or 'ownUtxos'
@@ -414,10 +411,7 @@ utxoToTuple
     , utxoValue
     } = (wUtxo, bundle)
    where
-    wUtxo =
-      WalletUTxO
-        { txIn = utxoRef
-        }
+    wUtxo = utxoRef
     bundle = toTokenBundle utxoValue
 
 txInDetailedToUtxoIndex :: [GYTxInDetailed v] -> CWallet.UTxOIndex WalletUTxO
@@ -430,10 +424,7 @@ txInDetailedToTuple
     , gyTxInDetValue
     } = (wUtxo, bundle)
    where
-    wUtxo =
-      WalletUTxO
-        { txIn = gyTxInTxOutRef gyTxInDet
-        }
+    wUtxo = gyTxInTxOutRef gyTxInDet
     bundle = toTokenBundle gyTxInDetValue
 
 toCWalletAddress :: GYAddress -> CWallet.Address

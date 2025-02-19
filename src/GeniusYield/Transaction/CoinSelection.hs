@@ -60,9 +60,8 @@ import GeniusYield.Utils
 type GYCoinSelectionContext :: PlutusVersion -> Type
 data GYCoinSelectionContext v
 
-data WalletUTxO = WalletUTxO
-  { txIn :: !GYTxOutRef
-  , address :: !GYAddress
+newtype WalletUTxO = WalletUTxO
+  { txIn :: GYTxOutRef
   }
   deriving (Eq, Generic, Ord, Show)
 
@@ -418,7 +417,6 @@ utxoToTuple
     wUtxo =
       WalletUTxO
         { txIn = utxoRef
-        , address = utxoAddress
         }
     bundle = toTokenBundle utxoValue
 
@@ -429,14 +427,12 @@ txInDetailedToTuple :: GYTxInDetailed v -> (WalletUTxO, CTokenBundle.TokenBundle
 txInDetailedToTuple
   GYTxInDetailed
     { gyTxInDet
-    , gyTxInDetAddress
     , gyTxInDetValue
     } = (wUtxo, bundle)
    where
     wUtxo =
       WalletUTxO
         { txIn = gyTxInTxOutRef gyTxInDet
-        , address = gyTxInDetAddress
         }
     bundle = toTokenBundle gyTxInDetValue
 

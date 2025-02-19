@@ -47,6 +47,7 @@ import Data.List.NonEmpty qualified as NE
 import Data.Map qualified as Map
 import Data.Monoid (Sum (..))
 import Data.Ord (comparing)
+import Data.Ratio ((%))
 import Data.Semigroup (mtimesDefault)
 import Data.Set qualified as S
 import Data.Set qualified as Set
@@ -1923,7 +1924,13 @@ splitBundleIfAssetCountExcessive b isExcessive
  where
   splitInHalf = flip equipartitionAssets (() :| [()])
 
-equipartitionAssets :: GYValue -> NonEmpty a -> NonEmpty GYValue
+equipartitionAssets ::
+  -- | Value to parition
+  GYValue ->
+  -- | Represents the number of portions in which to partition the value.
+  NonEmpty a ->
+  -- | The partitioned values.
+  NonEmpty GYValue
 equipartitionAssets (valueSplitAda -> (adaC, nonAdaVal)) count = NE.zipWith f (equipartitionNatural (fromIntegral adaC) count) (equipartitionNonAdaAssets nonAdaVal count)
  where
   f adaCP nonAdaValP = valueFromLovelace (fromIntegral adaCP) <> nonAdaValP
@@ -1941,7 +1948,7 @@ equipartitionAssets (valueSplitAda -> (adaC, nonAdaVal)) count = NE.zipWith f (e
     NonEmpty a ->
     -- \^ Represents the number of portions in which to partition the token map.
     NonEmpty GYValue -- without lovelace
-  -- \^ The partitioned maps.
+    -- \^ The partitioned maps.
   equipartitionNonAdaAssets m mapCount =
     valueFromList <$> NE.unfoldr generateChunk (assetCounts, valueToList m)
    where
@@ -1963,7 +1970,76 @@ equipartitionAssets (valueSplitAda -> (adaC, nonAdaVal)) count = NE.zipWith f (e
      where
       (prefix, suffix) = L.splitAt c aqs
 
-equipartitionQuantitiesWithUpperBound = undefined
+equipartitionQuantitiesWithUpperBound ::
+  GYValue ->
+  -- | Maximum allowable token quantity.
+  Natural ->
+  -- | The partitioned bundles.
+  NonEmpty GYValue
+equipartitionQuantitiesWithUpperBound (valueSplitAda -> (adaC, nonAdaVal)) maxQuantity =
+  NE.zipWith f cs ms
+ where
+  cs = equipartitionNatural (fromIntegral adaC) ms
+  ms = equipartitionNonAdaQuantitiesWithUpperBound nonAdaVal maxQuantity
+  f adaCP nonAdaValP = valueFromLovelace (fromIntegral adaCP) <> nonAdaValP
+  -- \| Partitions a token map into 'n' smaller maps, where the quantity of each
+  --   token is equipartitioned across the resultant maps, with the goal that no
+  --   token quantity in any of the resultant maps exceeds the given upper bound.
+  --
+  -- The value 'n' is computed automatically, and is the minimum value required
+  -- to achieve the goal that no token quantity in any of the resulting maps
+  -- exceeds the maximum allowable token quantity.
+  equipartitionNonAdaQuantitiesWithUpperBound ::
+    GYValue -> -- Denotes without lovelace
+    Natural ->
+    -- \^ Maximum allowable token quantity.
+    NonEmpty GYValue -- Denotes without lovelace
+  -- \^ The partitioned maps.
+  equipartitionNonAdaQuantitiesWithUpperBound m maxQuantity
+    | maxQuantity == 0 =
+        maxQuantityZeroError
+    | currentMaxQuantity <= maxQuantity =
+        m :| []
+    | otherwise =
+        equipartitionNonAdaQuantities m (() :| replicate extraPartCount ())
+   where
+    currentMaxQuantity = maximumQuantity m
+    maximumQuantity val = valueToMap val & Map.elems & maximum & fromIntegral
+    extraPartCount :: Int
+    extraPartCount = floor $ pred currentMaxQuantity % maxQuantity
+
+    maxQuantityZeroError =
+      error $
+        unwords
+          [ "equipartitionQuantitiesWithUpperBound:"
+          , "the maximum allowable token quantity cannot be zero."
+          ]
+  -- \| Partitions a token map into 'n' smaller maps, where the quantity of each
+  --   token is equipartitioned across the resultant maps.
+  --
+  -- In the resultant maps, the smallest quantity and largest quantity of a given
+  -- token will differ by no more than 1.
+  --
+  -- The resultant list is sorted into ascending order when maps are compared
+  -- with the 'leq' function.
+  equipartitionNonAdaQuantities ::
+    GYValue -> -- without lovelace
+    -- \^ The map to be partitioned.
+    NonEmpty a ->
+    -- \^ Represents the number of portions in which to partition the map.
+    NonEmpty GYValue -- without lovelace
+  -- \^ The partitioned maps.
+  equipartitionNonAdaQuantities m count =
+    F.foldl' accumulate (mempty <$ count) (valueToList m)
+   where
+    accumulate ::
+      NonEmpty GYValue ->
+      (GYAssetClass, Integer) ->
+      NonEmpty GYValue
+    accumulate maps (asset, quantity) =
+      NE.zipWith (<>) maps $
+        valueSingleton asset . fromIntegral
+          <$> equipartitionNatural (fromIntegral quantity) count
 
 {- | Splits bundles with excessive asset counts into smaller bundles.
 

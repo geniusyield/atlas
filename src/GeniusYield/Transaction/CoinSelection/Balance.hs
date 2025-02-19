@@ -19,7 +19,7 @@ import Cardano.Api qualified as Api
 import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Binary qualified as CBOR
 import Cardano.Ledger.Conway.Core (eraProtVerHigh)
-import Cardano.Numeric.Util (padCoalesce, partitionNatural)
+import Cardano.Numeric.Util (equipartitionNatural, padCoalesce, partitionNatural)
 import Control.Monad.Extra (
   andM,
   (<=<),
@@ -1923,7 +1923,46 @@ splitBundleIfAssetCountExcessive b isExcessive
  where
   splitInHalf = flip equipartitionAssets (() :| [()])
 
-equipartitionAssets = undefined
+equipartitionAssets :: GYValue -> NonEmpty a -> NonEmpty GYValue
+equipartitionAssets (valueSplitAda -> (adaC, nonAdaVal)) count = NE.zipWith f (equipartitionNatural (fromIntegral adaC) count) (equipartitionNonAdaAssets nonAdaVal count)
+ where
+  f adaCP nonAdaValP = valueFromLovelace (fromIntegral adaCP) <> nonAdaValP
+
+  -- \| Partitions a token map into 'n' smaller maps, where the asset sets of the
+  --   resultant maps are disjoint.
+  --
+  -- In the resultant maps, the smallest asset set size and largest asset set
+  -- size will differ by no more than 1.
+  --
+  -- The quantities of each asset are unchanged.
+  equipartitionNonAdaAssets ::
+    GYValue -> -- without lovelace
+    -- \^ The token map to be partitioned.
+    NonEmpty a ->
+    -- \^ Represents the number of portions in which to partition the token map.
+    NonEmpty GYValue -- without lovelace
+  -- \^ The partitioned maps.
+  equipartitionNonAdaAssets m mapCount =
+    valueFromList <$> NE.unfoldr generateChunk (assetCounts, valueToList m)
+   where
+    -- The total number of assets.
+    assetCount :: Int
+    assetCount = valueTotalAssets m
+
+    -- How many asset quantities to include in each chunk.
+    assetCounts :: NonEmpty Int
+    assetCounts =
+      fromIntegral @Natural @Int
+        <$> equipartitionNatural (fromIntegral @Int @Natural assetCount) mapCount
+
+    -- Generates a single chunk of asset quantities.
+    generateChunk :: (NonEmpty Int, [aq]) -> ([aq], Maybe (NonEmpty Int, [aq]))
+    generateChunk (c :| mcs, aqs) = case NE.nonEmpty mcs of
+      Just cs -> (prefix, Just (cs, suffix))
+      Nothing -> (aqs, Nothing)
+     where
+      (prefix, suffix) = L.splitAt c aqs
+
 equipartitionQuantitiesWithUpperBound = undefined
 
 {- | Splits bundles with excessive asset counts into smaller bundles.

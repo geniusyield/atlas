@@ -84,35 +84,14 @@ source-repository-package
   tag: d611632fc3d616d5b4038a70f864bf2613c125d0
   --sha256: sha256-v0q8qHdI6LKc8mP43QZt3UGdTNDQXE0aF6QapvZsTvU=
 
------- Following is mostly from @cardano-wallet@'s @cabal.project@ file. -------
+------ Following is mostly from @cardano-node@'s @cabal.project@ file. -------
 
 --------------------------------------------------------------------------------
 -- BEGIN Constraints tweaking section
 
 allow-newer:
-    async-timer:unliftio-core
-  , katip:Win32
+    katip:Win32
   , ekg-wai:time
-
-constraints:
-    base >= 4.18.2.0 && < 5
-  , openapi3 >= 3.2.0
-  , persistent ^>= 2.14.6.0
-
-  , bech32 >= 1.1.7
-
-  -- lower versions of katip won't build with the Win32-2.12.0.1
-  -- which is shipped with the ghc-9.2.8
-  , katip >= 0.8.7.4
-
-
-  -- Cardano Node dependencies:
-  , io-classes >= 1.4
-  , io-classes -asserts
-
-  , cardano-ledger-api ^>= 1.9
-
-  , ouroboros-network ^>= 0.17
 
 -- END Constraints tweaking section
 --------------------------------------------------------------------------------
@@ -128,9 +107,6 @@ constraints:
 package cryptonite
   flags: -support_rdrand
 
-package cardano-config
-  flags: -systemd
-
 package cardano-node
   flags: -systemd
 
@@ -139,4 +115,4 @@ package bitvec
 
 -- -------------------------------------------------------------------------
 
--------- End contents from @cardano-wallet@'s @cabal.project@ file. --------
+-------- End contents from @cardano-node@'s @cabal.project@ file. --------

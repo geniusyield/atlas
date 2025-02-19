@@ -1,3 +1,7 @@
+## Next
+
+* `valueAdjust` now omits for entries if result of adjustment is zero.
+
 ## 0.11.1
 
 * Adds support of Ogmios-Kupo provider, see section on providers at https://atlas-app.io/getting-started/endpoints.

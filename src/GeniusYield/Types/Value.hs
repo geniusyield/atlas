@@ -29,6 +29,8 @@ module GeniusYield.Types.Value (
   valueFromApiTxOutValue,
   valueToApiTxOutValue,
   valueAssets,
+  valueWithoutAssets,
+  valueRestrictAssets,
   parseValueKM,
 
   -- ** Arithmetic
@@ -262,9 +264,13 @@ valueInsert asc i (GYValue m) = GYValue (Map.insert asc i m)
 
 {- | Adjust the amount of a given 'GYAssetClass' in the given 'GYValue'.
 If the asset is not present in the value, original value is returned instead.
+
+If the result of the adjustment is zero, the asset is removed from the value.
 -}
 valueAdjust :: (Integer -> Integer) -> GYAssetClass -> GYValue -> GYValue
-valueAdjust f asc (GYValue m) = GYValue (Map.adjust f asc m)
+valueAdjust f asc (GYValue m) = case Map.lookup asc m of
+  Nothing -> GYValue m
+  Just i -> let fi = f i in if fi == 0 then GYValue (Map.delete asc m) else GYValue (Map.insert asc fi m)
 
 {- | The expression (@'valueAlter' f asc val@) alters the value @x@ at @asc@, or absence thereof.
 'valueAlter' can be used to insert, delete, or update a value in a 'GYValue'.
@@ -285,6 +291,12 @@ valueAssets (GYValue m) = Map.keysSet m
 -- | Returns the total count of assets in a given 'GYValue'
 valueTotalAssets :: GYValue -> Int
 valueTotalAssets (GYValue v) = Map.size v
+
+valueWithoutAssets :: GYValue -> Set GYAssetClass -> GYValue
+valueWithoutAssets (GYValue m) acs = GYValue $ Map.withoutKeys m acs
+
+valueRestrictAssets :: GYValue -> Set GYAssetClass -> GYValue
+valueRestrictAssets (GYValue m) acs = GYValue $ Map.restrictKeys m acs
 
 {- |
 

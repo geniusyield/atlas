@@ -71,14 +71,7 @@ source-repository-package
   tag: 630ef0067c2c0df1b398256d75923db928beefa1
   --sha256: sha256-0iDG3LW60pb+ih+nfqQ3vR+WI7JEm+0kI3Vg7jqm1L0=
   subdir:
-    lib/crypto-primitives/
-    lib/coin-selection/
-    lib/delta-types/
-    lib/launcher/
     lib/numeric/
-    lib/primitive/
-    lib/test-utils/
-    lib/text-class/
 
 package postgresql-libpq
   flags: +use-pkg-config

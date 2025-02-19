@@ -267,7 +267,6 @@ library
     cardano-addresses,
     cardano-api,
     cardano-api:internal,
-    cardano-coin-selection,
     cardano-crypto,
     cardano-crypto-class,
     cardano-ledger-api,
@@ -282,14 +281,12 @@ library
     cardano-numeric,
     cardano-slotting,
     cardano-testnet,
-    cardano-wallet-primitive,
     ouroboros-consensus,
     ouroboros-consensus-cardano,
     ouroboros-network-protocols,
     plutus-ledger-api,
     plutus-tx,
     plutus-tx-plugin,
-    text-class
 
   -- needed for examples
   -- Version of @plutus-core@ is pinned in @cabal.project@ file.

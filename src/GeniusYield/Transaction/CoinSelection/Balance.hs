@@ -77,10 +77,8 @@ type ValueSizeAssessor = GYValue -> ValueSizeAssessment
 -- | Semantically a 'GYValue' without the 'GYLovelace' asset class.
 type GYValueWithoutLovelace = GYValue
 
--- TODO: Having this 'v' lingering around is nuisance.
-
 -- | Specifies all constraints required for coin selection.
-data SelectionConstraints v = SelectionConstraints
+data SelectionConstraints = SelectionConstraints
   { tokenBundleSizeAssessor ::
       ValueSizeAssessor
   -- ^ Assesses the size of a value relative to the upper limit of
@@ -409,7 +407,7 @@ selectionDeltaCoin = fmap (fromIntegral . (`valueAssetClass` GYLovelace)) . sele
 
 -- | Indicates whether or not a selection result has a valid surplus.
 selectionHasValidSurplus ::
-  Foldable f => SelectionConstraints v -> SelectionResult f -> Bool
+  Foldable f => SelectionConstraints -> SelectionResult f -> Bool
 selectionHasValidSurplus constraints selection =
   case selectionDeltaAllAssets selection of
     SelectionSurplus s -> surplusIsValid s
@@ -464,7 +462,7 @@ selectionSkeleton s =
 
 -- | Computes the minimum required cost of a selection.
 selectionMinimumCost ::
-  Foldable f => SelectionConstraints v -> SelectionResult f -> Natural
+  Foldable f => SelectionConstraints -> SelectionResult f -> Natural
 selectionMinimumCost c = view #computeMinimumCost c . selectionSkeleton
 
 {- | Computes the maximum acceptable cost of a selection.
@@ -482,7 +480,7 @@ that we can reference from within property tests.
 See 'selectionHasValidSurplus'.
 -}
 selectionMaximumCost ::
-  Foldable f => SelectionConstraints v -> SelectionResult f -> Natural
+  Foldable f => SelectionConstraints -> SelectionResult f -> Natural
 selectionMaximumCost c sr = let mc = selectionMinimumCost c sr in mc + mc
 
 -- | Represents the set of errors that may occur while performing a selection.
@@ -541,8 +539,8 @@ data UnableToConstructChangeError = UnableToConstructChangeError
   }
   deriving (Generic, Eq, Show)
 
-type PerformSelection m f v =
-  SelectionConstraints v ->
+type PerformSelection m f =
+  SelectionConstraints ->
   SelectionParams f ->
   m (Either SelectionBalanceError (SelectionResult f))
 
@@ -553,9 +551,9 @@ selection criteria, this function guarantees to return a 'SelectionResult'
 for which 'selectionHasValidSurplus' returns 'True'.
 -}
 performSelection ::
-  forall m v.
+  forall m.
   (HasCallStack, MonadRandom m) =>
-  PerformSelection m [] v
+  PerformSelection m []
 performSelection = performSelectionEmpty performSelectionNonEmpty
 
 {- | Transforms a coin selection function that requires a non-empty list of
@@ -586,10 +584,10 @@ If the original list is empty, this function:
          selectionHasValidSurplus constraints (transformResult result)
 -}
 performSelectionEmpty ::
-  forall m v.
+  forall m.
   Functor m =>
-  PerformSelection m NonEmpty v ->
-  PerformSelection m [] v
+  PerformSelection m NonEmpty ->
+  PerformSelection m []
 performSelectionEmpty performSelectionFn constraints params =
   fmap transformResult
     <$> performSelectionFn constraints (transformParams params)
@@ -650,9 +648,9 @@ performSelectionEmpty performSelectionFn constraints params =
   dummyCoin = 1
 
 performSelectionNonEmpty ::
-  forall m ctx.
+  forall m.
   (HasCallStack, MonadRandom m) =>
-  PerformSelection m NonEmpty ctx
+  PerformSelection m NonEmpty
 performSelectionNonEmpty constraints params
   -- Is the total available UTXO balance sufficient?
   | not utxoBalanceSufficient =

@@ -65,14 +65,6 @@ source-repository-package
     cardano-api
     cardano-api-gen
 
-source-repository-package
-  type: git
-  location: https://github.com/cardano-foundation/cardano-wallet
-  tag: 630ef0067c2c0df1b398256d75923db928beefa1
-  --sha256: sha256-0iDG3LW60pb+ih+nfqQ3vR+WI7JEm+0kI3Vg7jqm1L0=
-  subdir:
-    lib/numeric/
-
 package postgresql-libpq
   flags: +use-pkg-config
 

@@ -25,7 +25,7 @@ module GeniusYield.Transaction.CoinSelection.Balance (
   performSelection,
 ) where
 
-import Cardano.Numeric.Util (equipartitionNatural, padCoalesce, partitionNatural)
+import GeniusYield.Transaction.CoinSelection.Numeric (equipartitionNatural, padCoalesce, partitionNatural)
 import Control.Monad.Extra (
   andM,
   (<=<),

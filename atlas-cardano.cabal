@@ -109,6 +109,7 @@ library
     GeniusYield.Transaction.CBOR
     GeniusYield.Transaction.CoinSelection
     GeniusYield.Transaction.CoinSelection.Balance
+    GeniusYield.Transaction.CoinSelection.Numeric
     GeniusYield.Transaction.CoinSelection.Types
     GeniusYield.Transaction.CoinSelection.UTxOIndex.Internal
     GeniusYield.Transaction.CoinSelection.UTxOIndex
@@ -278,7 +279,6 @@ library
     cardano-ledger-alonzo,
     cardano-ledger-binary,
     cardano-ledger-shelley,
-    cardano-numeric,
     cardano-slotting,
     cardano-testnet,
     ouroboros-consensus,

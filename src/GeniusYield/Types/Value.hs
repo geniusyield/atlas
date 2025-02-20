@@ -29,15 +29,19 @@ module GeniusYield.Types.Value (
   valueFromApiTxOutValue,
   valueToApiTxOutValue,
   valueAssets,
+  valueWithoutAssets,
+  valueRestrictAssets,
   parseValueKM,
 
   -- ** Arithmetic
   valueMinus,
+  valueMonus,
   valueNegate,
   valuePositive,
   valueNonNegative,
   valueGreaterOrEqual,
   valueGreater,
+  valueLessOrEqual,
 
   -- ** Unions & Intersections
   valueUnionWith,
@@ -46,9 +50,12 @@ module GeniusYield.Types.Value (
 
   -- ** Lookup
   valueAssetClass,
+  valueAssetPresent,
 
   -- ** Splitting
   valueSplitAda,
+  valueAda,
+  valueNonAda,
   valueSplitSign,
 
   -- ** Predicates
@@ -257,9 +264,13 @@ valueInsert asc i (GYValue m) = GYValue (Map.insert asc i m)
 
 {- | Adjust the amount of a given 'GYAssetClass' in the given 'GYValue'.
 If the asset is not present in the value, original value is returned instead.
+
+If the result of the adjustment is zero, the asset is removed from the value.
 -}
 valueAdjust :: (Integer -> Integer) -> GYAssetClass -> GYValue -> GYValue
-valueAdjust f asc (GYValue m) = GYValue (Map.adjust f asc m)
+valueAdjust f asc (GYValue m) = case Map.lookup asc m of
+  Nothing -> GYValue m
+  Just i -> let fi = f i in if fi == 0 then GYValue (Map.delete asc m) else GYValue (Map.insert asc fi m)
 
 {- | The expression (@'valueAlter' f asc val@) alters the value @x@ at @asc@, or absence thereof.
 'valueAlter' can be used to insert, delete, or update a value in a 'GYValue'.
@@ -280,6 +291,12 @@ valueAssets (GYValue m) = Map.keysSet m
 -- | Returns the total count of assets in a given 'GYValue'
 valueTotalAssets :: GYValue -> Int
 valueTotalAssets (GYValue v) = Map.size v
+
+valueWithoutAssets :: GYValue -> Set GYAssetClass -> GYValue
+valueWithoutAssets (GYValue m) acs = GYValue $ Map.withoutKeys m acs
+
+valueRestrictAssets :: GYValue -> Set GYAssetClass -> GYValue
+valueRestrictAssets (GYValue m) acs = GYValue $ Map.restrictKeys m acs
 
 {- |
 
@@ -378,9 +395,27 @@ instance Swagger.ToSchema GYValue where
 -- Arithmetic
 -------------------------------------------------------------------------------
 
--- | Substracts the second 'GYValue' from the first one. AssetClass by AssetClass.
+{- | Subtracts the second 'GYValue' from the first one (asset class by asset class). Note that zero entries are filtered for.
+
+>>> valueFromList [(GYLovelace, 100)] `valueMinus` valueFromList [(GYLovelace, 200)]
+valueFromList [(GYLovelace,-100)]
+
+>>> valueFromList [(GYLovelace, 100)] `valueMinus` valueFromList [(GYLovelace, 100)]
+valueFromList []
+-}
 valueMinus :: GYValue -> GYValue -> GYValue
 valueMinus x y = x <> valueNegate y
+
+{- | Subtracts the second 'GYValue' from the first one (asset class by asset class). However, this differs from 'valueMinus' in that it filters out negative amounts (zero amounts are already filtered by 'valueMinus').
+
+>>> valueFromList [(GYLovelace, 100)] `valueMonus` valueFromList [(GYLovelace, 200)]
+valueFromList []
+
+>>> valueFromList [(GYLovelace, 100)] `valueMonus` valueFromList [(GYLovelace, 50)]
+valueFromList [(GYLovelace,50)]
+-}
+valueMonus :: GYValue -> GYValue -> GYValue
+valueMonus x y = valueMinus x y & GYValue . Map.filter (> 0) . valueToMap
 
 -- | Returns the given 'GYValue' with all amounts negated.
 valueNegate :: GYValue -> GYValue
@@ -402,6 +437,10 @@ valueGreaterOrEqual v w = valueNonNegative $ v `valueMinus` w
 valueGreater :: GYValue -> GYValue -> Bool
 valueGreater v w = valuePositive $ v `valueMinus` w
 
+-- | Checks if all amounts of the first 'GYValue' are less than the second 'GYValue'.
+valueLessOrEqual :: GYValue -> GYValue -> Bool
+valueLessOrEqual v w = valueGreaterOrEqual w v
+
 {- | Splits a 'GYValue' into the lovelace amount and the rest of it's components.
 
 >>> valueSplitAda $ valueFromLovelace 100
@@ -413,9 +452,20 @@ valueGreater v w = valuePositive $ v `valueMinus` w
 valueSplitAda :: GYValue -> (Integer, GYValue)
 valueSplitAda (GYValue m) = (Map.findWithDefault 0 GYLovelace m, GYValue (Map.delete GYLovelace m))
 
+-- | Get the lovelace amount from a 'GYValue'.
+valueAda :: GYValue -> Integer
+valueAda = fst . valueSplitAda
+
+-- | Removes the lovelace amount from a 'GYValue'.
+valueNonAda :: GYValue -> GYValue
+valueNonAda = snd . valueSplitAda
+
 -- | Returns the amount of a 'GYAssetClass' contained in the given 'GYValue'.
 valueAssetClass :: GYValue -> GYAssetClass -> Integer
 valueAssetClass (GYValue m) ac = Map.findWithDefault 0 ac m
+
+valueAssetPresent :: GYValue -> GYAssetClass -> Bool
+valueAssetPresent v ac = valueAssetClass v ac > 0
 
 {- | Split a 'GYValue' into its positive and negative components. The first element of
   the pair is the positive components of the value. The second element is the negative component.

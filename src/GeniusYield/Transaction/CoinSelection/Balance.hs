@@ -23,9 +23,13 @@ module GeniusYield.Transaction.CoinSelection.Balance (
   BalanceInsufficientError (..),
   UnableToConstructChangeError (..),
   performSelection,
+  -- The following four functions are not really used by us at the moment.
+  selectionHasValidSurplus,
+  selectionDeltaCoin,
+  selectionSurplusCoin,
+  runRoundRobin,
 ) where
 
-import GeniusYield.Transaction.CoinSelection.Numeric (equipartitionNatural, padCoalesce, partitionNatural)
 import Control.Monad.Extra (
   andM,
   (<=<),
@@ -50,6 +54,7 @@ import Data.Ord (comparing)
 import Data.Ratio ((%))
 import Data.Set qualified as Set
 import GeniusYield.Imports
+import GeniusYield.Transaction.CoinSelection.Numeric (equipartitionNatural, padCoalesce, partitionNatural)
 import GeniusYield.Transaction.CoinSelection.UTxOIndex (SelectionFilter (..), UTxOIndex)
 import GeniusYield.Transaction.CoinSelection.UTxOIndex qualified as UTxOIndex
 import GeniusYield.Transaction.CoinSelection.UTxOSelection (IsUTxOSelection, UTxOSelection, UTxOSelectionNonEmpty)
@@ -68,6 +73,9 @@ data ValueSizeAssessment
   deriving (Eq, Generic, Show)
 
 type ValueSizeAssessor = GYValue -> ValueSizeAssessment
+
+-- | Semantically a 'GYValue' without the 'GYLovelace' asset class.
+type GYValueWithoutLovelace = GYValue
 
 -- TODO: Having this 'v' lingering around is nuisance.
 
@@ -92,11 +100,7 @@ data SelectionConstraints v = SelectionConstraints
   -- ^ Computes the minimum cost of a given selection skeleton.
   -- TODO: This can be cleverly used to not make use of logarithmic overestimation function. To study if it's only for fees or also for min deposits, if min deposit then which one?
   -- TODO: Whether I can be precise here also depends upon how many times is this called. Our initial implementation had logarithmic iteration.
-  , {- FIXME: Remove this comment.
-    , maximumLengthChangeAddress
-        :: Address ctx
-    -}
-    changeAddress ::
+  , changeAddress ::
       GYAddress
   , maximumOutputAdaQuantity ::
       Natural
@@ -106,7 +110,6 @@ data SelectionConstraints v = SelectionConstraints
       Natural
   -- ^ Specifies the largest non-ada quantity that can appear in the
   -- token bundle of an output.
-  -- FIXME: Delete this comment.
   , nullAddress ::
       GYAddress
       -- TODO: This is supposed to be an empty bytestring, not a complete gyaddress. Study if it creates an issue and whether it can be omitted.
@@ -1238,7 +1241,7 @@ makeChange criteria
   -- This list is sorted into ascending order of asset count, where empty
   -- change maps are all located at the start of the list.
   --
-  changeMapOutputCoinPairs :: NonEmpty (GYValue, Natural) -- First component is actually tokens without ada.
+  changeMapOutputCoinPairs :: NonEmpty (GYValueWithoutLovelace, Natural)
   changeMapOutputCoinPairs =
     outputCoins
       -- First, combine the original output coins with the change maps for
@@ -1300,7 +1303,7 @@ makeChange criteria
 
   -- Change for user-specified assets: assets that were present in the
   -- original set of user-specified outputs ('outputsToCover').
-  changeForUserSpecifiedAssets :: NonEmpty GYValue -- Actually denotes tokens without ada though this is not captured by our GYValue type.
+  changeForUserSpecifiedAssets :: NonEmpty GYValueWithoutLovelace
   changeForUserSpecifiedAssets =
     F.foldr
       ( NE.zipWith (<>)
@@ -1311,7 +1314,7 @@ makeChange criteria
 
   -- Change for non-user-specified assets: assets that were not present
   -- in the original set of user-specified outputs ('outputsToCover').
-  changeForNonUserSpecifiedAssets :: NonEmpty GYValue -- Actually denotes tokens without ada though this is not captured by our GYValue type.
+  changeForNonUserSpecifiedAssets :: NonEmpty GYValueWithoutLovelace
   changeForNonUserSpecifiedAssets =
     makeChangeForNonUserSpecifiedAssets
       outputMaps
@@ -1321,7 +1324,7 @@ makeChange criteria
       & removeBurnValuesFromChangeMaps
         (removeUserSpecifiedAssetIds assetsToBurn)
    where
-    removeUserSpecifiedAssetIds :: GYValue -> GYValue -- Actually denotes tokens without ada though this is not captured by our GYValue type.
+    removeUserSpecifiedAssetIds :: GYValueWithoutLovelace -> GYValueWithoutLovelace
     removeUserSpecifiedAssetIds = flip valueWithoutAssets userSpecifiedAssetIds
 
   totalInputValueInsufficient =
@@ -1338,7 +1341,7 @@ makeChange criteria
       , shortfall
       }
 
-  outputMaps :: NonEmpty GYValue -- Actually denotes tokens without ada though this is not captured by our GYValue type.
+  outputMaps :: NonEmpty GYValueWithoutLovelace
   outputMaps = valueNonAda <$> outputBundles
 
   outputCoins :: NonEmpty Natural
@@ -1386,8 +1389,7 @@ discrete non-zero quantities of that asset present in the selected inputs.
 -}
 collateNonUserSpecifiedAssetQuantities ::
   -- | Token maps of all selected inputs.
-  NonEmpty GYValue -> -- Denotes without lovelace.
-
+  NonEmpty GYValueWithoutLovelace ->
   -- | Set of all assets in user-specified outputs.
   Set GYAssetClass ->
   Map GYAssetClass (NonEmpty Natural)
@@ -1395,7 +1397,7 @@ collateNonUserSpecifiedAssetQuantities inputMaps userSpecifiedAssetIds =
   F.foldr discardUserSpecifiedAssets mempty inputMaps
  where
   discardUserSpecifiedAssets ::
-    GYValue -> -- Denotes without lovelace.
+    GYValueWithoutLovelace ->
     Map GYAssetClass (NonEmpty Natural) ->
     Map GYAssetClass (NonEmpty Natural)
   discardUserSpecifiedAssets tokens m =
@@ -1440,13 +1442,11 @@ assignCoinsToChangeMaps ::
   Natural ->
   -- | A function to calculate the minimum required ada quantity for any
   -- token map.
-  (GYValue -> Natural) -> -- Denotes without lovelace
-
+  (GYValueWithoutLovelace -> Natural) ->
   -- | A list of pre-computed asset change maps paired with original output
   -- coins, sorted into an order that ensures all empty token maps are at the
   -- start of the list.
-  NonEmpty (GYValue, Natural) -> -- Denotes without lovelace.
-
+  NonEmpty (GYValueWithoutLovelace, Natural) ->
   -- | Resulting change bundles, or the shortfall quantity if there was not
   -- enough ada available to assign a minimum ada quantity to all non-empty
   -- token maps.
@@ -1525,7 +1525,7 @@ assignCoinsToChangeMaps adaAvailable minCoinFor pairsAtStart
         ]
 
 -- | Assigns the minimum required ada quantity to a token map.
-assignMinimumCoin :: (GYValue -> Natural) -> GYValue -> GYValue -- This first two 'GYValue' in this signature denote tokens without lovelace.
+assignMinimumCoin :: (GYValueWithoutLovelace -> Natural) -> GYValueWithoutLovelace -> GYValue
 assignMinimumCoin minCoinFor m = valueFromLovelace (fromIntegral $ minCoinFor m) <> m
 
 {- | Constructs change outputs for a user-specified asset: an asset that was
@@ -1544,8 +1544,7 @@ makeChangeForUserSpecifiedAsset ::
   -- | A list of weights for the distribution. Conveniently captures both
   -- the weights, and the number of elements amongst which the quantity
   -- should be distributed.
-  NonEmpty GYValue -> -- Denotes without lovelace.
-
+  NonEmpty GYValueWithoutLovelace ->
   -- | A surplus token quantity to distribute.
   (GYAssetClass, Natural) ->
   NonEmpty GYValue
@@ -1579,7 +1578,7 @@ makeChangeForNonUserSpecifiedAsset ::
   -- | An asset quantity to distribute.
   (GYAssetClass, NonEmpty Natural) ->
   -- | The resultant change maps.
-  NonEmpty GYValue -- Actually denotes tokens without ada though this is not captured by our GYValue type.
+  NonEmpty GYValueWithoutLovelace
 makeChangeForNonUserSpecifiedAsset n (asset, fmap (Sum . fromIntegral) -> quantities) =
   valueSingleton asset . getSum <$> padCoalesce quantities n
 
@@ -1595,7 +1594,7 @@ makeChangeForNonUserSpecifiedAssets ::
   -- | A map of asset quantities to distribute.
   Map GYAssetClass (NonEmpty Natural) ->
   -- | The resultant change maps.
-  NonEmpty GYValue -- Actually denotes tokens without ada though this is not captured by our GYValue type.
+  NonEmpty GYValueWithoutLovelace
 makeChangeForNonUserSpecifiedAssets n nonUserSpecifiedAssetQuantities =
   F.foldr
     (NE.zipWith (<>) . makeChangeForNonUserSpecifiedAsset n)
@@ -1751,8 +1750,8 @@ The length of the given list is preserved in the output list.
 -}
 addMintValueToChangeMaps ::
   (GYAssetClass, Natural) ->
-  NonEmpty GYValue -> -- Actually denotes tokens without ada though this is not captured by our GYValue type.
-  NonEmpty GYValue -- Actually denotes tokens without ada though this is not captured by our GYValue type.
+  NonEmpty GYValueWithoutLovelace ->
+  NonEmpty GYValueWithoutLovelace
 addMintValueToChangeMaps (assetId, fromIntegral -> assetQty) =
   -- The largest element is the last element in an ascending order list
   modifyLast $ \m -> valueAdjust (assetQty +) assetId m
@@ -1766,11 +1765,11 @@ Plural of @addMintValueToChangeMaps@.
 -}
 addMintValuesToChangeMaps ::
   -- | Map of minted values
-  GYValue ->
+  GYValueWithoutLovelace ->
   -- | Change maps
-  NonEmpty GYValue ->
+  NonEmpty GYValueWithoutLovelace ->
   -- | Change maps with minted values
-  NonEmpty GYValue -- All 'GYValue' here are for without lovelace.
+  NonEmpty GYValueWithoutLovelace
 addMintValuesToChangeMaps =
   flip (F.foldr addMintValueToChangeMaps) . map (Data.Bifunctor.second fromInteger) . valueToList
 
@@ -1825,10 +1824,9 @@ removeBurnValueFromChangeMaps ::
   -- | Asset quantity reduction target
   (GYAssetClass, Natural) ->
   -- | Change maps with quantities of the given asset to be reduced
-  NonEmpty GYValue -> -- without lovelace
-
+  NonEmpty GYValueWithoutLovelace ->
   -- | Change maps with reduced quantities of the given asset
-  NonEmpty GYValue -- without lovelace
+  NonEmpty GYValueWithoutLovelace
 removeBurnValueFromChangeMaps (assetId, assetQty) maps =
   maps
     & fmap (fromIntegral . (`valueAssetClass` assetId))
@@ -1882,12 +1880,11 @@ Plural of @removeBurnValueFromChangeMaps@.
 -}
 removeBurnValuesFromChangeMaps ::
   -- | Map of burned values
-  GYValue -> -- all 'GYValue' here are for without lovelace.
-
+  GYValueWithoutLovelace ->
   -- | Change maps
-  NonEmpty GYValue ->
+  NonEmpty GYValueWithoutLovelace ->
   -- | Change maps with burned values removed
-  NonEmpty GYValue
+  NonEmpty GYValueWithoutLovelace
 removeBurnValuesFromChangeMaps =
   flip (F.foldr removeBurnValueFromChangeMaps) . fmap (Data.Bifunctor.second fromIntegral) . valueToList
 
@@ -1936,12 +1933,11 @@ The quantities of each asset are unchanged.
 -}
 equipartitionNonAdaAssets ::
   -- | The token map to be partitioned.
-  GYValue -> -- without lovelace
-
+  GYValueWithoutLovelace ->
   -- | Represents the number of portions in which to partition the token map.
   NonEmpty a ->
   -- | The partitioned maps.
-  NonEmpty GYValue -- without lovelace
+  NonEmpty GYValueWithoutLovelace
 equipartitionNonAdaAssets m mapCount =
   valueFromList <$> NE.unfoldr generateChunk (assetCounts, valueToList m)
  where
@@ -1985,12 +1981,11 @@ to achieve the goal that no token quantity in any of the resulting maps
 exceeds the maximum allowable token quantity.
 -}
 equipartitionNonAdaQuantitiesWithUpperBound ::
-  GYValue -> -- Denotes without lovelace
-
+  GYValueWithoutLovelace ->
   -- | Maximum allowable token quantity.
   Natural ->
   -- | The partitioned maps.
-  NonEmpty GYValue -- Denotes without lovelace
+  NonEmpty GYValueWithoutLovelace
 equipartitionNonAdaQuantitiesWithUpperBound m maxQuantity
   | maxQuantity == 0 =
       maxQuantityZeroError
@@ -2022,12 +2017,11 @@ with the 'leq' function.
 -}
 equipartitionNonAdaQuantities ::
   -- | The map to be partitioned.
-  GYValue -> -- without lovelace
-
+  GYValueWithoutLovelace ->
   -- | Represents the number of portions in which to partition the map.
   NonEmpty a ->
   -- | The partitioned maps.
-  NonEmpty GYValue -- without lovelace
+  NonEmpty GYValueWithoutLovelace
 equipartitionNonAdaQuantities m count =
   F.foldl' accumulate (mempty <$ count) (valueToList m)
  where
@@ -2140,15 +2134,6 @@ distance a b
   | a > b = a - b
   | a < b = b - a
   | otherwise = 0
-
-mapMaybe :: (a -> Maybe b) -> NonEmpty a -> [b]
-mapMaybe predicate (x :| xs) = go (x : xs)
- where
-  go [] = []
-  go (a : as) =
-    case predicate a of
-      Just b -> b : go as
-      Nothing -> go as
 
 naturalMonus :: Natural -> Natural -> Natural
 naturalMonus a b

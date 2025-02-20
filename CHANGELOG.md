@@ -1,6 +1,7 @@
 ## Next
 
 * `valueAdjust` now omits for entries if result of adjustment is zero.
+* Port coin selection algorithm from [`cardano-wallet`](https://github.com/cardano-foundation/cardano-wallet) to Atlas. This is done in sync with our 3rd Milestone and allows us to support latest versions of node & other IOG tooling.
 
 ## 0.11.1
 

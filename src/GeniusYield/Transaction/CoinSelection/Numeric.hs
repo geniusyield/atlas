@@ -21,9 +21,6 @@ module GeniusYield.Transaction.CoinSelection.Numeric (
   power,
 ) where
 
-import Prelude hiding (
-  round,
- )
 import Control.Arrow (
   (&&&),
  )
@@ -49,9 +46,12 @@ import GHC.Stack (
 import Numeric.Natural (
   Natural,
  )
+import Prelude hiding (
+  round,
+ )
 
-import qualified Data.Foldable as F
-import qualified Data.List.NonEmpty as NE
+import Data.Foldable qualified as F
+import Data.List.NonEmpty qualified as NE
 
 --------------------------------------------------------------------------------
 -- Public functions

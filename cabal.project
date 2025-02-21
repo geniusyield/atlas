@@ -21,7 +21,6 @@ index-state:
   , hackage.haskell.org 2024-10-10T00:52:24Z
   , cardano-haskell-packages 2024-11-26T16:00:26Z
 
-
 -- TODO: Default value should be @direct@ in upcoming 3.10 version of cabal, omit this line then.
 test-show-details: direct
 
@@ -65,119 +64,26 @@ source-repository-package
     cardano-api
     cardano-api-gen
 
-source-repository-package
-  type: git
-  location: https://github.com/cardano-foundation/cardano-wallet
-  tag: 630ef0067c2c0df1b398256d75923db928beefa1
-  --sha256: sha256-0iDG3LW60pb+ih+nfqQ3vR+WI7JEm+0kI3Vg7jqm1L0=
-  subdir:
-    lib/crypto-primitives/
-    lib/coin-selection/
-    lib/delta-types/
-    lib/launcher/
-    lib/numeric/
-    lib/primitive/
-    lib/test-utils/
-    lib/text-class/
-
 package postgresql-libpq
   flags: +use-pkg-config
 
------- Following is mostly from @cardano-wallet@'s @cabal.project@ file. -------
-
---------------------------------------------------------------------------------
--- BEGIN Cardano Addresses Dependency
-
+-- Temporary until latest version is available on Hackage (or CHaP for that matter). Track https://github.com/IntersectMBO/cardano-addresses/issues/294.
 source-repository-package
-    type: git
-    location: https://github.com/IntersectMBO/cardano-addresses
-    tag: 2bca06deaa60e54a5322ac757387d744bf043367
-    --sha256: 1y1mzfly7jac40b9g4xc078rcm5zqhc3xxv77kwxi10yph1jwq7z
-    subdir: command-line
-            core
+  type: git
+  location: https://github.com/IntersectMBO/cardano-addresses
+  tag: d611632fc3d616d5b4038a70f864bf2613c125d0
+  --sha256: sha256-vQ2XB95kw05IZuRkyK4cPQtaKZ1bZAoLtN9GrOOwQvM=
 
--- Normally cabal won't apply ghc-options which we specify to build packages
--- to their "regular" dependencies.
--- However, the dependencies declared using the `source-repository-package`
--- pragma are an exception to this rule.
--- This is why we need to manually control options that are applied to the
--- `cardano-addresses` package by declaring them explicitly here.
-package cardano-addresses-cli
-    ghc-options:
-        -Wwarn=deprecations
-
-package cardano-addresses
-    ghc-options:
-        -Wwarn=incomplete-uni-patterns
--- END Cardano Addresses Dependency
---------------------------------------------------------------------------------
-
-source-repository-package
-    type: git
-    location: https://github.com/input-output-hk/cardano-sl-x509
-    tag: a91add165152fa36f08e95fafe7da24f1dba4690
-    --sha256: 1ia8vlqghis92cla8qmqa6kh8f3jn29b01fshyk5hmgy5373s684
-
-source-repository-package
-    type: git
-    location: https://github.com/cardano-foundation/cardano-wallet-client.git
-    tag: 353412ca621dc28af53e4a19795338b19bab1b7b
-    --sha256: 04q58c82wy6x9nkwqbvcxbv6s61fx08h5kf62sb511aqp08id4bb
-    subdir: generated
-
-source-repository-package
-    type: git
-    location: https://github.com/cardano-foundation/cardano-wallet-agda
-    tag: f3479b501a2efe50bcf1ee0d09bc2d1325a982e7
-    --sha256: 10d6k7mw1zw9vpzz8dhb52vfmj2rshsk225nvyl8nrc94fr627kz
-    subdir:
-      lib/customer-deposit-wallet-pure
-      lib/cardano-wallet-read
-
---------------------------------------------------------------------------------
--- BEGIN Constraints tweaking section
+------ Following is mostly from @cardano-node@'s @cabal.project@ file. -------
 
 allow-newer:
-    async-timer:unliftio-core
-  , katip:Win32
+    katip:Win32
   , ekg-wai:time
-
-constraints:
-    base >= 4.18.2.0 && < 5
-  , openapi3 >= 3.2.0
-  , persistent ^>= 2.14.6.0
-
-  , bech32 >= 1.1.7
-
-  -- lower versions of katip won't build with the Win32-2.12.0.1
-  -- which is shipped with the ghc-9.2.8
-  , katip >= 0.8.7.4
-
-
-  -- Cardano Node dependencies:
-  , io-classes >= 1.4
-  , io-classes -asserts
-
-  , cardano-ledger-api ^>= 1.9
-
-  , ouroboros-network ^>= 0.17
-
--- END Constraints tweaking section
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
--- Flags for dependencies without an S-R-P pragma should be kept in this section
--- (conversely, flags for the S-R-P dependencies should be kept within the
--- same section where an S-R-P pragma is located,
--- for them to be managed together)
 
 -- Using RDRAND instead of /dev/urandom as an entropy source for key
 -- generation is dubious. Set the flag so we use /dev/urandom by default.
 package cryptonite
   flags: -support_rdrand
-
-package cardano-config
-  flags: -systemd
 
 package cardano-node
   flags: -systemd
@@ -185,6 +91,4 @@ package cardano-node
 package bitvec
   flags: -simd
 
--- -------------------------------------------------------------------------
-
--------- End contents from @cardano-wallet@'s @cabal.project@ file. --------
+-------- End contents from @cardano-node@'s @cabal.project@ file. --------

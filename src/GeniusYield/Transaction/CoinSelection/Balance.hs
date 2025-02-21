@@ -83,16 +83,13 @@ data SelectionConstraints = SelectionConstraints
       ValueSizeAssessor
   -- ^ Assesses the size of a value relative to the upper limit of
   -- what can be included in a transaction output.
-  -- TODO: Make it just a Bool?
-  -- TODO: Get rid of "bundle"...
+  -- TODO: Get rid of "bundle" keyword as we "value" (instead of tokenbundle) to denote it...
   , computeMinimumAdaQuantity ::
       GYAddress ->
       GYValue ->
       Natural
   -- ^ Computes the minimum ada quantity required for a given output.
-  , -- TODO: Can we make it GYTxOut something?
-
-    computeMinimumCost ::
+  , computeMinimumCost ::
       SelectionSkeleton ->
       Natural
   -- ^ Computes the minimum cost of a given selection skeleton.
@@ -110,7 +107,7 @@ data SelectionConstraints = SelectionConstraints
   -- token bundle of an output.
   , nullAddress ::
       GYAddress
-      -- TODO: This is supposed to be an empty bytestring, not a complete gyaddress. Study if it creates an issue and whether it can be omitted.
+      -- TODO: This is supposed to be an empty bytestring, not a complete gyaddress.
   }
   deriving Generic
 
@@ -215,7 +212,6 @@ data UTxOBalanceSufficiencyInfo = UTxOBalanceSufficiencyInfo
   -- ^ See 'computeUTxOBalanceRequired'.
   , difference :: GYValue
   -- ^ The difference between 'available' and 'required'.
-  -- TODO: I need to be careful with how this difference is calculated. The thing is am I violating an invariant?
   , sufficiency :: UTxOBalanceSufficiency
   -- ^ Whether or not the balance is sufficient.
   }
@@ -403,8 +399,6 @@ selectionDeltaCoin ::
   Foldable f => SelectionResult f -> SelectionDelta Natural
 selectionDeltaCoin = fmap (fromIntegral . (`valueAssetClass` GYLovelace)) . selectionDeltaAllAssets
 
--- TODO: Was this above function ever used?
-
 -- | Indicates whether or not a selection result has a valid surplus.
 selectionHasValidSurplus ::
   Foldable f => SelectionConstraints -> SelectionResult f -> Bool
@@ -457,8 +451,11 @@ selectionSkeleton s =
   SelectionSkeleton
     { skeletonInputCount = F.length (view #inputsSelected s)
     , skeletonOutputs = F.toList (view #outputsCovered s)
-    , skeletonChange = valueAssets <$> view #changeGenerated s
+    , skeletonChange = valueAssetsWithoutLovelace <$> view #changeGenerated s
     }
+
+valueAssetsWithoutLovelace :: GYValue -> Set GYAssetClass
+valueAssetsWithoutLovelace = Set.delete GYLovelace . valueAssets
 
 -- | Computes the minimum required cost of a selection.
 selectionMinimumCost ::
@@ -535,7 +532,6 @@ data UnableToConstructChangeError = UnableToConstructChangeError
       !Natural
   -- ^ The additional coin quantity that would be required to cover the
   -- selection cost and minimum coin quantity of each change output.
-  -- TODO: What's this "selection cost" that they mention here?
   }
   deriving (Generic, Eq, Show)
 
@@ -632,7 +628,6 @@ performSelectionEmpty performSelectionFn constraints params =
   -- Using a null address allows us to minimize any overestimation in cost
   -- resulting from the use of a dummy output.
   --
-  -- TODO: How exactly does it compute to and to "which" cost?
   dummyAddress = nullAddress constraints
 
   -- A dummy 'Coin' value for the dummy output.
@@ -740,7 +735,7 @@ performSelectionNonEmpty constraints params
   predictChange s =
     either
       (const $ invariantResultWithNoCost $ UTxOSelection.selectedIndex s)
-      (fmap (\val -> GYLovelace `Set.delete` valueAssets val))
+      (fmap valueAssetsWithoutLovelace)
       ( makeChange
           MakeChangeCriteria
             { minCoinFor = noMinimumCoin
@@ -1151,7 +1146,6 @@ data MakeChangeCriteria minCoinFor bundleSizeAssessor = MakeChangeCriteria
       Natural
   -- ^ Specifies the largest non-ada quantity that can appear in the
   -- token bundle of an output.
-  -- TODO: This was TokenQuantity. Does my move towards Natural violate some invariant?
   }
   deriving (Eq, Generic, Show)
 
@@ -1362,7 +1356,7 @@ makeChange criteria
   -- Identifiers of all user-specified assets: assets that were included in
   -- the original set of outputs.
   userSpecifiedAssetIds :: Set GYAssetClass
-  userSpecifiedAssetIds = valueAssets (F.fold outputBundles)
+  userSpecifiedAssetIds = valueAssetsWithoutLovelace (F.fold outputBundles)
 
   -- Identifiers and quantities of all non-user-specified assets: assets that
   -- were not included in the original set of outputs, but that were
@@ -1752,7 +1746,7 @@ addMintValueToChangeMaps ::
   NonEmpty GYValueWithoutLovelace
 addMintValueToChangeMaps (assetId, fromIntegral -> assetQty) =
   -- The largest element is the last element in an ascending order list
-  modifyLast $ \m -> valueAdjust (assetQty +) assetId m
+  modifyLast $ \m -> valueAdjustOverDefault (assetQty +) assetId m
  where
   modifyLast f xs = case NE.reverse xs of
     (y :| ys) -> NE.reverse (f y :| ys)
@@ -1993,7 +1987,10 @@ equipartitionNonAdaQuantitiesWithUpperBound m maxQuantity
       equipartitionNonAdaQuantities m (() :| replicate extraPartCount ())
  where
   currentMaxQuantity = maximumQuantity m
-  maximumQuantity val = valueToMap val & Map.elems & maximum & fromIntegral
+  maximumQuantity val =
+    valueToMap val & Map.elems & \case
+      [] -> 0
+      nonEmptyElemsList -> maximum nonEmptyElemsList & fromIntegral
   extraPartCount :: Int
   extraPartCount = floor $ pred currentMaxQuantity % maxQuantity
 

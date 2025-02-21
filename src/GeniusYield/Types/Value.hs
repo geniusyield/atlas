@@ -24,6 +24,7 @@ module GeniusYield.Types.Value (
   valueTotalAssets,
   valueInsert,
   valueAdjust,
+  valueAdjustOverDefault,
   valueAlter,
   valueFromLovelace,
   valueFromApiTxOutValue,
@@ -270,6 +271,12 @@ If the result of the adjustment is zero, the asset is removed from the value.
 valueAdjust :: (Integer -> Integer) -> GYAssetClass -> GYValue -> GYValue
 valueAdjust f asc (GYValue m) = case Map.lookup asc m of
   Nothing -> GYValue m
+  Just i -> let fi = f i in if fi == 0 then GYValue (Map.delete asc m) else GYValue (Map.insert asc fi m)
+
+-- | Same as 'valueAdjust' but if the asset is not present in the value, we apply the function to 0 and insert the resultant (if non-zero) into the value.
+valueAdjustOverDefault :: (Integer -> Integer) -> GYAssetClass -> GYValue -> GYValue
+valueAdjustOverDefault f asc (GYValue m) = case Map.lookup asc m of
+  Nothing -> let fi = f 0 in if fi == 0 then GYValue m else GYValue (Map.insert asc fi m)
   Just i -> let fi = f i in if fi == 0 then GYValue (Map.delete asc m) else GYValue (Map.insert asc fi m)
 
 {- | The expression (@'valueAlter' f asc val@) alters the value @x@ at @asc@, or absence thereof.

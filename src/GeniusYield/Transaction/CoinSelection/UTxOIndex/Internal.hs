@@ -1,3 +1,7 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use &&" #-}
+
 {- |
 Copyright: © 2018-2021 IOHK, 2025 GYELD GMBH
 License: Apache-2.0

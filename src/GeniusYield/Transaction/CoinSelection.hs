@@ -1,5 +1,3 @@
--- To work on this module, module [@Cardano.CoinSelection.Balance@](https://github.com/cardano-foundation/cardano-wallet/blob/master/lib/coin-selection/lib/Cardano/CoinSelection/Balance.hs) should be understood.
-
 {- |
 Module      : GeniusYield.Transaction.CoinSelection
 Copyright   : (c) 2023 GYELD GMBH

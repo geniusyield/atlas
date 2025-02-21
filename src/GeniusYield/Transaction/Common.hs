@@ -81,7 +81,7 @@ utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref _witns) addr val d ms) = GYUTxO
 data GYBalancingError
   = GYBalancingErrorInsufficientFunds !GYValue
   | forall v. GYBalancingErrorNonPositiveTxOut !(GYTxOut v)
-  | -- | Lovelace shortfall in constructing a change output. See: "Cardano.CoinSelection.Balance.UnableToConstructChangeError"
+  | -- | Lovelace shortfall in constructing a change output. See: "GeniusYield.Transaction.CoinSelection.Balance.UnableToConstructChangeError"
     GYBalancingErrorChangeShortFall !Natural
   | -- | User wallet has no utxos to select.
     GYBalancingErrorEmptyOwnUTxOs

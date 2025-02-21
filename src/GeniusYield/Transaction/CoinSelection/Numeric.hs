@@ -53,6 +53,11 @@ import Prelude hiding (
 import Data.Foldable qualified as F
 import Data.List.NonEmpty qualified as NE
 
+{- $setup
+>>> import Data.Monoid (Sum (..))
+>>> import Data.List.NonEmpty (NonEmpty (..))
+-}
+
 --------------------------------------------------------------------------------
 -- Public functions
 --------------------------------------------------------------------------------
@@ -78,20 +83,20 @@ the source list.
 
 Examples (shown with ordinary list notation):
 
->>> padCoalesce [Sum 1] (replicate 4 ())
-[Sum 0, Sum 0, Sum 0, Sum 1]
+@>>> padCoalesce [Sum 1] (replicate 4 ())@
+@[Sum 0, Sum 0, Sum 0, Sum 1]@
 
->>> padCoalesce [Sum (-1)] (replicate 4 ())
-[Sum (-1), Sum 0, Sum 0, Sum 0]
+@>>> padCoalesce [Sum (-1)] (replicate 4 ())@
+@[Sum (-1), Sum 0, Sum 0, Sum 0]@
 
->>> padCoalesce [Sum 8, Sum 4, Sum 2, Sum 1] (replicate 3 ())
-[Sum 3, Sum 4, Sum 8]
+@>>> padCoalesce [Sum 8, Sum 4, Sum 2, Sum 1] (replicate 3 ())@
+@[Sum 3, Sum 4, Sum 8]
 
->>> padCoalesce [Sum 8, Sum 4, Sum 2, Sum 1] (replicate 2 ())
-[Sum 7, Sum 8]
+@>>> padCoalesce [Sum 8, Sum 4, Sum 2, Sum 1] (replicate 2 ())@
+@[Sum 7, Sum 8]
 
->>> padCoalesce [Sum 8, Sum 4, Sum 2, Sum 1] (replicate 1 ())
-[Sum 15]
+@>>> padCoalesce [Sum 8, Sum 4, Sum 2, Sum 1] (replicate 1 ())@
+@[Sum 15]@
 -}
 padCoalesce ::
   forall m a.
@@ -153,13 +158,13 @@ equipartitionNatural n count =
 Examples:
 
      >>> partitionNatural 9 (1 :| [1, 1])
-     Just (3 :| [3, 3])
+     Just (3 :| [3,3])
 
      >>> partitionNatural 10 (1 :| [])
-     10
+     Just (10 :| [])
 
      >>> partitionNatural 30 (1 :| [2, 4, 8])
-     Just (2 :| [4, 8, 16])
+     Just (2 :| [4,8,16])
 
 Pre-condition: there must be at least one non-zero weight.
 
@@ -170,12 +175,12 @@ If the pre-condition is satisfied, this function guarantees that:
  1.  The length of the resulting list is identical to the length of the
      specified list:
 
-     >>> fmap length (partitionNatural n weights) == Just (length weights)
+     @fmap length (partitionNatural n weights) == Just (length weights)@
 
  2.  The sum of elements in the resulting list is equal to the original
      natural number:
 
-     >>> fmap sum (partitionNatural n weights) == Just n
+     @fmap sum (partitionNatural n weights) == Just n@
 
  3.  The size of each element in the resulting list is within unity of the
      ideal proportion.

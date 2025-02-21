@@ -326,7 +326,7 @@ selected.
 This result of this function remains constant over applications of 'select'
 and 'selectMany':
 
->>> availableBalance s == availableBalance (selectMany is s)
+@availableBalance s == availableBalance (selectMany is s)@
 -}
 availableBalance :: IsUTxOSelection s u => s u -> GYValue
 availableBalance s = leftoverBalance s <> selectedBalance s
@@ -340,7 +340,7 @@ It predicts what 'selectedMap' would be if every single UTxO were selected.
 This result of this function remains constant over applications of 'select'
 and 'selectMany':
 
->>> availableMap s == availableMap (selectMany is s)
+@availableMap s == availableMap (selectMany is s)@
 -}
 availableMap :: IsUTxOSelection s u => Ord u => s u -> Map u GYValue
 availableMap s = leftoverMap s <> selectedMap s

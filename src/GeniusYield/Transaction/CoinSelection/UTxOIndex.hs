@@ -19,7 +19,7 @@ See the documentation for 'UTxOIndex' for more details.
 
 This module is meant to be imported qualified. For example:
 
->>> import qualified Cardano.CoinSelection.UTxOIndex as UTxOIndex
+>>> import qualified GeniusYield.Transaction.CoinSelection.UTxOIndex as UTxOIndex
 -}
 module GeniusYield.Transaction.CoinSelection.UTxOIndex (
   -- * Type

@@ -106,7 +106,7 @@ simpleScriptWitnessToApi = Api.SimpleScriptWitness Api.SimpleScriptInConway . h
  where
   h :: GYBuildSimpleScript u -> Api.S.SimpleScriptOrReferenceInput lang
   h (GYBuildSimpleScriptInlined v) = Api.SScript $ simpleScriptToApi v
-  h (GYBuildSimpleScriptReference ref s) = Api.SReferenceScript (txOutRefToApi ref) $ Just $ hashSimpleScript' s
+  h (GYBuildSimpleScriptReference ref _s) = Api.SReferenceScript (txOutRefToApi ref)
 
 type GYStakeValScript v = GYBuildPlutusScript v
 

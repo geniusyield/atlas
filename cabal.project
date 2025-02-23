@@ -31,15 +31,15 @@ package cardano-crypto-praos
 source-repository-package
   type: git
   location: https://github.com/sourabhxyz/haskell-sdk
-  tag: 558924a2379ca9c76562be2214e069118db1b3f6
-  --sha256: sha256-OEjlMxcJ8VUVDTEtzHcqQ7ml26Sxgb1X55AZCpJ6TJo=
+  tag: 8367d46936a916d4179ded3148a232a3931c7a62
+  --sha256: FIXME:
 
 -- TODO: Temporary, until proposed changes are in upstream (track https://github.com/mlabs-haskell/clb/pull/72)
 source-repository-package
   type: git
   location: https://github.com/sourabhxyz/clb
-  tag: d5ba83f8ecff7a30733c43a1bc0dc0c567d03858
-  --sha256: sha256-zfugilZJqbwvF9U3cUSDRGG28g5OHOz8XExqTpBeM0I=
+  tag: 1b084647dc9118520c1cc615cf2fa7c3dd8a394e
+  --sha256: FIXME:
   subdir:
     clb
     emulator

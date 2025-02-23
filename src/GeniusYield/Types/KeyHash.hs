@@ -43,7 +43,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
 import GeniusYield.Imports (coerce, (&), (>>>))
-import GeniusYield.Types.KeyRole (GYKeyRole (..), GYKeyRoleToLedger, GYKeyRoleVRF, SingGYKeyRole (..), SingGYKeyRoleI (..), fromSingGYKeyRole)
+import GeniusYield.Types.KeyRole (GYKeyRole (..), GYKeyRoleToLedger, GYKeyRoleVRF, GYKeyRoleVRFToLedger, SingGYKeyRole (..), SingGYKeyRoleI (..), fromSingGYKeyRole)
 import GeniusYield.Types.PubKeyHash (AsPubKeyHash (fromPubKeyHash, toPubKeyHash), CanSignTx, pubKeyHashFromApi, pubKeyHashToApi)
 import Text.Printf qualified as Printf
 
@@ -228,13 +228,13 @@ instance SingGYKeyRoleI kr => Swagger.ToSchema (GYKeyHash kr) where
           ?~ 56
 
 -- | Hash of a public key corresponding to a given `GYKeyRoleVRF`.
-newtype GYVRFVerKeyHash (kr :: GYKeyRoleVRF) = GYVRFVerKeyHash (Ledger.Hash Ledger.StandardCrypto (Ledger.VerKeyVRF Ledger.StandardCrypto))
+newtype GYVRFVerKeyHash (kr :: GYKeyRoleVRF) = GYVRFVerKeyHash (Ledger.VRFVerKeyHash (GYKeyRoleVRFToLedger kr) Ledger.StandardCrypto)
   deriving newtype (Eq, Ord)
 
-vrfVerKeyHashToLedger :: GYVRFVerKeyHash kr -> Ledger.Hash Ledger.StandardCrypto (Ledger.VerKeyVRF Ledger.StandardCrypto)
+vrfVerKeyHashToLedger :: GYVRFVerKeyHash kr -> Ledger.VRFVerKeyHash (GYKeyRoleVRFToLedger kr) Ledger.StandardCrypto
 vrfVerKeyHashToLedger = coerce
 
-vrfVerKeyHashFromLedger :: Ledger.Hash Ledger.StandardCrypto (Ledger.VerKeyVRF Ledger.StandardCrypto) -> GYVRFVerKeyHash kr
+vrfVerKeyHashFromLedger :: Ledger.VRFVerKeyHash (GYKeyRoleVRFToLedger kr) Ledger.StandardCrypto -> GYVRFVerKeyHash kr
 vrfVerKeyHashFromLedger = coerce
 
 {- |
@@ -250,7 +250,7 @@ instance Show (GYVRFVerKeyHash kr) where
 
 -- | Get corresponding raw bytes.
 vrfVerKeyHashToRawBytes :: GYVRFVerKeyHash kr -> BS.ByteString
-vrfVerKeyHashToRawBytes kh = Crypto.hashToBytes $ vrfVerKeyHashToLedger kh
+vrfVerKeyHashToRawBytes kh = Crypto.hashToBytes $ Ledger.fromVRFVerKeyHash $ vrfVerKeyHashToLedger kh
 
 -- | Get corresponding raw bytes represented as hex.
 vrfVerKeyHashToRawBytesHex :: GYVRFVerKeyHash kr -> BS.ByteString
@@ -262,7 +262,7 @@ vrfVerKeyHashToRawBytesHexText = vrfVerKeyHashToRawBytesHex >>> Text.decodeUtf8
 
 -- | Decode from raw bytes.
 vrfVerKeyHashFromRawBytes :: BS.ByteString -> Maybe (GYVRFVerKeyHash kr)
-vrfVerKeyHashFromRawBytes bs = vrfVerKeyHashFromLedger <$> Crypto.hashFromBytes bs
+vrfVerKeyHashFromRawBytes bs = vrfVerKeyHashFromLedger . Ledger.toVRFVerKeyHash <$> Crypto.hashFromBytes bs
 
 -- | Decode from raw bytes represented as hex.
 vrfVerKeyHashFromRawBytesHex :: BS.ByteString -> Either String (GYVRFVerKeyHash kr)

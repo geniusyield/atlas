@@ -207,6 +207,6 @@ blockDatums (Api.BlockInMode _ block) = goBlock block
 
   goDatum :: Api.TxOutDatum Api.CtxTx era -> [Api.HashableScriptData]
   goDatum Api.TxOutDatumNone = []
-  goDatum (Api.TxOutDatumInTx _ sd) = [sd]
+  goDatum (Api.TxOutSupplementalDatum _ sd) = [sd]
   goDatum (Api.TxOutDatumHash _ _h) = []
   goDatum (Api.TxOutDatumInline _ sd) = [sd]

@@ -83,6 +83,7 @@ module GeniusYield.Types.Value (
   tokenNameFromBS,
   tokenNameToPlutus,
   tokenNameFromPlutus,
+  tokenNameToApi,
   tokenNameFromHex,
   unsafeTokenNameFromHex,
   makeAssetClass,
@@ -96,6 +97,7 @@ import Data.Aeson.KeyMap qualified as KM
 import Data.Csv qualified as Csv
 import Data.List (intercalate)
 import Data.Scientific qualified as SC
+import GHC.IsList qualified (toList)
 import GeniusYield.Imports
 import PlutusTx.Builtins (fromBuiltin, toBuiltin)
 
@@ -226,7 +228,7 @@ valueFromApi :: Api.Value -> GYValue
 valueFromApi v =
   valueFromList
     [ (assetClassFromApi ac, n)
-    | (ac, Api.Quantity n) <- Api.valueToList v
+    | (ac, Api.Quantity n) <- GHC.IsList.toList v
     ]
 
 valueFromApiTxOutValue :: Api.TxOutValue era -> GYValue

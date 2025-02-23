@@ -214,9 +214,7 @@ txBodyReqSignatories body = case Api.txExtraKeyWits $ txBodyToApiTxBodyContent b
 
 -- | Returns the mint 'GYValue' of the given 'GYTxBody'.
 txBodyMintValue :: GYTxBody -> GYValue
-txBodyMintValue body = case Api.txMintValue $ txBodyToApiTxBodyContent body of
-  Api.TxMintNone -> mempty
-  Api.TxMintValue _ v _ -> valueFromApi v
+txBodyMintValue body = valueFromApi $ Api.txMintValueToValue $ Api.txMintValue $ txBodyToApiTxBodyContent body
 
 -- | Returns the validity range of the given 'GYTxBody'.
 txBodyValidityRange :: GYTxBody -> (Maybe GYSlot, Maybe GYSlot)

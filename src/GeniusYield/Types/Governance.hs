@@ -28,11 +28,16 @@ module GeniusYield.Types.Governance (
   GYProposalProcedure (..),
   completeProposalProcedure,
   propProcToLedger,
+  propProcFromLedger,
   GYConstitution (..),
   constitutionToLedger,
   constitutionFromLedger,
   GYGovAction (..),
   govActionToLedger,
+  govActionFromLedger,
+  GYGovActionState (..),
+  govActionStateToLedger,
+  govActionStateFromLedger,
 ) where
 
 import Cardano.Api.Ledger (maybeToStrictMaybe, strictMaybeToMaybe)
@@ -43,11 +48,11 @@ import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import Data.Word (Word16)
 import GeniusYield.Imports (Map, Natural, Set, (&))
-import GeniusYield.Types.Address (GYStakeAddress, stakeAddressToLedger)
+import GeniusYield.Types.Address (GYStakeAddress, stakeAddressFromLedger, stakeAddressToLedger)
 import GeniusYield.Types.Anchor
 import GeniusYield.Types.BuildWitness
 import GeniusYield.Types.Credential (GYCredential, credentialFromLedger, credentialToLedger)
-import GeniusYield.Types.Epoch (GYEpochNo, epochNoToLedger)
+import GeniusYield.Types.Epoch (GYEpochNo, epochNoFromLedger, epochNoToLedger)
 import GeniusYield.Types.KeyHash
 import GeniusYield.Types.KeyRole (GYKeyRole (..))
 import GeniusYield.Types.Reexpose (ProtVer, UnitInterval)
@@ -162,6 +167,15 @@ propProcToLedger GYProposalProcedure {..} =
     , Ledger.pProcAnchor = anchorToLedger propProcAnchor
     }
 
+propProcFromLedger :: Ledger.ProposalProcedure Consensus.StandardConway -> GYProposalProcedure
+propProcFromLedger Ledger.ProposalProcedure {..} =
+  GYProposalProcedure
+    { propProcDeposit = fromIntegral pProcDeposit
+    , propProcReturnAddr = stakeAddressFromLedger pProcReturnAddr
+    , propProcGovAction = govActionFromLedger pProcGovAction
+    , propProcAnchor = anchorFromLedger pProcAnchor
+    }
+
 data GYConstitution = GYConstitution
   { constitutionAnchor :: !GYAnchor
   , constitutionScript :: !(Maybe GYScriptHash)
@@ -229,3 +243,50 @@ govActionToLedger ga = case ga of
   castPurposeM mgid = ms $ castPurpose <$> mgid
 
   castScriptHashM sh = ms $ scriptHashToLedger <$> sh
+
+govActionFromLedger :: Ledger.GovAction Consensus.StandardConway -> GYGovAction
+govActionFromLedger ga = case ga of
+  Ledger.ParameterChange mgaid ppup msh -> ParameterChange (govActionIdFromLedger' <$> strictMaybeToMaybe mgaid) ppup (scriptHashFromLedger <$> strictMaybeToMaybe msh)
+  Ledger.HardForkInitiation mgaid pv -> HardForkInitiation (govActionIdFromLedger' <$> strictMaybeToMaybe mgaid) pv
+  Ledger.TreasuryWithdrawals tw msh -> TreasuryWithdrawals (Map.mapKeys stakeAddressFromLedger $ Map.map fromIntegral tw) (scriptHashFromLedger <$> strictMaybeToMaybe msh)
+  Ledger.NoConfidence mgaid -> NoConfidence (govActionIdFromLedger' <$> strictMaybeToMaybe mgaid)
+  Ledger.UpdateCommittee mgaid rm add thr -> UpdateCommittee (govActionIdFromLedger' <$> strictMaybeToMaybe mgaid) (Set.map credentialFromLedger rm) (Map.mapKeys credentialFromLedger $ Map.map epochNoFromLedger add) thr
+  Ledger.NewConstitution mgaid c -> NewConstitution (govActionIdFromLedger' <$> strictMaybeToMaybe mgaid) (constitutionFromLedger c)
+  Ledger.InfoAction -> InfoAction
+ where
+  govActionIdFromLedger' (Ledger.GovPurposeId gid) = govActionIdFromLedger gid
+
+data GYGovActionState = GYGovActionState
+  { gasId :: !GYGovActionId
+  , gasCommitteeVotes :: !(Map (GYCredential 'GYKeyRoleHotCommittee) GYVote)
+  , gasDRepVotes :: !(Map (GYCredential 'GYKeyRoleDRep) GYVote)
+  , gasStakePoolVotes :: !(Map (GYKeyHash 'GYKeyRoleStakePool) GYVote)
+  , gasProposalProcedure :: !GYProposalProcedure
+  , gasProposedIn :: !GYEpochNo
+  , gasExpiresAfter :: !GYEpochNo
+  }
+  deriving stock (Eq, Show, Ord)
+
+govActionStateToLedger :: GYGovActionState -> Ledger.GovActionState Consensus.StandardConway
+govActionStateToLedger GYGovActionState {..} =
+  Ledger.GovActionState
+    { Ledger.gasId = govActionIdToLedger gasId
+    , Ledger.gasCommitteeVotes = Map.mapKeys credentialToLedger $ Map.map voteToLedger gasCommitteeVotes
+    , Ledger.gasDRepVotes = Map.mapKeys credentialToLedger $ Map.map voteToLedger gasDRepVotes
+    , Ledger.gasStakePoolVotes = Map.mapKeys keyHashToLedger $ Map.map voteToLedger gasStakePoolVotes
+    , Ledger.gasProposalProcedure = propProcToLedger gasProposalProcedure
+    , Ledger.gasProposedIn = epochNoToLedger gasProposedIn
+    , Ledger.gasExpiresAfter = epochNoToLedger gasExpiresAfter
+    }
+
+govActionStateFromLedger :: Ledger.GovActionState Consensus.StandardConway -> GYGovActionState
+govActionStateFromLedger Ledger.GovActionState {..} =
+  GYGovActionState
+    { gasId = govActionIdFromLedger gasId
+    , gasCommitteeVotes = Map.mapKeys credentialFromLedger $ Map.map voteFromLedger gasCommitteeVotes
+    , gasDRepVotes = Map.mapKeys credentialFromLedger $ Map.map voteFromLedger gasDRepVotes
+    , gasStakePoolVotes = Map.mapKeys keyHashFromLedger $ Map.map voteFromLedger gasStakePoolVotes
+    , gasProposalProcedure = propProcFromLedger gasProposalProcedure
+    , gasProposedIn = epochNoFromLedger gasProposedIn
+    , gasExpiresAfter = epochNoFromLedger gasExpiresAfter
+    }

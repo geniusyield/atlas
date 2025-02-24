@@ -40,6 +40,8 @@ import GeniusYield.Imports
 import GeniusYield.Providers.Blockfrost qualified as Blockfrost
 
 -- import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
+
+import Data.Sequence qualified as Seq
 import GeniusYield.Providers.Kupo qualified as KupoApi
 import GeniusYield.Providers.Maestro qualified as MaestroApi
 import GeniusYield.Providers.Node (nodeGetDRepState, nodeGetDRepsState, nodeStakeAddressInfo)
@@ -168,7 +170,7 @@ withCfgProviders
   ns
   f =
     do
-      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution) <- case cfgCoreProvider of
+      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution, gyGetProposals) <- case cfgCoreProvider of
         GYNodeKupo path kupoUrl -> do
           let info = nodeConnectInfo path cfgNetworkId
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
@@ -186,6 +188,7 @@ withCfgProviders
             , nodeGetDRepsState info
             , Node.nodeStakePools info
             , Node.nodeConstitution info
+            , Node.nodeProposals info
             )
         GYOgmiosKupo ogmiosUrl kupoUrl -> do
           oEnv <- OgmiosApi.newOgmiosApiEnv $ Text.unpack ogmiosUrl
@@ -209,6 +212,7 @@ withCfgProviders
             , OgmiosApi.ogmiosGetDRepsState oEnv
             , OgmiosApi.ogmiosStakePools oEnv
             , OgmiosApi.ogmiosConstitution oEnv
+            , OgmiosApi.ogmiosProposals oEnv
             )
         GYMaestro (Confidential apiToken) turboSubmit -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
@@ -231,6 +235,7 @@ withCfgProviders
             , MaestroApi.maestroDRepsState maestroApiEnv
             , MaestroApi.maestroStakePools maestroApiEnv
             , MaestroApi.maestroConstitution maestroApiEnv
+            , MaestroApi.maestroProposals maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
@@ -253,6 +258,7 @@ withCfgProviders
             , Blockfrost.blockfrostDRepsState proj
             , Blockfrost.blockfrostStakePools proj
             , Blockfrost.blockfrostConstitution proj
+            , Blockfrost.blockfrostProposals proj
             )
 
       bracket (mkLogEnv ns cfgLogging) closeScribes $ \logEnv -> do
@@ -300,6 +306,7 @@ logTiming providers@GYProviders {..} =
     , gyLog' = gyLog'
     , gyGetStakePools = gyGetStakePools'
     , gyGetConstitution = gyGetConstitution'
+    , gyGetProposals = gyGetProposals'
     }
  where
   wrap :: String -> IO a -> IO a
@@ -374,6 +381,9 @@ logTiming providers@GYProviders {..} =
 
   gyGetConstitution' :: IO GYConstitution
   gyGetConstitution' = wrap "gyGetConstitution" gyGetConstitution
+
+  gyGetProposals' :: Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
+  gyGetProposals' = wrap "gyGetProposals" . gyGetProposals
 
 duration :: IO a -> IO (a, NominalDiffTime)
 duration m = do

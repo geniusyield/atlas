@@ -145,6 +145,11 @@ instance GYTxQueryMonad GYTxQueryMonadIO where
     providers <- asks envProviders
     ioToQueryMonad $ gyGetConstitution providers
 
+  proposals actionIds = do
+    logMsg mempty GYDebug "Querying Proposals"
+    providers <- asks envProviders
+    ioToQueryMonad $ gyGetProposals providers actionIds
+
   slotConfig = do
     providers <- asks envProviders
     ioToQueryMonad $ gyGetSlotConfig providers

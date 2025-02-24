@@ -24,6 +24,7 @@ module GeniusYield.Providers.Maestro (
   maestroDRepState,
   maestroDRepsState,
   maestroConstitution,
+  maestroProposals,
 ) where
 
 import Cardano.Api qualified as Api
@@ -46,6 +47,7 @@ import Data.Either.Combinators (maybeToRight)
 import Data.Int (Int64)
 import Data.Map.Strict qualified as M
 import Data.Maybe (fromJust)
+import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Time qualified as Time
@@ -667,3 +669,6 @@ maestroDRepsState _p _cs = error "Maestro does not support fetching the DReps st
 
 maestroConstitution :: Maestro.MaestroEnv 'Maestro.V1 -> IO GYConstitution
 maestroConstitution = error "Maestro does not support fetching the constitution"
+
+maestroProposals :: Maestro.MaestroEnv 'Maestro.V1 -> Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
+maestroProposals _p _actionIds = error "Maestro does not support fetching the proposals"

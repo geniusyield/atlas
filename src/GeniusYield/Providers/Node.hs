@@ -16,6 +16,7 @@ module GeniusYield.Providers.Node (
   nodeGetDRepState,
   nodeGetDRepsState,
   nodeConstitution,
+  nodeProposals,
 
   -- * Auxiliary
   networkIdToLocalNodeConnectInfo,
@@ -28,6 +29,7 @@ import Cardano.Slotting.Time (SystemStart)
 import Control.Exception (throwIO)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (listToMaybe)
+import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Data.Text qualified as Txt
 import GeniusYield.CardanoApi.Query
@@ -89,6 +91,10 @@ nodeGetDRepsState info dreps = do
 
 nodeConstitution :: Api.LocalNodeConnectInfo -> IO GYConstitution
 nodeConstitution info = constitutionFromLedger <$> queryConwayEra info Api.QueryConstitution
+
+nodeProposals :: Api.LocalNodeConnectInfo -> Set.Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
+nodeProposals info (Set.map govActionIdToLedger -> proposals) = do
+  fmap govActionStateFromLedger <$> queryConwayEra info (Api.QueryProposals proposals)
 
 nodeStakePools :: Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)
 nodeStakePools info = queryConwayEra info Api.QueryStakePools

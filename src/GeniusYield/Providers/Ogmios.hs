@@ -20,6 +20,7 @@ module GeniusYield.Providers.Ogmios (
   ogmiosStartTime,
   ogmiosEraSummaries,
   ogmiosConstitution,
+  ogmiosProposals,
 ) where
 
 import Cardano.Api qualified as Api
@@ -31,17 +32,21 @@ import Cardano.Ledger.Conway.PParams (
   ConwayPParams (..),
   THKD (..),
  )
+import Cardano.Ledger.Core qualified as Ledger
+import Cardano.Ledger.HKD (HKD, HKDFunctor (..))
 import Cardano.Ledger.Plutus qualified as Ledger
 import Cardano.Slotting.Slot qualified as CSlot
 import Cardano.Slotting.Time qualified as CTime
 import Control.Monad ((<=<))
 import Data.Aeson (Value (Null), object, withArray, withObject, (.:), (.:?), (.=))
+import Data.Aeson.Types qualified as Aeson
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromJust, listToMaybe)
+import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
-import Data.Word (Word64)
+import Data.Word (Word16, Word32, Word64)
 import Deriving.Aeson
 import GHC.Int (Int64)
 import GeniusYield.Imports
@@ -53,6 +58,7 @@ import GeniusYield.Providers.Common (
 import GeniusYield.Types hiding (poolId)
 import Maestro.Types.V1 (AsAda (..), AsBytes, AsLovelace (..), CostModel, EpochNo, EpochSize, EpochSlotLength, EraBound, LowerFirst, MaestroRational, MemoryCpuWith, MinFeeReferenceScripts, ProtocolParametersUpdateStakePool, ProtocolVersion)
 import Maestro.Types.V1 qualified as Maestro
+import Ouroboros.Consensus.Cardano.Block (StandardConway)
 import Ouroboros.Consensus.HardFork.History qualified as Ouroboros
 import Servant.API (
   JSON,
@@ -300,6 +306,127 @@ data OgmiosConstitutionResponse = OgmiosConstitutionResponse
   deriving stock (Show, Generic)
   deriving anyclass FromJSON
 
+constitutionFromOgmios :: OgmiosConstitutionResponse -> GYConstitution
+constitutionFromOgmios OgmiosConstitutionResponse {..} = GYConstitution {constitutionAnchor = anchorFromOgmiosMetadata metadata, constitutionScript = asHashHash <$> guardrails}
+
+newtype OgmiosProposals = OgmiosProposals (Set GYGovActionId)
+
+instance ToJSONRPC OgmiosProposals where
+  toMethod = const "queryLedgerState/governanceProposals"
+  toParams (OgmiosProposals proposals) = Just $ object ["proposals" .= Set.map encodeProposal proposals]
+   where
+    encodeProposal govActionId =
+      object ["transaction" .= object ["id" .= gaidTxId govActionId], "index" .= gaidIx govActionId]
+
+data OgmiosProposalResponse = OgmiosProposalResponse
+  { oprProposal :: GYGovActionId
+  , oprDeposit :: AsAda
+  , oprReturnAccount :: GYStakeAddressBech32
+  , oprMetadata :: OgmiosMetadata
+  , oprAction :: GYGovAction
+  , oprSince :: AsEpoch
+  , oprUntil :: AsEpoch
+  , oprVotes :: [OgmiosVote]
+  }
+
+instance FromJSON OgmiosProposalResponse where
+  parseJSON = withObject "OgmiosProposalResponse" $ \o -> do
+    oprProposal <- do
+      oproposal <- o .: "proposal"
+      parseGovActionId oproposal
+    oprDeposit <- o .: "deposit"
+    oprReturnAccount <- o .: "returnAccount"
+    oprMetadata <- o .: "metadata"
+    oprAction <- do
+      obj <- o .: "action"
+      parseAction obj
+
+    oprSince <- o .: "since"
+    oprUntil <- o .: "until"
+    oprVotes <- o .: "votes"
+    pure OgmiosProposalResponse {..}
+   where
+    parseAction :: Aeson.Object -> Aeson.Parser GYGovAction
+    parseAction obj = do
+      actionType <- obj .: "type"
+      case actionType of
+        "information" -> pure InfoAction
+        "noConfidence" -> do
+          mancestor <- parseAncestor obj
+          pure $ NoConfidence mancestor
+        "constitution" -> do
+          mancestor <- parseAncestor obj
+          ogmiosConstitutionResp <- parseJSON @OgmiosConstitutionResponse (Aeson.Object obj)
+          pure $ NewConstitution mancestor (constitutionFromOgmios ogmiosConstitutionResp)
+        "constitutionalCommittee" -> do
+          mancestor <- parseAncestor obj
+          undefined
+        "treasuryWithdrawals" -> do
+          withdrawals :: Map GYStakeAddressBech32 AsAda <- obj .: "withdrawals"
+          guardrails :: Maybe AsHash <- obj .: "guardrails"
+          pure $ TreasuryWithdrawals (Map.mapKeys stakeAddressFromBech32 $ Map.map (asLovelaceLovelace . asAdaAda) withdrawals) (asHashHash <$> guardrails)
+        "hardForkInitiation" -> do
+          mancestor <- parseAncestor obj
+          version <- obj .: "version" >>= parseJSON @ProtocolVersion
+          pure $ HardForkInitiation mancestor (protocolVersionFromOgmios "parseJSON (ogmiosProposalResponse)" version)
+        "protocolParametersUpdate" -> do
+          mancestor <- parseAncestor obj
+          guardrails :: Maybe AsHash <- obj .: "guardrails"
+          pparamsUpd :: ProtocolParametersM <- obj .: "parameters"
+          pure $ ParameterChange mancestor (Ledger.PParamsUpdate $ pparamsFromOgmios "parseJSON (OgmiosProposalResponse)" pparamsUpd) (asHashHash <$> guardrails)
+        anyOther -> fail $ "Invalid action type: " <> show anyOther
+    parseAncestor obj = do
+      ancestor <- obj .:? "ancestor"
+      case ancestor of
+        Nothing -> pure Nothing
+        Just a -> do
+          ancestorGovActionId <- parseGovActionId a
+          pure $ Just ancestorGovActionId
+    parseGovActionId :: Aeson.Object -> Aeson.Parser GYGovActionId
+    parseGovActionId obj = do
+      GYGovActionId
+        <$> (obj .: "transaction" >>= (.: "id"))
+        <*> (obj .: "index")
+
+data OgmiosVoter = OgmiosVoterCommittee !(GYCredential 'GYKeyRoleHotCommittee) | OgmiosVoterDRep !(GYCredential 'GYKeyRoleDRep) | OgmiosVoterStakePool !GYStakePoolIdBech32
+
+data OgmiosVote = OgmiosVote
+  { ovVoter :: !OgmiosVoter
+  , ovVote :: !GYVote
+  }
+
+instance FromJSON OgmiosVote where
+  parseJSON =
+    withObject "OgmiosVote" $
+      \o -> do
+        ovVoter <- do
+          issuer <- o .: "issuer"
+          voterRole <- issuer .: "role"
+          case voterRole of
+            "delegateRepresentative" -> do
+              cred <- getCredential issuer
+              pure $ OgmiosVoterDRep cred
+            "committee" -> do
+              cred <- getCredential issuer
+              pure $ OgmiosVoterCommittee cred
+            "stakePoolOperator" -> do
+              poolId <- issuer .: "id"
+              pure $ OgmiosVoterStakePool poolId
+            anyOther -> fail $ "Invalid voter role: " <> show anyOther
+        voteResult <- o .: "vote"
+        ovVote <- case voteResult of
+          "yes" -> pure Yes
+          "no" -> pure No
+          "abstain" -> pure Abstain
+          anyOther -> fail $ "Invalid vote result: " <> show anyOther
+        pure OgmiosVote {..}
+   where
+    getCredential o = do
+      credType <- o .: "from"
+      case credType of
+        OgCredTypeVerificationKey -> GYCredentialByKey <$> o .: "id"
+        OgCredTypeScript -> GYCredentialByScript <$> o .: "id"
+
 submitTx :: OgmiosRequest GYTx -> ClientM (OgmiosResponse TxSubmissionResponse)
 protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolParameters)
 tip :: OgmiosRequest OgmiosTip -> ClientM (OgmiosResponse OgmiosTipResponse)
@@ -309,6 +436,7 @@ stakeAddressInfo :: OgmiosRequest GYStakeAddress -> ClientM (OgmiosResponse (Map
 startTime :: OgmiosRequest OgmiosStartTime -> ClientM (OgmiosResponse GYTime)
 eraSummaries :: OgmiosRequest OgmiosEraSummaries -> ClientM (OgmiosResponse [EraSummary])
 constitution :: OgmiosRequest OgmiosConstitution -> ClientM (OgmiosResponse OgmiosConstitutionResponse)
+proposals :: OgmiosRequest OgmiosProposals -> ClientM (OgmiosResponse [OgmiosProposalResponse])
 
 type OgmiosApi =
   ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse)
@@ -320,8 +448,9 @@ type OgmiosApi =
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosStartTime) :> Post '[JSON] (OgmiosResponse GYTime)
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosEraSummaries) :> Post '[JSON] (OgmiosResponse [EraSummary])
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosConstitution) :> Post '[JSON] (OgmiosResponse OgmiosConstitutionResponse)
+    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosProposals) :> Post '[JSON] (OgmiosResponse [OgmiosProposalResponse])
 
-submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState :<|> stakeAddressInfo :<|> startTime :<|> eraSummaries :<|> constitution = client @OgmiosApi Proxy
+submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState :<|> stakeAddressInfo :<|> startTime :<|> eraSummaries :<|> constitution :<|> proposals = client @OgmiosApi Proxy
 
 -- | Submit a transaction to the node via Ogmios.
 ogmiosSubmitTx :: OgmiosApiEnv -> GYSubmitTx
@@ -384,145 +513,204 @@ data CostModels = CostModels
   deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "costModels", Rename "PlutusV1" "plutus:v1", Rename "PlutusV2" "plutus:v2", Rename "PlutusV3" "plutus:v3"]] CostModels
 
 -- | Protocol parameters.
-data ProtocolParameters = ProtocolParameters
-  { protocolParametersCollateralPercentage :: !Natural
-  , protocolParametersConstitutionalCommitteeMaxTermLength :: !Natural
-  , protocolParametersConstitutionalCommitteeMinSize :: !Natural
-  , protocolParametersDelegateRepresentativeDeposit :: !AsAda
-  , protocolParametersDelegateRepresentativeMaxIdleTime :: !Natural
-  , protocolParametersDelegateRepresentativeVotingThresholds :: !DRepVotingThresholds
-  , protocolParametersDesiredNumberOfStakePools :: !Natural
-  , protocolParametersGovernanceActionDeposit :: !AsAda
-  , protocolParametersGovernanceActionLifetime :: !Natural
-  , protocolParametersMaxBlockBodySize :: !AsBytes
-  , protocolParametersMaxBlockHeaderSize :: !AsBytes
-  , protocolParametersMaxCollateralInputs :: !Natural
-  , protocolParametersMaxExecutionUnitsPerBlock :: !(MemoryCpuWith Natural)
-  , protocolParametersMaxExecutionUnitsPerTransaction :: !(MemoryCpuWith Natural)
-  , protocolParametersMaxReferenceScriptsSize :: !AsBytes
-  , protocolParametersMaxTransactionSize :: !AsBytes
-  , protocolParametersMaxValueSize :: !AsBytes
-  , protocolParametersMinFeeCoefficient :: !Natural
-  , protocolParametersMinFeeConstant :: !AsAda
-  , protocolParametersMinFeeReferenceScripts :: !MinFeeReferenceScripts
-  , protocolParametersMinStakePoolCost :: !AsAda
-  , protocolParametersMinUtxoDepositCoefficient :: !Natural
-  , protocolParametersMonetaryExpansion :: !MaestroRational
-  , protocolParametersPlutusCostModels :: !CostModels
-  , protocolParametersScriptExecutionPrices :: !(MemoryCpuWith MaestroRational)
-  , protocolParametersStakeCredentialDeposit :: !AsAda
-  , protocolParametersStakePoolDeposit :: !AsAda
-  , protocolParametersStakePoolPledgeInfluence :: !MaestroRational
-  , protocolParametersStakePoolRetirementEpochBound :: !EpochNo
-  , protocolParametersStakePoolVotingThresholds :: !StakePoolVotingThresholds
-  , protocolParametersTreasuryExpansion :: !MaestroRational
-  , protocolParametersVersion :: !ProtocolVersion
+data ProtocolParametersHKD f = ProtocolParameters
+  { protocolParametersCollateralPercentage :: !(HKD f Natural)
+  , protocolParametersConstitutionalCommitteeMaxTermLength :: !(HKD f Natural)
+  , protocolParametersConstitutionalCommitteeMinSize :: !(HKD f Natural)
+  , protocolParametersDelegateRepresentativeDeposit :: !(HKD f AsAda)
+  , protocolParametersDelegateRepresentativeMaxIdleTime :: !(HKD f Natural)
+  , protocolParametersDelegateRepresentativeVotingThresholds :: !(HKD f DRepVotingThresholds)
+  , protocolParametersDesiredNumberOfStakePools :: !(HKD f Natural)
+  , protocolParametersGovernanceActionDeposit :: !(HKD f AsAda)
+  , protocolParametersGovernanceActionLifetime :: !(HKD f Natural)
+  , protocolParametersMaxBlockBodySize :: !(HKD f AsBytes)
+  , protocolParametersMaxBlockHeaderSize :: !(HKD f AsBytes)
+  , protocolParametersMaxCollateralInputs :: !(HKD f Natural)
+  , protocolParametersMaxExecutionUnitsPerBlock :: !(HKD f (MemoryCpuWith Natural))
+  , protocolParametersMaxExecutionUnitsPerTransaction :: !(HKD f (MemoryCpuWith Natural))
+  , protocolParametersMaxReferenceScriptsSize :: !(HKD f AsBytes)
+  , protocolParametersMaxTransactionSize :: !(HKD f AsBytes)
+  , protocolParametersMaxValueSize :: !(HKD f AsBytes)
+  , protocolParametersMinFeeCoefficient :: !(HKD f Natural)
+  , protocolParametersMinFeeConstant :: !(HKD f AsAda)
+  , protocolParametersMinFeeReferenceScripts :: !(HKD f MinFeeReferenceScripts)
+  , protocolParametersMinStakePoolCost :: !(HKD f AsAda)
+  , protocolParametersMinUtxoDepositCoefficient :: !(HKD f Natural)
+  , protocolParametersMonetaryExpansion :: !(HKD f MaestroRational)
+  , protocolParametersPlutusCostModels :: !(HKD f CostModels)
+  , protocolParametersScriptExecutionPrices :: !(HKD f (MemoryCpuWith MaestroRational))
+  , protocolParametersStakeCredentialDeposit :: !(HKD f AsAda)
+  , protocolParametersStakePoolDeposit :: !(HKD f AsAda)
+  , protocolParametersStakePoolPledgeInfluence :: !(HKD f MaestroRational)
+  , protocolParametersStakePoolRetirementEpochBound :: !(HKD f EpochNo)
+  , protocolParametersStakePoolVotingThresholds :: !(HKD f StakePoolVotingThresholds)
+  , protocolParametersTreasuryExpansion :: !(HKD f MaestroRational)
+  , protocolParametersVersion :: !(HKD f ProtocolVersion)
   }
-  deriving stock (Eq, Show, Generic)
-  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "protocolParameters", LowerFirst]] ProtocolParameters
+  deriving stock Generic
+
+type ProtocolParameters = ProtocolParametersHKD Identity
+
+deriving via (CustomJSON '[FieldLabelModifier '[StripPrefix "protocolParameters", LowerFirst]] ProtocolParameters) instance FromJSON ProtocolParameters
+deriving instance Eq ProtocolParameters
+deriving instance Show ProtocolParameters
+
+type ProtocolParametersM = ProtocolParametersHKD Ledger.StrictMaybe
+deriving via (CustomJSON '[FieldLabelModifier '[StripPrefix "protocolParameters", LowerFirst]] ProtocolParametersM) instance FromJSON ProtocolParametersM
+deriving instance Eq ProtocolParametersM
+deriving instance Show ProtocolParametersM
+
+protocolVersionFromOgmios :: String -> ProtocolVersion -> Ledger.ProtVer
+protocolVersionFromOgmios errPath protocolParametersVersion =
+  Ledger.ProtVer
+    { Ledger.pvMajor = Ledger.mkVersion (Maestro.protocolVersionMajor protocolParametersVersion) & fromMaybe (error (errPath <> "Major version received from Maestro is out of bounds"))
+    , Ledger.pvMinor = Maestro.protocolVersionMinor protocolParametersVersion
+    }
+
+pparamsFromOgmios :: forall f. HKDFunctor f => String -> ProtocolParametersHKD f -> ConwayPParams f StandardConway
+pparamsFromOgmios errPath ProtocolParameters {..} =
+  ConwayPParams
+    { cppMinFeeA = THKD $ hkdMap prxy (Ledger.Coin . (toInteger @Natural)) protocolParametersMinFeeCoefficient
+    , cppMinFeeB = THKD $ hkdMap prxy (Ledger.Coin . toInteger . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersMinFeeConstant
+    , cppMaxBBSize = THKD $ hkdMap prxy ((fromIntegral @Natural @Word32) . Maestro.asBytesBytes) protocolParametersMaxBlockBodySize
+    , cppMaxTxSize = THKD $ hkdMap prxy ((fromIntegral @Natural @Word32) . Maestro.asBytesBytes) protocolParametersMaxTransactionSize
+    , cppMaxBHSize = THKD $ hkdMap prxy (fromIntegral @Natural @Word16 . Maestro.asBytesBytes) protocolParametersMaxBlockHeaderSize
+    , cppKeyDeposit = THKD $ hkdMap prxy (Ledger.Coin . toInteger . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersStakeCredentialDeposit
+    , cppPoolDeposit = THKD $ hkdMap prxy (Ledger.Coin . toInteger . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersStakePoolDeposit
+    , cppEMax =
+        THKD $
+          hkdMap
+            prxy
+            ( Ledger.EpochInterval
+                . fromIntegral
+                . Maestro.unEpochNo
+            )
+            protocolParametersStakePoolRetirementEpochBound
+    , cppNOpt = THKD $ fromIntegral protocolParametersDesiredNumberOfStakePools
+    , cppA0 = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Pool influence received from Maestro is out of bounds")) . Ledger.boundRational @Ledger.NonNegativeInterval . Maestro.unMaestroRational) protocolParametersStakePoolPledgeInfluence
+    , cppRho = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Monetory expansion parameter received from Maestro is out of bounds")) . Ledger.boundRational @Ledger.UnitInterval . Maestro.unMaestroRational) protocolParametersMonetaryExpansion
+    , cppTau = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Treasury expansion parameter received from Maestro is out of bounds")) . Ledger.boundRational @Ledger.UnitInterval . Maestro.unMaestroRational) protocolParametersTreasuryExpansion
+    , cppProtocolVersion = toNoUpdate @f @Ledger.ProtVer $ hkdMap prxy (protocolVersionFromOgmios errPath) protocolParametersVersion
+    , cppMinPoolCost = THKD $ hkdMap prxy (Ledger.Coin . toInteger . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersMinStakePoolCost
+    , cppCoinsPerUTxOByte = THKD $ hkdMap prxy (Api.L.CoinPerByte . Ledger.Coin . toInteger @Natural) protocolParametersMinUtxoDepositCoefficient
+    , cppCostModels =
+        THKD $
+          hkdMap
+            prxy
+            ( \ppPlutusCostModels ->
+                Ledger.mkCostModels $
+                  Map.fromList
+                    [
+                      ( Ledger.PlutusV1
+                      , either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ coerce @_ @[Int64] (costModelsPlutusV1 ppPlutusCostModels)
+                      )
+                    ,
+                      ( Ledger.PlutusV2
+                      , either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ coerce @_ @[Int64] (costModelsPlutusV2 ppPlutusCostModels)
+                      )
+                    ,
+                      ( Ledger.PlutusV3
+                      , either (error (errPath <> "Couldn't build PlutusV3 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV3 $ coerce @_ @[Int64] (costModelsPlutusV3 ppPlutusCostModels)
+                      )
+                    ]
+            )
+            protocolParametersPlutusCostModels
+    , cppPrices =
+        THKD $
+          hkdMap
+            prxy
+            ( \ppScriptExecutionPrices ->
+                Ledger.Prices
+                  { Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Maestro's cpu steps")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithCpu ppScriptExecutionPrices
+                  , Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Maestro's memory units")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithMemory ppScriptExecutionPrices
+                  }
+            )
+            protocolParametersScriptExecutionPrices
+    , cppMaxTxExUnits =
+        THKD $
+          hkdMap
+            prxy
+            ( \ppMaxExecutionUnitsPerTransaction ->
+                Ledger.OrdExUnits $
+                  Ledger.ExUnits
+                    { Ledger.exUnitsSteps =
+                        Maestro.memoryCpuWithCpu ppMaxExecutionUnitsPerTransaction
+                    , Ledger.exUnitsMem =
+                        Maestro.memoryCpuWithMemory ppMaxExecutionUnitsPerTransaction
+                    }
+            )
+            protocolParametersMaxExecutionUnitsPerTransaction
+    , cppMaxBlockExUnits =
+        THKD $
+          hkdMap
+            prxy
+            ( \ppMaxExecutionUnitsPerBlock ->
+                Ledger.OrdExUnits $
+                  Ledger.ExUnits
+                    { Ledger.exUnitsSteps =
+                        Maestro.memoryCpuWithCpu ppMaxExecutionUnitsPerBlock
+                    , Ledger.exUnitsMem =
+                        Maestro.memoryCpuWithMemory ppMaxExecutionUnitsPerBlock
+                    }
+            )
+            protocolParametersMaxExecutionUnitsPerBlock
+    , cppMaxValSize = THKD $ hkdMap prxy (fromIntegral @Natural @Word32 . Maestro.asBytesBytes) protocolParametersMaxValueSize
+    , cppCollateralPercentage = THKD $ fromIntegral protocolParametersCollateralPercentage
+    , cppMaxCollateralInputs = THKD $ fromIntegral protocolParametersMaxCollateralInputs
+    , cppPoolVotingThresholds =
+        THKD $
+          hkdMap
+            prxy
+            ( \ppStakePoolVotingThresholds ->
+                Ledger.PoolVotingThresholds
+                  { pvtPPSecurityGroup = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.ppUpdateStakePoolSecurity $ stakePoolVotingThresholdsProtocolParametersUpdate ppStakePoolVotingThresholds
+                  , pvtMotionNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ stakePoolVotingThresholdsNoConfidence ppStakePoolVotingThresholds
+                  , pvtHardForkInitiation = unsafeBoundRational $ Maestro.unMaestroRational $ stakePoolVotingThresholdsHardForkInitiation ppStakePoolVotingThresholds
+                  , pvtCommitteeNormal = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeDefault $ stakePoolVotingThresholdsConstitutionalCommittee ppStakePoolVotingThresholds
+                  , pvtCommitteeNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeStateOfNoConfidence $ stakePoolVotingThresholdsConstitutionalCommittee ppStakePoolVotingThresholds
+                  }
+            )
+            protocolParametersStakePoolVotingThresholds
+    , cppDRepVotingThresholds =
+        THKD $
+          hkdMap
+            prxy
+            ( \ppDelegateRepresentativeVotingThresholds ->
+                Ledger.DRepVotingThresholds
+                  { dvtUpdateToConstitution = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsConstitution ppDelegateRepresentativeVotingThresholds
+                  , dvtTreasuryWithdrawal = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsTreasuryWithdrawals ppDelegateRepresentativeVotingThresholds
+                  , dvtPPTechnicalGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepTechnical $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
+                  , dvtPPNetworkGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepNetwork $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
+                  , dvtPPGovGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepGovernance $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
+                  , dvtPPEconomicGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepEconomic $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
+                  , dvtMotionNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsNoConfidence ppDelegateRepresentativeVotingThresholds
+                  , dvtHardForkInitiation = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsHardForkInitiation ppDelegateRepresentativeVotingThresholds
+                  , dvtCommitteeNormal = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeDefault $ drepVotingThresholdsConstitutionalCommittee ppDelegateRepresentativeVotingThresholds
+                  , dvtCommitteeNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeStateOfNoConfidence $ drepVotingThresholdsConstitutionalCommittee ppDelegateRepresentativeVotingThresholds
+                  }
+            )
+            protocolParametersDelegateRepresentativeVotingThresholds
+    , cppCommitteeMinSize = THKD $ fromIntegral protocolParametersConstitutionalCommitteeMinSize
+    , cppCommitteeMaxTermLength = THKD $ hkdMap prxy (Ledger.EpochInterval . fromIntegral @Natural) protocolParametersConstitutionalCommitteeMaxTermLength
+    , cppGovActionLifetime = THKD $ hkdMap prxy (Ledger.EpochInterval . fromIntegral @Natural) protocolParametersGovernanceActionLifetime
+    , cppGovActionDeposit = THKD $ hkdMap prxy (Ledger.Coin . fromIntegral . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersGovernanceActionDeposit
+    , cppDRepDeposit = THKD $ hkdMap prxy (Ledger.Coin . fromIntegral . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersDelegateRepresentativeDeposit
+    , cppDRepActivity = THKD $ hkdMap prxy (Ledger.EpochInterval . fromIntegral @Natural) protocolParametersDelegateRepresentativeMaxIdleTime
+    , cppMinFeeRefScriptCostPerByte = THKD $ hkdMap prxy (unsafeBoundRational @Ledger.NonNegativeInterval . Maestro.minFeeReferenceScriptsBase) protocolParametersMinFeeReferenceScripts
+    }
+ where
+  prxy = Proxy @f
 
 -- | Fetch protocol parameters.
 ogmiosProtocolParameters :: OgmiosApiEnv -> IO ApiProtocolParameters
 ogmiosProtocolParameters env = do
-  ProtocolParameters {..} <-
+  ogmiosPParams <-
     handleOgmiosError fn
       <=< runOgmiosClient env
       $ protocolParams (OgmiosRequest OgmiosPP)
   pure $
     Ledger.PParams $
-      ConwayPParams
-        { cppMinFeeA = THKD $ Ledger.Coin $ toInteger protocolParametersMinFeeCoefficient
-        , cppMinFeeB = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinFeeConstant
-        , cppMaxBBSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxBlockBodySize
-        , cppMaxTxSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxTransactionSize
-        , cppMaxBHSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxBlockHeaderSize
-        , cppKeyDeposit = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersStakeCredentialDeposit
-        , cppPoolDeposit = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersStakePoolDeposit
-        , cppEMax =
-            THKD $
-              Ledger.EpochInterval . fromIntegral $
-                Maestro.unEpochNo protocolParametersStakePoolRetirementEpochBound
-        , cppNOpt = THKD $ fromIntegral protocolParametersDesiredNumberOfStakePools
-        , cppA0 = THKD $ fromMaybe (error (errPath <> "Pool influence received from Maestro is out of bounds")) $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersStakePoolPledgeInfluence
-        , cppRho = THKD $ fromMaybe (error (errPath <> "Monetory expansion parameter received from Maestro is out of bounds")) $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersMonetaryExpansion
-        , cppTau = THKD $ fromMaybe (error (errPath <> "Treasury expansion parameter received from Maestro is out of bounds")) $ Ledger.boundRational $ Maestro.unMaestroRational protocolParametersTreasuryExpansion
-        , cppProtocolVersion =
-            Ledger.ProtVer
-              { Ledger.pvMajor = Ledger.mkVersion (Maestro.protocolVersionMajor protocolParametersVersion) & fromMaybe (error (errPath <> "Major version received from Maestro is out of bounds"))
-              , Ledger.pvMinor = Maestro.protocolVersionMinor protocolParametersVersion
-              }
-        , cppMinPoolCost = THKD $ Ledger.Coin $ toInteger $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersMinStakePoolCost
-        , cppCoinsPerUTxOByte = THKD $ Api.L.CoinPerByte $ Ledger.Coin $ toInteger protocolParametersMinUtxoDepositCoefficient
-        , cppCostModels =
-            THKD $
-              Ledger.mkCostModels $
-                Map.fromList
-                  [
-                    ( Ledger.PlutusV1
-                    , either (error (errPath <> "Couldn't build PlutusV1 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV1 $ coerce @_ @[Int64] (costModelsPlutusV1 protocolParametersPlutusCostModels)
-                    )
-                  ,
-                    ( Ledger.PlutusV2
-                    , either (error (errPath <> "Couldn't build PlutusV2 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV2 $ coerce @_ @[Int64] (costModelsPlutusV2 protocolParametersPlutusCostModels)
-                    )
-                  ,
-                    ( Ledger.PlutusV3
-                    , either (error (errPath <> "Couldn't build PlutusV3 cost models")) id $ Ledger.mkCostModel Ledger.PlutusV3 $ coerce @_ @[Int64] (costModelsPlutusV3 protocolParametersPlutusCostModels)
-                    )
-                  ]
-        , cppPrices = THKD $ Ledger.Prices {Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Maestro's cpu steps")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithCpu protocolParametersScriptExecutionPrices, Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Maestro's memory units")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithMemory protocolParametersScriptExecutionPrices}
-        , cppMaxTxExUnits =
-            THKD $
-              Ledger.OrdExUnits $
-                Ledger.ExUnits
-                  { Ledger.exUnitsSteps =
-                      Maestro.memoryCpuWithCpu protocolParametersMaxExecutionUnitsPerTransaction
-                  , Ledger.exUnitsMem =
-                      Maestro.memoryCpuWithMemory protocolParametersMaxExecutionUnitsPerTransaction
-                  }
-        , cppMaxBlockExUnits =
-            THKD $
-              Ledger.OrdExUnits $
-                Ledger.ExUnits
-                  { Ledger.exUnitsSteps =
-                      Maestro.memoryCpuWithCpu protocolParametersMaxExecutionUnitsPerBlock
-                  , Ledger.exUnitsMem =
-                      Maestro.memoryCpuWithMemory protocolParametersMaxExecutionUnitsPerBlock
-                  }
-        , cppMaxValSize = THKD $ fromIntegral $ Maestro.asBytesBytes protocolParametersMaxValueSize
-        , cppCollateralPercentage = THKD $ fromIntegral protocolParametersCollateralPercentage
-        , cppMaxCollateralInputs = THKD $ fromIntegral protocolParametersMaxCollateralInputs
-        , cppPoolVotingThresholds =
-            THKD $
-              Ledger.PoolVotingThresholds
-                { pvtPPSecurityGroup = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.ppUpdateStakePoolSecurity $ stakePoolVotingThresholdsProtocolParametersUpdate protocolParametersStakePoolVotingThresholds
-                , pvtMotionNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ stakePoolVotingThresholdsNoConfidence protocolParametersStakePoolVotingThresholds
-                , pvtHardForkInitiation = unsafeBoundRational $ Maestro.unMaestroRational $ stakePoolVotingThresholdsHardForkInitiation protocolParametersStakePoolVotingThresholds
-                , pvtCommitteeNormal = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeDefault $ stakePoolVotingThresholdsConstitutionalCommittee protocolParametersStakePoolVotingThresholds
-                , pvtCommitteeNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeStateOfNoConfidence $ stakePoolVotingThresholdsConstitutionalCommittee protocolParametersStakePoolVotingThresholds
-                }
-        , cppDRepVotingThresholds =
-            THKD $
-              Ledger.DRepVotingThresholds
-                { dvtUpdateToConstitution = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsConstitution protocolParametersDelegateRepresentativeVotingThresholds
-                , dvtTreasuryWithdrawal = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsTreasuryWithdrawals protocolParametersDelegateRepresentativeVotingThresholds
-                , dvtPPTechnicalGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepTechnical $ drepVotingThresholdsProtocolParametersUpdate protocolParametersDelegateRepresentativeVotingThresholds
-                , dvtPPNetworkGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepNetwork $ drepVotingThresholdsProtocolParametersUpdate protocolParametersDelegateRepresentativeVotingThresholds
-                , dvtPPGovGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepGovernance $ drepVotingThresholdsProtocolParametersUpdate protocolParametersDelegateRepresentativeVotingThresholds
-                , dvtPPEconomicGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepEconomic $ drepVotingThresholdsProtocolParametersUpdate protocolParametersDelegateRepresentativeVotingThresholds
-                , dvtMotionNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsNoConfidence protocolParametersDelegateRepresentativeVotingThresholds
-                , dvtHardForkInitiation = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsHardForkInitiation protocolParametersDelegateRepresentativeVotingThresholds
-                , dvtCommitteeNormal = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeDefault $ drepVotingThresholdsConstitutionalCommittee protocolParametersDelegateRepresentativeVotingThresholds
-                , dvtCommitteeNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeStateOfNoConfidence $ drepVotingThresholdsConstitutionalCommittee protocolParametersDelegateRepresentativeVotingThresholds
-                }
-        , cppCommitteeMinSize = THKD $ fromIntegral protocolParametersConstitutionalCommitteeMinSize
-        , cppCommitteeMaxTermLength = THKD (Ledger.EpochInterval $ fromIntegral protocolParametersConstitutionalCommitteeMaxTermLength)
-        , cppGovActionLifetime = THKD (Ledger.EpochInterval $ fromIntegral protocolParametersGovernanceActionLifetime)
-        , cppGovActionDeposit = THKD $ Ledger.Coin $ fromIntegral $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersGovernanceActionDeposit
-        , cppDRepDeposit = THKD $ Ledger.Coin $ fromIntegral $ Maestro.asLovelaceLovelace $ Maestro.asAdaAda protocolParametersDelegateRepresentativeDeposit
-        , cppDRepActivity = THKD (Ledger.EpochInterval $ fromIntegral protocolParametersDelegateRepresentativeMaxIdleTime)
-        , cppMinFeeRefScriptCostPerByte = THKD $ unsafeBoundRational $ Maestro.minFeeReferenceScriptsBase protocolParametersMinFeeReferenceScripts
-        }
+      pparamsFromOgmios errPath ogmiosPParams
  where
   errPath = "GeniusYield.Providers.Ogmios.ogmiosProtocolParameters: "
   fn = "ogmiosProtocolParameters"
@@ -637,7 +825,14 @@ ogmiosEraSummaries env = do
 
 ogmiosConstitution :: OgmiosApiEnv -> IO GYConstitution
 ogmiosConstitution env = do
-  OgmiosConstitutionResponse {..} <- handleOgmiosError fn <=< runOgmiosClient env $ constitution (OgmiosRequest OgmiosConstitution)
-  pure $ GYConstitution {constitutionAnchor = anchorFromOgmiosMetadata metadata, constitutionScript = asHashHash <$> guardrails}
+  ogmiosConstitutionResp <- handleOgmiosError fn <=< runOgmiosClient env $ constitution (OgmiosRequest OgmiosConstitution)
+  pure $ constitutionFromOgmios ogmiosConstitutionResp
  where
   fn = "ogmiosConstitution"
+
+ogmiosProposals :: OgmiosApiEnv -> Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
+ogmiosProposals env actionIds = do
+  proposalsResp <- handleOgmiosError fn <=< runOgmiosClient env $ proposals (OgmiosRequest $ OgmiosProposals actionIds)
+  pure $ Seq.fromList $ map govActionStateFromOgmiosProposalResponse proposalsResp
+ where
+  fn = "ogmiosProposals"

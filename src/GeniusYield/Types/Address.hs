@@ -42,6 +42,7 @@ module GeniusYield.Types.Address (
   unsafeStakeAddressFromText,
   stakeAddressToText,
   stakeAddressToLedger,
+  stakeAddressFromLedger,
   stakeAddressCredential,
   stakeAddressToCredential,
   stakeAddressFromCredential,
@@ -671,6 +672,9 @@ stakeAddressToText = Api.serialiseAddress . stakeAddressToApi
 
 stakeAddressToLedger :: GYStakeAddress -> Ledger.RewardAccount Ledger.StandardCrypto
 stakeAddressToLedger (stakeAddressToApi -> Api.StakeAddress nw sc) = Ledger.RewardAccount nw sc
+
+stakeAddressFromLedger :: Ledger.RewardAccount Ledger.StandardCrypto -> GYStakeAddress
+stakeAddressFromLedger (Ledger.RewardAccount nw sc) = stakeAddressFromApi $ Api.StakeAddress nw sc
 
 {-# DEPRECATED stakeAddressCredential "Use stakeAddressToCredential." #-}
 

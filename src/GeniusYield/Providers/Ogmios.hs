@@ -362,7 +362,13 @@ instance FromJSON OgmiosProposalResponse where
           pure $ NewConstitution mancestor (constitutionFromOgmios ogmiosConstitutionResp)
         "constitutionalCommittee" -> do
           mancestor <- parseAncestor obj
-          undefined
+          removedMembers <- obj .: "members" >>= (.: "removed")
+          removedMembersSet :: Set (GYCredential 'GYKeyRoleColdCommittee) <- Set.fromList <$> traverse getCredential removedMembers
+          addedMembers <- obj .: "members" >>= (.: "added")
+          addedMembersMap :: Map (GYCredential 'GYKeyRoleColdCommittee) GYEpochNo <- Map.fromList <$> traverse (\o -> (,) <$> getCredential o <*> (o .: "mandate" >>= (.: "epoch") <&> GYEpochNo)) addedMembers
+          quorum :: MaestroRational <- obj .: "quorum"
+          let quorumUnitInterval = (\r -> fromMaybe (error $ "parseJSON (OgmiosProposalResponse): unable to bound rational " <> show r) r) $ Ledger.boundRational $ Maestro.unMaestroRational quorum
+          pure $ UpdateCommittee mancestor removedMembersSet addedMembersMap quorumUnitInterval
         "treasuryWithdrawals" -> do
           withdrawals :: Map GYStakeAddressBech32 AsAda <- obj .: "withdrawals"
           guardrails :: Maybe AsHash <- obj .: "guardrails"
@@ -408,7 +414,7 @@ instance FromJSON OgmiosVote where
             "delegateRepresentative" -> do
               cred <- getCredential issuer
               pure $ OgmiosVoterDRep cred
-            "committee" -> do
+            "constitutionalCommittee" -> do
               cred <- getCredential issuer
               pure $ OgmiosVoterCommittee cred
             "stakePoolOperator" -> do
@@ -422,12 +428,13 @@ instance FromJSON OgmiosVote where
           "abstain" -> pure Abstain
           anyOther -> fail $ "Invalid vote result: " <> show anyOther
         pure OgmiosVote {..}
-   where
-    getCredential o = do
-      credType <- o .: "from"
-      case credType of
-        OgCredTypeVerificationKey -> GYCredentialByKey <$> o .: "id"
-        OgCredTypeScript -> GYCredentialByScript <$> o .: "id"
+
+getCredential :: SingGYKeyRoleI kr => Aeson.Object -> Aeson.Parser (GYCredential kr)
+getCredential o = do
+  credType <- o .: "from"
+  case credType of
+    OgCredTypeVerificationKey -> GYCredentialByKey <$> o .: "id"
+    OgCredTypeScript -> GYCredentialByScript <$> o .: "id"
 
 govActionStateFromOgmiosProposalResponse :: OgmiosProposalResponse -> GYGovActionState
 govActionStateFromOgmiosProposalResponse OgmiosProposalResponse {..} =

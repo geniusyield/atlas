@@ -96,6 +96,7 @@ data CtxCommittee = CtxCommittee
   , ctxCommitteeThreshold :: !UnitInterval
   -- ^ Threshold of the committee that is necessary for a successful vote
   }
+  deriving stock Show
 
 ctxNetworkId :: Ctx -> GYNetworkId
 ctxNetworkId Ctx {ctxNetworkInfo} = GYPrivnet ctxNetworkInfo

@@ -17,13 +17,16 @@ module GeniusYield.Providers.Node (
   nodeGetDRepsState,
   nodeConstitution,
   nodeProposals,
+  nodeCommitteeMembersState,
 
   -- * Auxiliary
   networkIdToLocalNodeConnectInfo,
 ) where
 
 import Cardano.Api qualified as Api
+import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Ledger.Api.State.Query qualified as Ledger
 import Cardano.Ledger.Coin qualified as Ledger
 import Cardano.Slotting.Time (SystemStart)
 import Control.Exception (throwIO)
@@ -95,6 +98,9 @@ nodeConstitution info = constitutionFromLedger <$> queryConwayEra info Api.Query
 nodeProposals :: Api.LocalNodeConnectInfo -> Set.Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
 nodeProposals info (Set.map govActionIdToLedger -> proposals) = do
   fmap govActionStateFromLedger <$> queryConwayEra info (Api.QueryProposals proposals)
+
+nodeCommitteeMembersState :: Api.LocalNodeConnectInfo -> IO (Ledger.CommitteeMembersState Ledger.StandardCrypto)
+nodeCommitteeMembersState info = queryConwayEra info $ Api.QueryCommitteeMembersState mempty mempty mempty
 
 nodeStakePools :: Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)
 nodeStakePools info = queryConwayEra info Api.QueryStakePools

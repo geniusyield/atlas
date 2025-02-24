@@ -12,9 +12,11 @@ module GeniusYield.Types.KeyRole (
   SingGYKeyRoleI (..),
   GYKeyRoleToLedger,
   GYKeyRoleVRF (..),
+  GYKeyRoleVRFToLedger,
 ) where
 
 import Cardano.Api.Ledger qualified as Ledger
+import Cardano.Ledger.Keys qualified as Ledger
 
 -- | Role of a key.
 data GYKeyRole
@@ -62,3 +64,6 @@ type family GYKeyRoleToLedger (kr :: GYKeyRole) :: Ledger.KeyRole where
 -- | Role of a VRF key.
 data GYKeyRoleVRF
   = GYKeyRoleVRFStakePool
+
+type family GYKeyRoleVRFToLedger (kr :: GYKeyRoleVRF) :: Ledger.KeyRoleVRF where
+  GYKeyRoleVRFToLedger 'GYKeyRoleVRFStakePool = Ledger.StakePoolVRF

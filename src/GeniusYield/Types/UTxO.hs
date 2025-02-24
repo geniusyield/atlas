@@ -153,7 +153,7 @@ utxoFromApi txIn (Api.TxOut a v d s) =
   f :: Api.TxOutDatum Api.CtxTx ApiEra -> GYOutDatum
   f Api.TxOutDatumNone = GYOutDatumNone
   f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
-  f (Api.TxOutDatumInTx _ sd) = GYOutDatumHash . hashDatum $ datumFromApi' sd
+  f (Api.TxOutSupplementalDatum _ sd) = GYOutDatumHash . hashDatum $ datumFromApi' sd
   f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' sd
 
 utxoFromApi' :: Api.TxIn -> Api.TxOut Api.CtxUTxO era -> GYUTxO

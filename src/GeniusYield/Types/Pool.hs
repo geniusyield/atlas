@@ -14,7 +14,6 @@ module GeniusYield.Types.Pool (
 
 import Cardano.Api.Address qualified as Api
 import Cardano.Api.ReexposeLedger qualified as Ledger
-import Cardano.Ledger.Api qualified as Ledger
 import Cardano.Ledger.BaseTypes
 import Data.IP (IPv4, IPv6)
 import Data.Maybe (fromMaybe)

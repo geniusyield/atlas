@@ -1,31 +1,32 @@
-cabal-version:      3.8
-name:               atlas-cardano
-version:            0.11.1
-synopsis:           Application backend for Plutus smart contracts on Cardano
+cabal-version: 3.8
+name: atlas-cardano
+version: 0.11.1
+synopsis: Application backend for Plutus smart contracts on Cardano
 description:
   Atlas is an all-in-one, Haskell-native application backend for writing off-chain code for on-chain Plutus smart contracts.
 
-license:            Apache-2.0
-license-file:       LICENSE
-copyright:          (c) 2023 GYELD GMBH
-author:             Lars Bruenjes
-maintainer:         support@geniusyield.co
-build-type:         Simple
-category:           Blockchain, Cardano, Framework
-homepage:           https://github.com/geniusyield/atlas#readme
-bug-reports:        https://github.com/geniusyield/atlas/issues
-extra-source-files: CHANGELOG.md
-                    README.md
+license: Apache-2.0
+license-file: LICENSE
+copyright: (c) 2023 GYELD GMBH
+author: Lars Bruenjes
+maintainer: support@geniusyield.co
+build-type: Simple
+category: Blockchain, Cardano, Framework
+homepage: https://github.com/geniusyield/atlas#readme
+bug-reports: https://github.com/geniusyield/atlas/issues
+extra-source-files:
+  CHANGELOG.md
+  README.md
+
 tested-with:
-  GHC ==9.6.5
-   || ==9.6.6
+  ghc ==9.6.5 || ==9.6.6
 
 source-repository head
-  type:     git
+  type: git
   location: https://github.com/geniusyield/atlas
 
 common common
-  default-language:   GHC2021
+  default-language: GHC2021
   default-extensions:
     DataKinds
     DefaultSignatures
@@ -43,28 +44,36 @@ common common
     UndecidableInstances
     ViewPatterns
 
-  ghc-options:        -Wall -Wincomplete-uni-patterns -Wunused-packages
+  ghc-options:
+    -Wall
+    -Wincomplete-uni-patterns
+    -Wunused-packages
 
   -- speed-ups GHCi considerably
-  ghc-options:        -fno-show-valid-hole-fits
+  ghc-options: -fno-show-valid-hole-fits
 
 common plutus-ghc-options
   -- so unfoldings are present even when compiled without optmizations
   ghc-options:
-    -fno-ignore-interface-pragmas -fno-omit-interface-pragmas
+    -fno-ignore-interface-pragmas
+    -fno-omit-interface-pragmas
     -Wno-partial-type-signatures
 
   -- expose all unfoldings, so plutustx compiler can do its job
   ghc-options:
-    -fexpose-all-unfoldings -fobject-code
-    -fplugin-opt PlutusTx.Plugin:defer-errors
+    -fexpose-all-unfoldings
+    -fobject-code
+    -fplugin-opt
+    PlutusTx.Plugin:defer-errors
 
   -- set target plutus-core version
-  ghc-options: -fplugin-opt PlutusTx.Plugin:target-version=1.0.0
+  ghc-options:
+    -fplugin-opt
+    PlutusTx.Plugin:target-version=1.0.0
 
 library
-  import:          common
-  hs-source-dirs:  src
+  import: common
+  hs-source-dirs: src
   exposed-modules:
     GeniusYield.Aeson.Utils
     GeniusYield.Api.TestTokens
@@ -111,8 +120,8 @@ library
     GeniusYield.Transaction.CoinSelection.Balance
     GeniusYield.Transaction.CoinSelection.Numeric
     GeniusYield.Transaction.CoinSelection.Types
-    GeniusYield.Transaction.CoinSelection.UTxOIndex.Internal
     GeniusYield.Transaction.CoinSelection.UTxOIndex
+    GeniusYield.Transaction.CoinSelection.UTxOIndex.Internal
     GeniusYield.Transaction.CoinSelection.UTxOSelection
     GeniusYield.Transaction.Common
     GeniusYield.TxBuilder
@@ -132,8 +141,8 @@ library
     GeniusYield.Types.Blueprint.Contract
     GeniusYield.Types.Blueprint.DefinitionId
     GeniusYield.Types.Blueprint.Parameter
-    GeniusYield.Types.Blueprint.Purpose
     GeniusYield.Types.Blueprint.Preamble
+    GeniusYield.Types.Blueprint.Purpose
     GeniusYield.Types.Blueprint.Schema
     GeniusYield.Types.Blueprint.TH
     GeniusYield.Types.Blueprint.Validator
@@ -141,15 +150,15 @@ library
     GeniusYield.Types.BuildWitness
     GeniusYield.Types.Certificate
     GeniusYield.Types.Credential
+    GeniusYield.Types.DRep
     GeniusYield.Types.Datum
     GeniusYield.Types.Delegatee
-    GeniusYield.Types.DRep
     GeniusYield.Types.Epoch
     GeniusYield.Types.Era
     GeniusYield.Types.Governance
-    GeniusYield.Types.KeyHash
     GeniusYield.Types.Key
     GeniusYield.Types.Key.Class
+    GeniusYield.Types.KeyHash
     GeniusYield.Types.KeyRole
     GeniusYield.Types.Ledger
     GeniusYield.Types.Logging
@@ -192,76 +201,77 @@ library
     GeniusYield.Providers.LiteChainIndex
     GeniusYield.Providers.Node.AwaitTx
     GeniusYield.Providers.Node.Query
-    GeniusYield.TxBuilder.IO.Query
     GeniusYield.TxBuilder.IO.Builder
+    GeniusYield.TxBuilder.IO.Query
     GeniusYield.Utils
+
   build-depends:
-    async ^>=2.2.5,
-    aeson ^>=2.2.3,
-    aeson-pretty ^>= 0.8.10,
-    attoparsec ^>=0.14.4,
-    auto-update ^>=0.2.1,
+    MonadRandom,
+    aeson,
+    aeson-pretty,
+    async,
+    attoparsec,
+    auto-update,
     base ^>=4.18.2,
-    base16-bytestring ^>=1.0.2,
-    blockfrost-client ^>=0.9.1,
-    bytestring ^>=0.11.5,
-    cache ^>=0.1.3,
-    cassava ^>=0.5.3,
-    cborg ^>=0.2.10,
-    containers ^>=0.6.7,
-    data-default ^>=0.7.1,
-    data-default-class ^>=0.1.2,
-    deriving-aeson ^>=0.2.9,
-    either ^>=5.0.2,
+    base16-bytestring,
+    blockfrost-client,
+    bytestring,
+    cache,
+    cassava,
+    cborg,
+    containers,
+    data-default,
+    data-default-class,
+    deriving-aeson,
+    either,
     extra,
     generic-lens,
-    hashable ^>=1.4.7,
-    hedgehog ^>=1.4,
-    hedgehog-extras ^>=0.6.5,
-    http-api-data ^>=0.6.1,
-    http-client ^>=0.7.17,
-    http-client-tls ^>=0.3.6,
-    http-types ^>=0.12.4,
-    indexed-traversable ^>=0.1.4,
-    iproute ^>=1.7.14,
-    katip ^>=0.8.8,
-    lens ^>=5.2.3,
-    MonadRandom ^>=0.6,
+    hashable,
+    hedgehog,
+    hedgehog-extras,
+    http-api-data,
+    http-client,
+    http-client-tls,
+    http-types,
+    indexed-traversable,
+    iproute,
+    katip,
+    lens,
     monoidmap,
-    mtl ^>=2.3.1,
-    network-uri ^>=2.6.4,
-    postgresql-simple ^>=0.7.0,
-    prettyprinter ^>=1.7.1,
-    raven-haskell ^>=0.1.4.1,
-    resourcet ^>=1.3.0,
-    safe-money ^>=0.9.1,
-    scientific ^>=0.3.8,
-    servant ^>=0.20.1,
-    servant-client ^>=0.20,
-    servant-client-core ^>=0.20,
-    some ^>=1.0.6,
-    sop-extras ^>=0.2.0,
-    stm ^>=2.5.1,
-    strict-mvar ^>=1.5.0,
-    string-conv ^>=0.2.0,
-    swagger2 ^>=2.8.9,
-    tasty ^>=1.5,
-    tasty-hunit ^>=0.10.2,
-    tasty-quickcheck ^>=0.11,
-    template-haskell ^>=2.20.0,
-    text ^>=2.0.2,
-    time ^>=1.12.2,
-    transformers ^>=0.6.1,
-    unordered-containers ^>=0.2.20,
-    vector ^>=0.13.1,
-    witherable ^>=0.5
+    mtl,
+    network-uri,
+    postgresql-simple,
+    prettyprinter,
+    raven-haskell,
+    resourcet,
+    safe-money,
+    scientific,
+    servant,
+    servant-client,
+    servant-client-core,
+    some,
+    sop-extras,
+    stm,
+    strict-mvar,
+    string-conv,
+    swagger2,
+    tasty,
+    tasty-hunit,
+    tasty-quickcheck,
+    template-haskell,
+    text,
+    time,
+    transformers,
+    unordered-containers,
+    vector,
+    witherable,
 
   -- Dependencies whose version is fixed/constrained by @cabal.project@ file.
   build-depends:
     bech32,
-    maestro-sdk,
     clb,
-    openapi3
+    maestro-sdk,
+    openapi3,
 
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file or derived from other related dependencies.
   build-depends:
@@ -270,14 +280,13 @@ library
     cardano-api:internal,
     cardano-crypto,
     cardano-crypto-class,
-    cardano-ledger-api,
-    cardano-ledger-core:{cardano-ledger-core, testlib},
-    cardano-ledger-byron,
-    cardano-ledger-core,
-    cardano-ledger-conway,
-    cardano-ledger-shelley,
     cardano-ledger-alonzo,
+    cardano-ledger-api,
     cardano-ledger-binary,
+    cardano-ledger-byron,
+    cardano-ledger-conway,
+    cardano-ledger-core,
+    cardano-ledger-core:{cardano-ledger-core, testlib},
     cardano-ledger-shelley,
     cardano-slotting,
     cardano-testnet,
@@ -290,12 +299,12 @@ library
 
   -- needed for examples
   -- Version of @plutus-core@ is pinned in @cabal.project@ file.
-  build-depends:   plutus-core
-  build-depends:   atlas-cardano:framework-onchain-plutustx
+  build-depends: plutus-core
+  build-depends: atlas-cardano:framework-onchain-plutustx
 
 library framework-onchain-plutustx
-  import:          common, plutus-ghc-options
-  hs-source-dirs:  src-plutustx
+  import: common, plutus-ghc-options
+  hs-source-dirs: src-plutustx
   exposed-modules:
     GeniusYield.OnChain.AStakeValidator
     GeniusYield.OnChain.AStakeValidator.Compiled
@@ -304,32 +313,37 @@ library framework-onchain-plutustx
     GeniusYield.OnChain.TestToken
     GeniusYield.OnChain.TestToken.Compiled
 
-  build-depends:   base ^>=4.18.2
-
+  build-depends: base ^>=4.18.2
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
   build-depends:
     plutus-core,
     plutus-ledger-api,
     plutus-tx,
-    plutus-tx-plugin
+    plutus-tx-plugin,
 
 test-suite atlas-tests
-  import:         common, plutus-ghc-options
-  type:           exitcode-stdio-1.0
-  main-is:        atlas-tests.hs
+  import: common, plutus-ghc-options
+  type: exitcode-stdio-1.0
+  main-is: atlas-tests.hs
   hs-source-dirs: tests
-  ghc-options:    -threaded -rtsopts -Wall
+  ghc-options:
+    -threaded
+    -rtsopts
+    -Wall
 
   -- set target plutus-core version
-  ghc-options:    -fplugin-opt PlutusTx.Plugin:target-version=1.0.0
+  ghc-options:
+    -fplugin-opt
+    PlutusTx.Plugin:target-version=1.0.0
+
   other-modules:
     GeniusYield.Test.Blueprint
     GeniusYield.Test.CoinSelection
     GeniusYield.Test.Config
     GeniusYield.Test.FeeTracking
     GeniusYield.Test.GYTxBody
-    GeniusYield.Test.GYTxSkeleton
     GeniusYield.Test.GYTxOutRefCbor
+    GeniusYield.Test.GYTxSkeleton
     GeniusYield.Test.OnChain.AlwaysSucceeds
     GeniusYield.Test.OnChain.AlwaysSucceeds.Compiled
     GeniusYield.Test.OnChain.GuessRefInputDatum
@@ -343,6 +357,7 @@ test-suite atlas-tests
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
+    MonadRandom,
     aeson,
     atlas-cardano,
     base,
@@ -355,7 +370,6 @@ test-suite atlas-tests
     filepath,
     http-api-data,
     maestro-sdk,
-    MonadRandom,
     ouroboros-consensus,
     plutus-ledger-api,
     plutus-tx,
@@ -365,20 +379,23 @@ test-suite atlas-tests
     tasty-quickcheck,
     text,
     time,
-    transformers
+    transformers,
 
   -- Additional dependencies.
   build-depends:
     QuickCheck,
     quickcheck-instances,
-    tasty-golden
+    tasty-golden,
 
 test-suite atlas-privnet-tests
-  import:         common
-  type:           exitcode-stdio-1.0
-  ghc-options:    -threaded -rtsopts
+  import: common
+  type: exitcode-stdio-1.0
+  ghc-options:
+    -threaded
+    -rtsopts
+
   hs-source-dirs: tests-privnet
-  main-is:        atlas-privnet-tests.hs
+  main-is: atlas-privnet-tests.hs
   other-modules:
     GeniusYield.Test.Privnet.Blueprint
     GeniusYield.Test.Privnet.Committee
@@ -402,23 +419,30 @@ test-suite atlas-privnet-tests
     mtl,
     plutus-tx,
     tasty,
-    tasty-hunit
+    tasty-hunit,
 
 test-suite atlas-unified-tests
-  import:         common, plutus-ghc-options
-  type:           exitcode-stdio-1.0
-  main-is:        atlas-unified-tests.hs
+  import: common, plutus-ghc-options
+  type: exitcode-stdio-1.0
+  main-is: atlas-unified-tests.hs
   hs-source-dirs: tests-unified
-  ghc-options:    -threaded -rtsopts -Wall
+  ghc-options:
+    -threaded
+    -rtsopts
+    -Wall
 
   -- set target plutus-core version
-  ghc-options:    -fplugin-opt PlutusTx.Plugin:target-version=1.0.0
+  ghc-options:
+    -fplugin-opt
+    PlutusTx.Plugin:target-version=1.0.0
+
   other-modules:
-    GeniusYield.Test.Unified.OnChain.BetRef
-    GeniusYield.Test.Unified.OnChain.BetRef.Compiled
     GeniusYield.Test.Unified.BetRef.Operations
     GeniusYield.Test.Unified.BetRef.PlaceBet
     GeniusYield.Test.Unified.BetRef.TakePot
+    GeniusYield.Test.Unified.OnChain.BetRef
+    GeniusYield.Test.Unified.OnChain.BetRef.Compiled
+
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
     atlas-cardano,
@@ -428,7 +452,7 @@ test-suite atlas-unified-tests
     mtl,
     plutus-core,
     plutus-ledger-api,
-    plutus-tx-plugin,
     plutus-tx,
+    plutus-tx-plugin,
     tasty,
     text,

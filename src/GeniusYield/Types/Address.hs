@@ -42,6 +42,7 @@ module GeniusYield.Types.Address (
   unsafeStakeAddressFromText,
   stakeAddressToText,
   stakeAddressToLedger,
+  stakeAddressFromLedger,
   stakeAddressCredential,
   stakeAddressToCredential,
   stakeAddressFromCredential,
@@ -672,6 +673,9 @@ stakeAddressToText = Api.serialiseAddress . stakeAddressToApi
 stakeAddressToLedger :: GYStakeAddress -> Ledger.RewardAccount Ledger.StandardCrypto
 stakeAddressToLedger (stakeAddressToApi -> Api.StakeAddress nw sc) = Ledger.RewardAccount nw sc
 
+stakeAddressFromLedger :: Ledger.RewardAccount Ledger.StandardCrypto -> GYStakeAddress
+stakeAddressFromLedger (Ledger.RewardAccount nw sc) = stakeAddressFromApi $ Api.StakeAddress nw sc
+
 {-# DEPRECATED stakeAddressCredential "Use stakeAddressToCredential." #-}
 
 -- | Get a stake credential from a stake address. This drops the network information.
@@ -888,6 +892,9 @@ instance FromJSON GYStakeAddressBech32 where
     case stakeAddressFromTextMaybe t of
       Just stakeAddr -> return $ GYStakeAddressBech32 stakeAddr
       Nothing -> fail "cannot deserialise stake address"
+
+instance Aeson.FromJSONKey GYStakeAddressBech32 where
+  fromJSONKey = Aeson.FromJSONKeyTextParser (either (fail . Text.unpack) pure . Web.parseUrlPiece)
 
 instance PQ.ToField GYStakeAddressBech32 where
   toField (GYStakeAddressBech32 stakeAddr) = PQ.toField $ stakeAddressToText stakeAddr

@@ -88,6 +88,7 @@ import Control.Concurrent.Class.MonadMVar.Strict (
  )
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.Default (Default, def)
+import Data.Sequence qualified as Seq
 import Data.Text qualified as Txt
 import Data.Time
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
@@ -100,7 +101,7 @@ import GeniusYield.Types.Credential (GYCredential, GYPaymentCredential)
 import GeniusYield.Types.DRep
 import GeniusYield.Types.Datum
 import GeniusYield.Types.Epoch (GYEpochNo (GYEpochNo))
-import GeniusYield.Types.Governance (GYConstitution)
+import GeniusYield.Types.Governance (GYConstitution, GYGovActionId, GYGovActionState)
 import GeniusYield.Types.KeyRole
 import GeniusYield.Types.Logging
 import GeniusYield.Types.ProtocolParameters
@@ -159,7 +160,9 @@ data GYProviders = GYProviders
     gyLog' :: !GYLogConfiguration
   , gyGetStakePools :: !(IO (Set Api.S.PoolId))
   , gyGetConstitution :: IO GYConstitution
-  -- Don't make this strict since it's not defined for all providers!
+  , -- Don't make this strict since it's not defined for all providers!
+    gyGetProposals :: Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
+    -- Don't make this strict since it's not defined for all providers!
   }
 
 gyGetSlotOfCurrentBlock :: GYProviders -> IO GYSlot

@@ -96,6 +96,7 @@ data CtxCommittee = CtxCommittee
   , ctxCommitteeThreshold :: !UnitInterval
   -- ^ Threshold of the committee that is necessary for a successful vote
   }
+  deriving stock Show
 
 ctxNetworkId :: Ctx -> GYNetworkId
 ctxNetworkId Ctx {ctxNetworkInfo} = GYPrivnet ctxNetworkInfo
@@ -231,6 +232,7 @@ ctxProviders ctx =
     , gyGetDRepsState = nodeGetDRepsState (ctxInfo ctx)
     , gyGetStakePools = nodeStakePools (ctxInfo ctx)
     , gyGetConstitution = nodeConstitution (ctxInfo ctx)
+    , gyGetProposals = nodeProposals (ctxInfo ctx)
     }
 
 -- | Function to find for the first locked output in the given `GYTxBody` at the given `GYAddress`.

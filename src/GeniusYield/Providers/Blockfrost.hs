@@ -13,6 +13,7 @@ module GeniusYield.Providers.Blockfrost (
   blockfrostDRepState,
   blockfrostDRepsState,
   blockfrostConstitution,
+  blockfrostProposals,
   networkIdToProject,
 ) where
 
@@ -40,6 +41,7 @@ import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (fold)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromJust)
+import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
@@ -598,6 +600,9 @@ blockfrostDRepsState _p _cs = error "Blockfrost SDK does not support fetching th
 
 blockfrostConstitution :: Blockfrost.Project -> IO GYConstitution
 blockfrostConstitution = error "Blockfrost does not support fetching the constitution"
+
+blockfrostProposals :: Blockfrost.Project -> Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
+blockfrostProposals _p _actionIds = error "Blockfrost SDK does not support fetching the proposals"
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions

@@ -83,13 +83,16 @@ txOutToApi (GYTxOut addr v md mrs) =
   resolveOutputScript (GYSimpleScript s) = Api.ScriptInAnyLang Api.SimpleScriptLanguage (Api.SimpleScript $ simpleScriptToApi s)
   resolveOutputScript (GYPlutusScript s) =
     let version = singPlutusVersionToApi $ scriptVersion s
-     in Api.ScriptInAnyLang (Api.PlutusScriptLanguage version) (Api.PlutusScript version (scriptToApi s))
+     in case version of
+          Api.PlutusScriptV1 -> Api.ScriptInAnyLang (Api.PlutusScriptLanguage version) (Api.PlutusScript version (scriptToApi s))
+          Api.PlutusScriptV2 -> Api.ScriptInAnyLang (Api.PlutusScriptLanguage version) (Api.PlutusScript version (scriptToApi s))
+          Api.PlutusScriptV3 -> Api.ScriptInAnyLang (Api.PlutusScriptLanguage version) (Api.PlutusScript version (scriptToApi s))
 
   mkDatum :: Maybe (GYDatum, GYTxOutUseInlineDatum v) -> Api.TxOutDatum Api.CtxTx ApiEra
   mkDatum Nothing = Api.TxOutDatumNone
   mkDatum (Just (d, di))
     | di' = Api.TxOutDatumInline Api.BabbageEraOnwardsConway d'
-    | otherwise = Api.TxOutDatumInTx Api.AlonzoEraOnwardsConway d'
+    | otherwise = Api.TxOutSupplementalDatum Api.AlonzoEraOnwardsConway d'
    where
     d' = datumToApi' d
 

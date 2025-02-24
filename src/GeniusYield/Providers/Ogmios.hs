@@ -205,6 +205,9 @@ newtype AsEpoch = AsEpoch
   deriving stock (Eq, Show, Generic)
   deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "asEpoch", LowerFirst]] AsEpoch
 
+epochFromOgmios :: AsEpoch -> GYEpochNo
+epochFromOgmios asEpoch = asEpoch & asEpochEpoch & fromIntegral & GYEpochNo
+
 data OgmiosMetadata = OgmiosMetadata
   { metadataUrl :: !GYUrl
   , metadataHash :: !GYAnchorDataHash
@@ -313,7 +316,7 @@ newtype OgmiosProposals = OgmiosProposals (Set GYGovActionId)
 
 instance ToJSONRPC OgmiosProposals where
   toMethod = const "queryLedgerState/governanceProposals"
-  toParams (OgmiosProposals proposals) = Just $ object ["proposals" .= Set.map encodeProposal proposals]
+  toParams (OgmiosProposals proposalsSet) = Just $ object ["proposals" .= Set.map encodeProposal proposalsSet]
    where
     encodeProposal govActionId =
       object ["transaction" .= object ["id" .= gaidTxId govActionId], "index" .= gaidIx govActionId]
@@ -340,7 +343,6 @@ instance FromJSON OgmiosProposalResponse where
     oprAction <- do
       obj <- o .: "action"
       parseAction obj
-
     oprSince <- o .: "since"
     oprUntil <- o .: "until"
     oprVotes <- o .: "votes"
@@ -348,7 +350,7 @@ instance FromJSON OgmiosProposalResponse where
    where
     parseAction :: Aeson.Object -> Aeson.Parser GYGovAction
     parseAction obj = do
-      actionType <- obj .: "type"
+      actionType :: Text <- obj .: "type"
       case actionType of
         "information" -> pure InfoAction
         "noConfidence" -> do
@@ -401,7 +403,7 @@ instance FromJSON OgmiosVote where
       \o -> do
         ovVoter <- do
           issuer <- o .: "issuer"
-          voterRole <- issuer .: "role"
+          voterRole :: Text <- issuer .: "role"
           case voterRole of
             "delegateRepresentative" -> do
               cred <- getCredential issuer
@@ -413,7 +415,7 @@ instance FromJSON OgmiosVote where
               poolId <- issuer .: "id"
               pure $ OgmiosVoterStakePool poolId
             anyOther -> fail $ "Invalid voter role: " <> show anyOther
-        voteResult <- o .: "vote"
+        voteResult :: Text <- o .: "vote"
         ovVote <- case voteResult of
           "yes" -> pure Yes
           "no" -> pure No
@@ -426,6 +428,21 @@ instance FromJSON OgmiosVote where
       case credType of
         OgCredTypeVerificationKey -> GYCredentialByKey <$> o .: "id"
         OgCredTypeScript -> GYCredentialByScript <$> o .: "id"
+
+govActionStateFromOgmiosProposalResponse :: OgmiosProposalResponse -> GYGovActionState
+govActionStateFromOgmiosProposalResponse OgmiosProposalResponse {..} =
+  let (gasStakePoolVotes, gasDRepVotes, gasCommitteeVotes) =
+        foldl'
+          ( \(!accGasStakePoolVotes, !accGasDRepVotes, !accGasCommitteeVotes) OgmiosVote {..} ->
+              case ovVoter of
+                OgmiosVoterCommittee cred -> (accGasStakePoolVotes, accGasDRepVotes, Map.insert cred ovVote accGasCommitteeVotes)
+                OgmiosVoterDRep cred -> (accGasStakePoolVotes, Map.insert cred ovVote accGasDRepVotes, accGasCommitteeVotes)
+                OgmiosVoterStakePool (stakePoolIdFromBech32 -> poolId) -> (Map.insert poolId ovVote accGasStakePoolVotes, accGasDRepVotes, accGasCommitteeVotes)
+          )
+          (mempty, mempty, mempty)
+          oprVotes
+      gasProposalProcedure = GYProposalProcedure {propProcDeposit = oprDeposit & asAdaAda & asLovelaceLovelace, propProcReturnAddr = oprReturnAccount & stakeAddressFromBech32, propProcGovAction = oprAction, propProcAnchor = oprMetadata & anchorFromOgmiosMetadata}
+   in GYGovActionState {gasStakePoolVotes = gasStakePoolVotes, gasProposedIn = epochFromOgmios oprSince, gasProposalProcedure = gasProposalProcedure, gasId = oprProposal, gasExpiresAfter = epochFromOgmios oprUntil, gasDRepVotes = gasDRepVotes, gasCommitteeVotes = gasCommitteeVotes}
 
 submitTx :: OgmiosRequest GYTx -> ClientM (OgmiosResponse TxSubmissionResponse)
 protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolParameters)
@@ -586,7 +603,7 @@ pparamsFromOgmios errPath ProtocolParameters {..} =
                 . Maestro.unEpochNo
             )
             protocolParametersStakePoolRetirementEpochBound
-    , cppNOpt = THKD $ fromIntegral protocolParametersDesiredNumberOfStakePools
+    , cppNOpt = THKD $ hkdMap prxy (fromIntegral @Natural @Word16) protocolParametersDesiredNumberOfStakePools
     , cppA0 = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Pool influence received from Maestro is out of bounds")) . Ledger.boundRational @Ledger.NonNegativeInterval . Maestro.unMaestroRational) protocolParametersStakePoolPledgeInfluence
     , cppRho = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Monetory expansion parameter received from Maestro is out of bounds")) . Ledger.boundRational @Ledger.UnitInterval . Maestro.unMaestroRational) protocolParametersMonetaryExpansion
     , cppTau = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Treasury expansion parameter received from Maestro is out of bounds")) . Ledger.boundRational @Ledger.UnitInterval . Maestro.unMaestroRational) protocolParametersTreasuryExpansion
@@ -655,8 +672,8 @@ pparamsFromOgmios errPath ProtocolParameters {..} =
             )
             protocolParametersMaxExecutionUnitsPerBlock
     , cppMaxValSize = THKD $ hkdMap prxy (fromIntegral @Natural @Word32 . Maestro.asBytesBytes) protocolParametersMaxValueSize
-    , cppCollateralPercentage = THKD $ fromIntegral protocolParametersCollateralPercentage
-    , cppMaxCollateralInputs = THKD $ fromIntegral protocolParametersMaxCollateralInputs
+    , cppCollateralPercentage = THKD $ hkdMap prxy (fromIntegral @Natural @Word16) protocolParametersCollateralPercentage
+    , cppMaxCollateralInputs = THKD $ hkdMap prxy (fromIntegral @Natural @Word16) protocolParametersMaxCollateralInputs
     , cppPoolVotingThresholds =
         THKD $
           hkdMap
@@ -690,7 +707,7 @@ pparamsFromOgmios errPath ProtocolParameters {..} =
                   }
             )
             protocolParametersDelegateRepresentativeVotingThresholds
-    , cppCommitteeMinSize = THKD $ fromIntegral protocolParametersConstitutionalCommitteeMinSize
+    , cppCommitteeMinSize = THKD $ hkdMap prxy (fromIntegral @Natural @Word16) protocolParametersConstitutionalCommitteeMinSize
     , cppCommitteeMaxTermLength = THKD $ hkdMap prxy (Ledger.EpochInterval . fromIntegral @Natural) protocolParametersConstitutionalCommitteeMaxTermLength
     , cppGovActionLifetime = THKD $ hkdMap prxy (Ledger.EpochInterval . fromIntegral @Natural) protocolParametersGovernanceActionLifetime
     , cppGovActionDeposit = THKD $ hkdMap prxy (Ledger.Coin . fromIntegral . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersGovernanceActionDeposit
@@ -743,7 +760,7 @@ ogmiosGetDRepsState env dreps = do
                 ( ogDRepStateCred s
                 , Just $
                     GYDRepState
-                      { drepExpiry = ogDRepStateMandate s & asEpochEpoch & (GYEpochNo . fromIntegral)
+                      { drepExpiry = ogDRepStateMandate s & epochFromOgmios
                       , drepAnchor =
                           let man = ogDRepStateAnchor s
                            in man >>= \an -> Just $ anchorFromOgmiosMetadata an

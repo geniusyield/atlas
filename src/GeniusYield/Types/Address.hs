@@ -893,6 +893,9 @@ instance FromJSON GYStakeAddressBech32 where
       Just stakeAddr -> return $ GYStakeAddressBech32 stakeAddr
       Nothing -> fail "cannot deserialise stake address"
 
+instance Aeson.FromJSONKey GYStakeAddressBech32 where
+  fromJSONKey = Aeson.FromJSONKeyTextParser (either (fail . Text.unpack) pure . Web.parseUrlPiece)
+
 instance PQ.ToField GYStakeAddressBech32 where
   toField (GYStakeAddressBech32 stakeAddr) = PQ.toField $ stakeAddressToText stakeAddr
 

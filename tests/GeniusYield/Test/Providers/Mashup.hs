@@ -156,6 +156,9 @@ providersMashupTests configs =
           printf "Signed tx: %s\n" (txToHex signedTxBody)
           tid <- gySubmitTx signedTxBody
           printf "Submitted tx: %s\n" tid
+          when (isProviderSupported config) $ do
+            mempoolTxs' <- runGYTxQueryMonadIO nid provider mempoolTxs
+            assertBool "Submitted tx not found in mempool" $ signedTxBody `elem` mempoolTxs'
           gyAwaitTxConfirmed (GYAwaitTxParameters {maxAttempts = 20, confirmations = 1, checkInterval = 10_000_000}) tid
     , testCase "Await Tx Confirmed - Submitted Tx" $
         forM_ configs $ \config -> withCfgProviders config mempty $
@@ -175,10 +178,10 @@ allEqual [] = True
 allEqual (x : xs) = all (== x) xs
 
 supportedProviders :: [GYCoreConfig] -> [GYCoreConfig]
-supportedProviders =
-  filter
-    ( \(cfgCoreProvider -> cp) -> case cp of
-        GYMaestro {} -> False
-        GYBlockfrost {} -> False
-        _anyOther -> True
-    )
+supportedProviders = filter isProviderSupported
+
+isProviderSupported :: GYCoreConfig -> Bool
+isProviderSupported (cfgCoreProvider -> cp) = case cp of
+  GYMaestro {} -> False
+  GYBlockfrost {} -> False
+  _anyOther -> True

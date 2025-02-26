@@ -25,6 +25,7 @@ module GeniusYield.Providers.Maestro (
   maestroDRepsState,
   maestroConstitution,
   maestroProposals,
+  maestroMempoolTxs,
 ) where
 
 import Cardano.Api qualified as Api
@@ -672,3 +673,6 @@ maestroConstitution = error "Maestro does not support fetching the constitution"
 
 maestroProposals :: Maestro.MaestroEnv 'Maestro.V1 -> Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
 maestroProposals _p _actionIds = error "Maestro does not support fetching the proposals"
+
+maestroMempoolTxs :: Maestro.MaestroEnv 'Maestro.V1 -> IO [GYTx]
+maestroMempoolTxs _p = error "Maestro does not support fetching the mempool transactions"

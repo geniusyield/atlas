@@ -33,7 +33,7 @@ import GeniusYield.Types
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock, (drepState | drepsState), constitution, proposals #-}
+  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock, (drepState | drepsState), constitution, proposals, mempoolTxs #-}
 
   -- | Get the network id
   networkId :: m GYNetworkId
@@ -143,6 +143,9 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
     Set GYGovActionId ->
     m (Seq.Seq GYGovActionState)
 
+  -- | Query the transactions in mempool.
+  mempoolTxs :: m [GYTx]
+
 -- | Class of monads for querying special chain data.
 
 {- Note [Necessity of 'GYTxSpecialQueryMonad' and transaction building as a class method]
@@ -211,6 +214,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (RandT g m) where
   ownAddresses = lift ownAddresses
@@ -250,6 +254,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (ReaderT env m) where
   ownAddresses = lift ownAddresses
@@ -315,6 +320,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (Strict.StateT s m) where
   ownAddresses = lift ownAddresses
@@ -354,6 +360,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (Lazy.StateT s m) where
   ownAddresses = lift ownAddresses
@@ -393,6 +400,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (CPS.WriterT w m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (CPS.WriterT w m) where
   ownAddresses = lift ownAddresses
@@ -432,6 +440,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Strict.WriterT w m) whe
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (Strict.WriterT w m) where
   ownAddresses = lift ownAddresses
@@ -471,6 +480,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Lazy.WriterT w m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (Lazy.WriterT w m) where
   ownAddresses = lift ownAddresses

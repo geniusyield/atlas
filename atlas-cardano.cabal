@@ -264,6 +264,7 @@ library
     transformers,
     unordered-containers,
     vector,
+    websockets,
     witherable,
 
   -- Dependencies whose version is fixed/constrained by @cabal.project@ file.

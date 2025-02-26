@@ -21,7 +21,7 @@ module GeniusYield.Providers.Ogmios (
   ogmiosEraSummaries,
   ogmiosConstitution,
   ogmiosProposals,
-  ogmiosMempoolTxs,
+  ogmiosMempoolTxsWs,
 ) where
 
 import Cardano.Api qualified as Api
@@ -40,12 +40,15 @@ import Cardano.Slotting.Slot qualified as CSlot
 import Cardano.Slotting.Time qualified as CTime
 import Control.Monad ((<=<))
 import Data.Aeson (Value (Null), object, withArray, withObject, (.:), (.:?), (.=))
+import Data.Aeson qualified as Aeson
 import Data.Aeson.Types qualified as Aeson
+import Data.ByteString.Lazy qualified as BSL
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromJust, listToMaybe)
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Data.Text qualified as Text
+import Data.Text.Encoding qualified as TE
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Word (Word16, Word32, Word64)
 import Deriving.Aeson
@@ -59,6 +62,7 @@ import GeniusYield.Providers.Common (
 import GeniusYield.Types hiding (poolId)
 import Maestro.Types.V1 (AsAda (..), AsBytes, AsLovelace (..), CostModel, EpochNo, EpochSize, EpochSlotLength, EraBound, LowerFirst, MaestroRational, MemoryCpuWith, MinFeeReferenceScripts, ProtocolParametersUpdateStakePool, ProtocolVersion)
 import Maestro.Types.V1 qualified as Maestro
+import Network.WebSockets qualified as WS
 import Ouroboros.Consensus.Cardano.Block (StandardConway)
 import Ouroboros.Consensus.HardFork.History qualified as Ouroboros
 import Servant.API (
@@ -69,9 +73,11 @@ import Servant.API (
   type (:<|>) (..),
  )
 import Servant.Client (
+  BaseUrl (..),
   ClientEnv,
   ClientError,
   ClientM,
+  baseUrl,
   client,
   runClientM,
  )
@@ -84,6 +90,9 @@ import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational)
 -}
 
 newtype OgmiosApiEnv = OgmiosApiEnv ClientEnv
+
+ogmiosToClientEnv :: OgmiosApiEnv -> ClientEnv
+ogmiosToClientEnv (OgmiosApiEnv cEnv) = cEnv
 
 {- | Returns a new 'OgmiosApiEnv' given the base url to query from.
 
@@ -103,6 +112,10 @@ data OgmiosProviderException
   | -- | Unable to deserialise transaction returned by Ogmios.
     OgmiosTransactionDeserialisationError
       -- | Transaction CBOR.
+      !String
+  | -- | Unable to decode response given by Ogmios under Websocket connection.
+    OgmiosWebsocketDecodeError
+      -- | Received response.
       !String
   deriving stock (Eq, Show)
   deriving anyclass Exception
@@ -925,21 +938,53 @@ ogmiosProposals env actionIds = do
  where
   fn = "ogmiosProposals"
 
-ogmiosMempoolTxs :: OgmiosApiEnv -> IO [GYTx]
-ogmiosMempoolTxs env = do
-  _ <-
-    handleOgmiosError fn
-      <=< runOgmiosClient env
-      $ mempoolAcquire (OgmiosRequest OgmiosMempoolAcquire)
-  txs <- go []
-  _ <- handleOgmiosError fn <=< runOgmiosClient env $ mempoolRelease (OgmiosRequest OgmiosMempoolRelease)
+processWSResponse :: FromJSON a => Text -> Text -> IO a
+processWSResponse fn msg = do
+  case Aeson.eitherDecode (BSL.fromStrict $ TE.encodeUtf8 msg) of
+    Left err -> throwIO . OgmiosWebsocketDecodeError $ err
+    Right (ogresponse :: OgmiosResponse a) -> ogresponse `reduceOgmiosResponse` (throwIO . OgmiosErrorResponse fn)
+
+ogmiosMempoolTxsWs :: OgmiosApiEnv -> IO [GYTx]
+ogmiosMempoolTxsWs (baseUrl . ogmiosToClientEnv -> BaseUrl {..}) = WS.runClient baseUrlHost baseUrlPort baseUrlPath $ \conn -> do
+  rpc conn $ OgmiosRequest OgmiosMempoolAcquire
+  msgAcq <- WS.receiveData conn
+  void $ processWSResponse @OgmiosMempoolAcquireResponse fn msgAcq
+  txs <- go conn []
+  rpc conn $ OgmiosRequest OgmiosMempoolRelease
+  msgRel <- WS.receiveData conn
+  void $ processWSResponse @OgmiosMempoolReleaseResponse fn msgRel
   pure txs
  where
-  fn = "ogmiosMempoolTxs"
-  go acc = do
-    OgmiosMempoolNextTransactionResponse {omntrTransaction} <- handleOgmiosError fn <=< runOgmiosClient env $ mempoolNextTransaction (OgmiosRequest OgmiosMempoolNextTransaction)
+  rpc :: ToJSONRPC a => WS.Connection -> OgmiosRequest a -> IO ()
+  rpc conn toSend = do
+    WS.sendTextData conn $ TE.decodeUtf8 $ BSL.toStrict $ Aeson.encode toSend
+  go conn acc = do
+    rpc conn $ OgmiosRequest OgmiosMempoolNextTransaction
+    msg <- WS.receiveData conn
+    OgmiosMempoolNextTransactionResponse {omntrTransaction} <- processWSResponse @OgmiosMempoolNextTransactionResponse fn msg
     case omntrTransaction of
       Nothing -> pure $ reverse acc
       Just OgmiosTransactionDetails {otdCbor} -> case txFromHex otdCbor of
         Nothing -> throwIO $ OgmiosTransactionDeserialisationError otdCbor
-        Just tx -> go (tx : acc)
+        Just tx -> go conn (tx : acc)
+  fn = "ogmiosMempoolTxs"
+
+-- For some reason, it doesn't work this way.
+-- ogmiosMempoolTxs :: OgmiosApiEnv -> IO [GYTx]
+-- ogmiosMempoolTxs env = do
+--   _ <-
+--     handleOgmiosError fn
+--       <=< runOgmiosClient env
+--       $ mempoolAcquire (OgmiosRequest OgmiosMempoolAcquire)
+--   txs <- go []
+--   _ <- handleOgmiosError fn <=< runOgmiosClient env $ mempoolRelease (OgmiosRequest OgmiosMempoolRelease)
+--   pure txs
+--  where
+--   fn = "ogmiosMempoolTxs"
+--   go acc = do
+--     OgmiosMempoolNextTransactionResponse {omntrTransaction} <- handleOgmiosError fn <=< runOgmiosClient env $ mempoolNextTransaction (OgmiosRequest OgmiosMempoolNextTransaction)
+--     case omntrTransaction of
+--       Nothing -> pure $ reverse acc
+--       Just OgmiosTransactionDetails {otdCbor} -> case txFromHex otdCbor of
+--         Nothing -> throwIO $ OgmiosTransactionDeserialisationError otdCbor
+--         Just tx -> go (tx : acc)

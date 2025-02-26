@@ -214,7 +214,7 @@ withCfgProviders
             , OgmiosApi.ogmiosStakePools oEnv
             , OgmiosApi.ogmiosConstitution oEnv
             , OgmiosApi.ogmiosProposals oEnv
-            , OgmiosApi.ogmiosMempoolTxs oEnv
+            , OgmiosApi.ogmiosMempoolTxsWs oEnv
             )
         GYMaestro (Confidential apiToken) turboSubmit -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId

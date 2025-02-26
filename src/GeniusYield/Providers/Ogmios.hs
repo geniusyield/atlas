@@ -21,6 +21,7 @@ module GeniusYield.Providers.Ogmios (
   ogmiosEraSummaries,
   ogmiosConstitution,
   ogmiosProposals,
+  ogmiosMempoolTxs,
 ) where
 
 import Cardano.Api qualified as Api
@@ -99,6 +100,10 @@ data OgmiosProviderException
     OgmiosErrorResponse !Text !Value
   | -- | The API returned an unexpected number of era summaries.
     OgmiosIncorrectEraHistoryLength ![EraSummary]
+  | -- | Unable to deserialise transaction returned by Ogmios.
+    OgmiosTransactionDeserialisationError
+      -- | Transaction CBOR.
+      !String
   deriving stock (Eq, Show)
   deriving anyclass Exception
 
@@ -451,6 +456,46 @@ govActionStateFromOgmiosProposalResponse OgmiosProposalResponse {..} =
       gasProposalProcedure = GYProposalProcedure {propProcDeposit = oprDeposit & asAdaAda & asLovelaceLovelace, propProcReturnAddr = oprReturnAccount & stakeAddressFromBech32, propProcGovAction = oprAction, propProcAnchor = oprMetadata & anchorFromOgmiosMetadata}
    in GYGovActionState {gasStakePoolVotes = gasStakePoolVotes, gasProposedIn = epochFromOgmios oprSince, gasProposalProcedure = gasProposalProcedure, gasId = oprProposal, gasExpiresAfter = epochFromOgmios oprUntil, gasDRepVotes = gasDRepVotes, gasCommitteeVotes = gasCommitteeVotes}
 
+data OgmiosMempoolAcquire = OgmiosMempoolAcquire
+data OgmiosMempoolNextTransaction = OgmiosMempoolNextTransaction
+data OgmiosMempoolRelease = OgmiosMempoolRelease
+instance ToJSONRPC OgmiosMempoolAcquire where
+  toMethod = const "acquireMempool"
+  toParams = const Nothing
+
+instance ToJSONRPC OgmiosMempoolNextTransaction where
+  toMethod = const "nextTransaction"
+  toParams = const (Just $ object ["fields" .= ("all" :: Text)])
+
+instance ToJSONRPC OgmiosMempoolRelease where
+  toMethod = const "releaseMempool"
+  toParams = const Nothing
+
+data OgmiosMempoolAcquireResponse = OgmiosMempoolAcquireResponse
+  { omarAcquired :: !Text
+  , omarSlot :: !Natural
+  }
+  deriving stock (Show, Generic)
+  deriving FromJSON via CustomJSON '[FieldLabelModifier '[StripPrefix "omar", LowerFirst]] OgmiosMempoolAcquireResponse
+
+newtype OgmiosMempoolNextTransactionResponse = OgmiosMempoolNextTransactionResponse
+  { omntrTransaction :: Maybe OgmiosTransactionDetails
+  }
+  deriving stock (Show, Generic)
+  deriving FromJSON via CustomJSON '[FieldLabelModifier '[StripPrefix "omntr", LowerFirst]] OgmiosMempoolNextTransactionResponse
+
+newtype OgmiosTransactionDetails = OgmiosTransactionDetails
+  { otdCbor :: String
+  }
+  deriving stock (Show, Generic)
+  deriving FromJSON via CustomJSON '[FieldLabelModifier '[StripPrefix "otd", LowerFirst]] OgmiosTransactionDetails
+
+newtype OgmiosMempoolReleaseResponse = OgmiosMempoolReleaseResponse
+  { omrrReleased :: Text
+  }
+  deriving stock (Show, Generic)
+  deriving FromJSON via CustomJSON '[FieldLabelModifier '[StripPrefix "omrr", LowerFirst]] OgmiosMempoolReleaseResponse
+
 submitTx :: OgmiosRequest GYTx -> ClientM (OgmiosResponse TxSubmissionResponse)
 protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolParameters)
 tip :: OgmiosRequest OgmiosTip -> ClientM (OgmiosResponse OgmiosTipResponse)
@@ -461,6 +506,9 @@ startTime :: OgmiosRequest OgmiosStartTime -> ClientM (OgmiosResponse GYTime)
 eraSummaries :: OgmiosRequest OgmiosEraSummaries -> ClientM (OgmiosResponse [EraSummary])
 constitution :: OgmiosRequest OgmiosConstitution -> ClientM (OgmiosResponse OgmiosConstitutionResponse)
 proposals :: OgmiosRequest OgmiosProposals -> ClientM (OgmiosResponse [OgmiosProposalResponse])
+mempoolAcquire :: OgmiosRequest OgmiosMempoolAcquire -> ClientM (OgmiosResponse OgmiosMempoolAcquireResponse)
+mempoolNextTransaction :: OgmiosRequest OgmiosMempoolNextTransaction -> ClientM (OgmiosResponse OgmiosMempoolNextTransactionResponse)
+mempoolRelease :: OgmiosRequest OgmiosMempoolRelease -> ClientM (OgmiosResponse OgmiosMempoolReleaseResponse)
 
 type OgmiosApi =
   ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse)
@@ -473,8 +521,24 @@ type OgmiosApi =
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosEraSummaries) :> Post '[JSON] (OgmiosResponse [EraSummary])
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosConstitution) :> Post '[JSON] (OgmiosResponse OgmiosConstitutionResponse)
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosProposals) :> Post '[JSON] (OgmiosResponse [OgmiosProposalResponse])
+    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosMempoolAcquire) :> Post '[JSON] (OgmiosResponse OgmiosMempoolAcquireResponse)
+    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosMempoolNextTransaction) :> Post '[JSON] (OgmiosResponse OgmiosMempoolNextTransactionResponse)
+    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosMempoolRelease) :> Post '[JSON] (OgmiosResponse OgmiosMempoolReleaseResponse)
 
-submitTx :<|> protocolParams :<|> tip :<|> stakePools :<|> drepState :<|> stakeAddressInfo :<|> startTime :<|> eraSummaries :<|> constitution :<|> proposals = client @OgmiosApi Proxy
+submitTx
+  :<|> protocolParams
+  :<|> tip
+  :<|> stakePools
+  :<|> drepState
+  :<|> stakeAddressInfo
+  :<|> startTime
+  :<|> eraSummaries
+  :<|> constitution
+  :<|> proposals
+  :<|> mempoolAcquire
+  :<|> mempoolNextTransaction
+  :<|> mempoolRelease =
+    client @OgmiosApi Proxy
 
 -- | Submit a transaction to the node via Ogmios.
 ogmiosSubmitTx :: OgmiosApiEnv -> GYSubmitTx
@@ -860,3 +924,22 @@ ogmiosProposals env actionIds = do
   pure $ Seq.fromList $ map govActionStateFromOgmiosProposalResponse proposalsResp
  where
   fn = "ogmiosProposals"
+
+ogmiosMempoolTxs :: OgmiosApiEnv -> IO [GYTx]
+ogmiosMempoolTxs env = do
+  _ <-
+    handleOgmiosError fn
+      <=< runOgmiosClient env
+      $ mempoolAcquire (OgmiosRequest OgmiosMempoolAcquire)
+  txs <- go []
+  _ <- handleOgmiosError fn <=< runOgmiosClient env $ mempoolRelease (OgmiosRequest OgmiosMempoolRelease)
+  pure txs
+ where
+  fn = "ogmiosMempoolTxs"
+  go acc = do
+    OgmiosMempoolNextTransactionResponse {omntrTransaction} <- handleOgmiosError fn <=< runOgmiosClient env $ mempoolNextTransaction (OgmiosRequest OgmiosMempoolNextTransaction)
+    case omntrTransaction of
+      Nothing -> pure $ reverse acc
+      Just OgmiosTransactionDetails {otdCbor} -> case txFromHex otdCbor of
+        Nothing -> throwIO $ OgmiosTransactionDeserialisationError otdCbor
+        Just tx -> go (tx : acc)

@@ -519,9 +519,10 @@ startTime :: OgmiosRequest OgmiosStartTime -> ClientM (OgmiosResponse GYTime)
 eraSummaries :: OgmiosRequest OgmiosEraSummaries -> ClientM (OgmiosResponse [EraSummary])
 constitution :: OgmiosRequest OgmiosConstitution -> ClientM (OgmiosResponse OgmiosConstitutionResponse)
 proposals :: OgmiosRequest OgmiosProposals -> ClientM (OgmiosResponse [OgmiosProposalResponse])
-mempoolAcquire :: OgmiosRequest OgmiosMempoolAcquire -> ClientM (OgmiosResponse OgmiosMempoolAcquireResponse)
-mempoolNextTransaction :: OgmiosRequest OgmiosMempoolNextTransaction -> ClientM (OgmiosResponse OgmiosMempoolNextTransactionResponse)
-mempoolRelease :: OgmiosRequest OgmiosMempoolRelease -> ClientM (OgmiosResponse OgmiosMempoolReleaseResponse)
+
+-- mempoolAcquire :: OgmiosRequest OgmiosMempoolAcquire -> ClientM (OgmiosResponse OgmiosMempoolAcquireResponse)
+-- mempoolNextTransaction :: OgmiosRequest OgmiosMempoolNextTransaction -> ClientM (OgmiosResponse OgmiosMempoolNextTransactionResponse)
+-- mempoolRelease :: OgmiosRequest OgmiosMempoolRelease -> ClientM (OgmiosResponse OgmiosMempoolReleaseResponse)
 
 type OgmiosApi =
   ReqBody '[JSON] (OgmiosRequest GYTx) :> Post '[JSON] (OgmiosResponse TxSubmissionResponse)
@@ -534,9 +535,10 @@ type OgmiosApi =
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosEraSummaries) :> Post '[JSON] (OgmiosResponse [EraSummary])
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosConstitution) :> Post '[JSON] (OgmiosResponse OgmiosConstitutionResponse)
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosProposals) :> Post '[JSON] (OgmiosResponse [OgmiosProposalResponse])
-    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosMempoolAcquire) :> Post '[JSON] (OgmiosResponse OgmiosMempoolAcquireResponse)
-    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosMempoolNextTransaction) :> Post '[JSON] (OgmiosResponse OgmiosMempoolNextTransactionResponse)
-    :<|> ReqBody '[JSON] (OgmiosRequest OgmiosMempoolRelease) :> Post '[JSON] (OgmiosResponse OgmiosMempoolReleaseResponse)
+
+-- :<|> ReqBody '[JSON] (OgmiosRequest OgmiosMempoolAcquire) :> Post '[JSON] (OgmiosResponse OgmiosMempoolAcquireResponse)
+-- :<|> ReqBody '[JSON] (OgmiosRequest OgmiosMempoolNextTransaction) :> Post '[JSON] (OgmiosResponse OgmiosMempoolNextTransactionResponse)
+-- :<|> ReqBody '[JSON] (OgmiosRequest OgmiosMempoolRelease) :> Post '[JSON] (OgmiosResponse OgmiosMempoolReleaseResponse)
 
 submitTx
   :<|> protocolParams
@@ -547,10 +549,10 @@ submitTx
   :<|> startTime
   :<|> eraSummaries
   :<|> constitution
-  :<|> proposals
-  :<|> mempoolAcquire
-  :<|> mempoolNextTransaction
-  :<|> mempoolRelease =
+  :<|> proposals =
+    -- :<|> mempoolAcquire
+    -- :<|> mempoolNextTransaction
+    -- :<|> mempoolRelease =
     client @OgmiosApi Proxy
 
 -- | Submit a transaction to the node via Ogmios.

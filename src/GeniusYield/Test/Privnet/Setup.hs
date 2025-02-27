@@ -62,7 +62,7 @@ import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational, (%!))
 import Test.Tasty (TestName, TestTree)
 import Test.Tasty.HUnit (testCaseSteps)
 import Testnet.Property.Util
-import Testnet.Start.Types (GenesisOptions (..), UserNodeConfig (UserNodeConfigNotSubmitted))
+import Testnet.Start.Types (GenesisOptions (..), GenesisOrigin (..), UserNodeConfig (UserNodeConfigNotSubmitted))
 import Testnet.Types hiding (shelleyGenesis)
 
 -------------------------------------------------------------------------------
@@ -374,7 +374,7 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
     Api.AnyShelleyBasedEra sbe <- pure cardanoNodeEra
     alonzoGenesis <- getDefaultAlonzoGenesis sbe
     shelleyGenesis <- getDefaultShelleyGenesis cardanoNodeEra cardanoMaxSupply shelleyOptions
-    cardanoTestnet testnetOptions conf UserNodeConfigNotSubmitted shelleyGenesis alonzoGenesis (conwayGenesis ctxCommittee)
+    cardanoTestnet testnetOptions conf UserNodeConfigNotSubmitted (shelleyGenesis, DefaultedOrigin) (alonzoGenesis, DefaultedOrigin) (conwayGenesis ctxCommittee, DefaultedOrigin)
    where
     CardanoTestnetOptions {cardanoNodeEra, cardanoMaxSupply} = testnetOptions
 

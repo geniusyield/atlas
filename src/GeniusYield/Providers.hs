@@ -14,3 +14,4 @@ import GeniusYield.Providers.CachedQueryUTxOs as X
 import GeniusYield.Providers.Kupo as X
 import GeniusYield.Providers.Maestro as X
 import GeniusYield.Providers.Node as X
+import GeniusYield.Providers.Ogmios as X

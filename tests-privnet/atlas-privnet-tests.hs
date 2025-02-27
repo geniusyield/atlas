@@ -7,14 +7,8 @@ Stability   : develop
 -}
 module Main (main) where
 
-import GeniusYield.Imports
-
-import Test.Tasty (defaultMain, testGroup)
-import Test.Tasty.HUnit (testCaseSteps)
-
 import GeniusYield.CardanoApi.EraHistory
-import GeniusYield.Types
-
+import GeniusYield.Imports
 import GeniusYield.Providers.Node (nodeCommitteeMembersState)
 import GeniusYield.Test.Privnet.Blueprint qualified
 import GeniusYield.Test.Privnet.Committee qualified
@@ -27,6 +21,9 @@ import GeniusYield.Test.Privnet.SimpleScripts qualified
 import GeniusYield.Test.Privnet.Stake qualified
 import GeniusYield.Test.Privnet.StakePool qualified
 import GeniusYield.TxBuilder
+import GeniusYield.Types
+import Test.Tasty (defaultMain, testGroup)
+import Test.Tasty.HUnit (testCaseSteps)
 
 main :: IO ()
 main = do
@@ -75,6 +72,6 @@ main = do
         , GeniusYield.Test.Privnet.SimpleScripts.simpleScriptsTests setup
         , GeniusYield.Test.Privnet.DRep.drepTests setup
         , GeniusYield.Test.Privnet.StakePool.stakePoolTests setup
-        -- , GeniusYield.Test.Privnet.Committee.committeeTests setup
-        -- , GeniusYield.Test.Privnet.Gov.govTests setup
+        , GeniusYield.Test.Privnet.Committee.committeeTests setup
+        , GeniusYield.Test.Privnet.Gov.govTests setup
         ]

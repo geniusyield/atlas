@@ -89,6 +89,7 @@ library
     GeniusYield.Imports
     GeniusYield.Providers
     GeniusYield.Providers.Blockfrost
+    GeniusYield.Providers.CacheLocal
     GeniusYield.Providers.CacheMempool
     GeniusYield.Providers.CachedQueryUTxOs
     GeniusYield.Providers.Common

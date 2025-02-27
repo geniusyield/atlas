@@ -7,8 +7,10 @@ Stability   : develop
 -}
 module GeniusYield.Providers.CacheMempool (
   augmentQueryUTxOWithMempool,
-  splitMempoolTxsInsOuts,
-  splitMempoolTxsOuts,
+  augmentQueryUTxO,
+  splitTxsInsOuts,
+  splitTxsOutsModuloIns,
+  outsWithDatumsToMap,
   outsWithDatumsMapToOuts,
 ) where
 
@@ -48,25 +50,36 @@ augmentQueryUTxOWithMempool' ::
   -- | 'GYDataStore' to fetch mempool transactions.
   GYDataStoreVar [GYTx] ->
   GYQueryUTxO
-augmentQueryUTxOWithMempool' GYQueryUTxO {..} fetchMempoolTxsDataStore = do
+augmentQueryUTxOWithMempool' q fetchMempoolTxsDataStore = augmentQueryUTxO q fetchMempoolTxsDataStore splitMempoolTxsDataStoreOutsModuloIns
+
+-- | Augment the query with mempool transactions.
+augmentQueryUTxO ::
+  -- | The query to augment.
+  GYQueryUTxO ->
+  -- | Placeholder for a particular data store.
+  a ->
+  -- | Function fetch outputs (modulo inputs) from the data store.
+  (a -> IO (Map.Map GYTxOutRef (GYUTxO, Maybe GYDatum))) ->
+  GYQueryUTxO
+augmentQueryUTxO GYQueryUTxO {..} dataStore fetchOutsModuloIns = do
   GYQueryUTxO
     { gyQueryUtxosAtTxOutRefsWithDatums' = case gyQueryUtxosAtTxOutRefsWithDatums' of
         Nothing -> gyQueryUtxosAtTxOutRefsWithDatums'
         Just f -> Just $ \refs -> do
-          mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+          mempoolOuts <- fetchOutsModuloIns dataStore
           foundOuts <- f refs
           let mempoolFoundOuts = Map.restrictKeys mempoolOuts (Set.fromList refs)
               foundOutsMap = outsWithDatumsToMap foundOuts
           pure $ Map.elems $ Map.union foundOutsMap mempoolFoundOuts
     , gyQueryUtxosAtTxOutRefs' = \refs -> do
-        mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+        mempoolOuts <- fetchOutsModuloIns dataStore
         foundOuts <- gyQueryUtxosAtTxOutRefs' refs
         let mempoolFoundOuts = Map.restrictKeys mempoolOuts (Set.fromList refs) & outsWithDatumsMapToOuts
         pure $ foundOuts <> mempoolFoundOuts
     , gyQueryUtxosAtPaymentCredsWithDatums' = case gyQueryUtxosAtPaymentCredsWithDatums' of
         Nothing -> gyQueryUtxosAtPaymentCredsWithDatums'
         Just f -> Just $ \creds -> do
-          mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+          mempoolOuts <- fetchOutsModuloIns dataStore
           foundOuts <- f creds
           let mempoolFoundOuts =
                 Map.filter
@@ -82,7 +95,7 @@ augmentQueryUTxOWithMempool' GYQueryUTxO {..} fetchMempoolTxsDataStore = do
               foundOutsMap = outsWithDatumsToMap foundOuts
           pure $ Map.elems $ Map.union foundOutsMap mempoolFoundOuts
     , gyQueryUtxosAtPaymentCredentials' = \creds -> do
-        mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+        mempoolOuts <- fetchOutsModuloIns dataStore
         foundOuts <- gyQueryUtxosAtPaymentCredentials' creds
         let mempoolFoundOuts =
               Map.filter
@@ -98,7 +111,7 @@ augmentQueryUTxOWithMempool' GYQueryUTxO {..} fetchMempoolTxsDataStore = do
                 & outsWithDatumsMapToOuts
         pure $ foundOuts <> mempoolFoundOuts
     , gyQueryUtxosAtPaymentCredential' = \cred massetClass -> do
-        mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+        mempoolOuts <- fetchOutsModuloIns dataStore
         foundOuts <- gyQueryUtxosAtPaymentCredential' cred massetClass
         let mempoolFoundOuts =
               Map.filter
@@ -121,7 +134,7 @@ augmentQueryUTxOWithMempool' GYQueryUTxO {..} fetchMempoolTxsDataStore = do
     , gyQueryUtxosAtPaymentCredWithDatums' = case gyQueryUtxosAtPaymentCredWithDatums' of
         Nothing -> gyQueryUtxosAtPaymentCredWithDatums'
         Just f -> Just $ \cred massetClass -> do
-          mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+          mempoolOuts <- fetchOutsModuloIns dataStore
           foundOuts <- f cred massetClass
           let mempoolFoundOuts =
                 Map.filter
@@ -144,7 +157,7 @@ augmentQueryUTxOWithMempool' GYQueryUTxO {..} fetchMempoolTxsDataStore = do
     , gyQueryUtxosAtAddressesWithDatums' = case gyQueryUtxosAtAddressesWithDatums' of
         Nothing -> gyQueryUtxosAtAddressesWithDatums'
         Just f -> Just $ \addrs -> do
-          mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+          mempoolOuts <- fetchOutsModuloIns dataStore
           foundOuts <- f addrs
           let mempoolFoundOuts =
                 Map.filter
@@ -155,7 +168,7 @@ augmentQueryUTxOWithMempool' GYQueryUTxO {..} fetchMempoolTxsDataStore = do
               foundOutsMap = outsWithDatumsToMap foundOuts
           pure $ Map.elems $ Map.union foundOutsMap mempoolFoundOuts
     , gyQueryUtxosAtAddresses' = \addrs -> do
-        mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+        mempoolOuts <- fetchOutsModuloIns dataStore
         foundOuts <- gyQueryUtxosAtAddresses' addrs
         let mempoolFoundOuts =
               Map.filter
@@ -168,7 +181,7 @@ augmentQueryUTxOWithMempool' GYQueryUTxO {..} fetchMempoolTxsDataStore = do
     , gyQueryUtxosAtAddressWithDatums' = case gyQueryUtxosAtAddressWithDatums' of
         Nothing -> gyQueryUtxosAtAddressWithDatums'
         Just f -> Just $ \addr massetClass -> do
-          mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+          mempoolOuts <- fetchOutsModuloIns dataStore
           foundOuts <- f addr massetClass
           let mempoolFoundOuts =
                 Map.filter
@@ -183,7 +196,7 @@ augmentQueryUTxOWithMempool' GYQueryUTxO {..} fetchMempoolTxsDataStore = do
               foundOutsMap = outsWithDatumsToMap foundOuts
           pure $ Map.elems $ Map.union foundOutsMap mempoolFoundOuts
     , gyQueryUtxosAtAddress' = \addr massetClass -> do
-        mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+        mempoolOuts <- fetchOutsModuloIns dataStore
         foundOuts <- gyQueryUtxosAtAddress' addr massetClass
         let mempoolFoundOuts =
               Map.filter
@@ -198,7 +211,7 @@ augmentQueryUTxOWithMempool' GYQueryUTxO {..} fetchMempoolTxsDataStore = do
                 & outsWithDatumsMapToOuts
         pure $ foundOuts <> mempoolFoundOuts
     , gyQueryUtxoRefsAtAddress' = \addr -> do
-        mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+        mempoolOuts <- fetchOutsModuloIns dataStore
         foundOuts <- Set.fromList <$> gyQueryUtxoRefsAtAddress' addr
         let mempoolFoundOuts =
               Map.filter
@@ -209,7 +222,7 @@ augmentQueryUTxOWithMempool' GYQueryUTxO {..} fetchMempoolTxsDataStore = do
                 & Map.keysSet
         pure $ Set.toList $ foundOuts <> mempoolFoundOuts
     , gyQueryUtxoAtTxOutRef' = \ref -> do
-        mempoolOuts <- splitMempoolTxsDataStoreOuts fetchMempoolTxsDataStore
+        mempoolOuts <- fetchOutsModuloIns dataStore
         foundOut <- gyQueryUtxoAtTxOutRef' ref
         let mempoolFoundOut = Map.lookup ref mempoolOuts <&> fst
         pure $ foundOut <|> mempoolFoundOut
@@ -221,17 +234,19 @@ outsWithDatumsToMap = Map.fromList . map (\(utxo, mdatum) -> (utxoRef utxo, (utx
 outsWithDatumsMapToOuts :: Map.Map GYTxOutRef (GYUTxO, Maybe GYDatum) -> GYUTxOs
 outsWithDatumsMapToOuts = utxosFromList . map fst . Map.elems
 
-splitMempoolTxsDataStoreOuts :: GYDataStoreVar [GYTx] -> IO (Map.Map GYTxOutRef (GYUTxO, Maybe GYDatum))
-splitMempoolTxsDataStoreOuts mempoolDataStore = do
+splitMempoolTxsDataStoreOutsModuloIns :: GYDataStoreVar [GYTx] -> IO (Map.Map GYTxOutRef (GYUTxO, Maybe GYDatum))
+splitMempoolTxsDataStoreOutsModuloIns mempoolDataStore = do
   mempoolTxs <- fetchFromDataStore mempoolDataStore
-  pure $ splitMempoolTxsOuts mempoolTxs
+  pure $ splitTxsOutsModuloIns mempoolTxs
 
-splitMempoolTxsOuts :: [GYTx] -> Map.Map GYTxOutRef (GYUTxO, Maybe GYDatum)
-splitMempoolTxsOuts txs = snd $ splitMempoolTxsInsOuts txs
+splitTxsOutsModuloIns :: [GYTx] -> Map.Map GYTxOutRef (GYUTxO, Maybe GYDatum)
+splitTxsOutsModuloIns txs =
+  let (ins, outsWithDatumsMap) = splitTxsInsOuts txs
+   in outsWithDatumsMap `Map.withoutKeys` ins
 
--- | Split the found mempool transactions into inputs & outputs.
-splitMempoolTxsInsOuts :: [GYTx] -> (Set GYTxOutRef, Map.Map GYTxOutRef (GYUTxO, Maybe GYDatum))
-splitMempoolTxsInsOuts = foldl' f (mempty, mempty)
+-- | Split the transactions into inputs & outputs.
+splitTxsInsOuts :: [GYTx] -> (Set GYTxOutRef, Map.Map GYTxOutRef (GYUTxO, Maybe GYDatum))
+splitTxsInsOuts = foldl' f (mempty, mempty)
  where
   f (!ins, !outsWithDatums) tx =
     let txBody = getTxBody tx

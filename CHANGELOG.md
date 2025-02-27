@@ -5,6 +5,7 @@
 * Update to latest IOG dependencies.
 * Support of monitoring mempool transactions (`mempoolTxs` query function).
 * Support of government related queries such as `constitution` (to query the current constitution definition) and `proposals` (to fetch for proposals that are considered for ratification)
+* Support of mempool based caching, enabled by setting `mempoolCache` in provider's configuration.
 
 ## 0.11.1
 

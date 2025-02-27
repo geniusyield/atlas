@@ -374,7 +374,7 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
     Api.AnyShelleyBasedEra sbe <- pure cardanoNodeEra
     alonzoGenesis <- getDefaultAlonzoGenesis sbe
     shelleyGenesis <- getDefaultShelleyGenesis cardanoNodeEra cardanoMaxSupply shelleyOptions
-    cardanoTestnet testnetOptions conf UserNodeConfigNotSubmitted (shelleyGenesis, DefaultedOrigin) (alonzoGenesis, DefaultedOrigin) (conwayGenesis ctxCommittee, DefaultedOrigin)
+    cardanoTestnet testnetOptions conf UserNodeConfigNotSubmitted (shelleyGenesis, DefaultedOrigin) (alonzoGenesis, DefaultedOrigin) (conwayGenesis ctxCommittee, UserProvidedOrigin)
    where
     CardanoTestnetOptions {cardanoNodeEra, cardanoMaxSupply} = testnetOptions
 

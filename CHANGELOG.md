@@ -1,7 +1,12 @@
-## Next
+## 0.12.0
 
 * `valueAdjust` now omits for entries if result of adjustment is zero.
 * Port coin selection algorithm from [`cardano-wallet`](https://github.com/cardano-foundation/cardano-wallet) to Atlas. This is done in sync with our 3rd Milestone and allows us to support latest versions of node & other IOG tooling.
+* Update to latest IOG dependencies.
+* Support of monitoring mempool transactions (`mempoolTxs` query function).
+* Support of government related queries such as `constitution` (to query the current constitution definition) and `proposals` (to fetch for proposals that are considered for ratification)
+* Support of mempool based caching, enabled by setting `mempoolCache` in provider's configuration.
+* Support of local transaction submission based caching (i.e., submitted transactions are considered to know for to be made available outputs & spent outputs), enabled by setting `localTxSubmissionCache` in provider's configuration.
 
 ## 0.11.1
 

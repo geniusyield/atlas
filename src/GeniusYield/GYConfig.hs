@@ -42,6 +42,8 @@ import GeniusYield.Providers.Blockfrost qualified as Blockfrost
 -- import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
 
 import Data.Sequence qualified as Seq
+import GeniusYield.Providers.CacheLocal
+import GeniusYield.Providers.CacheMempool (augmentQueryUTxOWithMempool)
 import GeniusYield.Providers.Kupo qualified as KupoApi
 import GeniusYield.Providers.Maestro qualified as MaestroApi
 import GeniusYield.Providers.Node (nodeGetDRepState, nodeGetDRepsState, nodeStakeAddressInfo)
@@ -61,25 +63,52 @@ newtype Confidential a = Confidential a
 instance Show (Confidential a) where
   showsPrec _ _ = showString "<Confidential>"
 
+newtype MempoolCacheSettings = MempoolCacheSettings
+  { mcsCacheInterval :: NominalDiffTime
+  }
+  deriving stock Show
+
+$( deriveFromJSON
+    defaultOptions
+      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+      , sumEncoding = UntaggedValue
+      }
+    ''MempoolCacheSettings
+ )
+
+newtype LocalTxSubmissionCacheSettings = LocalTxSubmissionCacheSettings
+  { lcsCacheInterval :: NominalDiffTime
+  }
+  deriving stock Show
+
+$( deriveFromJSON
+    defaultOptions
+      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+      , sumEncoding = UntaggedValue
+      }
+    ''LocalTxSubmissionCacheSettings
+ )
+
 {- |
 The supported providers. The options are:
 
-- Local node.socket and a maestro API key
-- Cardano db sync alongside cardano submit api
+- Local node.socket along with Kupo
+- Ogmios node instance along with Kupo
 - Maestro blockchain API, provided its API token.
+- Blockfrost API, provided its API key.
 
 In JSON format, this essentially corresponds to:
 
-= { socketPath: FilePath, kupoUrl: string }
-| { ogmiosUrl: string, kupoUrl: string }
+= { socketPath: FilePath, kupoUrl: string, mempoolCache: { cacheInterval: number }, localTxSubmissionCache: { cacheInterval: number } }
+| { ogmiosUrl: string, kupoUrl: string, mempoolCache: { cacheInterval: number }, localTxSubmissionCache: { cacheInterval: number } }
 | { maestroToken: string, turboSubmit: boolean }
 | { blockfrostKey: string }
 
 The constructor tags don't need to appear in the JSON.
 -}
 data GYCoreProviderInfo
-  = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text}
-  | GYOgmiosKupo {cpiOgmiosUrl :: !Text, cpiKupoUrl :: !Text}
+  = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text, cpiMempoolCache :: !(Maybe MempoolCacheSettings), cpiLocalTxSubmissionCache :: !(Maybe LocalTxSubmissionCacheSettings)}
+  | GYOgmiosKupo {cpiOgmiosUrl :: !Text, cpiKupoUrl :: !Text, cpiMempoolCache :: !(Maybe MempoolCacheSettings), cpiLocalTxSubmissionCache :: !(Maybe LocalTxSubmissionCacheSettings)}
   | GYMaestro {cpiMaestroToken :: !(Confidential Text), cpiTurboSubmit :: !(Maybe Bool)}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock Show
@@ -171,17 +200,27 @@ withCfgProviders
   f =
     do
       (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution, gyGetProposals, gyGetMempoolTxs) <- case cfgCoreProvider of
-        GYNodeKupo path kupoUrl -> do
+        GYNodeKupo path kupoUrl mmempoolCache mlocalTxSubCache -> do
           let info = nodeConnectInfo path cfgNetworkId
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
           nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetSlotOfCurrentBlock info
           nodeGetParams <- Node.nodeGetParameters info
+          queryUtxo <- case mmempoolCache of
+            Nothing -> pure $ KupoApi.kupoQueryUtxo kEnv
+            Just (MempoolCacheSettings cacheInterval) -> do
+              augmentQueryUTxOWithMempool (KupoApi.kupoQueryUtxo kEnv) (Node.nodeMempoolTxs info) cacheInterval
+          (queryUtxo', submitTx) <- case mlocalTxSubCache of
+            Nothing -> pure (queryUtxo, Node.nodeSubmitTx info)
+            Just (LocalTxSubmissionCacheSettings cacheInterval) -> do
+              locallySubmittedTxsVar <- mkLocallySubmittedTxsVar cacheInterval
+              let augmentedSubmitTx = augmentTxSubmission (Node.nodeSubmitTx info) locallySubmittedTxsVar
+              pure (augmentQueryUTxOWithLocalSubmission queryUtxo locallySubmittedTxsVar, augmentedSubmitTx)
           pure
             ( nodeGetParams
             , nodeSlotActions
-            , KupoApi.kupoQueryUtxo kEnv
+            , queryUtxo'
             , KupoApi.kupoLookupDatum kEnv
-            , Node.nodeSubmitTx info
+            , submitTx
             , KupoApi.kupoAwaitTxConfirmed kEnv
             , nodeStakeAddressInfo info
             , nodeGetDRepState info
@@ -191,7 +230,7 @@ withCfgProviders
             , Node.nodeProposals info
             , Node.nodeMempoolTxs info
             )
-        GYOgmiosKupo ogmiosUrl kupoUrl -> do
+        GYOgmiosKupo ogmiosUrl kupoUrl mmempoolCache mlocalTxSubCache -> do
           oEnv <- OgmiosApi.newOgmiosApiEnv $ Text.unpack ogmiosUrl
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
           ogmiosSlotActions <- makeSlotActions slotCachingTime $ OgmiosApi.ogmiosGetSlotOfCurrentBlock oEnv
@@ -201,12 +240,22 @@ withCfgProviders
               (OgmiosApi.ogmiosStartTime oEnv)
               (OgmiosApi.ogmiosEraSummaries oEnv)
               (OgmiosApi.ogmiosGetSlotOfCurrentBlock oEnv)
+          queryUtxo <- case mmempoolCache of
+            Nothing -> pure $ KupoApi.kupoQueryUtxo kEnv
+            Just (MempoolCacheSettings cacheInterval) -> do
+              augmentQueryUTxOWithMempool (KupoApi.kupoQueryUtxo kEnv) (OgmiosApi.ogmiosMempoolTxsWs oEnv) cacheInterval
+          (queryUtxo', submitTx) <- case mlocalTxSubCache of
+            Nothing -> pure (queryUtxo, OgmiosApi.ogmiosSubmitTx oEnv)
+            Just (LocalTxSubmissionCacheSettings cacheInterval) -> do
+              locallySubmittedTxsVar <- mkLocallySubmittedTxsVar cacheInterval
+              let augmentedSubmitTx = augmentTxSubmission (OgmiosApi.ogmiosSubmitTx oEnv) locallySubmittedTxsVar
+              pure (augmentQueryUTxOWithLocalSubmission queryUtxo locallySubmittedTxsVar, augmentedSubmitTx)
           pure
             ( ogmiosGetParams
             , ogmiosSlotActions
-            , KupoApi.kupoQueryUtxo kEnv
+            , queryUtxo'
             , KupoApi.kupoLookupDatum kEnv
-            , OgmiosApi.ogmiosSubmitTx oEnv
+            , submitTx
             , KupoApi.kupoAwaitTxConfirmed kEnv
             , OgmiosApi.ogmiosStakeAddressInfo oEnv
             , OgmiosApi.ogmiosGetDRepState oEnv

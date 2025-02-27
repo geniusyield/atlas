@@ -169,6 +169,7 @@ import GeniusYield.Types.BuildWitness as X
 import GeniusYield.Types.Certificate as X
 import GeniusYield.Types.Credential as X
 import GeniusYield.Types.DRep as X
+import GeniusYield.Types.DataStore as X
 import GeniusYield.Types.Datum as X
 import GeniusYield.Types.Delegatee as X
 import GeniusYield.Types.Epoch as X

@@ -8,6 +8,7 @@ Stability   : develop
 module GeniusYield.Types.UTxO (
   GYUTxO (..),
   utxoFromApi,
+  utxoFromApiWithDatum,
   utxoFromApi',
   utxoToApi,
   utxoToPlutus,
@@ -141,20 +142,26 @@ utxosToApi (GYUTxOs m) = Api.UTxO $ Map.foldlWithKey' f Map.empty m
   f m' oref (a, v, mh, ms) = Map.insert (txOutRefToApi oref) (utxoToApi $ GYUTxO oref a v mh ms) m'
 
 utxoFromApi :: Api.TxIn -> Api.TxOut Api.CtxTx ApiEra -> GYUTxO
-utxoFromApi txIn (Api.TxOut a v d s) =
-  GYUTxO
-    { utxoRef = txOutRefFromApi txIn
-    , utxoAddress = addressFromApi' a
-    , utxoValue = valueFromApiTxOutValue v
-    , utxoOutDatum = f d
-    , utxoRefScript = someScriptFromReferenceApi s
-    }
+utxoFromApi = (fst .) . utxoFromApiWithDatum
+
+utxoFromApiWithDatum :: Api.TxIn -> Api.TxOut Api.CtxTx ApiEra -> (GYUTxO, Maybe GYDatum)
+utxoFromApiWithDatum txIn (Api.TxOut a v d s) =
+  let (d', mfullD) = f d
+   in ( GYUTxO
+          { utxoRef = txOutRefFromApi txIn
+          , utxoAddress = addressFromApi' a
+          , utxoValue = valueFromApiTxOutValue v
+          , utxoOutDatum = d'
+          , utxoRefScript = someScriptFromReferenceApi s
+          }
+      , mfullD
+      )
  where
-  f :: Api.TxOutDatum Api.CtxTx ApiEra -> GYOutDatum
-  f Api.TxOutDatumNone = GYOutDatumNone
-  f (Api.TxOutDatumHash _ hash) = GYOutDatumHash $ datumHashFromApi hash
-  f (Api.TxOutSupplementalDatum _ sd) = GYOutDatumHash . hashDatum $ datumFromApi' sd
-  f (Api.TxOutDatumInline _ sd) = GYOutDatumInline $ datumFromApi' sd
+  f :: Api.TxOutDatum Api.CtxTx ApiEra -> (GYOutDatum, Maybe GYDatum)
+  f Api.TxOutDatumNone = (GYOutDatumNone, Nothing)
+  f (Api.TxOutDatumHash _ hash) = (GYOutDatumHash $ datumHashFromApi hash, Nothing)
+  f (Api.TxOutSupplementalDatum _ sd) = let sd' = datumFromApi' sd in (GYOutDatumHash . hashDatum $ sd', Just sd')
+  f (Api.TxOutDatumInline _ sd) = let sd' = datumFromApi' sd in (GYOutDatumInline sd', Just sd')
 
 utxoFromApi' :: Api.TxIn -> Api.TxOut Api.CtxUTxO era -> GYUTxO
 utxoFromApi' txIn (Api.TxOut a v d s) =

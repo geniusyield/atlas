@@ -99,6 +99,7 @@ import GeniusYield.TxBuilder.Errors
 import GeniusYield.Types.Address
 import GeniusYield.Types.Credential (GYCredential, GYPaymentCredential)
 import GeniusYield.Types.DRep
+import GeniusYield.Types.DataStore (GYDataStore (..), fetchFromDataStore, mkDataStoreVar)
 import GeniusYield.Types.Datum
 import GeniusYield.Types.Epoch (GYEpochNo (GYEpochNo))
 import GeniusYield.Types.Governance (GYConstitution, GYGovActionId, GYGovActionState)
@@ -334,9 +335,6 @@ gyWaitUntilSlotDefault getSlotOfCurrentBlock s = loop
         threadDelay 100_000
         loop
 
--- | Contains the data, alongside the time after which it should be refetched.
-data GYSlotStore = GYSlotStore !UTCTime !GYSlot
-
 {- | Construct efficient 'GYSlotActions' methods by ensuring the supplied getSlotOfCurrentBlock is only made after
 a given duration of time has passed.
 
@@ -352,29 +350,14 @@ makeSlotActions t getSlotOfCurrentBlock = do
   getTime <- mkAutoUpdate defaultUpdateSettings {updateAction = getCurrentTime}
   slotRefetchTime <- addUTCTime t <$> getTime
   initSlot <- getSlotOfCurrentBlock
-  slotStoreRef <- newMVar $ GYSlotStore slotRefetchTime initSlot
-  let gcs = getSlotOfCurrentBlock' getTime slotStoreRef
+  slotStoreRef <- mkDataStoreVar $ GYDataStore slotRefetchTime t initSlot getSlotOfCurrentBlock getTime
+  let gcs = fetchFromDataStore slotStoreRef
   pure
     GYSlotActions
       { gyGetSlotOfCurrentBlock' = gcs
       , gyWaitForNextBlock' = gyWaitForNextBlockDefault gcs
       , gyWaitUntilSlot' = gyWaitUntilSlotDefault gcs
       }
- where
-  getSlotOfCurrentBlock' :: IO UTCTime -> StrictMVar IO GYSlotStore -> IO GYSlot
-  getSlotOfCurrentBlock' getTime var = do
-    -- See note: [Caching and concurrently accessible MVars].
-    modifyMVar var $ \(GYSlotStore slotRefetchTime slotData) -> do
-      now <- getTime
-      if now < slotRefetchTime
-        then do
-          -- Return unmodified.
-          pure (GYSlotStore slotRefetchTime slotData, slotData)
-        else do
-          newSlot <- getSlotOfCurrentBlock
-          newNow <- getTime
-          let newSlotRefetchTime = addUTCTime t newNow
-          pure (GYSlotStore newSlotRefetchTime newSlot, newSlot)
 
 -------------------------------------------------------------------------------
 -- Protocol parameters

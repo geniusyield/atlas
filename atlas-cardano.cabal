@@ -152,6 +152,7 @@ library
     GeniusYield.Types.Certificate
     GeniusYield.Types.Credential
     GeniusYield.Types.DRep
+    GeniusYield.Types.DataStore
     GeniusYield.Types.Datum
     GeniusYield.Types.Delegatee
     GeniusYield.Types.Epoch

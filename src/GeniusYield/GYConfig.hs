@@ -42,6 +42,7 @@ import GeniusYield.Providers.Blockfrost qualified as Blockfrost
 -- import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
 
 import Data.Sequence qualified as Seq
+import GeniusYield.Providers.CacheMempool (augmentQueryUTxOWithMempool)
 import GeniusYield.Providers.Kupo qualified as KupoApi
 import GeniusYield.Providers.Maestro qualified as MaestroApi
 import GeniusYield.Providers.Node (nodeGetDRepState, nodeGetDRepsState, nodeStakeAddressInfo)
@@ -61,6 +62,19 @@ newtype Confidential a = Confidential a
 instance Show (Confidential a) where
   showsPrec _ _ = showString "<Confidential>"
 
+newtype MempoolCacheSettings = MempoolCacheSettings
+  { mcsCacheInterval :: NominalDiffTime
+  }
+  deriving stock Show
+
+$( deriveFromJSON
+    defaultOptions
+      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+      , sumEncoding = UntaggedValue
+      }
+    ''MempoolCacheSettings
+ )
+
 {- |
 The supported providers. The options are:
 
@@ -70,16 +84,16 @@ The supported providers. The options are:
 
 In JSON format, this essentially corresponds to:
 
-= { socketPath: FilePath, kupoUrl: string }
-| { ogmiosUrl: string, kupoUrl: string }
+= { socketPath: FilePath, kupoUrl: string, mempoolCache: { cacheInterval: number } }
+| { ogmiosUrl: string, kupoUrl: string, mempoolCache: { cacheInterval: number } }
 | { maestroToken: string, turboSubmit: boolean }
 | { blockfrostKey: string }
 
 The constructor tags don't need to appear in the JSON.
 -}
 data GYCoreProviderInfo
-  = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text}
-  | GYOgmiosKupo {cpiOgmiosUrl :: !Text, cpiKupoUrl :: !Text}
+  = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text, cpiMempoolCache :: !(Maybe MempoolCacheSettings)}
+  | GYOgmiosKupo {cpiOgmiosUrl :: !Text, cpiKupoUrl :: !Text, cpiMempoolCache :: !(Maybe MempoolCacheSettings)}
   | GYMaestro {cpiMaestroToken :: !(Confidential Text), cpiTurboSubmit :: !(Maybe Bool)}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock Show
@@ -171,15 +185,19 @@ withCfgProviders
   f =
     do
       (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution, gyGetProposals, gyGetMempoolTxs) <- case cfgCoreProvider of
-        GYNodeKupo path kupoUrl -> do
+        GYNodeKupo path kupoUrl mmempoolCache -> do
           let info = nodeConnectInfo path cfgNetworkId
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
           nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetSlotOfCurrentBlock info
           nodeGetParams <- Node.nodeGetParameters info
+          queryUtxo <- case mmempoolCache of
+            Nothing -> pure $ KupoApi.kupoQueryUtxo kEnv
+            Just (MempoolCacheSettings cacheInterval) -> do
+              augmentQueryUTxOWithMempool (KupoApi.kupoQueryUtxo kEnv) (Node.nodeMempoolTxs info) cacheInterval
           pure
             ( nodeGetParams
             , nodeSlotActions
-            , KupoApi.kupoQueryUtxo kEnv
+            , queryUtxo
             , KupoApi.kupoLookupDatum kEnv
             , Node.nodeSubmitTx info
             , KupoApi.kupoAwaitTxConfirmed kEnv
@@ -191,7 +209,7 @@ withCfgProviders
             , Node.nodeProposals info
             , Node.nodeMempoolTxs info
             )
-        GYOgmiosKupo ogmiosUrl kupoUrl -> do
+        GYOgmiosKupo ogmiosUrl kupoUrl mmempoolCache -> do
           oEnv <- OgmiosApi.newOgmiosApiEnv $ Text.unpack ogmiosUrl
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
           ogmiosSlotActions <- makeSlotActions slotCachingTime $ OgmiosApi.ogmiosGetSlotOfCurrentBlock oEnv
@@ -201,10 +219,14 @@ withCfgProviders
               (OgmiosApi.ogmiosStartTime oEnv)
               (OgmiosApi.ogmiosEraSummaries oEnv)
               (OgmiosApi.ogmiosGetSlotOfCurrentBlock oEnv)
+          queryUtxo <- case mmempoolCache of
+            Nothing -> pure $ KupoApi.kupoQueryUtxo kEnv
+            Just (MempoolCacheSettings cacheInterval) -> do
+              augmentQueryUTxOWithMempool (KupoApi.kupoQueryUtxo kEnv) (OgmiosApi.ogmiosMempoolTxsWs oEnv) cacheInterval
           pure
             ( ogmiosGetParams
             , ogmiosSlotActions
-            , KupoApi.kupoQueryUtxo kEnv
+            , queryUtxo
             , KupoApi.kupoLookupDatum kEnv
             , OgmiosApi.ogmiosSubmitTx oEnv
             , KupoApi.kupoAwaitTxConfirmed kEnv

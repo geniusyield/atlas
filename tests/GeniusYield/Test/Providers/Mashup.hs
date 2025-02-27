@@ -6,8 +6,8 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (handle)
 import Data.Default (def)
 import Data.List (isInfixOf)
-import Data.Maybe (fromJust)
-import Data.Set qualified as Set (difference, fromList)
+import Data.Maybe (fromJust, listToMaybe)
+import Data.Set qualified as Set (difference, fromList, isSubsetOf)
 import GeniusYield.CardanoApi.EraHistory (extractEraSummaries)
 import GeniusYield.GYConfig
 import GeniusYield.Imports
@@ -158,7 +158,12 @@ providersMashupTests configs =
           printf "Submitted tx: %s\n" tid
           when (isProviderSupported config) $ do
             mempoolTxs' <- runGYTxQueryMonadIO nid provider mempoolTxs
+            mempoolAugmentedSenderUTxOs <- runGYTxQueryMonadIO nid provider $ utxosAtAddress senderAddress Nothing
+            let mempoolUTxOsList = txBodyUTxOs . getTxBody <$> mempoolTxs'
             assertBool "Submitted tx not found in mempool" $ signedTxBody `elem` mempoolTxs'
+            case listToMaybe mempoolUTxOsList of
+              Nothing -> assertFailure "No UTxOs found in mempool transactions"
+              Just mempoolUTxOs -> assertBool "not (mempool UTxOs are not empty and sender augmented UTxOs contain them)" $ (mempoolUTxOs /= mempty) && (utxosRefs' mempoolUTxOs `Set.isSubsetOf` utxosRefs' mempoolAugmentedSenderUTxOs)
           gyAwaitTxConfirmed (GYAwaitTxParameters {maxAttempts = 20, confirmations = 1, checkInterval = 10_000_000}) tid
     , testCase "Await Tx Confirmed - Submitted Tx" $
         forM_ configs $ \config -> withCfgProviders config mempty $

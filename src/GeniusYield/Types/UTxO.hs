@@ -53,6 +53,7 @@ module GeniusYield.Types.UTxO (
 
   -- * Extract refs
   utxosRefs,
+  utxosRefs',
 ) where
 
 import GeniusYield.Imports
@@ -299,6 +300,10 @@ utxosToList (GYUTxOs m) = [GYUTxO r a v mh ms | (r, (a, v, mh, ms)) <- Map.toLis
 -- | Returns a list of all 'GYTxOutRef's inside a given 'GYUTxOs'.
 utxosRefs :: GYUTxOs -> [GYTxOutRef]
 utxosRefs (GYUTxOs m) = Map.keys m
+
+-- | Returns a set of all 'GYTxOutRef's inside a given 'GYUTxOs'.
+utxosRefs' :: GYUTxOs -> Set GYTxOutRef
+utxosRefs' (GYUTxOs m) = Map.keysSet m
 
 -- | Returns a 'GYUTxOs' from a single 'GYUTxO'.
 utxosFromUTxO :: GYUTxO -> GYUTxOs

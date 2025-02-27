@@ -7,6 +7,9 @@ Stability   : develop
 -}
 module GeniusYield.Providers.CacheMempool (
   augmentQueryUTxOWithMempool,
+  splitMempoolTxsInsOuts,
+  splitMempoolTxsOuts,
+  outsWithDatumsMapToOuts,
 ) where
 
 import Control.Applicative ((<|>))

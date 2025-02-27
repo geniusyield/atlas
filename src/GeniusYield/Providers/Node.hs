@@ -18,6 +18,7 @@ module GeniusYield.Providers.Node (
   nodeConstitution,
   nodeProposals,
   nodeCommitteeMembersState,
+  nodeMempoolTxs,
 
   -- * Auxiliary
   networkIdToLocalNodeConnectInfo,
@@ -27,11 +28,10 @@ import Cardano.Api qualified as Api
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Api.State.Query qualified as Ledger
-import Cardano.Ledger.Coin qualified as Ledger
 import Cardano.Slotting.Time (SystemStart)
 import Control.Exception (throwIO)
 import Data.Map.Strict qualified as Map
-import Data.Maybe (listToMaybe)
+import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Data.Text qualified as Txt
@@ -124,6 +124,24 @@ systemStart info = queryCardanoMode info Api.QuerySystemStart
 
 eraHistory :: Api.LocalNodeConnectInfo -> IO Api.EraHistory
 eraHistory info = makeLastEraEndUnbounded <$> queryCardanoMode info Api.QueryEraHistory
+
+nodeMempoolTxs :: Api.LocalNodeConnectInfo -> IO [GYTx]
+nodeMempoolTxs info = do
+  apiTxs <- go []
+  pure $ mapMaybe getGYTx apiTxs
+ where
+  go acc = do
+    apiTx <- Api.queryTxMonitoringLocal info Api.LocalTxMonitoringSendNextTx
+    case apiTx of
+      Api.LocalTxMonitoringNextTx mnextTx _slotNo -> case mnextTx of
+        Just nextTx -> go (nextTx : acc)
+        Nothing -> return $ finaliseAcc acc
+      _anyOther -> return $ finaliseAcc acc
+   where
+    finaliseAcc = reverse
+  getGYTx :: Api.TxInMode -> Maybe GYTx
+  getGYTx (Api.TxInMode Api.ShelleyBasedEraConway tx) = Just $ txFromApi tx
+  getGYTx _anyOther = Nothing
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions

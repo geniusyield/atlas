@@ -97,6 +97,7 @@ import GeniusYield.Types.PlutusVersion (
 -}
 
 newtype GYTx = GYTx (Api.Tx ApiEra)
+  deriving newtype Eq
 
 instance IsString GYTx where
   fromString = either error id . txFromHexE

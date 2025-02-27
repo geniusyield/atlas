@@ -351,6 +351,8 @@ instance GYTxQueryMonad GYTxMonadClb where
   drepState = const $ pure Nothing
   constitution = error "CLB does not support fetching of constitution"
 
+  mempoolTxs = error "CLB does not support fetching of mempool transactions"
+
   proposals _actionIds = error "CLB does not support fetching of proposals"
 
   -- Note, we need to define only one of drepState or drepsState unless required for performace reasons as they have default definition in terms of each other.

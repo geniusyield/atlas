@@ -150,6 +150,11 @@ instance GYTxQueryMonad GYTxQueryMonadIO where
     providers <- asks envProviders
     ioToQueryMonad $ gyGetProposals providers actionIds
 
+  mempoolTxs = do
+    logMsg mempty GYDebug "Querying Mempool Transactions"
+    providers <- asks envProviders
+    ioToQueryMonad $ gyGetMempoolTxs providers
+
   slotConfig = do
     providers <- asks envProviders
     ioToQueryMonad $ gyGetSlotConfig providers

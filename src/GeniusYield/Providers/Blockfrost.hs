@@ -14,6 +14,7 @@ module GeniusYield.Providers.Blockfrost (
   blockfrostDRepsState,
   blockfrostConstitution,
   blockfrostProposals,
+  blockfrostMempoolTxs,
   networkIdToProject,
 ) where
 
@@ -603,6 +604,9 @@ blockfrostConstitution = error "Blockfrost does not support fetching the constit
 
 blockfrostProposals :: Blockfrost.Project -> Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
 blockfrostProposals _p _actionIds = error "Blockfrost SDK does not support fetching the proposals"
+
+blockfrostMempoolTxs :: Blockfrost.Project -> IO [GYTx]
+blockfrostMempoolTxs _p = error "Blockfrost does not support fetching the mempool transactions" -- Blockfrost only provides transaction hashes, whereas we need complete transaction details.
 
 -------------------------------------------------------------------------------
 -- Auxiliary functions

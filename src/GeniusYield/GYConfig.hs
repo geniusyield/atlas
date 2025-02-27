@@ -170,7 +170,7 @@ withCfgProviders
   ns
   f =
     do
-      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution, gyGetProposals) <- case cfgCoreProvider of
+      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution, gyGetProposals, gyGetMempoolTxs) <- case cfgCoreProvider of
         GYNodeKupo path kupoUrl -> do
           let info = nodeConnectInfo path cfgNetworkId
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
@@ -189,6 +189,7 @@ withCfgProviders
             , Node.nodeStakePools info
             , Node.nodeConstitution info
             , Node.nodeProposals info
+            , Node.nodeMempoolTxs info
             )
         GYOgmiosKupo ogmiosUrl kupoUrl -> do
           oEnv <- OgmiosApi.newOgmiosApiEnv $ Text.unpack ogmiosUrl
@@ -213,6 +214,7 @@ withCfgProviders
             , OgmiosApi.ogmiosStakePools oEnv
             , OgmiosApi.ogmiosConstitution oEnv
             , OgmiosApi.ogmiosProposals oEnv
+            , OgmiosApi.ogmiosMempoolTxsWs oEnv
             )
         GYMaestro (Confidential apiToken) turboSubmit -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
@@ -236,6 +238,7 @@ withCfgProviders
             , MaestroApi.maestroStakePools maestroApiEnv
             , MaestroApi.maestroConstitution maestroApiEnv
             , MaestroApi.maestroProposals maestroApiEnv
+            , MaestroApi.maestroMempoolTxs maestroApiEnv
             )
         GYBlockfrost (Confidential key) -> do
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
@@ -259,6 +262,7 @@ withCfgProviders
             , Blockfrost.blockfrostStakePools proj
             , Blockfrost.blockfrostConstitution proj
             , Blockfrost.blockfrostProposals proj
+            , Blockfrost.blockfrostMempoolTxs proj
             )
 
       bracket (mkLogEnv ns cfgLogging) closeScribes $ \logEnv -> do
@@ -307,6 +311,7 @@ logTiming providers@GYProviders {..} =
     , gyGetStakePools = gyGetStakePools'
     , gyGetConstitution = gyGetConstitution'
     , gyGetProposals = gyGetProposals'
+    , gyGetMempoolTxs = gyGetMempoolTxs'
     }
  where
   wrap :: String -> IO a -> IO a
@@ -384,6 +389,8 @@ logTiming providers@GYProviders {..} =
 
   gyGetProposals' :: Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
   gyGetProposals' = wrap "gyGetProposals" . gyGetProposals
+
+  gyGetMempoolTxs' = wrap "gyGetMempoolTxs" gyGetMempoolTxs
 
 duration :: IO a -> IO (a, NominalDiffTime)
 duration m = do

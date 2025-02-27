@@ -162,6 +162,8 @@ data GYProviders = GYProviders
   , gyGetConstitution :: IO GYConstitution
   , -- Don't make this strict since it's not defined for all providers!
     gyGetProposals :: Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
+  , -- Don't make this strict since it's not defined for all providers!
+    gyGetMempoolTxs :: IO [GYTx]
     -- Don't make this strict since it's not defined for all providers!
   }
 

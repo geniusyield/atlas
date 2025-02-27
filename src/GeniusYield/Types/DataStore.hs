@@ -38,7 +38,7 @@ type GYDataStoreVar a = StrictMVar IO (GYDataStore a)
 fetchFromDataStore :: StrictMVar IO (GYDataStore a) -> IO a
 fetchFromDataStore var = do
   -- See note: [Caching and concurrently accessible MVars].
-  modifyMVar var $ \(GYDataStore {..}) -> do
+  modifyMVar var $ \GYDataStore {..} -> do
     now <- gyDataStoreGetTime
     if now < gyDataStoreRefetchTime
       then do

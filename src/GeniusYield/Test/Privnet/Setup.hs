@@ -127,8 +127,8 @@ debug :: String -> IO ()
 -- debug = putStrLn
 debug _ = return ()
 
-conwayGenesis :: ConwayGenesis c -> CtxCommittee -> ConwayGenesis StandardCrypto
-conwayGenesis cg ctxCommittee =
+conwayGenesis :: CtxCommittee -> ConwayGenesis StandardCrypto
+conwayGenesis ctxCommittee =
   let
     upPParams :: UpgradeConwayPParams Identity
     upPParams =
@@ -167,7 +167,7 @@ conwayGenesis cg ctxCommittee =
         }
     commonPoolVotingThreshold = 51 %! 100
    in
-    cg
+    ConwayGenesis
       { cgUpgradePParams = upPParams
       , cgConstitution = DefaultClass.def
       , cgCommittee =
@@ -371,8 +371,8 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
  where
   -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
   cardanoTestnet' testnetOptions shelleyOptions conf ctxCommittee = do
-    GenesisBatch (shelleyGenesis, alonzoGenesis, cg, _) <- getDefaultGenesisBatch testnetOptions shelleyOptions
-    cardanoTestnet testnetOptions conf UserNodeConfigNotSubmitted (GenesisBatch (shelleyGenesis, alonzoGenesis, conwayGenesis cg ctxCommittee, UserProvidedOrigin))
+    GenesisBatch (shelleyGenesis, alonzoGenesis, _, _) <- getDefaultGenesisBatch testnetOptions shelleyOptions
+    cardanoTestnet testnetOptions conf UserNodeConfigNotSubmitted (GenesisBatch (shelleyGenesis, alonzoGenesis, conwayGenesis ctxCommittee, UserProvidedOrigin))
 
 -------------------------------------------------------------------------------
 -- Generating users

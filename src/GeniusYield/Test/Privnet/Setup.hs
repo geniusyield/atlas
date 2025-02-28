@@ -372,7 +372,7 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
   -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
   cardanoTestnet' testnetOptions shelleyOptions conf ctxCommittee = do
     GenesisBatch (shelleyGenesis, alonzoGenesis, cg, _) <- getDefaultGenesisBatch testnetOptions shelleyOptions
-    cardanoTestnet testnetOptions conf UserNodeConfigNotSubmitted (GenesisBatch (shelleyGenesis, alonzoGenesis, conwayGenesis cg ctxCommittee, DefaultedOrigin))
+    cardanoTestnet testnetOptions conf UserNodeConfigNotSubmitted (GenesisBatch (shelleyGenesis, alonzoGenesis, conwayGenesis cg ctxCommittee, UserProvidedOrigin))
 
 -------------------------------------------------------------------------------
 -- Generating users

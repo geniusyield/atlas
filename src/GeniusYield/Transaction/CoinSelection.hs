@@ -182,8 +182,8 @@ selectInputs
    where
     selectionConstraints =
       SelectionConstraints
-        { tokenBundleSizeAssessor =
-            tokenBundleSizeAssessor' maxValueSize
+        { valueSizeAssessor =
+            valueSizeAssessor' maxValueSize
         , computeMinimumAdaQuantity = \addr tkMap -> do
             -- This function is ran for generated change outputs which do not have datum & reference script.
             -- This first parameter can actually be ignored as it will always be @toCWalletAddress changeAddr@.
@@ -289,8 +289,8 @@ utxoAsPubKeyInp GYUTxO {utxoRef, utxoAddress, utxoValue, utxoOutDatum, utxoRefSc
     , gyTxInDetScriptRef = utxoRefScript
     }
 
-tokenBundleSizeAssessor' :: Natural -> ValueSizeAssessor
-tokenBundleSizeAssessor' maxSize = assessTokenBundleSize
+valueSizeAssessor' :: Natural -> ValueSizeAssessor
+valueSizeAssessor' maxSize = assessTokenBundleSize
  where
   assessTokenBundleSize tb
     | serializedLengthBytes <= maxSize =

@@ -72,6 +72,6 @@ main = do
         , GeniusYield.Test.Privnet.SimpleScripts.simpleScriptsTests setup
         , GeniusYield.Test.Privnet.DRep.drepTests setup
         , GeniusYield.Test.Privnet.StakePool.stakePoolTests setup
-        , GeniusYield.Test.Privnet.Committee.committeeTests setup
-        , GeniusYield.Test.Privnet.Gov.govTests setup
+        -- , GeniusYield.Test.Privnet.Committee.committeeTests setup
+        -- , GeniusYield.Test.Privnet.Gov.govTests setup
         ]

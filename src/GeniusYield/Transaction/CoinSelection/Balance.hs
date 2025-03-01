@@ -79,7 +79,7 @@ type GYValueWithoutLovelace = GYValue
 
 -- | Specifies all constraints required for coin selection.
 data SelectionConstraints = SelectionConstraints
-  { tokenBundleSizeAssessor ::
+  { valueSizeAssessor ::
       ValueSizeAssessor
   -- ^ Assesses the size of a value relative to the upper limit of
   -- what can be included in a transaction output.
@@ -677,7 +677,7 @@ performSelectionNonEmpty constraints params
           makeChangeRepeatedly selection
  where
   SelectionConstraints
-    { tokenBundleSizeAssessor
+    { valueSizeAssessor
     , computeMinimumAdaQuantity
     , computeMinimumCost
     , maximumOutputAdaQuantity
@@ -739,12 +739,12 @@ performSelectionNonEmpty constraints params
       ( makeChange
           MakeChangeCriteria
             { minCoinFor = noMinimumCoin
-            , bundleSizeAssessor = tokenBundleSizeAssessor
+            , valueSizeAssessor = valueSizeAssessor
             , requiredCost = noCost
             , extraCoinSource
             , extraCoinSink
-            , inputBundles
-            , outputBundles
+            , inputValues
+            , outputValues
             , assetsToMint
             , assetsToBurn
             , maximumOutputAdaQuantity
@@ -752,8 +752,8 @@ performSelectionNonEmpty constraints params
             }
       )
    where
-    inputBundles = snd <$> UTxOSelection.selectedList s
-    outputBundles = snd <$> outputsToCover
+    inputValues = snd <$> UTxOSelection.selectedList s
+    outputValues = snd <$> outputsToCover
 
     noMinimumCoin :: GYValue -> Natural
     noMinimumCoin = const 0
@@ -824,12 +824,12 @@ performSelectionNonEmpty constraints params
       makeChange
         MakeChangeCriteria
           { minCoinFor = computeMinimumAdaQuantity changeAddress
-          , bundleSizeAssessor = tokenBundleSizeAssessor
+          , valueSizeAssessor = valueSizeAssessor
           , requiredCost
           , extraCoinSource
           , extraCoinSink
-          , inputBundles = snd <$> inputsSelected
-          , outputBundles = snd <$> outputsToCover
+          , inputValues = snd <$> inputsSelected
+          , outputValues = snd <$> outputsToCover
           , assetsToMint
           , assetsToBurn
           , maximumOutputAdaQuantity
@@ -1110,66 +1110,66 @@ runSelectionStep lens s
 --------------------------------------------------------------------------------
 
 -- | Criteria for the 'makeChange' function.
-data MakeChangeCriteria minCoinFor bundleSizeAssessor = MakeChangeCriteria
+data MakeChangeCriteria minCoinFor valueSizeAssessor = MakeChangeCriteria
   { minCoinFor :: minCoinFor
   -- ^ A function that computes the minimum required ada quantity for a
   -- particular output.
-  , bundleSizeAssessor :: bundleSizeAssessor
-  -- ^ A function to assess the size of a token bundle.
+  , valueSizeAssessor :: valueSizeAssessor
+  -- ^ A function to assess the size of a value.
   , requiredCost :: Natural
   -- ^ The minimal (and optimal) delta between the total ada balance
-  -- of all input bundles and the total ada balance of all output and
-  -- change bundles, where:
+  -- of all input values and the total ada balance of all output and
+  -- change values, where:
   --
-  --    delta = getCoin (fold inputBundles)
-  --          - getCoin (fold outputBundles)
-  --          - getCoin (fold changeBundles)
+  --    delta = getCoin (fold inputValues)
+  --          - getCoin (fold outputValues)
+  --          - getCoin (fold changeValues)
   --
   -- This typically captures fees plus key deposits.
   , extraCoinSource :: Natural
   -- ^ An extra source of ada.
   , extraCoinSink :: Natural
   -- ^ An extra sink for ada.
-  , inputBundles :: NonEmpty GYValue
-  -- ^ Token bundles of selected inputs.
-  , outputBundles :: NonEmpty GYValue
-  -- ^ Token bundles of original outputs.
+  , inputValues :: NonEmpty GYValue
+  -- ^ Token values of selected inputs.
+  , outputValues :: NonEmpty GYValue
+  -- ^ Token values of original outputs.
   , assetsToMint :: GYValue
   -- ^ Assets to mint: these provide input value to a transaction.
   , assetsToBurn :: GYValue
   -- ^ Assets to burn: these consume output value from a transaction.
   , maximumOutputAdaQuantity ::
       Natural
-  -- ^ Specifies the largest ada quantity that can appear in the token
-  -- bundle of an output.
+  -- ^ Specifies the largest ada quantity that can appear in the
+  -- value of an output.
   , maximumOutputTokenQuantity ::
       Natural
   -- ^ Specifies the largest non-ada quantity that can appear in the
-  -- token bundle of an output.
+  -- value of an output.
   }
   deriving (Eq, Generic, Show)
 
-{- | Indicates 'True' if and only if a token bundle exceeds the maximum size
+{- | Indicates 'True' if and only if a value exceeds the maximum size
   that can be included in a transaction output.
 -}
-tokenBundleSizeExceedsLimit :: ValueSizeAssessor -> GYValue -> Bool
-tokenBundleSizeExceedsLimit assess v =
+valueSizeExceedsLimit :: ValueSizeAssessor -> GYValue -> Bool
+valueSizeExceedsLimit assess v =
   case assess v of
     ValueSizeWithinLimit ->
       False
     ValueSizeExceedsLimit ->
       True
 
-{- | Constructs change bundles for a set of selected inputs and outputs.
+{- | Constructs change values for a set of selected inputs and outputs.
 
 Returns 'Nothing' if the specified inputs do not provide enough ada to
-satisfy the minimum delta and minimum ada quantities of the change bundles
+satisfy the minimum delta ('requiredCost') and minimum ada quantities of the change values
 generated.
 
 This function will generate runtime errors if:
 
-   1.  The total balance of all outputs is not less than or equal to the
-       total balance of all inputs.
+   1.  The total balance of all outputs (original outputs, assets to burn, and ada sink)
+       is not less than or equal to the total balance of all inputs (inputs, ada source & mints).
 
    2.  The total ada balance of all outputs is zero.
 
@@ -1177,7 +1177,12 @@ Pre-condition (1) should be satisfied by any result produced by the
 'runSelection' function.
 
 Pre-condition (2) should be satisfied by assigning a minimum ada quantity
-to every output token bundle.
+to every output value.
+
+This function calls @assignCoinsToChangeMaps adaAvailable minCoinFor changeMapOutputCoinPairs@
+where @adaAvailable@ is the total ada balance of all inputs minus the total ada balance of all outputs and 'requiredCost',
+@minCoinFor@ is a function that computes the minimum ada quantity for a particular output,
+and @changeMapOutputCoinPairs@ is a list of change maps paired with the ada quantity of the original outputs (see it's definition in code).
 -}
 makeChange ::
   -- | Criteria for making change.
@@ -1202,12 +1207,12 @@ makeChange criteria
  where
   MakeChangeCriteria
     { minCoinFor
-    , bundleSizeAssessor
+    , valueSizeAssessor
     , requiredCost
     , extraCoinSource
     , extraCoinSink
-    , inputBundles
-    , outputBundles
+    , inputValues
+    , outputValues
     , assetsToMint
     , assetsToBurn
     , maximumOutputAdaQuantity
@@ -1266,10 +1271,10 @@ makeChange criteria
       split b =
         b
           & flip
-            splitBundlesWithExcessiveAssetCounts
-            (tokenBundleSizeExceedsLimit assessBundleSizeWithMaxCoin)
+            splitValuesWithExcessiveAssetCounts
+            (valueSizeExceedsLimit assessValueSizeWithMaxCoin)
           & flip
-            splitBundlesWithExcessiveTokenQuantities
+            splitValuesWithExcessiveTokenQuantities
             maximumOutputTokenQuantity
 
       -- When assessing the size of a change map to determine if it is
@@ -1288,9 +1293,9 @@ makeChange criteria
       -- a bundle that is marginally over the limit, which would cause
       -- the resultant transaction to be rejected.
       --
-      assessBundleSizeWithMaxCoin :: ValueSizeAssessor
-      assessBundleSizeWithMaxCoin =
-        bundleSizeAssessor
+      assessValueSizeWithMaxCoin :: ValueSizeAssessor
+      assessValueSizeWithMaxCoin =
+        valueSizeAssessor
           . valueInsert GYLovelace (fromIntegral maximumOutputAdaQuantity)
 
   -- Change for user-specified assets: assets that were present in the
@@ -1334,21 +1339,21 @@ makeChange criteria
       }
 
   outputMaps :: NonEmpty GYValueWithoutLovelace
-  outputMaps = valueNonAda <$> outputBundles
+  outputMaps = valueNonAda <$> outputValues
 
   outputCoins :: NonEmpty Natural
-  outputCoins = fromInteger . valueAda <$> outputBundles
+  outputCoins = fromInteger . valueAda <$> outputValues
 
   totalInputValue :: GYValue
   totalInputValue =
-    F.fold inputBundles
+    F.fold inputValues
       <> valueFromLovelace (fromIntegral extraCoinSource)
       -- Mints represent extra inputs from "the void"
       <> assetsToMint
 
   totalOutputValue :: GYValue
   totalOutputValue =
-    F.fold outputBundles
+    F.fold outputValues
       <> valueFromLovelace (fromIntegral extraCoinSink)
       -- Burns represent extra outputs to "the void"
       <> assetsToBurn
@@ -1356,7 +1361,7 @@ makeChange criteria
   -- Identifiers of all user-specified assets: assets that were included in
   -- the original set of outputs.
   userSpecifiedAssetIds :: Set GYAssetClass
-  userSpecifiedAssetIds = valueAssetsWithoutLovelace (F.fold outputBundles)
+  userSpecifiedAssetIds = valueAssetsWithoutLovelace (F.fold outputValues)
 
   -- Identifiers and quantities of all non-user-specified assets: assets that
   -- were not included in the original set of outputs, but that were
@@ -1367,7 +1372,7 @@ makeChange criteria
   nonUserSpecifiedAssetQuantities :: Map GYAssetClass (NonEmpty Natural)
   nonUserSpecifiedAssetQuantities =
     collateNonUserSpecifiedAssetQuantities
-      (valueNonAda <$> inputBundles)
+      (valueNonAda <$> inputValues)
       userSpecifiedAssetIds
 
 {- | Generates a map of all non-user-specified assets and their quantities.
@@ -1427,6 +1432,10 @@ This function:
 
    - fails if (and only if) there was not enough ada available to assign the
      minimum ada quantity to all non-empty change maps.
+
+   - after the function has assigned the minimum ada quantity to all
+     non-empty change maps, it partitions any remaining ada according to the
+     weighted distribution of original output coins in our list.
 -}
 assignCoinsToChangeMaps ::
   HasCallStack =>
@@ -1539,15 +1548,15 @@ makeChangeForUserSpecifiedAsset ::
   NonEmpty GYValueWithoutLovelace ->
   -- | A surplus token quantity to distribute.
   (GYAssetClass, Natural) ->
-  NonEmpty GYValue
+  NonEmpty GYValueWithoutLovelace
 makeChangeForUserSpecifiedAsset targets (asset, excess) =
   valueSingleton asset
-    <$> maybe (fmap fromIntegral zeros) (fmap fromIntegral) (partitionNatural excess weights)
+    <$> maybe zeros (fmap fromIntegral) (partitionNatural excess weights)
  where
   weights :: NonEmpty Natural
   weights = fromIntegral . flip valueAssetClass asset <$> targets
 
-  zeros :: NonEmpty Natural
+  zeros :: NonEmpty Integer
   zeros = 0 <$ targets
 
 {- | Constructs change outputs for a non-user-specified asset: an asset that
@@ -1621,7 +1630,7 @@ makeChangeForCoin ws c = fromMaybe zeroWeightSumError $ partitionNatural c ws
 -- Minting and burning
 --------------------------------------------------------------------------------
 
--- Once we know how much change to give, grouping the change into bundles is a
+-- Once we know how much change to give, grouping the change into values is a
 -- somewhat complicated topic.
 --
 -- We want to create change outputs with, as far as possible, values that are
@@ -1637,7 +1646,7 @@ makeChangeForCoin ws c = fromMaybe zeroWeightSumError $ partitionNatural c ws
 -- requires us to add value to the change outputs and burning tokens requires
 -- us to remove value from the change outputs.
 --
--- It's also important to note that the change bundle calculation requires
+-- It's also important to note that the change value calculation requires
 -- that the change for user-specified and non-user-specified assets have the
 -- following properties:
 --
@@ -1659,23 +1668,23 @@ makeChangeForCoin ws c = fromMaybe zeroWeightSumError $ partitionNatural c ws
 --    [ [("A", 3), ("B",  9) ]
 --    [ [("A", 4), ("B", 12) ]
 --
--- That is to say, it generates change bundles that satisfy the following
+-- That is to say, it generates change values that satisfy the following
 -- properties:
 --
---    1.  The number of change bundles matches the number of outputs
+--    1.  The number of change values matches the number of outputs
 --        the user originally requested;
---    2.  The change bundles are split in such a way to maximize the
---        number of large change bundles.
+--    2.  The change values are split in such a way to maximize the
+--        number of large change values.
 --
--- The change function maintains the property that the change bundles are in
--- ascending partial order, such that each change bundle is a subset of the
+-- The change function maintains the property that the change values are in
+-- ascending partial order, such that each change value is a subset of the
 -- next. This property is required by 'changeMapOutputCoinPairs', so it's
 -- important it's maintained.
 --
--- The following two functions work by modifying the change bundles for
+-- The following two functions work by modifying the change values for
 -- non-user-specified assets.
 --
--- We add minted tokens to the largest change bundle:
+-- We add minted tokens to the largest change value:
 --
 --    [ [          ("B",  7) ]
 --    [ [("A", 1), ("B",  8) ]
@@ -1683,7 +1692,7 @@ makeChangeForCoin ws c = fromMaybe zeroWeightSumError $ partitionNatural c ws
 --    [ [("A", 3), ("B",  9) ]
 --    [ [("A", 4), ("B", 12) ] <-- add minted tokens here
 --
--- We remove burned tokens from the smallest change bundles, until all burned
+-- We remove burned tokens from the smallest change values, until all burned
 -- tokens are removed:
 --
 --    [ [          ("B", 7)  ] <-- start removing burned tokens from here
@@ -1694,22 +1703,22 @@ makeChangeForCoin ws c = fromMaybe zeroWeightSumError $ partitionNatural c ws
 --
 -- The solution for minting maintains the properties we desire, namely:
 --
---    1.  The number of change bundles matches the number of
---        "outputs to cover" (we are not changing the number of bundles).
---    2.  The change bundles are in ascending partial order (by adding to the
---        largest bundle we trivially maintain ordering).
---    3.  The change bundles are split in such a way to maximize the
---        number of large change bundles.
+--    1.  The number of change values matches the number of
+--        "outputs to cover" (we are not changing the number of values).
+--    2.  The change values are in ascending partial order (by adding to the
+--        largest value we trivially maintain ordering).
+--    3.  The change values are split in such a way to maximize the
+--        number of large change values.
 --
 -- The solution for burning maintains the same properties:
 --
---    1.  The number of change bundles is not changed, in the case we burn a
---        change bundle completely, we just leave it as an empty entry
+--    1.  The number of change values is not changed, in the case we burn a
+--        change value completely, we just leave it as an empty entry
 --        (effectively "pad with zeros").
---    2.  By removing from the smallest bundle, we maintain the ascending
---        partial order of the change bundles.
---    3.  By removing from the smallest bundles, we remove the "least useful"
---        bundles, maximizing the overall usefulness of our bundles.
+--    2.  By removing from the smallest value, we maintain the ascending
+--        partial order of the change values.
+--    3.  By removing from the smallest values, we remove the "least useful"
+--        values, maximizing the overall usefulness of our values.
 
 {- | Adds a minted asset quantity to a list of change maps.
 
@@ -1881,24 +1890,24 @@ removeBurnValuesFromChangeMaps =
   flip (F.foldr removeBurnValueFromChangeMaps) . fmap (Data.Bifunctor.second fromIntegral) . valueToList
 
 --------------------------------------------------------------------------------
--- Splitting bundles
+-- Splitting values
 --------------------------------------------------------------------------------
 
-{- | Splits a bundle into smaller bundles if its asset count is excessive when
+{- | Splits a value into smaller values if its asset count is excessive when
   measured with the given 'isExcessive' indicator function.
 
-Returns a list of smaller bundles for which 'isExcessive' returns 'False'.
+Returns a list of smaller values for which 'isExcessive' returns 'False'.
 -}
-splitBundleIfAssetCountExcessive ::
-  -- | The token bundle suspected to have an excessive number of assets.
+splitValueIfAssetCountExcessive ::
+  -- | The value suspected to have an excessive number of assets.
   GYValue ->
   -- | A function that returns 'True' if (and only if) the asset count of
-  -- the given bundle is excessive.
+  -- the given value is excessive.
   (GYValue -> Bool) ->
   NonEmpty GYValue
-splitBundleIfAssetCountExcessive b isExcessive
+splitValueIfAssetCountExcessive b isExcessive
   | isExcessive b =
-      splitInHalf b >>= flip splitBundleIfAssetCountExcessive isExcessive
+      splitInHalf b >>= flip splitValueIfAssetCountExcessive isExcessive
   | otherwise =
       pure b
  where
@@ -1955,7 +1964,7 @@ equipartitionQuantitiesWithUpperBound ::
   GYValue ->
   -- | Maximum allowable token quantity.
   Natural ->
-  -- | The partitioned bundles.
+  -- | The partitioned values.
   NonEmpty GYValue
 equipartitionQuantitiesWithUpperBound (valueSplitAda -> (adaC, nonAdaVal)) maxQuantity =
   NE.zipWith f cs ms
@@ -1964,7 +1973,7 @@ equipartitionQuantitiesWithUpperBound (valueSplitAda -> (adaC, nonAdaVal)) maxQu
   ms = equipartitionNonAdaQuantitiesWithUpperBound nonAdaVal maxQuantity
   f adaCP nonAdaValP = valueFromLovelace (fromIntegral adaCP) <> nonAdaValP
 
-{- | Partitions a token map into 'n' smaller maps, where the quantity of each
+{- | Partitions a token map ('GYValueWithoutLovelace') into 'n' smaller maps, where the quantity of each
   token is equipartitioned across the resultant maps, with the goal that no
   token quantity in any of the resultant maps exceeds the given upper bound.
 
@@ -2001,7 +2010,7 @@ equipartitionNonAdaQuantitiesWithUpperBound m maxQuantity
         , "the maximum allowable token quantity cannot be zero."
         ]
 
-{- | Partitions a token map into 'n' smaller maps, where the quantity of each
+{- | Partitions a token map ('GYValueWithoutLovelace') into 'n' smaller maps, where the quantity of each
   token is equipartitioned across the resultant maps.
 
 In the resultant maps, the smallest quantity and largest quantity of a given
@@ -2029,42 +2038,42 @@ equipartitionNonAdaQuantities m count =
       valueSingleton asset . fromIntegral
         <$> equipartitionNatural (fromIntegral quantity) count
 
-{- | Splits bundles with excessive asset counts into smaller bundles.
+{- | Splits values with excessive asset counts into smaller values.
 
-Only token bundles where the 'isExcessive' indicator function returns 'True'
+Only values where the 'isExcessive' indicator function returns 'True'
 will be split.
 
-Returns a list of smaller bundles for which 'isExcessive' returns 'False'.
+Returns a list of smaller values for which 'isExcessive' returns 'False'.
 
-If none of the bundles in the given list has an excessive asset count,
+If none of the values in the given list has an excessive asset count,
 this function will return the original list.
 -}
-splitBundlesWithExcessiveAssetCounts ::
-  -- | Token bundles.
+splitValuesWithExcessiveAssetCounts ::
+  -- | Values.
   NonEmpty GYValue ->
   -- | A function that returns 'True' if (and only if) the asset count of
-  -- the given bundle is excessive.
+  -- the given value is excessive.
   (GYValue -> Bool) ->
   NonEmpty GYValue
-splitBundlesWithExcessiveAssetCounts bs isExcessive =
-  (`splitBundleIfAssetCountExcessive` isExcessive) =<< bs
+splitValuesWithExcessiveAssetCounts bs isExcessive =
+  (`splitValueIfAssetCountExcessive` isExcessive) =<< bs
 
-{- | Splits bundles with excessive token quantities into smaller bundles.
+{- | Splits values (list of 'GYValue') with excessive token quantities into smaller values.
 
-Only token bundles containing quantities that exceed the maximum token
+Only values containing quantities that exceed the maximum token
 quantity will be split.
 
-If none of the bundles in the given list contain a quantity that exceeds
+If none of the values in the given list contain a quantity that exceeds
 the maximum token quantity, this function will return the original list.
 -}
-splitBundlesWithExcessiveTokenQuantities ::
-  -- | Token bundles.
+splitValuesWithExcessiveTokenQuantities ::
+  -- | Values.
   NonEmpty GYValue ->
   -- | Maximum allowable token quantity.
   Natural ->
-  -- | The partitioned bundles.
+  -- | The partitioned values.
   NonEmpty GYValue
-splitBundlesWithExcessiveTokenQuantities bs maxQuantity =
+splitValuesWithExcessiveTokenQuantities bs maxQuantity =
   (`equipartitionQuantitiesWithUpperBound` maxQuantity) =<< bs
 
 --------------------------------------------------------------------------------
@@ -2124,17 +2133,20 @@ newtype AssetCount a = AssetCount
 -- Utility functions
 --------------------------------------------------------------------------------
 
+-- | Modulus between two numbers.
 distance :: Natural -> Natural -> Natural
 distance a b
   | a > b = a - b
   | a < b = b - a
   | otherwise = 0
 
+-- | Subtract second number from first only if it is less then or equal to first. Return 0 otherwise.
 naturalMonus :: Natural -> Natural -> Natural
 naturalMonus a b
   | a >= b = a - b
   | otherwise = 0
 
+-- | Subtract second number from first only if it is less then or equal to first. Return 'Nothing' otherwise.
 naturalReductive :: Natural -> Natural -> Maybe Natural
 naturalReductive a b
   | a >= b = Just (a - b)

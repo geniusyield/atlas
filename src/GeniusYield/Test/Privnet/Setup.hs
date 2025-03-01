@@ -62,7 +62,7 @@ import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational, (%!))
 import Test.Tasty (TestName, TestTree)
 import Test.Tasty.HUnit (testCaseSteps)
 import Testnet.Property.Util
-import Testnet.Start.Types (GenesisOptions (..), GenesisOrigin (..), UserNodeConfig (UserNodeConfigNotSubmitted))
+import Testnet.Start.Types (GenesisBatch (..), GenesisOptions (..), GenesisOrigin (..), UserNodeConfig (UserNodeConfigNotSubmitted))
 import Testnet.Types hiding (shelleyGenesis)
 
 -------------------------------------------------------------------------------
@@ -127,8 +127,8 @@ debug :: String -> IO ()
 -- debug = putStrLn
 debug _ = return ()
 
-conwayGenesis :: CtxCommittee -> ConwayGenesis StandardCrypto
-conwayGenesis ctxCommittee =
+conwayGenesis :: ConwayGenesis StandardCrypto -> CtxCommittee -> ConwayGenesis StandardCrypto
+conwayGenesis cg ctxCommittee =
   let
     upPParams :: UpgradeConwayPParams Identity
     upPParams =
@@ -167,7 +167,7 @@ conwayGenesis ctxCommittee =
         }
     commonPoolVotingThreshold = 51 %! 100
    in
-    ConwayGenesis
+    cg
       { cgUpgradePParams = upPParams
       , cgConstitution = DefaultClass.def
       , cgCommittee =
@@ -371,12 +371,9 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
  where
   -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
   cardanoTestnet' testnetOptions shelleyOptions conf ctxCommittee = do
-    Api.AnyShelleyBasedEra sbe <- pure cardanoNodeEra
-    alonzoGenesis <- getDefaultAlonzoGenesis sbe
-    shelleyGenesis <- getDefaultShelleyGenesis cardanoNodeEra cardanoMaxSupply shelleyOptions
-    cardanoTestnet testnetOptions conf UserNodeConfigNotSubmitted (shelleyGenesis, DefaultedOrigin) (alonzoGenesis, DefaultedOrigin) (conwayGenesis ctxCommittee, UserProvidedOrigin)
-   where
-    CardanoTestnetOptions {cardanoNodeEra, cardanoMaxSupply} = testnetOptions
+    GenesisBatch (shelleyGenesis, alonzoGenesis, cg, _) <- getDefaultGenesisBatch testnetOptions shelleyOptions
+    -- FIXME: Instead of `DefaultedOrigin`, this should be `UserProvidedOrigin` but for now that is leading to issues, see https://github.com/IntersectMBO/cardano-node/issues/6130#issuecomment-2692010489. Issue at Atlas side: https://github.com/geniusyield/atlas/issues/415.
+    cardanoTestnet testnetOptions conf UserNodeConfigNotSubmitted (GenesisBatch (shelleyGenesis, alonzoGenesis, conwayGenesis cg ctxCommittee, DefaultedOrigin))
 
 -------------------------------------------------------------------------------
 -- Generating users

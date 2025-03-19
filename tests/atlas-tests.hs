@@ -62,6 +62,10 @@ main = do
               return $ Api.textEnvelopeToJSON Nothing simpleScriptAPIv1
           , goldenVsString "serialized-v2" (rootDir </> "fixtures" </> "script-env-v2.json") $ do
               return $ Api.textEnvelopeToJSON Nothing simpleScriptAPIv2
+          , testCase "correctly read script" $ do
+              envelopeContents <- BS.readFile $ rootDir </> "fixtures" </> "script-env-v2.json"
+              let envelopeContentsParsed = readScript' @'PlutusV2 envelopeContents
+              pure giftValidatorV2 @=? envelopeContentsParsed
           , -- we can deserialize v1 as v1.
             testCase "deserialize v1" $ do
               e <- Api.readFileTextEnvelope (Api.proxyToAsType Proxy) (Api.File $ rootDir </> "fixtures" </> "script-env-v1.json")

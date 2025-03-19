@@ -125,6 +125,7 @@ module GeniusYield.Types.Script (
   -- ** File operations
   writeScript,
   readScript,
+  readScript',
 
   -- * Any Script
   GYAnyScript (..),
@@ -140,6 +141,7 @@ import Cardano.Api.Script qualified as Api
 import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.SafeHash (SafeToHash (originalBytesSize))
 import Control.Lens ((?~))
+import Data.Aeson qualified as Aeson
 import Data.Aeson.Types (
   FromJSONKey (fromJSONKey),
   FromJSONKeyFunction (FromJSONKeyTextParser),
@@ -674,6 +676,15 @@ scriptSize s = anyScriptToApiScriptInEra s & Api.toShelleyScript & originalBytes
 -- | Writes a script to a file.
 writeScript :: forall v. FilePath -> GYScript v -> IO ()
 writeScript = writeScriptCore "Script"
+
+-- | Reads a script as represented by a 'ByteString'.
+readScript' :: forall v. SingPlutusVersionI v => ByteString -> Either Api.TextEnvelopeError (GYScript v)
+readScript' bs = case Aeson.eitherDecodeStrict bs of
+  Left e -> Left $ Api.TextEnvelopeAesonDecodeError e
+  Right (te :: Api.TextEnvelope) -> case singPlutusVersion @v of
+    SingPlutusV1 -> scriptFromApi <$> Api.deserialiseFromTextEnvelope (Api.AsPlutusScript Api.AsPlutusScriptV1) te
+    SingPlutusV2 -> scriptFromApi <$> Api.deserialiseFromTextEnvelope (Api.AsPlutusScript Api.AsPlutusScriptV2) te
+    SingPlutusV3 -> scriptFromApi <$> Api.deserialiseFromTextEnvelope (Api.AsPlutusScript Api.AsPlutusScriptV3) te
 
 -- | Reads a script from a file.
 readScript :: forall v. SingPlutusVersionI v => FilePath -> IO (GYScript v)

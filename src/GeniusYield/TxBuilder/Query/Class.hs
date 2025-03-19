@@ -136,7 +136,7 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
   -- | Query the current constitution definition.
   constitution :: m GYConstitution
 
-  -- | Query proposals that are considered for ratification..
+  -- | Query proposals that are considered for ratification.
   proposals ::
     -- | Specify a set of Governance Action IDs to filter the proposals. When this set is
     -- empty, all the proposals considered for ratification will be returned.

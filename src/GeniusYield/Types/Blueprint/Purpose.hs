@@ -8,7 +8,7 @@ Stability   : develop
 module GeniusYield.Types.Blueprint.Purpose (Purpose (..)) where
 
 import Deriving.Aeson
-import Maestro.Types.Common (LowerFirst)
+import GeniusYield.Types.Aeson (LowerFirst)
 
 {- |
   As per CIP-57, a validator arguments (redeemer, datum) and validator parameters

@@ -13,11 +13,11 @@ import Data.Set (Set)
 import Deriving.Aeson
 import GeniusYield.Aeson.Utils (buildObject, optionalField, requiredField)
 import GeniusYield.Imports (Text)
+import GeniusYield.Types.Aeson (LowerFirst)
 import GeniusYield.Types.Blueprint.DefinitionId (DefinitionId)
 import GeniusYield.Types.Blueprint.Preamble (Preamble)
 import GeniusYield.Types.Blueprint.Schema (Schema)
 import GeniusYield.Types.Blueprint.Validator (ValidatorBlueprint)
-import Maestro.Types.Common (LowerFirst)
 
 -- | A blueprint of a smart contract, as defined by the CIP-0057.
 data ContractBlueprint

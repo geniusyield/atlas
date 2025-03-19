@@ -19,7 +19,6 @@ import Cardano.Api qualified as Api
 import Control.Concurrent (threadDelay)
 import Control.Monad ((<=<))
 import Data.Aeson (Value (Null), withObject, (.:))
-import Data.Char (toLower)
 import Data.Maybe (listToMaybe)
 import Data.Text qualified as Text
 import Data.Word (Word64)
@@ -49,6 +48,7 @@ import GeniusYield.Types (
   GYUTxO (..),
   GYUTxOs,
   GYValue,
+  LowerFirst,
   addressFromBech32,
   addressToText,
   gyQueryUtxoAtAddressesDefault,
@@ -123,12 +123,6 @@ runKupoClient (KupoApiEnv cEnv) c = runClientM c cEnv
 
 -- | Pattern to match kupo results against.
 type Pattern = Text
-
--- Will lower the first character for your type.
-data LowerFirst
-instance StringModifier LowerFirst where
-  getStringModifier "" = ""
-  getStringModifier (c : cs) = toLower c : cs
 
 newtype KupoDatum = KupoDatum (Maybe GYDatum)
   deriving stock (Eq, Ord, Show, Generic)

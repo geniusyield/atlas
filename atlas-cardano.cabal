@@ -137,6 +137,7 @@ library
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
+    GeniusYield.Types.Aeson
     GeniusYield.Types.Anchor
     GeniusYield.Types.Blueprint
     GeniusYield.Types.Blueprint.Argument

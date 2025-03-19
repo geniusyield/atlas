@@ -35,8 +35,8 @@ import Deriving.Aeson
 import GHC.Natural (Natural)
 import GeniusYield.Aeson.Utils (optionalField, requiredField)
 import GeniusYield.Imports (Text, (&))
+import GeniusYield.Types.Aeson (LowerFirst)
 import GeniusYield.Types.Blueprint.DefinitionId (DefinitionId, unDefinitionId)
-import Maestro.Types.Common (LowerFirst)
 
 -- | Blueprint schema definition, as defined by the CIP-0057.
 data Schema

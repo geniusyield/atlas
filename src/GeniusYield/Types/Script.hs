@@ -521,7 +521,7 @@ type UPLCProgram = UPLC.Program UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
 
 -- | Apply a (data-encoded) parameter to a script.
 applyParam :: (PlutusTx.ToData p, SingPlutusVersionI v) => GYScript v -> p -> GYScript v
-applyParam (Plutus.uncheckedDeserialiseUPLC . scriptToSerialisedScript -> prog) param = scriptFromSerialisedScript $ Plutus.serialiseUPLC $ (prog `applyConstant` PLC.someValue (PlutusTx.toData param))
+applyParam (Plutus.uncheckedDeserialiseUPLC . scriptToSerialisedScript -> prog) param = scriptFromSerialisedScript $ Plutus.serialiseUPLC (prog `applyConstant` PLC.someValue (PlutusTx.toData param))
  where
   applyConstant :: UPLCProgram -> PLC.Some (PLC.ValueOf UPLC.DefaultUni) -> UPLCProgram
   applyConstant (UPLC.Program () v f) c = UPLC.Program () v . UPLC.Apply () f $ UPLC.Constant () c

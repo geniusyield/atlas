@@ -162,6 +162,7 @@ import Cardano.Ledger.Api (
 import Cardano.Ledger.Conway.PParams (ppGovActionDepositL)
 import GeniusYield.Types.Ada as X
 import GeniusYield.Types.Address as X
+import GeniusYield.Types.Aeson as X
 import GeniusYield.Types.Anchor as X
 import GeniusYield.Types.Blueprint as X
 import GeniusYield.Types.BuildScript as X

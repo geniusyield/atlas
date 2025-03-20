@@ -113,6 +113,7 @@ module GeniusYield.Types.Script (
   scriptFromPlutus,
   scriptFromSerialisedScript,
   scriptToSerialisedScript,
+  applyParam,
   scriptApiHash,
   scriptPlutusHash,
   someScriptPlutusHash,
@@ -168,10 +169,12 @@ import GeniusYield.Types.TxOutRef (
   GYTxOutRef,
   txOutRefToApi,
  )
+import PlutusCore qualified as PLC
 import PlutusLedgerApi.Common qualified as Plutus
 import PlutusLedgerApi.V1 qualified as PlutusV1
 import PlutusTx qualified
 import PlutusTx.Builtins qualified as PlutusTx
+import UntypedPlutusCore qualified as UPLC
 import Web.HttpApiData qualified as Web
 
 {- $setup
@@ -513,6 +516,15 @@ scriptToSerialisedScript :: GYScript v -> ShortByteString
 scriptToSerialisedScript script =
   scriptToApi script & \case
     (Api.S.PlutusScriptSerialised s) -> s
+
+type UPLCProgram = UPLC.Program UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
+
+-- | Apply a (data-encoded) parameter to a script.
+applyParam :: (PlutusTx.ToData p, SingPlutusVersionI v) => GYScript v -> p -> GYScript v
+applyParam (Plutus.uncheckedDeserialiseUPLC . scriptToSerialisedScript -> prog) param = scriptFromSerialisedScript $ Plutus.serialiseUPLC (prog `applyConstant` PLC.someValue (PlutusTx.toData param))
+ where
+  applyConstant :: UPLCProgram -> PLC.Some (PLC.ValueOf UPLC.DefaultUni) -> UPLCProgram
+  applyConstant (UPLC.Program () v f) c = UPLC.Program () v . UPLC.Apply () f $ UPLC.Constant () c
 
 scriptVersion :: GYScript v -> SingPlutusVersion v
 scriptVersion (GYScript v _ _) = v

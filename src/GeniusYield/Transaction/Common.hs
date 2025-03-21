@@ -81,6 +81,9 @@ data GYTxExtraConfiguration v = GYTxExtraConfiguration
   { gytxecUtxoInputMapper :: GYUTxO -> GYTxInDetailed v
   -- ^ When coin selection selects additional UTxOs, this function is used to map them to 'GYTxInDetailed'. This in particular is useful, when inputs are selected from a contract based wallet.
   , gytxecPreBodyContentMapper :: Api.TxBodyContent Api.BuildTx ApiEra -> Api.TxBodyContent Api.BuildTx ApiEra
+  -- ^ This function is called on the 'Api.TxBodyContent' before submitting it to 'makeTransactionBodyAutoBalanceWrapper'.
+  , gytxecPostBodyContentMapper :: Api.TxBodyContent Api.BuildTx ApiEra -> Api.TxBodyContent Api.BuildTx ApiEra
+  -- ^ This function is called on the 'Api.TxBodyContent' after submitting it to 'makeTransactionBodyAutoBalanceWrapper'.
   }
 
 instance Default (GYTxExtraConfiguration v) where
@@ -96,6 +99,7 @@ instance Default (GYTxExtraConfiguration v) where
             , gyTxInDetScriptRef = utxoRefScript
             }
       , gytxecPreBodyContentMapper = id
+      , gytxecPostBodyContentMapper = id
       }
 
 -------------------------------------------------------------------------------

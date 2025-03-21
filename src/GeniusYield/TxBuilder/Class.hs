@@ -19,6 +19,7 @@ module GeniusYield.TxBuilder.Class (
   GYTxSkeleton (..),
   GYTxSkeletonRefIns (..),
   buildTxBody,
+  buildTxBodyWithExtraConfiguration,
   buildTxBodyParallel,
   buildTxBodyChaining,
   waitNSlots,
@@ -172,6 +173,16 @@ class (Default (TxBuilderStrategy m), GYTxSpecialQueryMonad m, GYTxUserQueryMona
     m GYTxBody
   buildTxBodyWithStrategy = buildTxBodyWithStrategy'
 
+  buildTxBodyWithStrategyAndExtraConfiguration :: forall v. TxBuilderStrategy m -> GYTxExtraConfiguration v -> GYTxSkeleton v -> m GYTxBody
+  default buildTxBodyWithStrategyAndExtraConfiguration ::
+    forall v.
+    (MonadRandom m, TxBuilderStrategy m ~ GYCoinSelectionStrategy) =>
+    TxBuilderStrategy m ->
+    GYTxExtraConfiguration v ->
+    GYTxSkeleton v ->
+    m GYTxBody
+  buildTxBodyWithStrategyAndExtraConfiguration = buildTxBodyWithStrategyAndExtraConfiguration'
+
   -- | A multi 'GYTxSkeleton' builder. The result containing built bodies must be in the same order as the skeletons.
   --
   --     This does not perform chaining, i.e does not use utxos created by one of the given transactions in the next one.
@@ -205,6 +216,10 @@ class (Default (TxBuilderStrategy m), GYTxSpecialQueryMonad m, GYTxUserQueryMona
 -- | 'buildTxBodyWithStrategy' with the default coin selection strategy.
 buildTxBody :: forall v m. GYTxBuilderMonad m => GYTxSkeleton v -> m GYTxBody
 buildTxBody = buildTxBodyWithStrategy def
+
+-- | 'buildTxBodyWithStrategyAndExtraConfiguration' with the default coin selection strategy.
+buildTxBodyWithExtraConfiguration :: forall v m. GYTxBuilderMonad m => GYTxExtraConfiguration v -> GYTxSkeleton v -> m GYTxBody
+buildTxBodyWithExtraConfiguration = buildTxBodyWithStrategyAndExtraConfiguration def
 
 -- | 'buildTxBodyParallelWithStrategy' with the default coin selection strategy.
 buildTxBodyParallel :: forall v m. GYTxBuilderMonad m => [GYTxSkeleton v] -> m GYTxBuildResult
@@ -394,6 +409,7 @@ Since these wrapper data types are usage specific, and 'GYTxGameMonad' instances
 instance GYTxBuilderMonad m => GYTxBuilderMonad (RandT g m) where
   type TxBuilderStrategy (RandT g m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -406,6 +422,7 @@ instance GYTxMonad m => GYTxMonad (RandT g m) where
 instance GYTxBuilderMonad m => GYTxBuilderMonad (ReaderT env m) where
   type TxBuilderStrategy (ReaderT env m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -424,6 +441,7 @@ instance GYTxMonad m => GYTxMonad (ReaderT env m) where
 instance GYTxBuilderMonad m => GYTxBuilderMonad (Strict.StateT s m) where
   type TxBuilderStrategy (Strict.StateT s m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -436,6 +454,7 @@ instance GYTxMonad m => GYTxMonad (Strict.StateT s m) where
 instance GYTxBuilderMonad m => GYTxBuilderMonad (Lazy.StateT s m) where
   type TxBuilderStrategy (Lazy.StateT s m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -448,6 +467,7 @@ instance GYTxMonad m => GYTxMonad (Lazy.StateT s m) where
 instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (CPS.WriterT w m) where
   type TxBuilderStrategy (CPS.WriterT w m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -460,6 +480,7 @@ instance (GYTxMonad m, Monoid w) => GYTxMonad (CPS.WriterT w m) where
 instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (Strict.WriterT w m) where
   type TxBuilderStrategy (Strict.WriterT w m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -472,6 +493,7 @@ instance (GYTxMonad m, Monoid w) => GYTxMonad (Strict.WriterT w m) where
 instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (Lazy.WriterT w m) where
   type TxBuilderStrategy (Lazy.WriterT w m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 

@@ -54,6 +54,19 @@ module GeniusYield.Types.Key (
   writeExtendedSigningKey,
   readExtendedSigningKey,
 
+  -- * Extended verification key
+  GYExtendedVerificationKey,
+  getExtendedVerificationKey,
+  extendedVerificationKeyHash,
+  extendedVerificationKeyToRawBytes,
+  extendedVerificationKeyToRawBytesHex,
+  extendedVerificationKeyToRawBytesHexText,
+  extendedVerificationKeyFromRawBytes,
+  extendedVerificationKeyFromRawBytesHex,
+  GYExtendedVerificationKeyToApi,
+  extendedVerificationKeyToApi,
+  extendedVerificationKeyFromApi,
+
   -- * Payment verification key
   GYPaymentVerificationKey,
   paymentVerificationKeyFromApi,
@@ -115,6 +128,7 @@ module GeniusYield.Types.Key (
 import Cardano.Api qualified as Api
 import Cardano.Api.SerialiseTextEnvelope qualified as Api
 import Cardano.Api.Shelley qualified as Api
+import Cardano.Crypto.Hash.Class qualified as Crypto
 import Cardano.Crypto.Wallet qualified as Crypto.HD
 import Cardano.Ledger.Crypto qualified as Ledger
 import Cardano.Ledger.Keys qualified as Ledger
@@ -361,7 +375,7 @@ instance (SingGYKeyRoleI kr, Api.SerialiseAsCBOR (GYVerificationKeyToApi kr)) =>
     Right bs -> case Api.deserialiseFromCBOR (Api.proxyToAsType Proxy) bs of
       Left err -> fail $ show err
       Right skey -> return $ verificationKeyFromApi skey
-  parseJSON _ = fail "payment verification key expected"
+  parseJSON _ = fail "verification key expected"
 
 {- |
 
@@ -526,6 +540,106 @@ readExtendedSigningKey fp = do
       SingGYKeyRoleStakePool -> error "readExtendedSigningKey: Impossible, no API representation for extended stake pool key"
       SingGYKeyRoleHotCommittee -> Api.proxyToAsType Proxy
       SingGYKeyRoleColdCommittee -> Api.proxyToAsType Proxy
+
+newtype GYExtendedVerificationKey (kr :: GYKeyRole) = GYExtendedVerificationKey Crypto.HD.XPub
+  deriving newtype Eq
+
+instance SingGYKeyRoleI kr => Show (GYExtendedVerificationKey kr) where
+  showsPrec d k = showParen (d > 10) $ showString "GYExtendedVerificationKey (" . shows (fromSingGYKeyRole (singGYKeyRole @kr)) . showString ") " . shows (extendedVerificationKeyToRawBytesHex k)
+
+instance IsString (GYExtendedVerificationKey kr) where
+  fromString = BS8.pack >>> extendedVerificationKeyFromRawBytesHex >>> either error id
+
+{- |
+
+>>> LBS8.putStrLn $ Aeson.encode ("4081b0a03b2b66c74ed1b0de1d874ed820c31b2c0cbba632f4f1ca82a113ac7e18f5eadae23a5c4e65e65e9d4e3a1d0e5c54f0e0c04e6e85e1f7ea75db7c9f1e" :: GYExtendedVerificationKey 'GYKeyRolePayment)
+"58404081b0a03b2b66c74ed1b0de1d874ed820c31b2c0cbba632f4f1ca82a113ac7e18f5eadae23a5c4e65e65e9d4e3a1d0e5c54f0e0c04e6e85e1f7ea75db7c9f1e"
+-}
+instance
+  ( SingGYKeyRoleI kr
+  , Api.SerialiseAsCBOR (GYExtendedVerificationKeyToApi kr)
+  ) =>
+  Aeson.ToJSON (GYExtendedVerificationKey kr)
+  where
+  toJSON = Aeson.String . TE.decodeUtf8 . BS16.encode . Api.serialiseToCBOR . extendedVerificationKeyToApi
+
+{- |
+
+>>> Aeson.eitherDecode @(GYExtendedVerificationKey 'GYKeyRolePayment) "\"4081b0a03b2b66c74ed1b0de1d874ed820c31b2c0cbba632f4f1ca82a113ac7e18f5eadae23a5c4e65e65e9d4e3a1d0e5c54f0e0c04e6e85e1f7ea75db7c9f1e\""
+Right (GYExtendedVerificationKey (GYKeyRolePayment) "4081b0a03b2b66c74ed1b0de1d874ed820c31b2c0cbba632f4f1ca82a113ac7e18f5eadae23a5c4e65e65e9d4e3a1d0e5c54f0e0c04e6e85e1f7ea75db7c9f1e")
+
+>>> Aeson.eitherDecode @(GYExtendedVerificationKey 'GYKeyRolePayment) "\"4081b0a03b2b66c74ed1b0de1d874ed820c31b2c0cbba632f4f1ca82a113ac7e18f5eadae23a5c4e65e65e9d4e3a1d0e5c54f0e0c04e6e85e1f7ea75db7c9f1e26\""
+Left "Error in $: GeniusYield.Types.Key.extendedVerificationKeyFromRawBytesHex: unable to decode from bytes, given hex string \"4081b0a03b2b66c74ed1b0de1d874ed820c31b2c0cbba632f4f1ca82a113ac7e18f5eadae23a5c4e65e65e9d4e3a1d0e5c54f0e0c04e6e85e1f7ea75db7c9f1e26\", corresponding bytes \"@\\129\\176\\160;+f\\199N\\209\\176\\222\\GS\\135N\\216 \\195\\ESC,\\f\\187\\166\\&2\\244\\241\\202\\130\\161\\DC3\\172~\\CAN\\245\\234\\218\\226:\\\\Ne\\230^\\157N:\\GS\\SO\\\\T\\240\\224\\192Nn\\133\\225\\247\\234u\\219|\\159\\RS&\", error: error: xprv needs to be 64 bytes: got 65 bytes"
+-}
+instance (SingGYKeyRoleI kr, Api.SerialiseAsCBOR (GYExtendedVerificationKeyToApi kr)) => Aeson.FromJSON (GYExtendedVerificationKey kr) where
+  parseJSON (Aeson.String t) = either fail return $ extendedVerificationKeyFromRawBytesHex $ BS8.pack $ T.unpack t
+  parseJSON _ = fail "extended verification key expected"
+
+{- |
+
+>>> Printf.printf "%s\n" ("4081b0a03b2b66c74ed1b0de1d874ed820c31b2c0cbba632f4f1ca82a113ac7e18f5eadae23a5c4e65e65e9d4e3a1d0e5c54f0e0c04e6e85e1f7ea75db7c9f1e" :: (GYExtendedVerificationKey 'GYKeyRolePayment))
+4081b0a03b2b66c74ed1b0de1d874ed820c31b2c0cbba632f4f1ca82a113ac7e18f5eadae23a5c4e65e65e9d4e3a1d0e5c54f0e0c04e6e85e1f7ea75db7c9f1e
+-}
+instance Printf.PrintfArg (GYExtendedVerificationKey kr) where
+  formatArg = Printf.formatArg . extendedVerificationKeyToRawBytesHexText
+
+getExtendedVerificationKey :: GYExtendedSigningKey kr -> GYExtendedVerificationKey kr
+getExtendedVerificationKey (GYExtendedSigningKey xpub) = Crypto.HD.toXPub xpub & GYExtendedVerificationKey
+
+extendedVerificationKeyHash :: GYExtendedVerificationKey kr -> GYKeyHash kr
+extendedVerificationKeyHash (GYExtendedVerificationKey xpub) = keyHashFromLedger $ Ledger.KeyHash $ Crypto.castHash $ Crypto.hashWith Crypto.HD.xpubPublicKey xpub
+
+extendedVerificationKeyToRawBytes :: GYExtendedVerificationKey kr -> BS8.ByteString
+extendedVerificationKeyToRawBytes (GYExtendedVerificationKey xpub) = Crypto.HD.unXPub xpub
+
+extendedVerificationKeyToRawBytesHex :: GYExtendedVerificationKey kr -> BS8.ByteString
+extendedVerificationKeyToRawBytesHex = extendedVerificationKeyToRawBytes >>> BS16.encode
+
+extendedVerificationKeyToRawBytesHexText :: GYExtendedVerificationKey kr -> T.Text
+extendedVerificationKeyToRawBytesHexText = extendedVerificationKeyToRawBytesHex >>> TE.decodeUtf8
+
+-- | Decode from raw bytes.
+extendedVerificationKeyFromRawBytes :: BS8.ByteString -> Maybe (GYExtendedVerificationKey kr)
+extendedVerificationKeyFromRawBytes = either (const Nothing) Just . extendedVerificationKeyFromRawBytes'
+
+-- | Decode from raw bytes.
+extendedVerificationKeyFromRawBytes' :: BS8.ByteString -> Either String (GYExtendedVerificationKey kr)
+extendedVerificationKeyFromRawBytes' bs = GYExtendedVerificationKey <$> Crypto.HD.xpub bs
+
+-- | Decode from raw bytes represented as hex.
+extendedVerificationKeyFromRawBytesHex :: BS8.ByteString -> Either String (GYExtendedVerificationKey kr)
+extendedVerificationKeyFromRawBytesHex bs =
+  case BS16.decode bs of
+    Left e -> Left $ "GeniusYield.Types.Key.extendedVerificationKeyFromRawBytesHex: unable to decode from hex string: " <> BS8.unpack bs <> ", error: " <> e
+    Right bs' -> case extendedVerificationKeyFromRawBytes' bs' of
+      Left e -> Left $ "GeniusYield.Types.Key.extendedVerificationKeyFromRawBytesHex: unable to decode from bytes, given hex string " <> show bs <> ", corresponding bytes " <> show bs' <> ", error: " <> e
+      res -> res
+
+type family GYExtendedVerificationKeyToApi (kr :: GYKeyRole) where
+  GYExtendedVerificationKeyToApi 'GYKeyRolePayment = Api.VerificationKey Api.PaymentExtendedKey
+  GYExtendedVerificationKeyToApi 'GYKeyRoleStaking = Api.VerificationKey Api.StakeExtendedKey
+  GYExtendedVerificationKeyToApi 'GYKeyRoleDRep = Api.VerificationKey Api.DRepExtendedKey
+  -- GYExtendedVerificationKeyToApi 'GYKeyRoleStakePool = Api.VerificationKey Api.StakePoolKey
+  GYExtendedVerificationKeyToApi 'GYKeyRoleHotCommittee = Api.VerificationKey Api.CommitteeHotExtendedKey
+  GYExtendedVerificationKeyToApi 'GYKeyRoleColdCommittee = Api.VerificationKey Api.CommitteeColdExtendedKey
+
+extendedVerificationKeyToApi :: forall kr. SingGYKeyRoleI kr => GYExtendedVerificationKey kr -> GYExtendedVerificationKeyToApi kr
+extendedVerificationKeyToApi = case singGYKeyRole @kr of
+  SingGYKeyRolePayment -> coerce
+  SingGYKeyRoleStaking -> coerce
+  SingGYKeyRoleDRep -> coerce
+  SingGYKeyRoleStakePool -> error "extendedVerificationKeyToApi: Impossible, no API representation for extended stake pool key"
+  SingGYKeyRoleHotCommittee -> coerce
+  SingGYKeyRoleColdCommittee -> coerce
+
+extendedVerificationKeyFromApi :: forall kr. SingGYKeyRoleI kr => GYExtendedVerificationKeyToApi kr -> GYExtendedVerificationKey kr
+extendedVerificationKeyFromApi = case singGYKeyRole @kr of
+  SingGYKeyRolePayment -> coerce
+  SingGYKeyRoleStaking -> coerce
+  SingGYKeyRoleDRep -> coerce
+  SingGYKeyRoleStakePool -> error "extendedVerificationKeyFromApi: Impossible, no API representation for extended stake pool key"
+  SingGYKeyRoleHotCommittee -> coerce
+  SingGYKeyRoleColdCommittee -> coerce
 
 -------------------------------------------------------------------------------
 -- Payment verification key (public)

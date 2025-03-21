@@ -127,6 +127,7 @@ import Data.Word (Word64)
 import GHC.Stack (withFrozenCallStack)
 import GeniusYield.Imports
 import GeniusYield.Transaction
+import GeniusYield.Transaction.Common (GYTxExtraConfiguration)
 import GeniusYield.TxBuilder.Common
 import GeniusYield.TxBuilder.Errors
 import GeniusYield.TxBuilder.Query.Class
@@ -898,14 +899,23 @@ buildTxBodyWithStrategy' ::
   GYCoinSelectionStrategy ->
   GYTxSkeleton v ->
   m GYTxBody
-buildTxBodyWithStrategy' cstrat m = do
-  x <- buildTxBodyCore (const id) cstrat [m]
+buildTxBodyWithStrategy' cstrat = buildTxBodyWithStrategyAndExtraConfiguration' cstrat def
+
+buildTxBodyWithStrategyAndExtraConfiguration' ::
+  forall v m.
+  (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m) =>
+  GYCoinSelectionStrategy ->
+  GYTxExtraConfiguration v ->
+  GYTxSkeleton v ->
+  m GYTxBody
+buildTxBodyWithStrategyAndExtraConfiguration' cstrat ec m = do
+  x <- buildTxBodyCore (const id) cstrat ec [m]
   case x of
     GYTxBuildSuccess ne -> pure $ NE.head ne
     GYTxBuildPartialSuccess be _ -> throwError . GYBuildTxException $ GYBuildTxBalancingError be
     GYTxBuildFailure be -> throwError . GYBuildTxException $ GYBuildTxBalancingError be
     -- We know there is precisely one input.
-    GYTxBuildNoInputs -> error "buildTxBodyWithStrategy': absurd"
+    GYTxBuildNoInputs -> error "buildTxBodyWithStrategyAndExtraConfiguration': absurd"
 
 {- | A multi 'GYTxSkeleton' builder.
 
@@ -921,7 +931,7 @@ buildTxBodyParallelWithStrategy' ::
   [GYTxSkeleton v] ->
   m GYTxBuildResult
 buildTxBodyParallelWithStrategy' cstrat m = do
-  buildTxBodyCore updateOwnUtxosParallel cstrat m
+  buildTxBodyCore updateOwnUtxosParallel cstrat def m
 
 {- | A chaining 'GYTxSkeleton' builder.
 
@@ -938,7 +948,7 @@ buildTxBodyChainingWithStrategy' ::
   m GYTxBuildResult
 buildTxBodyChainingWithStrategy' cstrat m = do
   addrs <- ownAddresses
-  buildTxBodyCore (updateOwnUtxosChaining $ Set.fromList addrs) cstrat m
+  buildTxBodyCore (updateOwnUtxosChaining $ Set.fromList addrs) cstrat def m
 
 {- | The core implementation of buildTxBody: Building 'GYTxBody's out of one or more 'GYTxSkeleton's.
 
@@ -966,10 +976,11 @@ buildTxBodyCore ::
   (GYTxBody -> GYUTxOs -> GYUTxOs) ->
   -- | Coin selection strategy.
   GYCoinSelectionStrategy ->
+  GYTxExtraConfiguration v ->
   -- | Skeleton(s).
   [GYTxSkeleton v] ->
   m GYTxBuildResult
-buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
+buildTxBodyCore ownUtxoUpdateF cstrat ec skeletons = do
   logSkeletons skeletons
 
   -- Obtain constant parameters to be used across several 'GYTxBody' generations.
@@ -988,7 +999,7 @@ buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
   addrs <- ownAddresses
   change <- ownChangeAddress
 
-  e <- buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral skeletons
+  e <- buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral ec skeletons
   case e of
     Left err -> throwError $ GYBuildTxException err
     Right res -> pure res

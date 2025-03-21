@@ -56,6 +56,7 @@ import GeniusYield.Types.Value (
   valueSingleton,
  )
 
+import Data.Default (Default (..))
 import GeniusYield.Providers.Common (mainnetEraHist)
 import GeniusYield.Transaction (
   GYBuildTxEnv (..),
@@ -226,7 +227,7 @@ collateralUtxo =
     , utxoRefScript = Nothing
     }
 
-mockBuildTxEnv :: [GYValue] -> GYBuildTxEnv
+mockBuildTxEnv :: [GYValue] -> GYBuildTxEnv v
 mockBuildTxEnv wallet =
   GYBuildTxEnv
     { gyBTxEnvSystemStart = mockSystemStart
@@ -236,6 +237,7 @@ mockBuildTxEnv wallet =
     , gyBTxEnvOwnUtxos = buildOwnUtxos wallet
     , gyBTxEnvChangeAddr = mockChangeAddress
     , gyBTxEnvCollateral = collateralUtxo
+    , gyBTxEnvExtraConfiguration = def
     }
  where
   slotLen = fromInteger (scSlotLength defaultSlotConfig) / 1000

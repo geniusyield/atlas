@@ -109,7 +109,7 @@ import GeniusYield.Types
 import GeniusYield.Types.TxCert.Internal
 
 -- | A container for various network parameters, and user wallet information, used by balancer.
-data GYBuildTxEnv = GYBuildTxEnv
+data GYBuildTxEnv v = GYBuildTxEnv
   { gyBTxEnvSystemStart :: !SystemStart
   , gyBTxEnvEraHistory :: !Api.EraHistory
   , gyBTxEnvProtocolParams :: !ApiProtocolParameters
@@ -118,6 +118,7 @@ data GYBuildTxEnv = GYBuildTxEnv
   -- ^ own utxos available for use as _additional_ input
   , gyBTxEnvChangeAddr :: !GYAddress
   , gyBTxEnvCollateral :: !GYUTxO
+  , gyBTxEnvExtraConfiguration :: !(GYTxExtraConfiguration v)
   }
 
 -------------------------------------------------------------------------------
@@ -144,7 +145,7 @@ randImproveExtraLovelaceCeil = 20_000_000
 buildUnsignedTxBody ::
   forall m v.
   (HasCallStack, MonadRandom m) =>
-  GYBuildTxEnv ->
+  GYBuildTxEnv v ->
   GYCoinSelectionStrategy ->
   [GYTxInDetailed v] ->
   [GYTxOut v] ->
@@ -250,7 +251,7 @@ the tx with 'finalizeGYBalancedTx'. If such is the case, 'balanceTxStep' should 
 -}
 balanceTxStep ::
   (HasCallStack, MonadRandom m) =>
-  GYBuildTxEnv ->
+  GYBuildTxEnv v ->
   -- | minting
   Maybe (GYValue, [(GYBuildScript v, GYRedeemer)]) ->
   -- | withdrawals
@@ -277,6 +278,7 @@ balanceTxStep
     , gyBTxEnvChangeAddr = changeAddr
     , gyBTxEnvCollateral = collateral
     , gyBTxEnvPools = pools
+    , gyBTxEnvExtraConfiguration = ec
     }
   mmint
   wdrls
@@ -351,6 +353,7 @@ balanceTxStep
                 , maxValueSize = pp ^. Ledger.ppMaxValSizeL
                 , adaSource = adaSource
                 , adaSink = adaSink
+                , inputMapper = gytxecUtxoInputMapper ec
                 }
               cstrat
           pure (ins ++ addIns, collaterals, adjustedOuts ++ changeOuts)
@@ -367,7 +370,7 @@ balanceTxStep
 retColSup :: Api.BabbageEraOnwards ApiEra
 retColSup = Api.BabbageEraOnwardsConway
 
-finalizeGYBalancedTx :: GYBuildTxEnv -> GYBalancedTx v -> Int -> Either GYBuildTxError GYTxBody
+finalizeGYBalancedTx :: GYBuildTxEnv v -> GYBalancedTx v -> Int -> Either GYBuildTxError GYTxBody
 finalizeGYBalancedTx
   GYBuildTxEnv
     { gyBTxEnvSystemStart = ss

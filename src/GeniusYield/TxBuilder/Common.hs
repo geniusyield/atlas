@@ -41,6 +41,7 @@ import Data.Set qualified as Set
 import GeniusYield.Imports
 import GeniusYield.Transaction
 import GeniusYield.Transaction.Common (
+  GYTxExtraConfiguration,
   minimumUTxO,
   utxoFromTxInDetailed,
  )
@@ -221,9 +222,10 @@ buildTxCore ::
   GYAddress ->
   -- | Is `Nothing` if there was no 5 ada collateral returned by browser wallet.
   Maybe GYUTxO ->
+  GYTxExtraConfiguration v ->
   [GYTxSkeleton v] ->
   m (Either GYBuildTxError GYTxBuildResult)
-buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral skeletons = do
+buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ec skeletons = do
   ownUtxos <- utxosAtAddresses addrs
 
   let buildEnvWith ownUtxos' refIns collateralUtxo =
@@ -235,6 +237,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
           , gyBTxEnvOwnUtxos = utxosRemoveTxOutRefs refIns $ utxosRemoveRefScripts $ maybe ownUtxos' ((`utxosRemoveTxOutRef` ownUtxos') . utxoRef) reservedCollateral
           , gyBTxEnvChangeAddr = change
           , gyBTxEnvCollateral = collateralUtxo
+          , gyBTxEnvExtraConfiguration = ec
           }
 
       helper :: GYUTxOs -> GYTxSkeleton v -> m (Either GYBuildTxError GYTxBody)

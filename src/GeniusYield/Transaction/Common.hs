@@ -89,7 +89,7 @@ data GYTxExtraConfiguration v = GYTxExtraConfiguration
 instance Default (GYTxExtraConfiguration v) where
   def =
     GYTxExtraConfiguration
-      { gytxecUtxoInputMapper = \(GYUTxO {utxoRef, utxoAddress, utxoValue, utxoOutDatum, utxoRefScript}) ->
+      { gytxecUtxoInputMapper = \GYUTxO {utxoRef, utxoAddress, utxoValue, utxoOutDatum, utxoRefScript} ->
           GYTxInDetailed
             { -- It is assumed the 'GYUTxOs' arg designates key wallet utxos.
               gyTxInDet = GYTxIn utxoRef GYTxInWitnessKey

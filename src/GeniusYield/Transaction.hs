@@ -100,8 +100,8 @@ import Data.Map qualified as Map
 import Data.Ratio ((%))
 import Data.Semigroup (Sum (..))
 import Data.Set qualified as Set
-import GHC.IsList (IsList (fromList))
-import GeniusYield.Imports
+import GHC.IsList (IsList (..))
+import GeniusYield.Imports hiding (toList)
 import GeniusYield.Transaction.CBOR
 import GeniusYield.Transaction.CoinSelection
 import GeniusYield.Transaction.Common
@@ -794,3 +794,89 @@ collapseExtraOut apiOut@(Api.TxOut _ outVal _ _) bodyContent@Api.TxBodyContent {
   (skeletonOuts, changeOuts) = splitAt numSkeletonOuts txOuts
 
 type ShelleyBasedConwayEra = Api.S.ShelleyLedgerEra ApiEra
+
+{- | WARNING: This function is not the same as @makeTransactionBodyAutoBalance@ in 'Cardano.Api' module and is implemented in a manner very different to the original function, as it uses @estimateBalancedTxBody@ under the hood.
+
+The main reason why we needed it was to allow the usage of body content modifier from extra configuration.
+-}
+customMakeTransactionBodyAutoBalance ::
+  Api.MaryEraOnwards ApiEra ->
+  SystemStart ->
+  Api.LedgerEpochInfo ->
+  Api.LedgerProtocolParameters ApiEra ->
+  -- | The set of registered stake pools, that are being
+  --   unregistered in this transaction.
+  Set Api.PoolId ->
+  -- | Map of all deposits for stake credentials that are being
+  --   unregistered in this transaction
+  Map Api.StakeCredential Ledger.Coin ->
+  -- | Map of all deposits for drep credentials that are being
+  --   unregistered in this transaction
+  Map (Ledger.Credential Ledger.DRepRole Ledger.StandardCrypto) Ledger.Coin ->
+  -- | Just the transaction inputs, not the entire 'UTxO'.
+  Api.UTxO ApiEra ->
+  Api.TxBodyContent Api.BuildTx ApiEra ->
+  -- | Change address
+  Api.AddressInEra ApiEra ->
+  -- | Override key witnesses
+  Word ->
+  (Api.TxBodyContent Api.BuildTx ApiEra -> Api.TxBodyContent Api.BuildTx ApiEra) ->
+  Either (Api.TxFeeEstimationError ApiEra) (Api.BalancedTxBody ApiEra)
+customMakeTransactionBodyAutoBalance
+  w
+  systemstart
+  history
+  lpp@(Api.LedgerProtocolParameters pp)
+  poolids
+  stakeDelegDeposits
+  drepDelegDeposits
+  utxo
+  txbodycontent
+  changeaddr
+  nkeys
+  preMapper = do
+    let sbe = Api.convert w
+        era = Api.toCardanoEra sbe
+    txbodyWithHighChange :: Api.S.TxBody era <-
+      Api.maryEraOnwardsConstraints w $
+        first Api.TxFeeEstimationxBodyError $
+          Api.createTransactionBody sbe $
+            preMapper $
+              txbodycontent & Api.modTxOuts (<> [Api.TxOut changeaddr (valueToApiTxOutValue $ valueFromLovelace $ 2 ^ (64 :: Integer) - 1) Api.TxOutDatumNone Api.ReferenceScriptNone])
+    exUnitsMapWithLogs <-
+      Api.maryEraOnwardsConstraints w $
+        first Api.TxFeeEstimationTransactionTranslationError $
+          Api.evaluateTransactionExecutionUnits
+            era
+            systemstart
+            history
+            lpp
+            utxo
+            txbodyWithHighChange
+    let exUnitsMap = Map.map (fmap snd) exUnitsMapWithLogs
+    exUnitsMap' <-
+      -- This execution units computation does not depend upon fee field?
+      case Map.mapEither id exUnitsMap of
+        (failures, exUnitsMap') ->
+          handleExUnitsErrors
+            (Api.txScriptValidityToScriptValidity (Api.txScriptValidity txbodycontent))
+            failures
+            exUnitsMap'
+    Api.estimateBalancedTxBody w txbodycontent pp poolids stakeDelegDeposits drepDelegDeposits exUnitsMap' undefined (fromIntegral nkeys) 0 undefined changeaddr undefined
+
+handleExUnitsErrors ::
+  -- | Mark script as expected to pass or fail validation
+  Api.ScriptValidity ->
+  Map Api.ScriptWitnessIndex Api.ScriptExecutionError ->
+  Map Api.ScriptWitnessIndex Api.ExecutionUnits ->
+  Either (Api.TxFeeEstimationError era) (Map Api.ScriptWitnessIndex Api.ExecutionUnits)
+handleExUnitsErrors Api.ScriptValid failuresMap exUnitsMap =
+  if null failures
+    then Right exUnitsMap
+    else Left (Api.TxFeeEstimationScriptExecutionError $ Api.TxBodyScriptExecutionError failures)
+ where
+  failures :: [(Api.ScriptWitnessIndex, Api.ScriptExecutionError)]
+  failures = toList failuresMap
+handleExUnitsErrors Api.ScriptInvalid failuresMap exUnitsMap
+  | null failuresMap = Left $ Api.TxFeeEstimationBalanceError Api.TxBodyScriptBadScriptValidity
+  | otherwise = Right $ Map.map (\_ -> Api.ExecutionUnits 0 0) failuresMap <> exUnitsMap

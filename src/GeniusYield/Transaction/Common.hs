@@ -80,6 +80,7 @@ utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref _witns) addr val d ms) = GYUTxO
 data GYTxExtraConfiguration v = GYTxExtraConfiguration
   { gytxecUtxoInputMapper :: GYUTxO -> GYTxInDetailed v
   -- ^ When coin selection selects additional UTxOs, this function is used to map them to 'GYTxInDetailed'. This in particular is useful, when inputs are selected from a contract based wallet.
+  , gytxecPreBodyContentMapper :: Api.TxBodyContent Api.BuildTx ApiEra -> Api.TxBodyContent Api.BuildTx ApiEra
   }
 
 instance Default (GYTxExtraConfiguration v) where
@@ -94,6 +95,7 @@ instance Default (GYTxExtraConfiguration v) where
             , gyTxInDetDatum = utxoOutDatum
             , gyTxInDetScriptRef = utxoRefScript
             }
+      , gytxecPreBodyContentMapper = id
       }
 
 -------------------------------------------------------------------------------

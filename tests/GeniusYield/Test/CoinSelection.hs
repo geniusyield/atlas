@@ -10,9 +10,11 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
+import Data.Default (Default (..))
 import GeniusYield.Imports
 import GeniusYield.Transaction
 import GeniusYield.Transaction.CoinSelection
+import GeniusYield.Transaction.Common (GYTxExtraConfiguration (..))
 import GeniusYield.Types
 
 data CoinSelectionTestParams = CoinSelectionTestParams
@@ -433,6 +435,7 @@ buildEnvWith ownUtxos existingInps targetOuts mintVal =
     , maxValueSize = 5000 -- Current max value size (obtained from protocol params)
     , adaSource = 0
     , adaSink = 0
+    , inputMapper = gytxecUtxoInputMapper def
     }
 
 buildInps :: [GYValue] -> [GYValue] -> [GYTxInDetailed v]

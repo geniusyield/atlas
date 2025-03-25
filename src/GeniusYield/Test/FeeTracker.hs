@@ -160,6 +160,11 @@ instance GYTxBuilderMonad m => GYTxBuilderMonad (FeeTracker m) where
     case res of
       GYTxBuildSuccess bodies -> pure $ NE.head bodies
       _ -> error "FeeTracker.buildTxBodyWithStrategy: Absurd"
+  buildTxBodyWithStrategyAndExtraConfiguration strat extraConfig skeleton = do
+    res <- wrapBodyBuilder (\x -> GYTxBuildSuccess . NE.singleton <$> buildTxBodyWithStrategyAndExtraConfiguration @m strat extraConfig (head x)) [skeleton]
+    case res of
+      GYTxBuildSuccess bodies -> pure $ NE.head bodies
+      _ -> error "FeeTracker.buildTxBodyWithStrategyAndExtraConfiguration: Absurd"
   buildTxBodyParallelWithStrategy strat = wrapBodyBuilder $ buildTxBodyParallelWithStrategy strat
   buildTxBodyChainingWithStrategy strat = wrapBodyBuilder $ buildTxBodyChainingWithStrategy strat
 

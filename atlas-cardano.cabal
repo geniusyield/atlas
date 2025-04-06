@@ -53,21 +53,25 @@ common common
   ghc-options: -fno-show-valid-hole-fits
 
 common plutus-ghc-options
+  default-extensions:
+    Strict
+
   -- so unfoldings are present even when compiled without optmizations
   ghc-options:
     -fno-ignore-interface-pragmas
     -fno-omit-interface-pragmas
+    -fno-full-laziness
+    -fno-spec-constr
+    -fno-specialise
+    -fno-strictness
+    -fno-unbox-strict-fields
+    -fno-unbox-small-strict-fields
     -Wno-partial-type-signatures
 
-  -- expose all unfoldings, so plutustx compiler can do its job
+  -- Plugin options.
   ghc-options:
-    -fexpose-all-unfoldings
-    -fobject-code
     -fplugin-opt
     PlutusTx.Plugin:defer-errors
-
-  -- set target plutus-core version
-  ghc-options:
     -fplugin-opt
     PlutusTx.Plugin:target-version=1.0.0
 
@@ -311,12 +315,8 @@ library framework-onchain-plutustx
   import: common, plutus-ghc-options
   hs-source-dirs: src-plutustx
   exposed-modules:
-    GeniusYield.OnChain.AStakeValidator
-    GeniusYield.OnChain.AStakeValidator.Compiled
     GeniusYield.OnChain.Examples.ReadOracle
     GeniusYield.OnChain.Examples.ReadOracle.Compiled
-    GeniusYield.OnChain.TestToken
-    GeniusYield.OnChain.TestToken.Compiled
 
   build-depends: base ^>=4.18.2
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
@@ -420,6 +420,7 @@ test-suite atlas-privnet-tests
     base16-bytestring,
     bytestring,
     containers,
+    file-embed,
     lens,
     mtl,
     plutus-tx,

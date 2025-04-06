@@ -74,8 +74,8 @@ testTokenPolicyBP =
 writeTestTokenPolicy :: FilePath -> IO ()
 writeTestTokenPolicy fp = writeBlueprint fp testTokenPolicyBP
 
-originalParameterisedTestTokenPolicy :: PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ())
-originalParameterisedTestTokenPolicy = $$(PlutusTx.compile [||mkTestTokenPolicy'||])
-
 originalParameterisedTestTokenPolicyScript :: ByteString
 originalParameterisedTestTokenPolicyScript = serialiseCompiledCode originalParameterisedTestTokenPolicy & fromShort
+
+originalParameterisedTestTokenPolicy :: PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ())
+originalParameterisedTestTokenPolicy = $$(PlutusTx.compile [||mkTestTokenPolicy'||])

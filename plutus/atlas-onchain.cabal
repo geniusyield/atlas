@@ -82,6 +82,7 @@ library
     GeniusYield.OnChain.Examples.ReadOracle
     GeniusYield.OnChain.Examples.ReadOracle.Compiled
     GeniusYield.OnChain.FakeCoin
+    GeniusYield.OnChain.FakeCoin.Compiled
     GeniusYield.OnChain.TestToken
     GeniusYield.OnChain.TestToken.Compiled
 

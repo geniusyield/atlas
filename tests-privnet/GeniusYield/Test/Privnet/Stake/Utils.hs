@@ -34,7 +34,7 @@ aStakeValidator :: GYScript 'PlutusV2
 aStakeValidator =
   let fileBS = $(makeRelativeToProject "./plutus/data/compiled-scripts/a-stake-validator.bp" >>= embedFile)
    in case extractBlueprintValidator fileBS of
-        Nothing -> error "unable to reade stake validator"
+        Nothing -> error "unable to read stake validator"
         Just s -> applyParam s (addressToPlutus someAddr)
 
 createMangledUser :: Ctx -> GYStakeCredential -> IO User

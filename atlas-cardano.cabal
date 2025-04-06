@@ -233,6 +233,7 @@ library
     deriving-aeson,
     either,
     extra,
+    file-embed,
     generic-lens,
     hashable,
     hedgehog,

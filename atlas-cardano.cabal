@@ -310,22 +310,6 @@ library
   -- needed for examples
   -- Version of @plutus-core@ is pinned in @cabal.project@ file.
   build-depends: plutus-core
-  build-depends: atlas-cardano:framework-onchain-plutustx
-
-library framework-onchain-plutustx
-  import: common, plutus-ghc-options
-  hs-source-dirs: src-plutustx
-  exposed-modules:
-    GeniusYield.OnChain.Examples.ReadOracle
-    GeniusYield.OnChain.Examples.ReadOracle.Compiled
-
-  build-depends: base ^>=4.18.2
-  -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
-  build-depends:
-    plutus-core,
-    plutus-ledger-api,
-    plutus-tx,
-    plutus-tx-plugin,
 
 test-suite atlas-tests
   import: common, plutus-ghc-options
@@ -416,7 +400,7 @@ test-suite atlas-privnet-tests
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
-    atlas-cardano:{atlas-cardano, framework-onchain-plutustx},
+    atlas-cardano,
     base,
     base16-bytestring,
     bytestring,

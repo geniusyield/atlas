@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 {- |
 Module      : GeniusYield.Test.Privnet.Examples.Oracle
 Copyright   : (c) 2023 GYELD GMBH
@@ -8,24 +10,27 @@ Stability   : develop
 module GeniusYield.Test.Privnet.Examples.Oracle (tests) where
 
 import Control.Lens ((.~))
+import Data.FileEmbed
 import Data.Map.Strict qualified as Map
+import GeniusYield.Examples.Gift
+import GeniusYield.Imports
+import GeniusYield.Test.Privnet.Asserts
+import GeniusYield.Test.Privnet.Ctx
+import GeniusYield.Test.Privnet.Setup
+import GeniusYield.TxBuilder
+import GeniusYield.Types
 import Test.Tasty (
   TestTree,
   testGroup,
  )
 import Test.Tasty.HUnit (testCaseSteps)
 
-import GeniusYield.Examples.Gift
-import GeniusYield.Imports
-import GeniusYield.OnChain.Examples.ReadOracle.Compiled
-import GeniusYield.Test.Privnet.Asserts
-import GeniusYield.Test.Privnet.Ctx
-import GeniusYield.Test.Privnet.Setup
-import GeniusYield.TxBuilder
-import GeniusYield.Types
-
 readOracleValidatorV2 :: GYScript 'PlutusV2
-readOracleValidatorV2 = validatorFromPlutus readOracleValidator
+readOracleValidatorV2 =
+  let fileBS = $(makeRelativeToProject "./plutus/data/compiled-scripts/read-oracle-validator.bp" >>= embedFile)
+   in case extractBlueprintValidator fileBS of
+        Left e -> error $ "unable to read oracle validator, " <> e
+        Right s -> s
 
 tests :: Setup -> TestTree
 tests setup =

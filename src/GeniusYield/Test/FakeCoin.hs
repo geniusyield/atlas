@@ -22,5 +22,5 @@ fakeMintingPolicy :: GYTokenName -> GYScript PlutusV2
 fakeMintingPolicy tn =
   let fileBS = $(makeRelativeToProject "./plutus/data/compiled-scripts/fake-coin.bp" >>= embedFile)
    in case extractBlueprintValidator fileBS of
-        Nothing -> error "unable to read fake coin"
-        Just s -> applyParam s (tokenNameToPlutus tn)
+        Left e -> error $ "unable to read fake coin, " <> e
+        Right s -> applyParam s (tokenNameToPlutus tn)

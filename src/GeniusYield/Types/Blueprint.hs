@@ -22,7 +22,6 @@ import Data.ByteString (ByteString)
 import Data.ByteString.Base16 qualified as BS16
 import Data.ByteString.Lazy qualified as LBS
 import Data.ByteString.Short qualified as SBS
-import Data.Either.Extra (eitherToMaybe)
 import Data.Set qualified as Set
 import Data.Text.Encoding (encodeUtf8)
 import GeniusYield.Imports ((&), (<&>))
@@ -77,10 +76,18 @@ readBlueprint :: FilePath -> IO ContractBlueprint
 readBlueprint = readJSON
 
 -- | Extracts a validator from 'ContractBlueprint'
-extractBlueprintValidator :: SingPlutusVersionI v => ByteString -> Maybe (GYScript v)
+extractBlueprintValidator :: SingPlutusVersionI v => ByteString -> Either String (GYScript v)
 extractBlueprintValidator bs = do
-  bp <- Aeson.decodeStrict bs
-  val <- contractValidators bp & Set.lookupMin
-  valCC <- validatorCompiled val
-  sbs <- encodeUtf8 (compiledValidatorCode valCC) & BS16.decode & eitherToMaybe <&> SBS.toShort
+  bp <- Aeson.eitherDecodeStrict bs
+  val <-
+    contractValidators bp
+      & Set.lookupMin
+      & ( \case
+            Nothing -> Left "no validator found"
+            Just m -> Right m
+        )
+  valCC <- case validatorCompiled val of
+    Nothing -> Left "no compiled code of validator found"
+    Just cc -> Right cc
+  sbs <- encodeUtf8 (compiledValidatorCode valCC) & BS16.decode <&> SBS.toShort
   pure $ scriptFromSerialisedScript sbs

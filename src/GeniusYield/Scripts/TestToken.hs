@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 {- |
 Module      : GeniusYield.Scripts.TestToken
 Copyright   : (c) 2023 GYELD GMBH
@@ -9,8 +11,14 @@ module GeniusYield.Scripts.TestToken (
   testTokenPolicy,
 ) where
 
-import GeniusYield.OnChain.TestToken.Compiled (originalTestTokenPolicy)
+import Data.Function ((&))
 import GeniusYield.Types
+import PlutusLedgerApi.V1 (TokenName (unTokenName), TxId (getTxId))
+import PlutusLedgerApi.V1 qualified as Plutus
+
+$(makeBPTypes "plutus/data/compiled-scripts/test-token-policy.bp")
+
+$(uponBPTypes "plutus/data/compiled-scripts/test-token-policy.bp")
 
 testTokenPolicy ::
   -- | count
@@ -21,5 +29,5 @@ testTokenPolicy ::
   GYTxOutRef ->
   GYScript 'PlutusV2
 testTokenPolicy count tn utxo =
-  mintingPolicyFromPlutus @'PlutusV2 $
-    originalTestTokenPolicy count (tokenNameToPlutus tn) (txOutRefToPlutus utxo)
+  scriptFromBPSerialisedScript $
+    applyParamsToBPValidator_Test_token_policy count (tokenNameToPlutus tn & unTokenName) (case txOutRefToPlutus utxo of Plutus.TxOutRef txid ix -> BPTxOutRef (BPTxId $ getTxId txid) ix)

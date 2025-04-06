@@ -1,0 +1,112 @@
+cabal-version: 3.8
+name: atlas-onchain
+version: 0.1.0
+synopsis: On-chain code referred by Atlas.
+license: Apache-2.0
+license-file: LICENSE
+copyright: (c) 2023 GYELD GMBH
+author: Lars Bruenjes
+maintainer: support@geniusyield.co
+build-type: Simple
+category: Blockchain, Cardano, Framework
+homepage: https://github.com/geniusyield/atlas#readme
+bug-reports: https://github.com/geniusyield/atlas/issues
+extra-source-files:
+  CHANGELOG.md
+  README.md
+
+tested-with:
+  ghc ==9.6.5 || ==9.6.6
+
+source-repository head
+  type: git
+  location: https://github.com/geniusyield/atlas
+
+common common
+  default-language: GHC2021
+  default-extensions:
+    DataKinds
+    DefaultSignatures
+    DeriveAnyClass
+    DerivingStrategies
+    DerivingVia
+    GADTs
+    LambdaCase
+    MultiWayIf
+    OverloadedStrings
+    PatternSynonyms
+    RecordWildCards
+    RoleAnnotations
+    TypeFamilyDependencies
+    UndecidableInstances
+    ViewPatterns
+
+  ghc-options:
+    -Wall
+    -Wincomplete-uni-patterns
+    -Wunused-packages
+
+  -- speed-ups GHCi considerably
+  ghc-options: -fno-show-valid-hole-fits
+
+common plutus-ghc-options
+  default-extensions:
+    Strict
+    TemplateHaskell
+
+  -- so unfoldings are present even when compiled without optmizations
+  ghc-options:
+    -fno-ignore-interface-pragmas
+    -fno-omit-interface-pragmas
+    -fno-full-laziness
+    -fno-spec-constr
+    -fno-specialise
+    -fno-strictness
+    -fno-unbox-strict-fields
+    -fno-unbox-small-strict-fields
+    -Wno-partial-type-signatures
+
+  -- Plugin options.
+  ghc-options:
+    -fplugin-opt
+    PlutusTx.Plugin:defer-errors
+    -fplugin-opt
+    PlutusTx.Plugin:target-version=1.0.0
+
+library
+  import: common, plutus-ghc-options
+  hs-source-dirs: src-plutustx
+  exposed-modules:
+    GeniusYield.OnChain.AStakeValidator
+    GeniusYield.OnChain.AStakeValidator.Compiled
+    GeniusYield.OnChain.Examples.ReadOracle
+    GeniusYield.OnChain.Examples.ReadOracle.Compiled
+    GeniusYield.OnChain.FakeCoin
+    GeniusYield.OnChain.TestToken
+    GeniusYield.OnChain.TestToken.Compiled
+
+  build-depends: base ^>=4.18.2
+  -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
+  build-depends:
+    bytestring,
+    containers,
+    plutus-core,
+    plutus-ledger-api,
+    plutus-tx,
+    plutus-tx-plugin,
+
+executable atlas-onchain-compiler
+  import: common
+  default-language: GHC2021
+  hs-source-dirs: app-plutustx
+  main-is: Main.hs
+  ghc-options:
+    -O2
+    -threaded
+    -rtsopts
+    -with-rtsopts=-T
+
+  build-depends:
+    atlas-onchain,
+    base ^>=4.18.2,
+    filepath,

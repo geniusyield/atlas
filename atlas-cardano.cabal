@@ -334,8 +334,6 @@ test-suite atlas-tests
     GeniusYield.Test.GYTxBody
     GeniusYield.Test.GYTxOutRefCbor
     GeniusYield.Test.GYTxSkeleton
-    GeniusYield.Test.OnChain.AlwaysSucceeds
-    GeniusYield.Test.OnChain.AlwaysSucceeds.Compiled
     GeniusYield.Test.OnChain.GuessRefInputDatum
     GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
     GeniusYield.Test.Providers

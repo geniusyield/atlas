@@ -23,18 +23,13 @@ import Test.Tasty (
 import Data.FileEmbed
 import GeniusYield.HTTP.Errors
 import GeniusYield.Imports
+import GeniusYield.OnChain.GuessRefInputDatum.Types
 import GeniusYield.Test.Clb
 import GeniusYield.Test.Utils
 import GeniusYield.Transaction
 import GeniusYield.TxBuilder
 import GeniusYield.Types
 import PlutusTx qualified
-
-newtype RefInputDatum = RefInputDatum Integer
-PlutusTx.unstableMakeIsData ''RefInputDatum
-
-newtype Guess = Guess Integer
-PlutusTx.unstableMakeIsData ''Guess
 
 gyGuessRefInputDatumValidator :: GYScript 'PlutusV2
 gyGuessRefInputDatumValidator =

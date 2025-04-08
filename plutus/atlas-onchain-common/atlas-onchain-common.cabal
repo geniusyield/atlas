@@ -1,10 +1,8 @@
 cabal-version: 3.8
-name: atlas-onchain
+name: atlas-onchain-common
 version: 0.1.0
 synopsis: On-chain code referred by Atlas.
-license: Apache-2.0
-license-file: LICENSE
-copyright: (c) 2023 GYELD GMBH
+copyright: (c) 2025 GYELD GMBH
 author: Lars Bruenjes
 maintainer: support@geniusyield.co
 build-type: Simple
@@ -75,45 +73,13 @@ common plutus-ghc-options
 
 library
   import: common, plutus-ghc-options
-  hs-source-dirs: src-plutustx
+  hs-source-dirs: src
   exposed-modules:
-    GeniusYield.OnChain.AStakeValidator
-    GeniusYield.OnChain.AStakeValidator.Compiled
-    GeniusYield.OnChain.BetRef
-    GeniusYield.OnChain.BetRef.Compiled
-    GeniusYield.OnChain.Examples.ReadOracle
-    GeniusYield.OnChain.Examples.ReadOracle.Compiled
-    GeniusYield.OnChain.FakeCoin
-    GeniusYield.OnChain.FakeCoin.Compiled
-    GeniusYield.OnChain.GuessRefInputDatum
-    GeniusYield.OnChain.GuessRefInputDatum.Compiled
-    GeniusYield.OnChain.TestToken
-    GeniusYield.OnChain.TestToken.Compiled
+    GeniusYield.OnChain.BetRef.Types
+    GeniusYield.OnChain.GuessRefInputDatum.Types
 
-  build-depends:
-    atlas-onchain-common,
-    base ^>=4.18.2,
-
+  build-depends: base ^>=4.18.2
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
   build-depends:
-    bytestring,
-    containers,
     plutus-ledger-api,
     plutus-tx,
-    plutus-tx-plugin,
-
-executable atlas-onchain-compiler
-  import: common
-  default-language: GHC2021
-  hs-source-dirs: app-plutustx
-  main-is: Main.hs
-  ghc-options:
-    -O2
-    -threaded
-    -rtsopts
-    -with-rtsopts=-T
-
-  build-depends:
-    atlas-onchain,
-    base ^>=4.18.2,
-    filepath,

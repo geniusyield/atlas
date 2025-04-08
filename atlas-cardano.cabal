@@ -346,6 +346,7 @@ test-suite atlas-tests
     MonadRandom,
     aeson,
     atlas-cardano,
+    atlas-onchain-common,
     base,
     bytestring,
     cardano-api,
@@ -428,15 +429,15 @@ test-suite atlas-unified-tests
     GeniusYield.Test.Unified.BetRef.Operations
     GeniusYield.Test.Unified.BetRef.PlaceBet
     GeniusYield.Test.Unified.BetRef.TakePot
-    GeniusYield.Test.Unified.OnChain.BetRef
-    GeniusYield.Test.Unified.OnChain.BetRef.Compiled
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
     atlas-cardano,
+    atlas-onchain-common,
     base,
     containers,
     extra,
+    file-embed,
     mtl,
     plutus-core,
     plutus-ledger-api,

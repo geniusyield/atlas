@@ -1,14 +1,7 @@
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NumericUnderscores #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module GeniusYield.Test.Unified.OnChain.BetRef (
+module GeniusYield.OnChain.BetRef (
   mkBetRefValidator,
   OracleAnswerDatum (..),
   BetRefParams (..),
@@ -16,6 +9,7 @@ module GeniusYield.Test.Unified.OnChain.BetRef (
   BetRefAction (..),
 ) where
 
+import GeniusYield.OnChain.BetRef.Types
 import PlutusLedgerApi.V1.Address (toPubKeyHash)
 import PlutusLedgerApi.V1.Interval (contains)
 import PlutusLedgerApi.V1.Value (geq)
@@ -25,50 +19,7 @@ import PlutusLedgerApi.V2.Contexts (
   findOwnInput,
   getContinuingOutputs,
  )
-import PlutusTx qualified
 import PlutusTx.Prelude as PlutusTx
-import Prelude (Show)
-
--- | Goals made my the concerned team.
-type TeamGoals = Integer
-
--- | Match result given by the oracle.
-newtype OracleAnswerDatum = OracleAnswerDatum TeamGoals deriving newtype (Eq, Show)
-
-PlutusTx.unstableMakeIsData ''OracleAnswerDatum
-
--- | Our contract is parameterized with this.
-data BetRefParams = BetRefParams
-  { brpOraclePkh :: PubKeyHash
-  -- ^ Oracle's payment public key hash. This is needed to assert that UTxO being looked at indeed belongs to the Oracle.
-  , brpBetUntil :: POSIXTime
-  -- ^ Time until which bets can be placed.
-  , brpBetReveal :: POSIXTime
-  -- ^ Time at which Oracle will reveal the correct match result.
-  , brpBetStep :: Value
-  -- ^ Each newly placed bet must be more than previous bet by `brpBetStep` amount.
-  }
-  deriving stock Show
-
--- PlutusTx.makeLift ''BetRefParams
-PlutusTx.unstableMakeIsData ''BetRefParams
-
--- | List of guesses by users along with the maximum bet placed yet. A new guess gets /prepended/ to this list. Note that since we are always meant to increment previously placed bet with `brpBetStep`, the newly placed bet would necessarily be maximum (it would be foolish to initialize `brpBetStep` with some negative amounts).
-data BetRefDatum = BetRefDatum
-  { brdBets :: [(PubKeyHash, OracleAnswerDatum)]
-  , brdPreviousBet :: Value
-  }
-
-PlutusTx.unstableMakeIsData ''BetRefDatum
-
--- | Redeemer representing choices available to the user.
-data BetRefAction
-  = -- | User makes a guess.
-    Bet !OracleAnswerDatum
-  | -- | User takes the pot.
-    Take
-
-PlutusTx.unstableMakeIsData ''BetRefAction
 
 -- Note: The first argument is meant to be data encoded 'BetRefParams'.
 -- Unable to use the actual type since makeLift doesn't work on it, for whatever reason....

@@ -8,22 +8,10 @@ module GeniusYield.OnChain.GuessRefInputDatum (
   Guess (..),
 ) where
 
-import GHC.Generics (Generic)
+import GeniusYield.OnChain.GuessRefInputDatum.Types
 import PlutusLedgerApi.V2
 import PlutusLedgerApi.V2.Contexts (findDatum)
-import PlutusTx qualified
-import PlutusTx.Blueprint
-import PlutusTx.Blueprint.TH qualified
 import PlutusTx.Prelude as PlutusTx
-
-newtype RefInputDatum = RefInputDatum Integer
-PlutusTx.unstableMakeIsData ''RefInputDatum
-
--- Redeemer
-newtype Guess = Guess Integer
-  deriving stock Generic
-  deriving anyclass HasBlueprintDefinition
-$(PlutusTx.Blueprint.TH.unstableMakeIsDataSchema ''Guess)
 
 {-# INLINEABLE mkGuessRefInputDatumValidator #-}
 mkGuessRefInputDatumValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()

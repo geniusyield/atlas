@@ -1,6 +1,7 @@
 module Main (main) where
 
 import GeniusYield.OnChain.AStakeValidator.Compiled (writeAStakeValidator)
+import GeniusYield.OnChain.BetRef.Compiled (writeBetRefValidator)
 import GeniusYield.OnChain.Examples.ReadOracle.Compiled (writeReadOracleValidator)
 import GeniusYield.OnChain.FakeCoin.Compiled (writeFakeCoin)
 import GeniusYield.OnChain.GuessRefInputDatum.Compiled (writeGuessRefInputDatumValidator)
@@ -16,3 +17,4 @@ main =
         writeFakeCoin $ getPath "fake-coin"
         writeReadOracleValidator $ getPath "read-oracle-validator"
         writeGuessRefInputDatumValidator $ getPath "guess-ref-input-datum-validator"
+        writeBetRefValidator $ getPath "bet-ref-validator"

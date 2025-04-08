@@ -14,3 +14,4 @@ main =
         writeAStakeValidator $ getPath "a-stake-validator"
         writeFakeCoin $ getPath "fake-coin"
         writeReadOracleValidator $ getPath "read-oracle-validator"
+        writeReadOracleValidator $ getPath "guess-ref-input-datum-validator"

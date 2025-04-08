@@ -1,31 +1,31 @@
 {- |
-Module      : GeniusYield.OnChain.Examples.ReadOracle.Compiled
+Module      : GeniusYield.OnChain.Examples.GuessRefInputDatum.Compiled
 Copyright   : (c) 2023 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop
 -}
-module GeniusYield.OnChain.Examples.ReadOracle.Compiled (
-  readOracleValidator,
-  writeReadOracleValidator,
+module GeniusYield.OnChain.GuessRefInputDatum.Compiled (
+  guessRefInputDatumValidator,
+  writeGuessRefInputDatumValidator,
 ) where
 
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (fromShort)
 import Data.Function ((&))
 import Data.Set qualified as Set
-import GeniusYield.OnChain.Examples.ReadOracle
+import GeniusYield.OnChain.GuessRefInputDatum
 import PlutusLedgerApi.Common (serialiseCompiledCode)
 import PlutusTx qualified
 import PlutusTx.Blueprint
 
-readOracleValidatorBP :: ContractBlueprint
-readOracleValidatorBP =
+guessRefInputDatumValidatorBP :: ContractBlueprint
+guessRefInputDatumValidatorBP =
   MkContractBlueprint
-    { contractId = Just "read-oracle"
+    { contractId = Just "guess-ref-input-datum"
     , contractPreamble =
         MkPreamble
-          { preambleTitle = "read-oracle"
+          { preambleTitle = "guess-ref-input-datum"
           , preambleDescription = Nothing
           , preambleVersion = "1.0.0"
           , preamblePlutusVersion = PlutusV2
@@ -34,11 +34,11 @@ readOracleValidatorBP =
     , contractValidators =
         Set.singleton
           MkValidatorBlueprint
-            { validatorTitle = "read-oracle"
+            { validatorTitle = "guess-ref-input-datum"
             , validatorRedeemer =
                 MkArgumentBlueprint
                   { argumentTitle = Nothing
-                  , argumentSchema = definitionRef @PlutusTx.BuiltinData
+                  , argumentSchema = definitionRef @Guess
                   , argumentPurpose = commonPurp
                   , argumentDescription = Nothing
                   }
@@ -53,18 +53,18 @@ readOracleValidatorBP =
                     , argumentPurpose = commonPurp
                     , argumentDescription = Nothing
                     }
-            , validatorCompiled = Just $ compiledValidator PlutusV2 readOracleValidatorScript
+            , validatorCompiled = Just $ compiledValidator PlutusV2 guessRefInputDatumValidatorScript
             }
-    , contractDefinitions = deriveDefinitions @'[PlutusTx.BuiltinData]
+    , contractDefinitions = deriveDefinitions @'[Guess, PlutusTx.BuiltinData]
     }
  where
   commonPurp = Set.singleton Spend
 
-writeReadOracleValidator :: FilePath -> IO ()
-writeReadOracleValidator fp = writeBlueprint fp readOracleValidatorBP
+writeGuessRefInputDatumValidator :: FilePath -> IO ()
+writeGuessRefInputDatumValidator fp = writeBlueprint fp guessRefInputDatumValidatorBP
 
-readOracleValidatorScript :: ByteString
-readOracleValidatorScript = serialiseCompiledCode readOracleValidator & fromShort
+guessRefInputDatumValidatorScript :: ByteString
+guessRefInputDatumValidatorScript = serialiseCompiledCode guessRefInputDatumValidator & fromShort
 
-readOracleValidator :: PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ())
-readOracleValidator = $$(PlutusTx.compile [||mkReadOracleValidator||])
+guessRefInputDatumValidator :: PlutusTx.CompiledCode (PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> PlutusTx.BuiltinData -> ())
+guessRefInputDatumValidator = $$(PlutusTx.compile [||mkGuessRefInputDatumValidator||])

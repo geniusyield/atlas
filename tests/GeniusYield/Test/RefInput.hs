@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- Test to signify correct functionality of reference inputs implementation.
 -- TODO: Atlas currently doesn't support referring to the uninlined datum of reference input. But if that support is added, tests can be written utilising it here.
@@ -19,17 +20,28 @@ import Test.Tasty (
   testGroup,
  )
 
+import Data.FileEmbed
 import GeniusYield.HTTP.Errors
 import GeniusYield.Imports
 import GeniusYield.Test.Clb
-import GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
 import GeniusYield.Test.Utils
 import GeniusYield.Transaction
 import GeniusYield.TxBuilder
 import GeniusYield.Types
+import PlutusTx qualified
+
+newtype RefInputDatum = RefInputDatum Integer
+PlutusTx.unstableMakeIsData ''RefInputDatum
+
+newtype Guess = Guess Integer
+PlutusTx.unstableMakeIsData ''Guess
 
 gyGuessRefInputDatumValidator :: GYScript 'PlutusV2
-gyGuessRefInputDatumValidator = validatorFromPlutus guessRefInputDatumValidator
+gyGuessRefInputDatumValidator =
+  let fileBS = $(makeRelativeToProject "./plutus/data/compiled-scripts/guess-ref-input-datum-validator.bp" >>= embedFile)
+   in case extractBlueprintValidator fileBS of
+        Left e -> error $ "unable to read guess ref input datum validator, " <> e
+        Right s -> s
 
 refInputTests :: TestTree
 refInputTests =

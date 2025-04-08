@@ -334,8 +334,6 @@ test-suite atlas-tests
     GeniusYield.Test.GYTxBody
     GeniusYield.Test.GYTxOutRefCbor
     GeniusYield.Test.GYTxSkeleton
-    GeniusYield.Test.OnChain.GuessRefInputDatum
-    GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
     GeniusYield.Test.Providers
     GeniusYield.Test.Providers.Mashup
     GeniusYield.Test.RefInput
@@ -355,6 +353,7 @@ test-suite atlas-tests
     containers,
     data-default,
     directory,
+    file-embed,
     filepath,
     http-api-data,
     maestro-sdk,

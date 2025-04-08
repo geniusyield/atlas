@@ -2,22 +2,18 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-{- |
-Module      : GeniusYield.Test.OnChain.GuessRefInputDatum
-Copyright   : (c) 2023 GYELD GMBH
-License     : Apache 2.0
-Maintainer  : support@geniusyield.com
-Stability   : develop
--}
-module GeniusYield.Test.OnChain.GuessRefInputDatum (
+module GeniusYield.OnChain.GuessRefInputDatum (
   mkGuessRefInputDatumValidator,
   RefInputDatum (..),
   Guess (..),
 ) where
 
+import GHC.Generics (Generic)
 import PlutusLedgerApi.V2
 import PlutusLedgerApi.V2.Contexts (findDatum)
 import PlutusTx qualified
+import PlutusTx.Blueprint
+import PlutusTx.Blueprint.TH qualified
 import PlutusTx.Prelude as PlutusTx
 
 newtype RefInputDatum = RefInputDatum Integer
@@ -25,7 +21,9 @@ PlutusTx.unstableMakeIsData ''RefInputDatum
 
 -- Redeemer
 newtype Guess = Guess Integer
-PlutusTx.unstableMakeIsData ''Guess
+  deriving stock Generic
+  deriving anyclass HasBlueprintDefinition
+$(PlutusTx.Blueprint.TH.unstableMakeIsDataSchema ''Guess)
 
 {-# INLINEABLE mkGuessRefInputDatumValidator #-}
 mkGuessRefInputDatumValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()

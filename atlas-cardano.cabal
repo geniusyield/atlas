@@ -52,29 +52,6 @@ common common
   -- speed-ups GHCi considerably
   ghc-options: -fno-show-valid-hole-fits
 
-common plutus-ghc-options
-  default-extensions:
-    Strict
-
-  -- so unfoldings are present even when compiled without optmizations
-  ghc-options:
-    -fno-ignore-interface-pragmas
-    -fno-omit-interface-pragmas
-    -fno-full-laziness
-    -fno-spec-constr
-    -fno-specialise
-    -fno-strictness
-    -fno-unbox-strict-fields
-    -fno-unbox-small-strict-fields
-    -Wno-partial-type-signatures
-
-  -- Plugin options.
-  ghc-options:
-    -fplugin-opt
-    PlutusTx.Plugin:defer-errors
-    -fplugin-opt
-    PlutusTx.Plugin:target-version=1.0.0
-
 library
   import: common
   hs-source-dirs: src
@@ -305,14 +282,13 @@ library
     ouroboros-network-protocols,
     plutus-ledger-api,
     plutus-tx,
-    plutus-tx-plugin,
 
   -- needed for examples
   -- Version of @plutus-core@ is pinned in @cabal.project@ file.
   build-depends: plutus-core
 
 test-suite atlas-tests
-  import: common, plutus-ghc-options
+  import: common
   type: exitcode-stdio-1.0
   main-is: atlas-tests.hs
   hs-source-dirs: tests
@@ -320,11 +296,6 @@ test-suite atlas-tests
     -threaded
     -rtsopts
     -Wall
-
-  -- set target plutus-core version
-  ghc-options:
-    -fplugin-opt
-    PlutusTx.Plugin:target-version=1.0.0
 
   other-modules:
     GeniusYield.Test.Blueprint
@@ -359,9 +330,7 @@ test-suite atlas-tests
     http-api-data,
     maestro-sdk,
     ouroboros-consensus,
-    plutus-ledger-api,
     plutus-tx,
-    plutus-tx-plugin,
     tasty,
     tasty-hunit,
     tasty-quickcheck,
@@ -411,7 +380,7 @@ test-suite atlas-privnet-tests
     tasty-hunit,
 
 test-suite atlas-unified-tests
-  import: common, plutus-ghc-options
+  import: common
   type: exitcode-stdio-1.0
   main-is: atlas-unified-tests.hs
   hs-source-dirs: tests-unified
@@ -419,11 +388,6 @@ test-suite atlas-unified-tests
     -threaded
     -rtsopts
     -Wall
-
-  -- set target plutus-core version
-  ghc-options:
-    -fplugin-opt
-    PlutusTx.Plugin:target-version=1.0.0
 
   other-modules:
     GeniusYield.Test.Unified.BetRef.Operations
@@ -439,9 +403,5 @@ test-suite atlas-unified-tests
     extra,
     file-embed,
     mtl,
-    plutus-core,
-    plutus-ledger-api,
-    plutus-tx,
-    plutus-tx-plugin,
     tasty,
     text,

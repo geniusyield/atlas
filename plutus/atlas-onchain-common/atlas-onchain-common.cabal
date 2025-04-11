@@ -47,32 +47,8 @@ common common
   -- speed-ups GHCi considerably
   ghc-options: -fno-show-valid-hole-fits
 
-common plutus-ghc-options
-  default-extensions:
-    Strict
-    TemplateHaskell
-
-  -- so unfoldings are present even when compiled without optmizations
-  ghc-options:
-    -fno-ignore-interface-pragmas
-    -fno-omit-interface-pragmas
-    -fno-full-laziness
-    -fno-spec-constr
-    -fno-specialise
-    -fno-strictness
-    -fno-unbox-strict-fields
-    -fno-unbox-small-strict-fields
-    -Wno-partial-type-signatures
-
-  -- Plugin options.
-  ghc-options:
-    -fplugin-opt
-    PlutusTx.Plugin:defer-errors
-    -fplugin-opt
-    PlutusTx.Plugin:target-version=1.0.0
-
 library
-  import: common, plutus-ghc-options
+  import: common
   hs-source-dirs: src
   exposed-modules:
     GeniusYield.OnChain.BetRef.Types

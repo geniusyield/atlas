@@ -35,6 +35,7 @@ common common
     PatternSynonyms
     RecordWildCards
     RoleAnnotations
+    TemplateHaskell
     TypeFamilyDependencies
     UndecidableInstances
     ViewPatterns

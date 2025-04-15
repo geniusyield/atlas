@@ -169,8 +169,8 @@ txBodyToCBOR = Api.serialiseToCBOR . txBodyToApi
 
 -- | Return the fees in lovelace.
 txBodyFee :: GYTxBody -> Integer
-txBodyFee (GYTxBody (Api.TxBody Api.TxBodyContent {Api.txFee = fee})) =
-  case fee of
+txBodyFee (GYTxBody body) =
+  case Api.txFee $ Api.getTxBodyContent body of
     Api.TxFeeExplicit _ (Ledger.Coin actual) -> actual
 
 -- | Return the fees as 'GYValue'.
@@ -182,9 +182,11 @@ txBodyUTxOs :: GYTxBody -> GYUTxOs
 txBodyUTxOs = utxosFromList . fmap fst . txBodyUTxOsWithDatums
 
 txBodyUTxOsWithDatums :: GYTxBody -> [(GYUTxO, Maybe GYDatum)]
-txBodyUTxOsWithDatums (GYTxBody body@(Api.TxBody Api.TxBodyContent {txOuts})) =
+txBodyUTxOsWithDatums (GYTxBody body) =
   zipWith f [0 ..] txOuts
  where
+  txOuts = Api.txOuts $ Api.getTxBodyContent body
+
   txId = Api.getTxId body
 
   f :: Word -> Api.TxOut Api.CtxTx ApiEra -> (GYUTxO, Maybe GYDatum)
@@ -192,13 +194,15 @@ txBodyUTxOsWithDatums (GYTxBody body@(Api.TxBody Api.TxBodyContent {txOuts})) =
 
 -- | Returns the 'GYTxOutRef' consumed by the tx.
 txBodyTxIns :: GYTxBody -> [GYTxOutRef]
-txBodyTxIns (GYTxBody (Api.TxBody Api.TxBodyContent {txIns})) = map (txOutRefFromApi . fst) txIns
+txBodyTxIns (GYTxBody body) =
+  map (txOutRefFromApi . fst) $ Api.txIns $ Api.getTxBodyContent body
 
 -- | Returns the 'GYTxOutRef' for the reference inputs present in the tx.
 txBodyTxInsReference :: GYTxBody -> [GYTxOutRef]
-txBodyTxInsReference (GYTxBody (Api.TxBody Api.TxBodyContent {txInsReference})) = case txInsReference of
-  Api.TxInsReferenceNone -> []
-  Api.TxInsReference Api.S.BabbageEraOnwardsConway inRefs -> map txOutRefFromApi inRefs
+txBodyTxInsReference (GYTxBody body) =
+  case Api.txInsReference $ Api.getTxBodyContent body of
+    Api.TxInsReferenceNone -> []
+    Api.TxInsReference Api.S.BabbageEraOnwardsConway inRefs -> map txOutRefFromApi inRefs
 
 -- | Returns the 'GYTxId' of the given 'GYTxBody'.
 txBodyTxId :: GYTxBody -> GYTxId
@@ -209,7 +213,7 @@ getTxBody :: GYTx -> GYTxBody
 getTxBody = txBodyFromApi . Api.getTxBody . txToApi
 
 txBodyToApiTxBodyContent :: GYTxBody -> Api.TxBodyContent Api.ViewTx ApiEra
-txBodyToApiTxBodyContent body = let Api.TxBody bc = txBodyToApi body in bc
+txBodyToApiTxBodyContent body = Api.getTxBodyContent $ txBodyToApi body
 
 -- | Returns the required signatories of the given 'GYTxBody'.
 txBodyReqSignatories :: GYTxBody -> Set.Set GYPubKeyHash

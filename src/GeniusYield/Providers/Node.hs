@@ -99,7 +99,7 @@ nodeProposals :: Api.LocalNodeConnectInfo -> Set.Set GYGovActionId -> IO (Seq.Se
 nodeProposals info (Set.map govActionIdToLedger -> proposals) = do
   fmap govActionStateFromLedger <$> queryConwayEra info (Api.QueryProposals proposals)
 
-nodeCommitteeMembersState :: Api.LocalNodeConnectInfo -> IO (Ledger.CommitteeMembersState Ledger.StandardCrypto)
+nodeCommitteeMembersState :: Api.LocalNodeConnectInfo -> IO Ledger.CommitteeMembersState
 nodeCommitteeMembersState info = queryConwayEra info $ Api.QueryCommitteeMembersState mempty mempty mempty
 
 nodeStakePools :: Api.LocalNodeConnectInfo -> IO (Set.Set Api.S.PoolId)

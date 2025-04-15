@@ -103,10 +103,10 @@ paymentCredentialFromApi (Api.PaymentCredentialByKey pkh) = GYPaymentCredentialB
 paymentCredentialFromApi (Api.PaymentCredentialByScript sh) = GYPaymentCredentialByScript (scriptHashFromApi sh)
 
 -- | Convert to corresponding ledger representation.
-paymentCredentialToLedger :: GYPaymentCredential -> Ledger.Credential Ledger.Payment Ledger.StandardCrypto
+paymentCredentialToLedger :: GYPaymentCredential -> Ledger.Credential Ledger.Payment
 paymentCredentialToLedger = credentialToLedger
 
-paymentCredentialFromLedger :: Ledger.Credential Ledger.Payment Ledger.StandardCrypto -> GYPaymentCredential
+paymentCredentialFromLedger :: Ledger.Credential Ledger.Payment -> GYPaymentCredential
 paymentCredentialFromLedger = credentialFromLedger
 
 -- | Convert @GY@ type to corresponding type in @plutus@ library.
@@ -145,11 +145,11 @@ stakeCredentialFromApi (Api.StakeCredentialByKey skh) = GYStakeCredentialByKey (
 stakeCredentialFromApi (Api.StakeCredentialByScript sh) = GYStakeCredentialByScript (stakeValidatorHashFromApi sh)
 
 -- | Convert to corresponding ledger type.
-stakeCredentialToLedger :: GYStakeCredential -> Ledger.Credential Ledger.Staking Ledger.StandardCrypto
+stakeCredentialToLedger :: GYStakeCredential -> Ledger.Credential Ledger.Staking
 stakeCredentialToLedger = credentialToLedger
 
 -- | Convert from corresponding ledger type.
-stakeCredentialFromLedger :: Ledger.Credential Ledger.Staking Ledger.StandardCrypto -> GYStakeCredential
+stakeCredentialFromLedger :: Ledger.Credential Ledger.Staking -> GYStakeCredential
 stakeCredentialFromLedger = credentialFromLedger
 
 -- | Convert @GY@ type to corresponding type in @plutus@ library.
@@ -191,11 +191,11 @@ instance SingGYKeyRoleI kr => Printf.PrintfArg (GYCredential kr) where
 instance Hashable (GYCredential kr) where
   hashWithSalt salt cred = hashWithSalt salt $ credentialToHexText cred
 
-credentialToLedger :: GYCredential kr -> Ledger.Credential (GYKeyRoleToLedger kr) Ledger.StandardCrypto
+credentialToLedger :: GYCredential kr -> Ledger.Credential (GYKeyRoleToLedger kr)
 credentialToLedger (GYCredentialByKey kh) = Ledger.KeyHashObj $ keyHashToLedger kh
 credentialToLedger (GYCredentialByScript sh) = Ledger.ScriptHashObj $ scriptHashToLedger sh
 
-credentialFromLedger :: Ledger.Credential (GYKeyRoleToLedger kr) Ledger.StandardCrypto -> GYCredential kr
+credentialFromLedger :: Ledger.Credential (GYKeyRoleToLedger kr) -> GYCredential kr
 credentialFromLedger (Ledger.KeyHashObj kh) = GYCredentialByKey $ keyHashFromLedger kh
 credentialFromLedger (Ledger.ScriptHashObj sh) = GYCredentialByScript $ scriptHashFromLedger sh
 

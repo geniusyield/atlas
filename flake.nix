@@ -10,7 +10,7 @@
   outputs = { self, nixpkgs, flake-utils, haskellNix, CHaP }:
     let
       supportedSystems = [
-        "x86_64-linux"	"x86_64-darwin"	"aarch64-darwin"
+        "x86_64-linux"
       ];
     in
       flake-utils.lib.eachSystem supportedSystems (system:
@@ -37,7 +37,8 @@
                   cabal = {}  ;
                   hlint = {};
                   haskell-language-server = {};
-                  fourmolu = {};
+                  # ghc-lib-parser doesnt compile with anything newer
+                  fourmolu = "0.17.0.0";
                 };
                 # Non-Haskell shell tools go here
                 shell.buildInputs = with pkgs; [

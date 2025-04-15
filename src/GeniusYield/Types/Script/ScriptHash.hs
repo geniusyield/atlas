@@ -26,8 +26,7 @@ module GeniusYield.Types.Script.ScriptHash (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Ledger qualified as Ledger
-import Cardano.Api.Script qualified as Api
+import Cardano.Api.Internal.Script qualified as Api
 import Cardano.Ledger.Hashes qualified as Ledger
 import Data.Text qualified as Text
 import GeniusYield.Imports
@@ -75,11 +74,11 @@ scriptHashFromApi :: Api.ScriptHash -> GYScriptHash
 scriptHashFromApi = coerce
 
 -- | Convert to corresponding ledger representation.
-scriptHashToLedger :: GYScriptHash -> Ledger.ScriptHash Ledger.StandardCrypto
+scriptHashToLedger :: GYScriptHash -> Ledger.ScriptHash
 scriptHashToLedger = scriptHashToApi >>> Api.toShelleyScriptHash
 
 -- | Convert from corresponding ledger representation.
-scriptHashFromLedger :: Ledger.ScriptHash Ledger.StandardCrypto -> GYScriptHash
+scriptHashFromLedger :: Ledger.ScriptHash -> GYScriptHash
 scriptHashFromLedger = Api.fromShelleyScriptHash >>> scriptHashFromApi
 
 apiHashToPlutus :: Api.ScriptHash -> PlutusV1.ScriptHash

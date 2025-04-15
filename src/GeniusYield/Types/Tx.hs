@@ -46,9 +46,7 @@ import Cardano.Ledger.Alonzo.TxWits (
   addrAlonzoTxWitsL,
  )
 import Cardano.Ledger.Binary qualified as CBOR
-import Cardano.Ledger.Conway (Conway)
 import Cardano.Ledger.Conway qualified as Conway (ConwayEra)
-import Cardano.Ledger.Crypto qualified as Crypto
 import Control.Lens (view, (?~))
 import Data.Aeson.Types qualified as Aeson
 import Data.ByteString qualified as BS
@@ -290,7 +288,7 @@ txIdFromPlutus (PlutusTxIdBeforeV3 (PlutusV1.TxId (Plutus.BuiltinByteString bs))
 txIdFromPlutus (PlutusTxIdV3 (PlutusV3.TxId (Plutus.BuiltinByteString bs))) = txIdFromApi <$> Api.deserialiseFromRawBytes Api.AsTxId bs
 
 -- | Wrapper around transaction witness set. Note that Babbage ledger also uses the same @TxWitness@ type defined in Alonzo ledger, which was updated for Plutus-V2 scripts and same is expected for Plutus-V3.
-newtype GYTxWitness = GYTxWitness (AlonzoTxWits (Conway.ConwayEra Crypto.StandardCrypto))
+newtype GYTxWitness = GYTxWitness (AlonzoTxWits Conway.ConwayEra)
   deriving newtype (Show, Eq, Semigroup, Monoid)
 
 instance Swagger.ToSchema GYTxWitness where
@@ -316,16 +314,16 @@ instance Web.FromHttpApiData GYTxWitness where
 txWitFromHexBS :: BS.ByteString -> Either String GYTxWitness
 txWitFromHexBS bs = do
   bs' <- BS16.decode bs
-  txWit <- first show $ CBOR.decodeFullAnnotator (eraProtVerHigh @Conway) "Reading transaction witness set" CBOR.decCBOR (LBS.fromStrict bs')
+  txWit <- first show $ CBOR.decodeFullAnnotator (eraProtVerHigh @Conway.ConwayEra) "Reading transaction witness set" CBOR.decCBOR (LBS.fromStrict bs')
   return (GYTxWitness txWit)
 
 txWitFromHex :: String -> Maybe GYTxWitness
 txWitFromHex = rightToMaybe . txWitFromHexBS . TE.encodeUtf8 . fromString
 
-txWitFromLedger :: AlonzoTxWits (Conway.ConwayEra Crypto.StandardCrypto) -> GYTxWitness
+txWitFromLedger :: AlonzoTxWits Conway.ConwayEra -> GYTxWitness
 txWitFromLedger = coerce
 
-txWitToLedger :: GYTxWitness -> AlonzoTxWits (Conway.ConwayEra Crypto.StandardCrypto)
+txWitToLedger :: GYTxWitness -> AlonzoTxWits Conway.ConwayEra
 txWitToLedger = coerce
 
 -- `txWitCbor` is the cbor obtained using CIP-30 compatible wallet's `api.signTx`.

@@ -30,7 +30,7 @@ module GeniusYield.Types.BuildScript (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Script qualified as Api
+import Cardano.Api.Internal.Script qualified as Api
 import Cardano.Api.Shelley qualified as Api.S
 import Data.GADT.Compare
 import GeniusYield.Imports

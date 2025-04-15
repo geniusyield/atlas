@@ -27,7 +27,7 @@ import Test.Tasty.HUnit (testCaseSteps)
 
 readOracleValidatorV2 :: GYScript 'PlutusV2
 readOracleValidatorV2 =
-  let fileBS = $(makeRelativeToProject "./plutus/data/compiled-scripts/read-oracle-validator.bp" >>= embedFile)
+  let fileBS = $(makeRelativeToProject "./plutus/atlas-onchain-common/data/compiled-scripts/read-oracle-validator.bp" >>= embedFile)
    in case extractBlueprintValidator fileBS of
         Left e -> error $ "unable to read oracle validator, " <> e
         Right s -> s

@@ -20,7 +20,7 @@ fakeCoin (FakeCoin tag) = mintingPolicyId (fakeMintingPolicy tag) `GYToken` tag
 
 fakeMintingPolicy :: GYTokenName -> GYScript PlutusV2
 fakeMintingPolicy tn =
-  let fileBS = $(makeRelativeToProject "./plutus/data/compiled-scripts/fake-coin.bp" >>= embedFile)
+  let fileBS = $(makeRelativeToProject "./plutus/atlas-onchain-common/data/compiled-scripts/fake-coin.bp" >>= embedFile)
    in case extractBlueprintValidator fileBS of
         Left e -> error $ "unable to read fake coin, " <> e
         Right s -> applyParam s (tokenNameToPlutus tn)

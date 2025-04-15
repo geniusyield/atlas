@@ -1,6 +1,6 @@
 {- |
 Module      : GeniusYield.OnChain.Examples.BetRef.Compiled
-Copyright   : (c) 2023 GYELD GMBH
+Copyright   : (c) 2025 GYELD GMBH
 License     : Apache 2.0
 Maintainer  : support@geniusyield.co
 Stability   : develop

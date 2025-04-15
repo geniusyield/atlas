@@ -9,10 +9,6 @@ build-type: Simple
 category: Blockchain, Cardano, Framework
 homepage: https://github.com/geniusyield/atlas#readme
 bug-reports: https://github.com/geniusyield/atlas/issues
-data-dir: data
-data-files:
-  compiled-scripts/*.bp
-
 extra-source-files:
   CHANGELOG.md
   README.md

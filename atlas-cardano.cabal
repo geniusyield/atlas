@@ -197,7 +197,7 @@ library
     async,
     attoparsec,
     auto-update,
-    base ^>=4.18.2,
+    base >=4.18.2 && <4.21,
     base16-bytestring,
     blockfrost-client,
     bytestring,
@@ -264,7 +264,6 @@ library
   build-depends:
     cardano-addresses,
     cardano-api,
-    cardano-api:internal,
     cardano-crypto,
     cardano-crypto-class,
     cardano-ledger-alonzo,

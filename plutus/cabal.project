@@ -17,22 +17,19 @@ packages: atlas-onchain-common
 tests: true
 
 -- repeating the index-state for hackage to work around hackage.nix parsing limitation
-index-state: 2025-01-01T23:24:19Z
+index-state: 2025-03-18T07:42:38Z
 
 -- NOTE: Do not bump chap index beyond that used by target cardano-node version.
 index-state:
-  , hackage.haskell.org 2025-01-01T23:24:19Z
-  , cardano-haskell-packages 2025-02-11T21:18:23Z
+  , hackage.haskell.org 2025-03-18T07:42:38Z
+  , cardano-haskell-packages 2025-04-08T17:22:48Z
 
 -- TODO: Default value should be @direct@ in upcoming 3.10 version of cabal, omit this line then.
 test-show-details: direct
 
-package cardano-crypto-praos
-  flags: -external-libsodium-vrf
-
 package bitvec
   flags: -simd
-  
+
 allow-newer:
   -- https://github.com/tweag/HaskellR/pull/420
   , inline-r:singletons-th
@@ -43,3 +40,27 @@ allow-newer:
   , inline-r:bytestring
   , inline-r:containers
   , inline-r:primitive
+
+if impl (ghc >= 9.12)
+  allow-newer:
+    -- https://github.com/phadej/vec/issues/118
+    , bin:base
+    , fin:base
+    , ral:base
+
+    -- https://github.com/well-typed/cborg/pull/339
+    , cborg:base
+    , cborg:ghc-prim
+    , serialise:base
+    , serialise:ghc-prim
+
+    -- https://github.com/haskellari/tree-diff/issues/97
+    , tree-diff:base
+    , tree-diff:time
+
+    -- https://github.com/typeclasses/hex-text/issues/9
+    , hex-text:base
+
+    -- Currently locked to nothunks ^>= 0.2 but ^>=0.3 would make this
+    -- un-needed.
+    , nothunks:time

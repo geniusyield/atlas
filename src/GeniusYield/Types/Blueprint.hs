@@ -11,12 +11,20 @@ module GeniusYield.Types.Blueprint (
   module X,
   writeBlueprint,
   readBlueprint,
+  extractBlueprintValidator,
 ) where
 
 import Data.Aeson (ToJSON (..))
+import Data.Aeson qualified as Aeson
 import Data.Aeson.Encode.Pretty (encodePretty')
 import Data.Aeson.Encode.Pretty qualified as Pretty
+import Data.ByteString (ByteString)
+import Data.ByteString.Base16 qualified as BS16
 import Data.ByteString.Lazy qualified as LBS
+import Data.ByteString.Short qualified as SBS
+import Data.Set qualified as Set
+import Data.Text.Encoding (encodeUtf8)
+import GeniusYield.Imports ((&), (<&>))
 import GeniusYield.ReadJSON (readJSON)
 import GeniusYield.Types.Blueprint.Argument as X
 import GeniusYield.Types.Blueprint.Contract as X
@@ -27,6 +35,8 @@ import GeniusYield.Types.Blueprint.Purpose as X
 import GeniusYield.Types.Blueprint.Schema as X
 import GeniusYield.Types.Blueprint.TH as X
 import GeniusYield.Types.Blueprint.Validator as X
+import GeniusYield.Types.PlutusVersion (SingPlutusVersionI)
+import GeniusYield.Types.Script (GYScript, scriptFromSerialisedScript)
 
 -- | Write a 'ContractBlueprint' to a file.
 writeBlueprint :: FilePath -> ContractBlueprint -> IO ()
@@ -64,3 +74,20 @@ encodeBlueprint =
 -- | Read a 'ContractBlueprint' from a file.
 readBlueprint :: FilePath -> IO ContractBlueprint
 readBlueprint = readJSON
+
+-- | Extracts a validator from 'ContractBlueprint'
+extractBlueprintValidator :: SingPlutusVersionI v => ByteString -> Either String (GYScript v)
+extractBlueprintValidator bs = do
+  bp <- Aeson.eitherDecodeStrict bs
+  val <-
+    contractValidators bp
+      & Set.lookupMin
+      & ( \case
+            Nothing -> Left "no validator found"
+            Just m -> Right m
+        )
+  valCC <- case validatorCompiled val of
+    Nothing -> Left "no compiled code of validator found"
+    Just cc -> Right cc
+  sbs <- encodeUtf8 (compiledValidatorCode valCC) & BS16.decode <&> SBS.toShort
+  pure $ scriptFromSerialisedScript sbs

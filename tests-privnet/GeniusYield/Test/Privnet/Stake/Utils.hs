@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module GeniusYield.Test.Privnet.Stake.Utils (
   createMangledUser,
   aStakeValidator,
@@ -11,6 +13,7 @@ module GeniusYield.Test.Privnet.Stake.Utils (
   stakeIntegrationTest,
 ) where
 
+import Data.FileEmbed
 import Data.Foldable (for_)
 import Data.Maybe (
   fromJust,
@@ -18,7 +21,6 @@ import Data.Maybe (
  )
 import Data.Set qualified as Set
 import GeniusYield.Imports
-import GeniusYield.OnChain.AStakeValidator.Compiled (originalAStakeValidator)
 import GeniusYield.Test.Privnet.Ctx
 import GeniusYield.Transaction (GYCoinSelectionStrategy (..))
 import GeniusYield.TxBuilder
@@ -30,8 +32,10 @@ someAddr = unsafeAddressFromText "addr_test1wpgexmeunzsykesf42d4eqet5yvzeap6trjn
 
 aStakeValidator :: GYScript 'PlutusV2
 aStakeValidator =
-  stakeValidatorFromPlutus @'PlutusV2 $
-    originalAStakeValidator (addressToPlutus someAddr)
+  let fileBS = $(makeRelativeToProject "./plutus/data/compiled-scripts/a-stake-validator.bp" >>= embedFile)
+   in case extractBlueprintValidator fileBS of
+        Left e -> error $ "unable to read stake validator, " <> e
+        Right s -> applyParam s (addressToPlutus someAddr)
 
 createMangledUser :: Ctx -> GYStakeCredential -> IO User
 createMangledUser ctx stakeCred = do

@@ -9,12 +9,11 @@ module GeniusYield.Test.FeeTracking (feeTrackingTests) where
 
 import Test.Tasty
 
+import GeniusYield.Examples.Gift (giftValidatorV2)
 import GeniusYield.Test.Clb
 import GeniusYield.Test.Utils
 import GeniusYield.TxBuilder
 import GeniusYield.Types
-
-import GeniusYield.Test.OnChain.AlwaysSucceeds.Compiled
 
 data LovelaceConfig = WithLovelace | WithoutLovelace
 
@@ -56,7 +55,7 @@ sendToOther Wallets {w1, w2} amt = withWalletBalancesCheckSimple [w1 := valueNeg
 
 sendAndConsume :: TestFunction
 sendAndConsume Wallets {w1, w2} amt = withWalletBalancesCheckSimple [w1 := valueNegate amt, w2 := amt] $ do
-  target <- scriptAddress gyAlwaysSucceedsValidator
+  target <- scriptAddress giftValidatorV2
   txId <- asUser w1 $ do
     txBody <- buildTxBody . mustHaveOutput $ mkGYTxOut target amt unitDatum
     signAndSubmitConfirmed txBody
@@ -64,14 +63,14 @@ sendAndConsume Wallets {w1, w2} amt = withWalletBalancesCheckSimple [w1 := value
     txBody <-
       buildTxBody @PlutusV1 . mustHaveInput $
         GYTxIn
-          { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) (Just unitDatum) unitRedeemer
+          { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined giftValidatorV2) (Just unitDatum) unitRedeemer
           , gyTxInTxOutRef = txOutRefFromTuple (txId, 0)
           }
     signAndSubmitConfirmed_ txBody
 
 sendAndContinue :: TestFunction
 sendAndContinue Wallets {w1, w2} amt = withWalletBalancesCheckSimple [w1 := valueNegate amt, w2 := mempty] $ do
-  target <- scriptAddress gyAlwaysSucceedsValidator
+  target <- scriptAddress giftValidatorV2
   txId <- asUser w1 $ do
     txBody <- buildTxBody . mustHaveOutput $ mkGYTxOut target amt unitDatum
     signAndSubmitConfirmed txBody
@@ -81,7 +80,7 @@ sendAndContinue Wallets {w1, w2} amt = withWalletBalancesCheckSimple [w1 := valu
         mconcat
           [ mustHaveInput $
               GYTxIn
-                { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) (Just unitDatum) unitRedeemer
+                { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined giftValidatorV2) (Just unitDatum) unitRedeemer
                 , gyTxInTxOutRef = txOutRefFromTuple (txId, 0)
                 }
           , mustHaveOutput $ mkGYTxOut target amt unitDatum
@@ -90,21 +89,21 @@ sendAndContinue Wallets {w1, w2} amt = withWalletBalancesCheckSimple [w1 := valu
 
 selfConsume :: TestFunction
 selfConsume Wallets {w1} amt = withWalletBalancesCheckSimple [w1 := mempty] $ do
-  target <- scriptAddress gyAlwaysSucceedsValidator
+  target <- scriptAddress giftValidatorV2
   asUser w1 $ do
     sendBody <- buildTxBody . mustHaveOutput $ mkGYTxOut target amt unitDatum
     txId <- signAndSubmitConfirmed sendBody
     consumeBody <-
       buildTxBody @PlutusV1 . mustHaveInput $
         GYTxIn
-          { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) (Just unitDatum) unitRedeemer
+          { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined giftValidatorV2) (Just unitDatum) unitRedeemer
           , gyTxInTxOutRef = txOutRefFromTuple (txId, 0)
           }
     signAndSubmitConfirmed_ consumeBody
 
 selfContinue :: TestFunction
 selfContinue Wallets {w1} amt = withWalletBalancesCheckSimple [w1 := valueNegate amt] $ do
-  target <- scriptAddress gyAlwaysSucceedsValidator
+  target <- scriptAddress giftValidatorV2
   asUser w1 $ do
     sendBody <- buildTxBody . mustHaveOutput $ mkGYTxOut target amt unitDatum
     txId <- signAndSubmitConfirmed sendBody
@@ -113,7 +112,7 @@ selfContinue Wallets {w1} amt = withWalletBalancesCheckSimple [w1 := valueNegate
         mconcat
           [ mustHaveInput $
               GYTxIn
-                { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) (Just unitDatum) unitRedeemer
+                { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined giftValidatorV2) (Just unitDatum) unitRedeemer
                 , gyTxInTxOutRef = txOutRefFromTuple (txId, 0)
                 }
           , mustHaveOutput $ mkGYTxOut target amt unitDatum
@@ -125,7 +124,7 @@ selfPartialConsume lovelaceConf TestInfo {testWallets = Wallets {w1}, testGoldAs
   let amt = mkAmt lovelaceConf $ valueSingleton testGoldAsset 10
       partialAmt = mkAmt lovelaceConf $ valueSingleton testGoldAsset 5
   withWalletBalancesCheckSimple [w1 := valueNegate partialAmt] $ do
-    target <- scriptAddress gyAlwaysSucceedsValidator
+    target <- scriptAddress giftValidatorV2
     asUser w1 $ do
       sendBody <- buildTxBody . mustHaveOutput $ mkGYTxOut target amt unitDatum
       txId <- signAndSubmitConfirmed sendBody
@@ -134,7 +133,7 @@ selfPartialConsume lovelaceConf TestInfo {testWallets = Wallets {w1}, testGoldAs
           mconcat
             [ mustHaveInput $
                 GYTxIn
-                  { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined gyAlwaysSucceedsValidator) (Just unitDatum) unitRedeemer
+                  { gyTxInWitness = GYTxInWitnessScript (GYBuildPlutusScriptInlined giftValidatorV2) (Just unitDatum) unitRedeemer
                   , gyTxInTxOutRef = txOutRefFromTuple (txId, 0)
                   }
             , mustHaveOutput $ mkGYTxOut target partialAmt unitDatum
@@ -144,6 +143,3 @@ selfPartialConsume lovelaceConf TestInfo {testWallets = Wallets {w1}, testGoldAs
 prepTest :: GYTxGameMonad m => LovelaceConfig -> TestFunction -> TestInfo -> m ()
 prepTest lovelaceConf f TestInfo {testWallets, testGoldAsset} =
   f testWallets . mkAmt lovelaceConf $ valueSingleton testGoldAsset 10
-
-gyAlwaysSucceedsValidator :: GYScript 'PlutusV2
-gyAlwaysSucceedsValidator = validatorFromPlutus alwaysSucceedsValidator

@@ -11,7 +11,7 @@ import Data.Aeson (FromJSON (parseJSON), ToJSON (..), withObject, (.:), (.:?))
 import Data.List.NonEmpty (nonEmpty)
 import Deriving.Aeson
 import GeniusYield.Aeson.Utils (buildObject, optionalField, requiredField)
-import GeniusYield.Imports (Text)
+import GeniusYield.Imports (Text, fromMaybe)
 import GeniusYield.Types.Blueprint.Argument (ArgumentBlueprint)
 import GeniusYield.Types.Blueprint.Parameter (ParameterBlueprint)
 import GeniusYield.Types.Script.ScriptHash (GYScriptHash)
@@ -39,7 +39,7 @@ instance FromJSON ValidatorBlueprint where
     validatorDescription <- o .:? "description"
     validatorRedeemer <- o .: "redeemer"
     validatorDatum <- o .:? "datum"
-    validatorParameters <- o .: "parameters"
+    validatorParameters <- fromMaybe [] <$> o .:? "parameters"
     validatorCompiledCode <- o .:? "compiledCode"
     validatorHash <- o .:? "hash"
 

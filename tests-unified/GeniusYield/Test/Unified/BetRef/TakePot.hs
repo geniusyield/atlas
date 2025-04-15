@@ -13,11 +13,11 @@ import Test.Tasty (
 
 import GeniusYield.HTTP.Errors (someBackendError)
 import GeniusYield.Imports
+import GeniusYield.OnChain.BetRef.Types
 import GeniusYield.Test.Clb
 import GeniusYield.Test.Privnet.Setup
 import GeniusYield.Test.Unified.BetRef.Operations
 import GeniusYield.Test.Unified.BetRef.PlaceBet
-import GeniusYield.Test.Unified.OnChain.BetRef.Compiled
 import GeniusYield.Test.Utils
 import GeniusYield.TxBuilder
 import GeniusYield.Types

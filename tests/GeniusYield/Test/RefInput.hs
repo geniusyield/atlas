@@ -32,7 +32,7 @@ import GeniusYield.Types
 
 gyGuessRefInputDatumValidator :: GYScript 'PlutusV2
 gyGuessRefInputDatumValidator =
-  let fileBS = $(makeRelativeToProject "./plutus/atlas-onchain-common/data/compiled-scripts/guess-ref-input-datum-validator.bp" >>= embedFile)
+  let fileBS = $(makeRelativeToProject "./data/compiled-scripts/guess-ref-input-datum-validator.bp" >>= embedFile)
    in case extractBlueprintValidator fileBS of
         Left e -> error $ "unable to read guess ref input datum validator, " <> e
         Right s -> s

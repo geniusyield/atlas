@@ -32,7 +32,7 @@ someAddr = unsafeAddressFromText "addr_test1wpgexmeunzsykesf42d4eqet5yvzeap6trjn
 
 aStakeValidator :: GYScript 'PlutusV2
 aStakeValidator =
-  let fileBS = $(makeRelativeToProject "./plutus/atlas-onchain-common/data/compiled-scripts/a-stake-validator.bp" >>= embedFile)
+  let fileBS = $(makeRelativeToProject "./data/compiled-scripts/a-stake-validator.bp" >>= embedFile)
    in case extractBlueprintValidator fileBS of
         Left e -> error $ "unable to read stake validator, " <> e
         Right s -> applyParam s (addressToPlutus someAddr)

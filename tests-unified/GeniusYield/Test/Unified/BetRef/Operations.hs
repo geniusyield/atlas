@@ -47,7 +47,7 @@ mkScript betUntil betReveal oraclePkh betStep = do
 -- | Validator in question, obtained after giving required parameters.
 mkBetRefValidator :: BetRefParams -> GYScript PlutusV2
 mkBetRefValidator brp =
-  let fileBS = $(makeRelativeToProject "./plutus/atlas-onchain-common/data/compiled-scripts/bet-ref-validator.bp" >>= embedFile)
+  let fileBS = $(makeRelativeToProject "./data/compiled-scripts/bet-ref-validator.bp" >>= embedFile)
    in case extractBlueprintValidator fileBS of
         Left e -> error $ "unable to read bet-ref validator, " <> e
         Right s -> applyParam s brp

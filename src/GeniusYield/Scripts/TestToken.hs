@@ -17,9 +17,9 @@ import GeniusYield.Types
 import PlutusLedgerApi.V1 (TokenName (unTokenName), TxId (getTxId))
 import PlutusLedgerApi.V1 qualified as Plutus
 
-$(makeBPTypes "plutus/atlas-onchain-common/data/compiled-scripts/test-token-policy.bp")
+$(makeBPTypes "data/compiled-scripts/test-token-policy.bp")
 
-$(uponBPTypes "plutus/atlas-onchain-common/data/compiled-scripts/test-token-policy.bp")
+$(uponBPTypes "data/compiled-scripts/test-token-policy.bp")
 
 testTokenPolicy ::
   -- | count

@@ -296,11 +296,11 @@ addRefScript addr sc =
     txBody <-
       lift $
         buildTxBody $
-          mustHaveOutput @'PlutusV2
+          mustHaveOutput @v
             GYTxOut
               { gyTxOutAddress = addr
               , gyTxOutValue = mempty
-              , gyTxOutDatum = Just (unitDatum, GYTxOutUseInlineDatum)
+              , gyTxOutDatum = Nothing
               , gyTxOutRefS = Just $ GYPlutusScript sc
               }
     lift $ signAndSubmitConfirmed_ txBody

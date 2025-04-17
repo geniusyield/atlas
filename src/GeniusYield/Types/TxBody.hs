@@ -169,7 +169,7 @@ txBodyToCBOR = Api.serialiseToCBOR . txBodyToApi
 
 -- | Return the fees in lovelace.
 txBodyFee :: GYTxBody -> Integer
-txBodyFee (GYTxBody (Api.TxBody Api.TxBodyContent {Api.txFee = fee})) =
+txBodyFee (GYTxBody (Api.getTxBodyContent -> Api.TxBodyContent {Api.txFee = fee})) =
   case fee of
     Api.TxFeeExplicit _ (Ledger.Coin actual) -> actual
 
@@ -182,7 +182,7 @@ txBodyUTxOs :: GYTxBody -> GYUTxOs
 txBodyUTxOs = utxosFromList . fmap fst . txBodyUTxOsWithDatums
 
 txBodyUTxOsWithDatums :: GYTxBody -> [(GYUTxO, Maybe GYDatum)]
-txBodyUTxOsWithDatums (GYTxBody body@(Api.TxBody Api.TxBodyContent {txOuts})) =
+txBodyUTxOsWithDatums (GYTxBody body@(Api.getTxBodyContent -> Api.TxBodyContent {txOuts})) =
   zipWith f [0 ..] txOuts
  where
   txId = Api.getTxId body
@@ -192,11 +192,11 @@ txBodyUTxOsWithDatums (GYTxBody body@(Api.TxBody Api.TxBodyContent {txOuts})) =
 
 -- | Returns the 'GYTxOutRef' consumed by the tx.
 txBodyTxIns :: GYTxBody -> [GYTxOutRef]
-txBodyTxIns (GYTxBody (Api.TxBody Api.TxBodyContent {txIns})) = map (txOutRefFromApi . fst) txIns
+txBodyTxIns (GYTxBody (Api.getTxBodyContent -> Api.TxBodyContent {txIns})) = map (txOutRefFromApi . fst) txIns
 
 -- | Returns the 'GYTxOutRef' for the reference inputs present in the tx.
 txBodyTxInsReference :: GYTxBody -> [GYTxOutRef]
-txBodyTxInsReference (GYTxBody (Api.TxBody Api.TxBodyContent {txInsReference})) = case txInsReference of
+txBodyTxInsReference (GYTxBody (Api.getTxBodyContent -> Api.TxBodyContent {txInsReference})) = case txInsReference of
   Api.TxInsReferenceNone -> []
   Api.TxInsReference Api.S.BabbageEraOnwardsConway inRefs -> map txOutRefFromApi inRefs
 
@@ -209,7 +209,7 @@ getTxBody :: GYTx -> GYTxBody
 getTxBody = txBodyFromApi . Api.getTxBody . txToApi
 
 txBodyToApiTxBodyContent :: GYTxBody -> Api.TxBodyContent Api.ViewTx ApiEra
-txBodyToApiTxBodyContent body = let Api.TxBody bc = txBodyToApi body in bc
+txBodyToApiTxBodyContent body = let bc = txBodyToApi body & Api.getTxBodyContent in bc
 
 -- | Returns the required signatories of the given 'GYTxBody'.
 txBodyReqSignatories :: GYTxBody -> Set.Set GYPubKeyHash

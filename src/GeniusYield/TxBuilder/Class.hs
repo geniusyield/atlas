@@ -111,6 +111,7 @@ import Cardano.Api.Shelley qualified as CApi
 import Cardano.Api.Shelley qualified as CApi.S
 import Cardano.Ledger.Alonzo.Scripts qualified as Ledger
 import Cardano.Ledger.Alonzo.TxWits qualified as Ledger
+import Cardano.Ledger.Api qualified as Ledger
 import Cardano.Ledger.Conway.Scripts qualified as Ledger
 import Cardano.Ledger.Plutus.Language qualified as Ledger
 import Control.Monad (zipWithM)
@@ -1130,12 +1131,13 @@ obtainTxBodyContentBuildTx (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxB
     GYCredential kr ->
     CApi.KeyWitnessInCtx witRole ->
     CApi.ScriptWitnessInCtx witRole ->
-    (CApi.HashableScriptData, CApi.ExecutionUnits) ->
+    Ledger.ConwayPlutusPurpose Ledger.AsIx (Ledger.ConwayEra Ledger.StandardCrypto) ->
     CApi.ScriptDatum witRole ->
     m (CApi.BuildTxWith CApi.BuildTx (CApi.Witness witRole CApi.ConwayEra))
-  resolveScriptWitness refScripts cred keyWitFor scriptWitFor (red, exUnits) dat = case cred of
+  resolveScriptWitness refScripts cred keyWitFor scriptWitFor purp dat = case cred of
     GYCredentialByKey _ -> pure $ CApi.BuildTxWith $ CApi.KeyWitness keyWitFor
-    GYCredentialByScript sh ->
+    GYCredentialByScript sh -> do
+      (red, exUnits) <- resolveRedeemer purp
       case Map.lookup sh refScripts of
         Nothing ->
           case findScript sh of
@@ -1167,7 +1169,6 @@ obtainTxBodyContentBuildTx (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxB
                     exUnits
                 GYSimpleScript _ss -> CApi.SimpleScriptWitness CApi.SimpleScriptInConway $ CApi.SReferenceScript $ txOutRefToApi ref
   inFromApi refScripts (ix, (utxo, mdatum)) = do
-    resolvedRedeemer <- resolveRedeemer $ Ledger.ConwaySpending (Ledger.AsIx ix)
     resolvedScriptWitness <-
       resolveScriptWitness
         refScripts
@@ -1175,7 +1176,7 @@ obtainTxBodyContentBuildTx (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxB
         )
         CApi.KeyWitnessForSpending
         CApi.ScriptWitnessForSpending
-        resolvedRedeemer
+        (Ledger.ConwaySpending (Ledger.AsIx ix)) -- Only used if it's a script based credential.
         ( case utxoOutDatum utxo of
             GYOutDatumInline _ -> CApi.InlineScriptDatum
             GYOutDatumNone -> CApi.ScriptDatumForTxIn Nothing
@@ -1186,14 +1187,13 @@ obtainTxBodyContentBuildTx (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxB
       , resolvedScriptWitness
       )
   wdrlFromApi refScripts (ix, (stakeAddr, coin, _)) = do
-    resolvedRedeemer <- resolveRedeemer $ Ledger.ConwayRewarding (Ledger.AsIx ix)
     resolvedScriptWitness <-
       resolveScriptWitness
         refScripts
         (stakeAddressToCredential (stakeAddressFromApi stakeAddr))
         CApi.KeyWitnessForStakeAddr
         CApi.ScriptWitnessForStakeAddr
-        resolvedRedeemer
+        (Ledger.ConwayRewarding (Ledger.AsIx ix))
         CApi.NoScriptDatumForStake
     pure
       ( stakeAddr

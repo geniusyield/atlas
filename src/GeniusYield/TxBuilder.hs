@@ -86,7 +86,7 @@ is moving to given pubkeyhash address(es).
 -}
 getTxBalance :: GYTxQueryMonad m => GYPubKeyHash -> GYTx -> m GYValue
 getTxBalance pkh tx = do
-  let Api.TxBody content = Api.getTxBody $ txToApi tx
+  let content = Api.getTxBodyContent $ Api.getTxBody $ txToApi tx
       ins = txOutRefFromApi . fst <$> Api.txIns content
       outValue =
         mconcat

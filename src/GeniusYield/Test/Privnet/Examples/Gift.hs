@@ -654,7 +654,7 @@ grabGifts validator = do
 -- | Grab gifts using a referenced validator.
 grabGiftsRef ::
   forall m u v.
-  (GYTxQueryMonad m, v `VersionIsGreaterOrEqual` u, u `VersionIsGreaterOrEqual` 'PlutusV2, v `VersionIsGreaterOrEqual` 'PlutusV2) =>
+  (GYTxQueryMonad m, v `VersionIsGreaterOrEqual` u) =>
   GYTxOutRef ->
   GYScript v ->
   m (Maybe (GYTxSkeleton u))

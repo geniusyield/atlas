@@ -1,0 +1,31 @@
+module GeniusYield.Test.BuildTxBodyContent (
+  buildTxBodyContentTests,
+) where
+
+import Cardano.Api qualified as Api
+import Data.Maybe (fromJust)
+import GeniusYield.GYConfig
+import GeniusYield.Imports
+import GeniusYield.TxBuilder.Class
+import GeniusYield.TxBuilder.IO
+import GeniusYield.Types
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (testCase, (@?=))
+
+-- This test is not enabled in CI as it requires mainnet key.
+buildTxBodyContentTests :: GYCoreConfig -> TestTree
+buildTxBodyContentTests config =
+  testGroup
+    "buildTxBodyContentTests"
+    [ testCase "round-trip" $ do
+        -- A transaction that utilises spending and withdrawal from a script.
+        let tx = fromJust $ txFromHex "84ad00d9010283825820150bdb29d28833a32d2682f990e928b15ed3a8a4c959bacbc75879f749c0d0bd02825820356fdf39e2ce7dfc69d5d33fdcfe752ed444571b782fabb7f62a5d87e1621c4000825820ff7a2e0ff06e8f9b8d272d5b36c3ac61858087d457c46513b852686dd90315b701018382583901eec5ad5a9d70a725818ba37c46169907269ff46d002f489871daad6599054cb3233960706b29d6585332bd43f6e3199afc212bd2983fb4301b0000000ea1313dd5a300583911ea07b733d932129c378af627436e7cbc2ef0bf96e0036bb51b3bde6b52563c5410bff6a0d43ccebb7c37e1f69f5eb260552521adff33b9c201821b0000006732b60923a2581cf5808c2c990d86da54bfc97d89cee6efa20cd8461616359478d96b4ca2434d535001582063a3b8ee322ea31a931fd1902528809dc681bc650af21895533c9e98fa4bef2e1b7fffffffb219496d581cf66d78b4a3cb3d37afa0ec36461e51ecbde00f26c8f0a68f94b69880a144694254431a003f4855028201d8185878d8799fd8799fd87a9f581c1eae96baf29e27682ea3f815aba361a0c6059d45e4bfbe95bbd2f44affffd8799f4040ffd8799f581cf66d78b4a3cb3d37afa0ec36461e51ecbde00f26c8f0a68f94b698804469425443ff1a4de6b69c1b000000672f15e5241a003f443918641864d8799f190682ffd87980ff825839015b7e23228dba75595645fc357d0f97ba258cfccfff5d588d4bb9165b533b9586f0fb9aafd578e0d0154e9478d23614e736eb39d1a30d8a991a02cc531b021a000a22f9031a0921c7dd05a1581df11eae96baf29e27682ea3f815aba361a0c6059d45e4bfbe95bbd2f44a000758205160f88b929bf8a6c57c285b889488f9137c0ef3cfd0bcf408a10020e69146d5081a0921c7290b58200d3b132f6f31e65ae6e457dae85119da39d44394895a3f137a5fe4a1b66349f80dd9010281825820150bdb29d28833a32d2682f990e928b15ed3a8a4c959bacbc75879f749c0d0bd020ed9010281581c5b7e23228dba75595645fc357d0f97ba258cfccfff5d588d4bb9165b10825839015b7e23228dba75595645fc357d0f97ba258cfccfff5d588d4bb9165b533b9586f0fb9aafd578e0d0154e9478d23614e736eb39d1a30d8a991a027f7c74111a004c4b4012d90102848258200dc17712e37a4e741767db2f90d4ffbf69faf88b9bed4c47864f7bd912924bea00825820cf4ecddde0d81f9ce8fcc881a85eb1f8ccdaf6807f03fea4cd02da896a621776008258202536194d2a976370a932174c10975493ab58fd7c16395d50e62b7c0e1949baea00825820d46bd227bd2cf93dedd22ae9b6d92d30140cf0d68b756f6608e38d680c61ad1700a200d9010281825820c5d63d7dc066df52592135b6d3cb4f3470d06f7bdd4b2d2e32eb59ca3782662f58403335274c4691a8e4a6bd0126b2c25cb2d329ab3d1c6a9b3a1b0694f08b23067562d28c23f40ef33ba79f4c61102505b51a9472e9f1ca584da5e682ac0d4bc80d0583840001d87980821962d91a007cc793840002d87980821a00012dfc1a0166fa60840300d8799f009f1a000aae60ff4100d87a809fd87a80ffff821a001439f21a19521cc4f5a11902a2a1636d736781774d696e737761703a204f72646572204578656375746564"
+            txBody = getTxBody tx
+        putStrLn $ printf "txBody: %s" (show txBody)
+        buildBodyContent <- withCfgProviders config mempty $ \provider -> do
+          runGYTxQueryMonadIO (cfgNetworkId config) provider $ do
+            obtainTxBodyContentBuildTx txBody
+        let txBodyRT = either (error . show) txBodyFromApi $ Api.createTransactionBody Api.ShelleyBasedEraConway buildBodyContent
+        -- Following actually fails as protocol parameters used to build is likely different. But still is useful to make sure that there is no semantic difference.
+        txBodyRT @?= txBody
+    ]

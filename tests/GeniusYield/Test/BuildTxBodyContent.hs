@@ -12,6 +12,7 @@ import GeniusYield.Types
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 
+-- This test is not enabled in CI as it requires mainnet key.
 buildTxBodyContentTests :: GYCoreConfig -> TestTree
 buildTxBodyContentTests config =
   testGroup
@@ -25,5 +26,6 @@ buildTxBodyContentTests config =
           runGYTxQueryMonadIO (cfgNetworkId config) provider $ do
             obtainTxBodyContentBuildTx txBody
         let txBodyRT = either (error . show) txBodyFromApi $ Api.createTransactionBody Api.ShelleyBasedEraConway buildBodyContent
+        -- Following actually fails as protocol parameters used to build is likely different. But still is useful to make sure that there is no semantic difference.
         txBodyRT @?= txBody
     ]

@@ -103,6 +103,7 @@ module GeniusYield.TxBuilder.Class (
   wrapReqWithTimeLog,
   wt,
   obtainTxBodyContentBuildTx,
+  obtainTxBodyContentBuildTx',
 ) where
 
 import Cardano.Api qualified as CApi
@@ -1057,8 +1058,16 @@ updateOwnUtxosChaining ownAddrs txBody utxos = utxosRemoveTxOutRefs (Set.fromLis
   txOuts = txBodyUTxOs txBody
   txOutsOwn = filterUTxOs (\GYUTxO {utxoAddress} -> utxoAddress `Set.member` ownAddrs) txOuts
 
+-- | See 'obtainTxBodyContentBuildTx'' for details.
 obtainTxBodyContentBuildTx :: forall m. GYTxSpecialQueryMonad m => GYTxBody -> m (CApi.TxBodyContent CApi.BuildTx ApiEra)
-obtainTxBodyContentBuildTx (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxBody lscripts scriptData _ _)) = do
+obtainTxBodyContentBuildTx txBody = fst <$> obtainTxBodyContentBuildTx' txBody
+
+{- | Obtain 'TxBodyContent BuildTx ApiEra' from 'GYTxBody'. Also returns the set of UTxOs used as input in this transaction (reference and spending inputs).
+
+__CAUTION__: This does not account for mint value, voting procedures and proposal procedures.
+-}
+obtainTxBodyContentBuildTx' :: forall m. GYTxSpecialQueryMonad m => GYTxBody -> m (CApi.TxBodyContent CApi.BuildTx ApiEra, GYUTxOs)
+obtainTxBodyContentBuildTx' (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxBody lscripts scriptData _ _)) = do
   let
     -- We obtained `TxBodyContent ViewTx`. Now we need to obtain `BuildTx` version of it.
     txBodyContentViewTx = CApi.getTxBodyContent txBody
@@ -1067,14 +1076,16 @@ obtainTxBodyContentBuildTx (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxB
   resolvedRefIns <- utxosAtTxOutRefs $ map txOutRefFromApi $ case CApi.txInsReference txBodyContentViewTx of
     CApi.TxInsReferenceNone -> []
     CApi.TxInsReference _ refIns -> refIns
-  let refScripts :: Map GYScriptHash (GYTxOutRef, GYAnyScript) =
-        foldl'
+
+  let totalIns = resolvedRefIns <> utxosFromList (map fst resolvedSpendIns)
+      refScripts :: Map GYScriptHash (GYTxOutRef, GYAnyScript) =
+        foldlUTxOs'
           ( \acc GYUTxO {..} -> case utxoRefScript of
               Nothing -> acc
               Just as -> Map.insert (hashAnyScript as) (utxoRef, as) acc
           )
           mempty
-          (utxosToList resolvedRefIns <> map fst resolvedSpendIns)
+          totalIns
   pp <- protocolParams
   wdrls' <- case CApi.txWithdrawals txBodyContentViewTx of
     CApi.TxWithdrawalsNone -> pure CApi.TxWithdrawalsNone
@@ -1088,30 +1099,32 @@ obtainTxBodyContentBuildTx (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxB
       certs' <- zipWithM (curry (certFromApi refScripts)) [0 ..] (toList cs)
       pure $ CApi.TxCertificates csbe (fromList certs')
   pure $
-    CApi.TxBodyContent
-      { txWithdrawals = wdrls'
-      , txVotingProcedures = Nothing
-      , txValidityUpperBound = CApi.txValidityUpperBound txBodyContentViewTx
-      , txValidityLowerBound = CApi.txValidityLowerBound txBodyContentViewTx
-      , txUpdateProposal = CApi.txUpdateProposal txBodyContentViewTx
-      , txTreasuryDonation = CApi.txTreasuryDonation txBodyContentViewTx
-      , txTotalCollateral = CApi.txTotalCollateral txBodyContentViewTx
-      , txScriptValidity = CApi.txScriptValidity txBodyContentViewTx
-      , txReturnCollateral = CApi.txReturnCollateral txBodyContentViewTx
-      , txProtocolParams = CApi.BuildTxWith $ Just $ CApi.S.LedgerProtocolParameters pp
-      , txProposalProcedures = Nothing
-      , txOuts = CApi.txOuts txBodyContentViewTx
-      , txMintValue = CApi.TxMintNone
-      , txMetadata = CApi.txMetadata txBodyContentViewTx
-      , txInsReference = CApi.txInsReference txBodyContentViewTx
-      , txInsCollateral = CApi.txInsCollateral txBodyContentViewTx
-      , txIns = ins'
-      , txFee = CApi.txFee txBodyContentViewTx
-      , txExtraKeyWits = CApi.txExtraKeyWits txBodyContentViewTx
-      , txCurrentTreasuryValue = CApi.txCurrentTreasuryValue txBodyContentViewTx
-      , txCertificates = certs'
-      , txAuxScripts = CApi.txAuxScripts txBodyContentViewTx
-      }
+    ( CApi.TxBodyContent
+        { txWithdrawals = wdrls'
+        , txVotingProcedures = Nothing
+        , txValidityUpperBound = CApi.txValidityUpperBound txBodyContentViewTx
+        , txValidityLowerBound = CApi.txValidityLowerBound txBodyContentViewTx
+        , txUpdateProposal = CApi.txUpdateProposal txBodyContentViewTx
+        , txTreasuryDonation = CApi.txTreasuryDonation txBodyContentViewTx
+        , txTotalCollateral = CApi.txTotalCollateral txBodyContentViewTx
+        , txScriptValidity = CApi.txScriptValidity txBodyContentViewTx
+        , txReturnCollateral = CApi.txReturnCollateral txBodyContentViewTx
+        , txProtocolParams = CApi.BuildTxWith $ Just $ CApi.S.LedgerProtocolParameters pp
+        , txProposalProcedures = Nothing
+        , txOuts = CApi.txOuts txBodyContentViewTx
+        , txMintValue = CApi.TxMintNone
+        , txMetadata = CApi.txMetadata txBodyContentViewTx
+        , txInsReference = CApi.txInsReference txBodyContentViewTx
+        , txInsCollateral = CApi.txInsCollateral txBodyContentViewTx
+        , txIns = ins'
+        , txFee = CApi.txFee txBodyContentViewTx
+        , txExtraKeyWits = CApi.txExtraKeyWits txBodyContentViewTx
+        , txCurrentTreasuryValue = CApi.txCurrentTreasuryValue txBodyContentViewTx
+        , txCertificates = certs'
+        , txAuxScripts = CApi.txAuxScripts txBodyContentViewTx
+        }
+    , totalIns
+    )
  where
   findScript sh =
     find

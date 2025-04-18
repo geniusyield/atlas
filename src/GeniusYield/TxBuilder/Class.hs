@@ -136,8 +136,9 @@ import Data.Set qualified as Set
 import Data.Text qualified as Txt
 import Data.Time (diffUTCTime, getCurrentTime)
 import Data.Word (Word64)
+import GHC.IsList (fromList, toList)
 import GHC.Stack (withFrozenCallStack)
-import GeniusYield.Imports
+import GeniusYield.Imports hiding (toList)
 import GeniusYield.Transaction
 import GeniusYield.Transaction.Common (GYTxExtraConfiguration)
 import GeniusYield.TxBuilder.Common
@@ -1081,6 +1082,11 @@ obtainTxBodyContentBuildTx (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxB
       wdrls' <- zipWithM (curry (wdrlFromApi refScripts)) [0 ..] wdrls
       pure $ CApi.TxWithdrawals wsbe wdrls'
   ins' <- zipWithM (curry (inFromApi refScripts)) [0 ..] resolvedSpendIns
+  certs' <- case CApi.txCertificates txBodyContentViewTx of
+    CApi.TxCertificatesNone -> pure CApi.TxCertificatesNone
+    CApi.TxCertificates csbe cs -> do
+      certs' <- zipWithM (curry (certFromApi refScripts)) [0 ..] (toList cs)
+      pure $ CApi.TxCertificates csbe (fromList certs')
   pure $
     CApi.TxBodyContent
       { txWithdrawals = wdrls'
@@ -1103,7 +1109,7 @@ obtainTxBodyContentBuildTx (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxB
       , txFee = CApi.txFee txBodyContentViewTx
       , txExtraKeyWits = CApi.txExtraKeyWits txBodyContentViewTx
       , txCurrentTreasuryValue = CApi.txCurrentTreasuryValue txBodyContentViewTx
-      , txCertificates = CApi.TxCertificatesNone
+      , txCertificates = certs'
       , txAuxScripts = CApi.txAuxScripts txBodyContentViewTx
       }
  where
@@ -1199,4 +1205,20 @@ obtainTxBodyContentBuildTx (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxB
       ( stakeAddr
       , coin
       , resolvedScriptWitness
+      )
+  certFromApi refScripts (ix, (cert, _)) = do
+    scred <- case certificateFromApiMaybe cert of
+      Nothing -> throwError $ GYObtainTxBodyContentException $ GYInvalidCertificate cert
+      Just cert' -> pure $ certificateToStakeCredential cert'
+    resolvedScriptWitness <-
+      resolveScriptWitness
+        refScripts
+        scred
+        CApi.KeyWitnessForStakeAddr
+        CApi.ScriptWitnessForStakeAddr
+        (Ledger.ConwayCertifying (Ledger.AsIx ix))
+        CApi.NoScriptDatumForStake
+    pure
+      ( cert
+      , (\wit -> Just (scred & stakeCredentialToApi, wit)) <$> resolvedScriptWitness
       )

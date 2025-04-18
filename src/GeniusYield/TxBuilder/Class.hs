@@ -835,7 +835,7 @@ utxoDatumHushed = fmap hush . utxoDatum
 mustHaveInput :: GYTxIn v -> GYTxSkeleton v
 mustHaveInput i = emptyGYTxSkeleton {gytxIns = [i]}
 
-mustHaveRefInput :: VersionIsGreaterOrEqual v 'PlutusV2 => GYTxOutRef -> GYTxSkeleton v
+mustHaveRefInput :: GYTxOutRef -> GYTxSkeleton v
 mustHaveRefInput i = emptyGYTxSkeleton {gytxRefIns = GYTxSkeletonRefIns (Set.singleton i)}
 
 mustHaveOutput :: GYTxOut v -> GYTxSkeleton v

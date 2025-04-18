@@ -656,7 +656,6 @@ scriptToApiPlutusScriptWitness (GYScript v api _) = case v of
       (Api.S.PScript api)
 
 referenceScriptToApiPlutusScriptWitness ::
-  VersionIsGreaterOrEqual v 'PlutusV2 =>
   GYTxOutRef ->
   GYScript v ->
   Api.S.ScriptDatum witctx ->

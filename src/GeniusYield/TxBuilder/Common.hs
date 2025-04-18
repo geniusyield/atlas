@@ -104,7 +104,7 @@ instance Semigroup (GYTxSkeletonProposalProcedures v) where
   GYTxSkeletonProposalProceduresNone <> GYTxSkeletonProposalProceduresNone = GYTxSkeletonProposalProceduresNone
 
 data GYTxSkeletonRefIns :: PlutusVersion -> Type where
-  GYTxSkeletonRefIns :: VersionIsGreaterOrEqual v 'PlutusV2 => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
+  GYTxSkeletonRefIns :: !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
   GYTxSkeletonNoRefIns :: GYTxSkeletonRefIns v
 
 deriving instance Show (GYTxSkeletonRefIns v)

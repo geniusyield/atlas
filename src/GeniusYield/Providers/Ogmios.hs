@@ -29,6 +29,7 @@ import Cardano.Api.Ledger qualified as Api.L
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Alonzo.PParams qualified as Ledger
+import Cardano.Ledger.Conway qualified as Conway
 import Cardano.Ledger.Conway.PParams (
   ConwayPParams (..),
   THKD (..),
@@ -36,7 +37,6 @@ import Cardano.Ledger.Conway.PParams (
 import Cardano.Ledger.Core qualified as Ledger
 import Cardano.Ledger.HKD (HKD, HKDFunctor (..))
 import Cardano.Ledger.Plutus qualified as Ledger
-import Cardano.Ledger.Conway qualified as Conway
 import Cardano.Slotting.Slot qualified as CSlot
 import Cardano.Slotting.Time qualified as CTime
 import Control.Monad ((<=<))

@@ -59,6 +59,64 @@ allow-newer:
     katip:Win32
   , ekg-wai:time
 
+if impl (ghc >= 9.10)
+  allow-newer:
+    -- https://github.com/biocad/openapi3/pull/108 or https://github.com/biocad/openapi3/pull/109.
+    , openapi3:base
+    , openapi3:template-haskell
+
+    , clb:base
+
+    -- https://github.com/maestro-org/haskell-sdk/pull/77.
+    , maestro-sdk:bytestring
+
+if impl (ghc >= 9.12)
+  allow-newer:
+    -- https://github.com/phadej/vec/issues/118
+    , bin:base
+    , fin:base
+    , ral:base
+
+    -- https://github.com/haskellari/tree-diff/issues/97
+    , tree-diff:base
+
+    -- https://github.com/kapralVV/Unique/issues/11
+    , Unique:hashable
+
+    -- https://github.com/fizruk/http-api-data/pull/146
+    , http-api-data:base
+
+    -- https://github.com/ocharles/libsystemd-journal/pull/32
+    , libsystemd-journal:base
+
+    -- https://github.com/Gabriella439/Haskell-Pipes-Safe-Library/pull/70
+    , pipes-safe:base
+
+    -- https://github.com/haskell-servant/servant/pull/1810
+    , servant:base
+    , servant-server:base
+
+    -- https://github.com/IntersectMBO/ouroboros-consensus/blob/main/cabal.project#L70-L74
+    , ouroboros-network-protocols:base
+    , ouroboros-network-framework:base
+    , ouroboros-network-api:base
+    , network-mux:base
+    , ouroboros-network:base
+    , cardano-ping:base
+
+    -- https://github.com/GetShopTV/swagger2/pull/257
+    , swagger2:base
+    , swagger2:template-haskell
+    , swagger2:time
+    , swagger2:containers
+    , insert-ordered-containers:base
+    , insert-ordered-containers:hashable
+    , hashable:base
+
+    -- https://github.com/haskellari/postgresql-simple/pull/153
+    , postgresql-simple:base
+    , postgresql-simple:template-haskell
+
 -- Using RDRAND instead of /dev/urandom as an entropy source for key
 -- generation is dubious. Set the flag so we use /dev/urandom by default.
 package cryptonite

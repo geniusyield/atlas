@@ -504,11 +504,14 @@ finalizeGYBalancedTx
       Nothing -> Api.TxMintNone
       Just (v, xs) ->
         let policyIdWit = Map.fromList [(mintingPolicyIdFromWitness p, (p, r)) | (p, r) <- xs]
-            mintVal :: Map
-                  Api.S.PolicyId
-                  (Api.S.PolicyAssets,
-                   Api.S.BuildTxWith
-                     Api.S.BuildTx (Api.S.ScriptWitness Api.S.WitCtxMint ApiEra))
+            mintVal ::
+              Map
+                Api.S.PolicyId
+                ( Api.S.PolicyAssets
+                , Api.S.BuildTxWith
+                    Api.S.BuildTx
+                    (Api.S.ScriptWitness Api.S.WitCtxMint ApiEra)
+                )
             mintVal =
               valueToList v
                 & foldl'
@@ -520,13 +523,13 @@ finalizeGYBalancedTx
                           Map.insertWith
                             (\(pa1, btw1) (pa2, _) -> (pa1 <> pa2, btw1))
                             (mintingPolicyIdToApi pid)
-                              ( Api.PolicyAssets $ Map.singleton (tokenNameToApi tn) (Api.Quantity amt)
-                              , Api.BuildTxWith
-                                  ( case p of
-                                      GYBuildPlutusScript s -> gyMintingScriptWitnessToApiPlutusSW s (redeemerToApi r) (Api.ExecutionUnits 0 0)
-                                      GYBuildSimpleScript s -> simpleScriptWitnessToApi s
-                                  )
-                              )
+                            ( Api.PolicyAssets $ Map.singleton (tokenNameToApi tn) (Api.Quantity amt)
+                            , Api.BuildTxWith
+                                ( case p of
+                                    GYBuildPlutusScript s -> gyMintingScriptWitnessToApiPlutusSW s (redeemerToApi r) (Api.ExecutionUnits 0 0)
+                                    GYBuildSimpleScript s -> simpleScriptWitnessToApi s
+                                )
+                            )
                             acc
                   )
                   mempty

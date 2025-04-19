@@ -26,7 +26,7 @@ import GeniusYield.Imports
 
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Crypto.Hash.Class qualified as Crypto
-import Cardano.Ledger.SafeHash qualified as Ledger
+import Cardano.Ledger.Hashes qualified as Ledger
 import Control.Monad ((>=>))
 import Data.ByteString.Char8 (ByteString)
 
@@ -92,7 +92,7 @@ anchorDataHashFromByteString bs = GYAnchorDataHash . Ledger.unsafeMakeSafeHash <
 
 -- | Hash anchor data.
 hashAnchorData :: GYAnchorData -> GYAnchorDataHash
-hashAnchorData = GYAnchorDataHash . Ledger.hashAnchorData . Ledger.AnchorData
+hashAnchorData = GYAnchorDataHash . Ledger.hashAnnotated . Ledger.AnchorData
 
 -- | Anchor.
 data GYAnchor = GYAnchor {anchorUrl :: !GYUrl, anchorDataHash :: !GYAnchorDataHash}

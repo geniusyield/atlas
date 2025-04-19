@@ -39,7 +39,7 @@ import Data.Time.Clock (
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Script qualified as Api
+import Cardano.Api.Internal.Script qualified as Api
 import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Address qualified as L
 import Cardano.Ledger.Api qualified as L
@@ -48,7 +48,7 @@ import Cardano.Ledger.Conway.Core qualified as ConwayCore
 import Cardano.Ledger.Core qualified as L
 import Cardano.Ledger.Plutus.TxInfo qualified as L
 import Cardano.Ledger.Shelley.API qualified as L.S
-import Cardano.Ledger.UTxO qualified as L
+import Cardano.Ledger.State qualified as L
 import Cardano.Slotting.Slot (
   EpochNo (..),
   EpochSize (..),
@@ -208,7 +208,7 @@ mkTestFor name action =
     logDoc = Clb.ppLog $ Clb._clbLog mock
     logString = renderString $ layoutPretty options logDoc
 
-mkSimpleWallet :: TL.KeyPair L.S.Payment L.StandardCrypto -> User
+mkSimpleWallet :: TL.KeyPair L.S.Payment -> User
 mkSimpleWallet kp =
   let key = paymentSigningKeyFromLedgerKeyPair kp
    in User'

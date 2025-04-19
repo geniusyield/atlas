@@ -107,11 +107,11 @@ pubKeyHashFromApi :: Api.Hash Api.PaymentKey -> GYPubKeyHash
 pubKeyHashFromApi = coerce
 
 -- | Convert to corresponding ledger representation.
-pubKeyHashToLedger :: GYPubKeyHash -> Ledger.KeyHash (a :: Ledger.KeyRole) Ledger.StandardCrypto
+pubKeyHashToLedger :: GYPubKeyHash -> Ledger.KeyHash (a :: Ledger.KeyRole)
 pubKeyHashToLedger = pubKeyHashToApi >>> Api.unPaymentKeyHash >>> Ledger.coerceKeyRole
 
 -- | Convert from corresponding ledger representation.
-pubKeyHashFromLedger :: Ledger.KeyHash (a :: Ledger.KeyRole) Ledger.StandardCrypto -> GYPubKeyHash
+pubKeyHashFromLedger :: Ledger.KeyHash (a :: Ledger.KeyRole) -> GYPubKeyHash
 pubKeyHashFromLedger = Ledger.coerceKeyRole >>> Api.PaymentKeyHash >>> pubKeyHashFromApi
 
 {- |

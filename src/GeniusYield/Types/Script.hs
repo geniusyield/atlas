@@ -138,9 +138,9 @@ module GeniusYield.Types.Script (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Script qualified as Api
+import Cardano.Api.Internal.Script qualified as Api
 import Cardano.Api.Shelley qualified as Api.S
-import Cardano.Ledger.SafeHash (SafeToHash (originalBytesSize))
+import Cardano.Ledger.Hashes (SafeToHash (originalBytesSize))
 import Control.Lens ((?~))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Types (

@@ -68,7 +68,7 @@ type GYAnchorData = ByteString
 >>> hashAnchorData "Hello, World!"
 GYAnchorDataHash (SafeHash "511bc81dde11180838c562c82bb35f3223f46061ebde4a955c27b3f489cf1e03")
 -}
-newtype GYAnchorDataHash = GYAnchorDataHash (Ledger.SafeHash Ledger.StandardCrypto Ledger.AnchorData)
+newtype GYAnchorDataHash = GYAnchorDataHash (Ledger.SafeHash Ledger.AnchorData)
   deriving stock Show
   deriving newtype (Eq, Ord, FromJSON, ToJSON)
 
@@ -98,8 +98,8 @@ hashAnchorData = GYAnchorDataHash . Ledger.hashAnchorData . Ledger.AnchorData
 data GYAnchor = GYAnchor {anchorUrl :: !GYUrl, anchorDataHash :: !GYAnchorDataHash}
   deriving stock (Eq, Ord, Show)
 
-anchorToLedger :: GYAnchor -> Ledger.Anchor Ledger.StandardCrypto
+anchorToLedger :: GYAnchor -> Ledger.Anchor
 anchorToLedger GYAnchor {..} = Ledger.Anchor (coerce anchorUrl) (coerce anchorDataHash)
 
-anchorFromLedger :: Ledger.Anchor Ledger.StandardCrypto -> GYAnchor
+anchorFromLedger :: Ledger.Anchor -> GYAnchor
 anchorFromLedger (Ledger.Anchor url hash) = GYAnchor (coerce url) (coerce hash)

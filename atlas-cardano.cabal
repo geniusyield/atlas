@@ -267,8 +267,7 @@ library
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file or derived from other related dependencies.
   build-depends:
     cardano-addresses,
-    cardano-api,
-    cardano-api:internal,
+    cardano-api ^>=10.13.1,
     cardano-crypto,
     cardano-crypto-class,
     cardano-ledger-alonzo,

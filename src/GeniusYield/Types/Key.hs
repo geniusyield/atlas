@@ -126,11 +126,10 @@ module GeniusYield.Types.Key (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.SerialiseTextEnvelope qualified as Api
+import Cardano.Api.Internal.SerialiseTextEnvelope qualified as Api
 import Cardano.Api.Shelley qualified as Api
 import Cardano.Crypto.Hash.Class qualified as Crypto
 import Cardano.Crypto.Wallet qualified as Crypto.HD
-import Cardano.Ledger.Crypto qualified as Ledger
 import Cardano.Ledger.Keys qualified as Ledger
 import Data.Aeson qualified as Aeson
 import Data.ByteString.Base16 qualified as BS16
@@ -176,7 +175,7 @@ import GeniusYield.Types.StakeKeyHash (
 >>> "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290" :: (GYSigningKey 'GYKeyRolePayment)
 GYSigningKey (GYKeyRolePayment) "5ac75cb3435ef38c5bf15d11469b301b13729deb9595133a608fc0881fcec290"
 -}
-newtype GYSigningKey (kr :: GYKeyRole) = GYSigningKey (Ledger.SignKeyDSIGN Ledger.StandardCrypto)
+newtype GYSigningKey (kr :: GYKeyRole) = GYSigningKey (Crypto.SignKeyDSIGN Ledger.DSIGN)
 
 instance SingGYKeyRoleI kr => Show (GYSigningKey kr) where
   showsPrec d k = showParen (d > 10) $ showString "GYSigningKey (" . shows (fromSingGYKeyRole (singGYKeyRole @kr)) . showString ") " . shows (signingKeyToRawBytesHex k)
@@ -232,11 +231,11 @@ instance Printf.PrintfArg (GYSigningKey kr) where
   formatArg = Printf.formatArg . signingKeyToRawBytesHexText
 
 -- TODO: use coerce, for some reason it's giving weird error.
-signingKeyToLedger :: GYSigningKey kr -> Ledger.SignKeyDSIGN Ledger.StandardCrypto
+signingKeyToLedger :: GYSigningKey kr -> Crypto.SignKeyDSIGN Ledger.DSIGN
 signingKeyToLedger (GYSigningKey k) = k
 
 -- TODO: use coerce.
-signingKeyFromLedger :: Ledger.SignKeyDSIGN Ledger.StandardCrypto -> GYSigningKey kr
+signingKeyFromLedger :: Crypto.SignKeyDSIGN Ledger.DSIGN -> GYSigningKey kr
 signingKeyFromLedger = GYSigningKey
 
 signingKeyToRawBytes :: GYSigningKey kr -> BS8.ByteString
@@ -329,17 +328,17 @@ readSigningKey fp = do
       SingGYKeyRoleHotCommittee -> [Api.FromSomeType (Api.proxyToAsType Proxy) id]
       SingGYKeyRoleColdCommittee -> [Api.FromSomeType (Api.proxyToAsType Proxy) id]
 
-signingKeyToLedgerKeyPair :: GYSigningKey kr -> TLedger.KeyPair (GYKeyRoleToLedger kr) Ledger.StandardCrypto
+signingKeyToLedgerKeyPair :: GYSigningKey kr -> TLedger.KeyPair (GYKeyRoleToLedger kr)
 signingKeyToLedgerKeyPair skey =
   TLedger.KeyPair
     { TLedger.vKey = verificationKeyToLedger $ getVerificationKey skey
     , TLedger.sKey = signingKeyToLedger skey
     }
 
-signingKeyFromLedgerKeyPair :: TLedger.KeyPair (GYKeyRoleToLedger kr) Ledger.StandardCrypto -> GYSigningKey kr
+signingKeyFromLedgerKeyPair :: TLedger.KeyPair (GYKeyRoleToLedger kr) -> GYSigningKey kr
 signingKeyFromLedgerKeyPair = signingKeyFromLedger . TLedger.sKey
 
-newtype GYVerificationKey (kr :: GYKeyRole) = GYVerificationKey (Ledger.VKey (GYKeyRoleToLedger kr) Ledger.StandardCrypto)
+newtype GYVerificationKey (kr :: GYKeyRole) = GYVerificationKey (Ledger.VKey (GYKeyRoleToLedger kr))
   deriving newtype Eq
 
 instance SingGYKeyRoleI kr => Show (GYVerificationKey kr) where
@@ -385,10 +384,10 @@ instance (SingGYKeyRoleI kr, Api.SerialiseAsCBOR (GYVerificationKeyToApi kr)) =>
 instance Printf.PrintfArg (GYVerificationKey kr) where
   formatArg = Printf.formatArg . verificationKeyToRawBytesHexText
 
-verificationKeyToLedger :: GYVerificationKey kr -> Ledger.VKey (GYKeyRoleToLedger kr) Ledger.StandardCrypto
+verificationKeyToLedger :: GYVerificationKey kr -> Ledger.VKey (GYKeyRoleToLedger kr)
 verificationKeyToLedger = coerce
 
-verificationKeyFromLedger :: Ledger.VKey (GYKeyRoleToLedger kr) Ledger.StandardCrypto -> GYVerificationKey kr
+verificationKeyFromLedger :: Ledger.VKey (GYKeyRoleToLedger kr) -> GYVerificationKey kr
 verificationKeyFromLedger = coerce
 
 getVerificationKey :: GYSigningKey kr -> GYVerificationKey kr
@@ -670,7 +669,7 @@ paymentVerificationKeyFromApi = verificationKeyFromApi
 paymentVerificationKeyToApi :: GYPaymentVerificationKey -> Api.VerificationKey Api.PaymentKey
 paymentVerificationKeyToApi = verificationKeyToApi
 
-paymentVerificationKeyToLedger :: GYPaymentVerificationKey -> Ledger.VKey Ledger.Payment Ledger.StandardCrypto
+paymentVerificationKeyToLedger :: GYPaymentVerificationKey -> Ledger.VKey Ledger.Payment
 paymentVerificationKeyToLedger = verificationKeyToLedger
 
 paymentVerificationKeyRawBytes :: GYPaymentVerificationKey -> BS8.ByteString
@@ -721,13 +720,13 @@ paymentSigningKeyToApi = signingKeyToApi
 extendedPaymentSigningKeyToApi :: GYExtendedPaymentSigningKey -> Api.SigningKey Api.PaymentExtendedKey
 extendedPaymentSigningKeyToApi = extendedSigningKeyToApi
 
-paymentSigningKeyToLedger :: GYPaymentSigningKey -> Ledger.SignKeyDSIGN Ledger.StandardCrypto
+paymentSigningKeyToLedger :: GYPaymentSigningKey -> Crypto.SignKeyDSIGN Ledger.DSIGN
 paymentSigningKeyToLedger = signingKeyToLedger
 
-paymentSigningKeyToLedgerKeyPair :: GYPaymentSigningKey -> TLedger.KeyPair Ledger.Payment Ledger.StandardCrypto
+paymentSigningKeyToLedgerKeyPair :: GYPaymentSigningKey -> TLedger.KeyPair Ledger.Payment
 paymentSigningKeyToLedgerKeyPair = signingKeyToLedgerKeyPair
 
-paymentSigningKeyFromLedgerKeyPair :: TLedger.KeyPair Ledger.Payment Ledger.StandardCrypto -> GYPaymentSigningKey
+paymentSigningKeyFromLedgerKeyPair :: TLedger.KeyPair Ledger.Payment -> GYPaymentSigningKey
 paymentSigningKeyFromLedgerKeyPair = signingKeyFromLedgerKeyPair
 
 -- | Reads a payment signing key from a file.
@@ -787,7 +786,7 @@ stakeVerificationKeyFromApi = verificationKeyFromApi
 stakeVerificationKeyToApi :: GYStakeVerificationKey -> Api.VerificationKey Api.StakeKey
 stakeVerificationKeyToApi = verificationKeyToApi
 
-stakeVerificationKeyToLedger :: GYStakeVerificationKey -> Ledger.VKey Ledger.Staking Ledger.StandardCrypto
+stakeVerificationKeyToLedger :: GYStakeVerificationKey -> Ledger.VKey Ledger.Staking
 stakeVerificationKeyToLedger = verificationKeyToLedger
 
 stakeKeyHash :: GYStakeVerificationKey -> GYStakeKeyHash
@@ -831,13 +830,13 @@ stakeSigningKeyToApi = signingKeyToApi
 extendedStakeSigningKeyToApi :: GYExtendedStakeSigningKey -> Api.SigningKey Api.StakeExtendedKey
 extendedStakeSigningKeyToApi = extendedSigningKeyToApi
 
-stakeSigningKeyToLedger :: GYStakeSigningKey -> Ledger.SignKeyDSIGN Ledger.StandardCrypto
+stakeSigningKeyToLedger :: GYStakeSigningKey -> Crypto.SignKeyDSIGN Ledger.DSIGN
 stakeSigningKeyToLedger = signingKeyToLedger
 
-stakeSigningKeyToLedgerKeyPair :: GYStakeSigningKey -> TLedger.KeyPair Ledger.Staking Ledger.StandardCrypto
+stakeSigningKeyToLedgerKeyPair :: GYStakeSigningKey -> TLedger.KeyPair Ledger.Staking
 stakeSigningKeyToLedgerKeyPair = signingKeyToLedgerKeyPair
 
-stakeSigningKeyFromLedgerKeyPair :: TLedger.KeyPair Ledger.Staking Ledger.StandardCrypto -> GYStakeSigningKey
+stakeSigningKeyFromLedgerKeyPair :: TLedger.KeyPair Ledger.Staking -> GYStakeSigningKey
 stakeSigningKeyFromLedgerKeyPair = signingKeyFromLedgerKeyPair
 
 -- | Reads a stake signing key from a file.

@@ -30,13 +30,13 @@ data GYDRep
   | GYDRepAlwaysNoConfidence
   deriving stock (Show, Eq, Ord)
 
-drepToLedger :: GYDRep -> Ledger.DRep Ledger.StandardCrypto
+drepToLedger :: GYDRep -> Ledger.DRep
 drepToLedger drep = case drep of
   GYDRepCredential c -> Ledger.DRepCredential $ credentialToLedger c
   GYDRepAlwaysAbstain -> Ledger.DRepAlwaysAbstain
   GYDRepAlwaysNoConfidence -> Ledger.DRepAlwaysNoConfidence
 
-drepFromLedger :: Ledger.DRep Ledger.StandardCrypto -> GYDRep
+drepFromLedger :: Ledger.DRep -> GYDRep
 drepFromLedger drep = case drep of
   Ledger.DRepCredential c -> GYDRepCredential $ credentialFromLedger c
   Ledger.DRepAlwaysAbstain -> GYDRepAlwaysAbstain
@@ -51,7 +51,7 @@ data GYDRepState = GYDRepState
   }
   deriving (Show, Eq, Ord)
 
-drepStateToLedger :: GYDRepState -> Ledger.DRepState Ledger.StandardCrypto
+drepStateToLedger :: GYDRepState -> Ledger.DRepState
 drepStateToLedger GYDRepState {..} =
   Ledger.DRepState
     { Ledger.drepExpiry = epochNoToLedger drepExpiry
@@ -60,7 +60,7 @@ drepStateToLedger GYDRepState {..} =
     , Ledger.drepDelegs = Set.map credentialToLedger drepDelegs
     }
 
-drepStateFromLedger :: Ledger.DRepState Ledger.StandardCrypto -> GYDRepState
+drepStateFromLedger :: Ledger.DRepState -> GYDRepState
 drepStateFromLedger Ledger.DRepState {..} =
   GYDRepState
     { drepExpiry = epochNoFromLedger drepExpiry

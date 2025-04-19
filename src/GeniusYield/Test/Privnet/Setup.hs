@@ -61,10 +61,10 @@ import Hedgehog.Extras.Stock qualified as H'
 import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational, (%!))
 import Test.Tasty (TestName, TestTree)
 import Test.Tasty.HUnit (testCaseSteps)
+import Testnet.Defaults (defaultConwayGenesis)
 import Testnet.Property.Util
 import Testnet.Start.Types (GenesisOptions (..), UserProvidedData (NoUserProvidedData, UserProvidedData))
 import Testnet.Types hiding (shelleyGenesis)
-import Testnet.Defaults (defaultConwayGenesis)
 
 -------------------------------------------------------------------------------
 -- Setup

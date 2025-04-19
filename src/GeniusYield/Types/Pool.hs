@@ -13,7 +13,9 @@ module GeniusYield.Types.Pool (
 ) where
 
 import Cardano.Api.Internal.Address qualified as Api
+import Cardano.Ledger.Address qualified as Ledger
 import Cardano.Ledger.BaseTypes
+import Cardano.Ledger.PoolParams qualified as Ledger
 import Data.IP (IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Set qualified as Set
@@ -24,8 +26,6 @@ import GeniusYield.Types.Address
 import GeniusYield.Types.Anchor
 import GeniusYield.Types.KeyHash
 import GeniusYield.Types.KeyRole
-import Cardano.Ledger.PoolParams qualified as Ledger
-import Cardano.Ledger.Address qualified as Ledger
 
 data GYStakePoolRelay
   = -- | One or both of IPv4 & IPv6

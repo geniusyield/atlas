@@ -73,7 +73,7 @@ import Data.Swagger.Lens qualified ()
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TE
 import Data.Vector qualified as Vector
-import Data.Word (Word32, Word16)
+import Data.Word (Word16, Word32)
 import Database.PostgreSQL.Simple qualified as PQ
 import Database.PostgreSQL.Simple.FromField qualified as PQ (
   FromField (..),

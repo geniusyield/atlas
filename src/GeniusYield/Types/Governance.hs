@@ -43,6 +43,7 @@ module GeniusYield.Types.Governance (
 import Cardano.Api.Ledger (maybeToStrictMaybe, strictMaybeToMaybe)
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api
+import Cardano.Ledger.Conway qualified as Conway
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import Data.Word (Word16)
@@ -57,7 +58,6 @@ import GeniusYield.Types.KeyRole (GYKeyRole (..))
 import GeniusYield.Types.Reexpose (ProtVer, UnitInterval)
 import GeniusYield.Types.Script (GYScriptHash, scriptHashFromLedger, scriptHashToLedger)
 import GeniusYield.Types.Tx (GYTxId, txIdFromApi, txIdToApi)
-import Cardano.Ledger.Conway qualified as Conway
 
 -- | Vote on a governance proposal.
 data GYVote = Yes | No | Abstain

@@ -8,6 +8,7 @@
   subdir:
     plutus/atlas-onchain-common
     .
+  ```
 * Support of advanced transaction building configuration. Currently Atlas assumes that extra wallet inputs selected by coin selection algorithm are coming from key based wallet but these inputs could also come from script based wallet instead. Type `GYTxExtraConfiguration` has field `gytxecUtxoInputMapper` to allow for this configuration. Other fields included in `GYTxExtraConfiguration` provides advanced configuration, please see corresponding haddock for more details. Transaction building functions such as `buildTxBodyWithExtraConfiguration` allow passing this extra configuration.
 * Support of extended verification keys. See `GYExtendedVerificationKey` type and related utilities such as `getExtendedVerificationKey`.
 * Added `applyParam` to apply data encoded script parameter to a plutus script.

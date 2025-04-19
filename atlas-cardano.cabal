@@ -201,7 +201,7 @@ library
     async,
     attoparsec,
     auto-update,
-    base ^>=4.18.2,
+    base >=4.18.2 && <5,
     base16-bytestring,
     blockfrost-client,
     bytestring,

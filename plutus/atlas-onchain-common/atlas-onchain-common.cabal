@@ -55,7 +55,7 @@ library
     GeniusYield.OnChain.BetRef.Types
     GeniusYield.OnChain.GuessRefInputDatum.Types
 
-  build-depends: base ^>=4.18.2
+  build-depends: base >=4.18.2 && <5
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
   build-depends:
     plutus-ledger-api,

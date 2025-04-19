@@ -1,3 +1,18 @@
+## 0.13.0
+
+* Support of GHC 9.10 & 9.12.
+* Updated to latest IOG libraries, in particular `cardano-api` version >= 10.13 & `cardano-node` version >= 10.3.
+* Usage of reference scripts no longer prohibit PlutusV1 scripts which can now also be given via reference.
+* On-chain code is now split into a separate package so that Atlas no longer depends upon `plutus-tx-plugin` which is constrained to a very specific GHC version. User's of Atlas, should have following `subdir` stanza when specifying Atlas dependency in their `cabal.project` file:
+  ```
+  subdir:
+    plutus/atlas-onchain-common
+    .
+* Support of advanced transaction building configuration. Currently Atlas assumes that extra wallet inputs selected by coin selection algorithm are coming from key based wallet but these inputs could also come from script based wallet instead. Type `GYTxExtraConfiguration` has field `gytxecUtxoInputMapper` to allow for this configuration. Other fields included in `GYTxExtraConfiguration` provides advanced configuration, please see corresponding haddock for more details. Transaction building functions such as `buildTxBodyWithExtraConfiguration` allow passing this extra configuration.
+* Support of extended verification keys. See `GYExtendedVerificationKey` type and related utilities such as `getExtendedVerificationKey`.
+* Added `applyParam` to apply data encoded script parameter to a plutus script.
+* Added `readScript'`, which is a variant of `readScript` where file contents are already loaded.
+
 ## 0.12.0
 
 * `valueAdjust` now omits for entries if result of adjustment is zero.

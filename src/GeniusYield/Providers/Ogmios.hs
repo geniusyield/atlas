@@ -29,6 +29,7 @@ import Cardano.Api.Ledger qualified as Api.L
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Alonzo.PParams qualified as Ledger
+import Cardano.Ledger.Conway qualified as Conway
 import Cardano.Ledger.Conway.PParams (
   ConwayPParams (..),
   THKD (..),
@@ -63,7 +64,6 @@ import GeniusYield.Types hiding (poolId)
 import Maestro.Types.V1 (AsAda (..), AsBytes, AsLovelace (..), CostModel, EpochNo, EpochSize, EpochSlotLength, EraBound, MaestroRational, MemoryCpuWith, MinFeeReferenceScripts, ProtocolParametersUpdateStakePool, ProtocolVersion)
 import Maestro.Types.V1 qualified as Maestro
 import Network.WebSockets qualified as WS
-import Ouroboros.Consensus.Cardano.Block (StandardConway)
 import Ouroboros.Consensus.HardFork.History qualified as Ouroboros
 import Servant.API (
   JSON,
@@ -670,7 +670,7 @@ protocolVersionFromOgmios errPath protocolParametersVersion =
     , Ledger.pvMinor = Maestro.protocolVersionMinor protocolParametersVersion
     }
 
-pparamsFromOgmios :: forall f. HKDFunctor f => String -> ProtocolParametersHKD f -> ConwayPParams f StandardConway
+pparamsFromOgmios :: forall f. HKDFunctor f => String -> ProtocolParametersHKD f -> ConwayPParams f Conway.ConwayEra
 pparamsFromOgmios errPath ProtocolParameters {..} =
   ConwayPParams
     { cppMinFeeA = THKD $ hkdMap prxy (Ledger.Coin . (toInteger @Natural)) protocolParametersMinFeeCoefficient

@@ -74,13 +74,9 @@ import Cardano.Ledger.Alonzo.Tx qualified as AlonzoTx
 import Cardano.Ledger.Binary qualified as CBOR
 import Cardano.Ledger.Binary.Crypto qualified as CBOR
 import Cardano.Ledger.Conway.PParams qualified as Ledger
-import Cardano.Ledger.Core (
-  Era (..),
-  EraTx (sizeTxF),
-  eraProtVerLow,
- )
+import Cardano.Ledger.Core (EraTx (sizeTxF), eraProtVerLow)
 import Cardano.Ledger.Core qualified as Ledger
-import Cardano.Ledger.Crypto (Crypto (..))
+import Cardano.Ledger.Keys (DSIGN)
 import Cardano.Ledger.Keys.WitVKey (WitVKey (..))
 import Cardano.Ledger.Shelley.API.Wallet qualified as Shelley
 import Cardano.Slotting.Time (SystemStart)
@@ -508,6 +504,14 @@ finalizeGYBalancedTx
       Nothing -> Api.TxMintNone
       Just (v, xs) ->
         let policyIdWit = Map.fromList [(mintingPolicyIdFromWitness p, (p, r)) | (p, r) <- xs]
+            mintVal ::
+              Map
+                Api.S.PolicyId
+                ( Api.S.PolicyAssets
+                , Api.S.BuildTxWith
+                    Api.S.BuildTx
+                    (Api.S.ScriptWitness Api.S.WitCtxMint ApiEra)
+                )
             mintVal =
               valueToList v
                 & foldl'
@@ -517,18 +521,15 @@ finalizeGYBalancedTx
                         Nothing -> error $ "absurd: policy id " <> show pid <> " not found in wit map " <> show policyIdWit
                         Just (p, r) ->
                           Map.insertWith
-                            (<>)
+                            (\(pa1, btw1) (pa2, _) -> (pa1 <> pa2, btw1))
                             (mintingPolicyIdToApi pid)
-                            [
-                              ( tokenNameToApi tn
-                              , Api.Quantity amt
-                              , Api.BuildTxWith
-                                  ( case p of
-                                      GYBuildPlutusScript s -> gyMintingScriptWitnessToApiPlutusSW s (redeemerToApi r) (Api.ExecutionUnits 0 0)
-                                      GYBuildSimpleScript s -> simpleScriptWitnessToApi s
-                                  )
-                              )
-                            ]
+                            ( Api.PolicyAssets $ Map.singleton (tokenNameToApi tn) (Api.Quantity amt)
+                            , Api.BuildTxWith
+                                ( case p of
+                                    GYBuildPlutusScript s -> gyMintingScriptWitnessToApiPlutusSW s (redeemerToApi r) (Api.ExecutionUnits 0 0)
+                                    GYBuildSimpleScript s -> simpleScriptWitnessToApi s
+                                )
+                            )
                             acc
                   )
                   mempty
@@ -651,7 +652,7 @@ makeTransactionBodyAutoBalanceWrapper ::
   Api.S.TxBodyContent Api.S.BuildTx ApiEra ->
   GYAddress ->
   Map.Map Api.StakeCredential Ledger.Coin ->
-  Map.Map (Ledger.Credential Ledger.DRepRole Ledger.StandardCrypto) Ledger.Coin ->
+  Map.Map (Ledger.Credential Ledger.DRepRole) Ledger.Coin ->
   Word ->
   Int ->
   Either GYBuildTxError (Api.S.TxBodyContent Api.S.BuildTx ApiEra)
@@ -728,7 +729,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body ch
         -- This low level code is taken verbatim from here: https://github.com/IntersectMBO/cardano-ledger/blob/6db84a7b77e19af58feb2f45dfc50aa70435967b/eras/shelley/impl/src/Cardano/Ledger/Shelley/API/Wallet.hs#L475-L494, as this is what is referred by @cardano-api@ under the hood.
         -- This does not take into account the bootstrap (byron) witnesses.
         version = eraProtVerLow @ShelleyBasedConwayEra
-        sigSize = fromIntegral $ sizeSigDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedConwayEra)))
+        sigSize = fromIntegral $ sizeSigDSIGN (Proxy @DSIGN)
         dummySig =
           fromRight
             (error "corrupt dummy signature")
@@ -738,7 +739,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body ch
                 CBOR.decodeSignedDSIGN
                 (CBOR.serialize version $ LBS.replicate sigSize 0)
             )
-        vkeySize = fromIntegral $ sizeVerKeyDSIGN (Proxy @(DSIGN (EraCrypto ShelleyBasedConwayEra)))
+        vkeySize = fromIntegral $ sizeVerKeyDSIGN (Proxy @DSIGN)
         dummyVKey w =
           let padding = LBS.replicate paddingSize 0
               paddingSize = vkeySize - LBS.length sw

@@ -15,12 +15,12 @@ packages: plutus/atlas-onchain-common
 tests: true
 
 -- repeating the index-state for hackage to work around hackage.nix parsing limitation
-index-state: 2025-01-01T23:24:19Z
+index-state: 2025-04-15T19:49:23Z
 
 -- NOTE: Do not bump chap index beyond that used by target cardano-node version.
 index-state:
-  , hackage.haskell.org 2025-01-01T23:24:19Z
-  , cardano-haskell-packages 2025-02-11T21:18:23Z
+  , hackage.haskell.org 2025-04-15T19:49:23Z
+  , cardano-haskell-packages 2025-04-11T16:42:25Z
 
 -- TODO: Default value should be @direct@ in upcoming 3.10 version of cabal, omit this line then.
 test-show-details: direct
@@ -34,37 +34,14 @@ source-repository-package
   tag: 3e39a6d485d7c6f98222b1ca58aed2fb45e5ff27
   --sha256: sha256-plfrSgirKf7WGESYvEBqBkR1s673Qd0ZhGs0KzGfOig=
 
--- TODO: Temporary, until proposed changes are in upstream (track https://github.com/mlabs-haskell/clb/pull/72)
+-- TODO: Temporary, until proposed changes are in upstream (track https://github.com/mlabs-haskell/clb/pull/73)
 source-repository-package
   type: git
-  location: https://github.com/sourabhxyz/clb
-  tag: 1b084647dc9118520c1cc615cf2fa7c3dd8a394e
-  --sha256: sha256-QliJng5PmJIRJd/l644T0zxBBOKhuMkIgeu1B5ymfVU=
+  location: https://github.com/mlabs-haskell/clb
+  tag: f33e486279029c6dc38a4527ff587443f8cdf373
+  --sha256: sha256-77CoSzJEwZDGtkcquPcP6INdO2eDHqAwZ8o04ybMhrQ=
   subdir:
     clb
-    emulator
-
--- TODO: Temporary, remove once we are on 10.9 or above. Fix relates to issue: https://github.com/IntersectMBO/cardano-api/issues/714.
-source-repository-package
-  type: git
-  location: https://github.com/sourabhxyz/cardano-api
-  tag: 14674d6b099e8fc36e5044e206bfc32164f75cee
-  --sha256: sha256-Qr4rv9bLz+wJdICYjxDVnnzgsVwx+wsU+tSFwDYr/kE=
-  subdir:
-    cardano-api
-    cardano-api-gen
-
--- Using latest version which is not on CHaP.
-source-repository-package
-  type: git
-  location: https://github.com/IntersectMBO/cardano-node
-  tag: 36161c9e00850616bd64b8db0c06bd77eb1ec951
-  --sha256: sha256-eaaj6kQb/TMGmxAhw355x4kBJfznKAem+rhC9SkmePs=
-  subdir:
-    cardano-node
-    cardano-testnet
-    trace-dispatcher
-    trace-forward
 
 package postgresql-libpq
   flags: +use-pkg-config
@@ -81,6 +58,64 @@ source-repository-package
 allow-newer:
     katip:Win32
   , ekg-wai:time
+
+if impl (ghc >= 9.10)
+  allow-newer:
+    -- https://github.com/biocad/openapi3/pull/108 or https://github.com/biocad/openapi3/pull/109.
+    , openapi3:base
+    , openapi3:template-haskell
+
+    , clb:base
+
+    -- https://github.com/maestro-org/haskell-sdk/pull/77.
+    , maestro-sdk:bytestring
+
+if impl (ghc >= 9.12)
+  allow-newer:
+    -- https://github.com/phadej/vec/issues/118
+    , bin:base
+    , fin:base
+    , ral:base
+
+    -- https://github.com/haskellari/tree-diff/issues/97
+    , tree-diff:base
+
+    -- https://github.com/kapralVV/Unique/issues/11
+    , Unique:hashable
+
+    -- https://github.com/fizruk/http-api-data/pull/146
+    , http-api-data:base
+
+    -- https://github.com/ocharles/libsystemd-journal/pull/32
+    , libsystemd-journal:base
+
+    -- https://github.com/Gabriella439/Haskell-Pipes-Safe-Library/pull/70
+    , pipes-safe:base
+
+    -- https://github.com/haskell-servant/servant/pull/1810
+    , servant:base
+    , servant-server:base
+
+    -- https://github.com/IntersectMBO/ouroboros-consensus/blob/main/cabal.project#L70-L74
+    , ouroboros-network-protocols:base
+    , ouroboros-network-framework:base
+    , ouroboros-network-api:base
+    , network-mux:base
+    , ouroboros-network:base
+    , cardano-ping:base
+
+    -- https://github.com/GetShopTV/swagger2/pull/257
+    , swagger2:base
+    , swagger2:template-haskell
+    , swagger2:time
+    , swagger2:containers
+    , insert-ordered-containers:base
+    , insert-ordered-containers:hashable
+    , hashable:base
+
+    -- https://github.com/haskellari/postgresql-simple/pull/153
+    , postgresql-simple:base
+    , postgresql-simple:template-haskell
 
 -- Using RDRAND instead of /dev/urandom as an entropy source for key
 -- generation is dubious. Set the flag so we use /dev/urandom by default.

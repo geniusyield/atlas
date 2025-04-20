@@ -61,8 +61,9 @@ import Hedgehog.Extras.Stock qualified as H'
 import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational, (%!))
 import Test.Tasty (TestName, TestTree)
 import Test.Tasty.HUnit (testCaseSteps)
+import Testnet.Defaults (defaultConwayGenesis)
 import Testnet.Property.Util
-import Testnet.Start.Types (GenesisBatch (..), GenesisOptions (..), GenesisOrigin (..), UserNodeConfig (UserNodeConfigNotSubmitted))
+import Testnet.Start.Types (GenesisOptions (..), UserProvidedData (NoUserProvidedData, UserProvidedData))
 import Testnet.Types hiding (shelleyGenesis)
 
 -------------------------------------------------------------------------------
@@ -127,7 +128,7 @@ debug :: String -> IO ()
 -- debug = putStrLn
 debug _ = return ()
 
-conwayGenesis :: ConwayGenesis StandardCrypto -> CtxCommittee -> ConwayGenesis StandardCrypto
+conwayGenesis :: ConwayGenesis -> CtxCommittee -> ConwayGenesis
 conwayGenesis cg ctxCommittee =
   let
     upPParams :: UpgradeConwayPParams Identity
@@ -370,10 +371,15 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
       setupUser setup
  where
   -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
-  cardanoTestnet' testnetOptions shelleyOptions conf ctxCommittee = do
-    GenesisBatch (shelleyGenesis, alonzoGenesis, cg, _) <- getDefaultGenesisBatch testnetOptions shelleyOptions
-    -- FIXME: Instead of `DefaultedOrigin`, this should be `UserProvidedOrigin` but for now that is leading to issues, see https://github.com/IntersectMBO/cardano-node/issues/6130#issuecomment-2692010489. Issue at Atlas side: https://github.com/geniusyield/atlas/issues/415.
-    cardanoTestnet testnetOptions conf UserNodeConfigNotSubmitted (GenesisBatch (shelleyGenesis, alonzoGenesis, conwayGenesis cg ctxCommittee, DefaultedOrigin))
+  cardanoTestnet' testnetOptions genesisOptions conf ctxCommittee = do
+    -- -- FIXME: Instead of `DefaultedOrigin`, this should be `UserProvidedOrigin` but for now that is leading to issues, see https://github.com/IntersectMBO/cardano-node/issues/6130#issuecomment-2692010489. Issue at Atlas side: https://github.com/geniusyield/atlas/issues/415.
+    cardanoTestnet
+      testnetOptions
+      genesisOptions
+      NoUserProvidedData
+      NoUserProvidedData
+      (UserProvidedData (conwayGenesis defaultConwayGenesis ctxCommittee))
+      conf
 
 -------------------------------------------------------------------------------
 -- Generating users

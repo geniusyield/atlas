@@ -15,7 +15,7 @@ module GeniusYield.Transaction.CoinSelection (
 
 import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Binary qualified as CBOR
-import Cardano.Ledger.Conway (Conway)
+import Cardano.Ledger.Conway (ConwayEra)
 import Cardano.Ledger.Conway.Core (eraProtVerHigh)
 import Control.Monad.Random (MonadRandom)
 import Control.Monad.Trans.Except (
@@ -228,7 +228,7 @@ computeTokenBundleSerializedLengthBytes :: GYValue -> Natural
 computeTokenBundleSerializedLengthBytes =
   safeCast
     . BS.length
-    . CBOR.serialize' (eraProtVerHigh @Conway)
+    . CBOR.serialize' (eraProtVerHigh @ConwayEra)
     . Api.S.toMaryValue
     . valueToApi
  where

@@ -1192,8 +1192,7 @@ obtainTxBodyContentBuildTx' (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltx
     resolvedScriptWitness <-
       resolveScriptWitness
         refScripts
-        ( fromJust $ addressToPaymentCredential $ utxoAddress utxo
-        )
+        (fromJust $ addressToPaymentCredential $ utxoAddress utxo)
         CApi.KeyWitnessForSpending
         CApi.ScriptWitnessForSpending
         (Ledger.ConwaySpending (Ledger.AsIx ix)) -- Only used if it's a script based credential.

@@ -88,7 +88,7 @@ data GYObtainTxBodyContentError
   = -- | No script found for given hash.
     GYNoScriptForHash !GYScriptHash
   | -- | No redeemer found for given purpose.
-    GYNoRedeemerForPurpose !(Ledger.ConwayPlutusPurpose Ledger.AsIx (Ledger.ConwayEra Ledger.StandardCrypto))
+    GYNoRedeemerForPurpose !(Ledger.ConwayPlutusPurpose Ledger.AsIx (Ledger.ConwayEra))
   | -- | 'GYCertificate' can't be obtained from given api certificate.
     GYInvalidCertificate !(Api.Certificate ApiEra)
   deriving stock Show

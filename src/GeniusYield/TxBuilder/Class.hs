@@ -115,6 +115,7 @@ import Cardano.Ledger.Alonzo.TxWits qualified as Ledger
 import Cardano.Ledger.Api qualified as Ledger
 import Cardano.Ledger.Conway.Scripts qualified as Ledger
 import Cardano.Ledger.Plutus.Language qualified as Ledger
+import Control.Lens ((^.))
 import Control.Monad (zipWithM)
 import Control.Monad.Except (MonadError (..), liftEither)
 import Control.Monad.IO.Class (MonadIO (..))
@@ -1064,7 +1065,7 @@ obtainTxBodyContentBuildTx txBody = fst <$> obtainTxBodyContentBuildTx' txBody
 
 {- | Obtain 'TxBodyContent BuildTx ApiEra' from 'GYTxBody'. Also returns the set of UTxOs used as input in this transaction (reference and spending inputs).
 
-__CAUTION__: This does not account for mint value, voting procedures and proposal procedures.
+__CAUTION__: This does not account for mint value, voting procedures and proposal procedures present inside the original transaction.
 -}
 obtainTxBodyContentBuildTx' :: forall m. GYTxSpecialQueryMonad m => GYTxBody -> m (CApi.TxBodyContent CApi.BuildTx ApiEra, GYUTxOs)
 obtainTxBodyContentBuildTx' (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxBody lscripts scriptData _ _)) = do
@@ -1141,7 +1142,7 @@ obtainTxBodyContentBuildTx' (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltx
   resolveRedeemer purp = case scriptData of
     CApi.TxBodyNoScriptData -> throwError $ GYObtainTxBodyContentException $ GYNoRedeemerForPurpose purp
     CApi.TxBodyScriptData _aeo _dats reds ->
-      case Ledger.lookupRedeemer purp reds of
+      case Map.lookup purp (reds ^. Ledger.unRedeemersL) of
         Nothing -> throwError $ GYObtainTxBodyContentException $ GYNoRedeemerForPurpose purp
         Just red -> pure $ bimap (CApi.unsafeHashableScriptData . CApi.fromPlutusData . Ledger.unData) CApi.fromAlonzoExUnits red
   resolveScriptWitness ::
@@ -1150,7 +1151,7 @@ obtainTxBodyContentBuildTx' (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltx
     GYCredential kr ->
     CApi.KeyWitnessInCtx witRole ->
     CApi.ScriptWitnessInCtx witRole ->
-    Ledger.ConwayPlutusPurpose Ledger.AsIx (Ledger.ConwayEra Ledger.StandardCrypto) ->
+    Ledger.ConwayPlutusPurpose Ledger.AsIx (Ledger.ConwayEra) ->
     CApi.ScriptDatum witRole ->
     m (CApi.BuildTxWith CApi.BuildTx (CApi.Witness witRole CApi.ConwayEra))
   resolveScriptWitness refScripts cred keyWitFor scriptWitFor purp dat = case cred of

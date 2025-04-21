@@ -1099,7 +1099,7 @@ obtainTxBodyContentBuildTx' (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltx
     CApi.TxCertificates csbe cs -> do
       certs' <- zipWithM (curry (certFromApi refScripts)) [0 ..] (toList cs)
       pure $ CApi.TxCertificates csbe (fromList certs')
-  pure $
+  pure
     ( CApi.TxBodyContent
         { txWithdrawals = wdrls'
         , txVotingProcedures = Nothing
@@ -1151,7 +1151,7 @@ obtainTxBodyContentBuildTx' (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltx
     GYCredential kr ->
     CApi.KeyWitnessInCtx witRole ->
     CApi.ScriptWitnessInCtx witRole ->
-    Ledger.ConwayPlutusPurpose Ledger.AsIx (Ledger.ConwayEra) ->
+    Ledger.ConwayPlutusPurpose Ledger.AsIx Ledger.ConwayEra ->
     CApi.ScriptDatum witRole ->
     m (CApi.BuildTxWith CApi.BuildTx (CApi.Witness witRole CApi.ConwayEra))
   resolveScriptWitness refScripts cred keyWitFor scriptWitFor purp dat = case cred of

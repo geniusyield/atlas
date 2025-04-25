@@ -69,6 +69,7 @@ module GeniusYield.Types.Script (
   mintingPolicyIdToCurrencySymbol,
   mintingPolicyIdFromCurrencySymbol,
   mintingPolicyIdCurrencySymbol,
+  mintingPolicyIdToScriptHash,
 
   -- * StakeValidator
   GYStakeValidator,
@@ -389,6 +390,10 @@ mintingPolicyIdFromText policyid =
     $ TE.encodeUtf8 policyid
  where
   customError err = "Invalid minting policy: " ++ show policyid ++ "; Reason: " ++ show err
+
+-- | Obtain 'GYScriptHash' from 'GYMintingPolicyId'.
+mintingPolicyIdToScriptHash :: GYMintingPolicyId -> GYScriptHash
+mintingPolicyIdToScriptHash = mintingPolicyIdToApi >>> Api.unPolicyId >>> scriptHashFromApi
 
 -------------------------------------------------------------------------------
 -- Stake validator

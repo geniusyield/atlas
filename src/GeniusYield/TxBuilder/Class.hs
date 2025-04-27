@@ -1065,7 +1065,7 @@ obtainTxBodyContentBuildTx txBody = fst <$> obtainTxBodyContentBuildTx' txBody
 
 {- | Obtain 'TxBodyContent BuildTx ApiEra' from 'GYTxBody'. Also returns the set of UTxOs used as input in this transaction (reference and spending inputs).
 
-__CAUTION__: This does not account for mint value, voting procedures and proposal procedures present inside the original transaction.
+__CAUTION__: This does not account for voting procedures and proposal procedures present inside the original transaction.
 -}
 obtainTxBodyContentBuildTx' :: forall m. GYTxSpecialQueryMonad m => GYTxBody -> m (CApi.TxBodyContent CApi.BuildTx ApiEra, GYUTxOs)
 obtainTxBodyContentBuildTx' (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxBody lscripts scriptData _ _)) = do

@@ -105,7 +105,7 @@ jobs:
           stat preprod-submit-test-wallet.skey
           
     - name: Setup haskell tooling
-      uses: haskell/actions/setup@v2
+      uses: haskell-actions/setup@v2
       with:
         ghc-version: '9.10.1'
         cabal-version: '3.14.1.1'

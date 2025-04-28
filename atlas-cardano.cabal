@@ -302,6 +302,7 @@ test-suite atlas-tests
 
   other-modules:
     GeniusYield.Test.Blueprint
+    GeniusYield.Test.BuildTxBodyContent
     GeniusYield.Test.CoinSelection
     GeniusYield.Test.Config
     GeniusYield.Test.FeeTracking

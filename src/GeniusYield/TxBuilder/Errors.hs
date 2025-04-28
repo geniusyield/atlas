@@ -10,6 +10,7 @@ module GeniusYield.TxBuilder.Errors (
   GYConversionError (..),
   GYQueryUTxOError (..),
   GYQueryDatumError (..),
+  GYObtainTxBodyContentError (..),
   GYTxMonadException (..),
   GYBuildTxError (..),
   GYBalancingError (..),
@@ -21,12 +22,17 @@ import Control.Monad.Except (MonadError, throwError)
 import Cardano.Slotting.Time (SystemStart)
 import PlutusLedgerApi.V1.Value qualified as Plutus (Value)
 
+import Cardano.Api qualified as Api
+import Cardano.Api.Ledger qualified as Ledger
+import Cardano.Ledger.Conway qualified as Ledger
 import GeniusYield.HTTP.Errors
 import GeniusYield.Imports
 import GeniusYield.Transaction.Common
 import GeniusYield.Types.Address (GYAddress)
 import GeniusYield.Types.Datum (GYDatum, GYDatumHash)
+import GeniusYield.Types.Era (ApiEra)
 import GeniusYield.Types.Ledger (PlutusToCardanoError (..))
+import GeniusYield.Types.Script.ScriptHash (GYScriptHash)
 import GeniusYield.Types.Slot (GYSlot)
 import GeniusYield.Types.Time (GYTime)
 import GeniusYield.Types.TxIn (GYTxIn)
@@ -78,6 +84,15 @@ data GYQueryDatumError
     GYNoDatumHash !GYUTxO
   deriving stock Show
 
+data GYObtainTxBodyContentError
+  = -- | No script found for given hash.
+    GYNoScriptForHash !GYScriptHash
+  | -- | No redeemer found for given purpose.
+    GYNoRedeemerForPurpose !(Ledger.ConwayPlutusPurpose Ledger.AsIx Ledger.ConwayEra)
+  | -- | 'GYCertificate' can't be obtained from given api certificate.
+    GYInvalidCertificate !(Api.Certificate ApiEra)
+  deriving stock Show
+
 {- | Exceptions raised within the 'GeniusYield.TxBuilder.Class.GYTxMonad' computation.
 
 This includes exceptions raised within the contract itself. It does not include:
@@ -101,6 +116,8 @@ data GYTxMonadException :: Type where
   GYTimeUnderflowException :: SystemStart -> GYTime -> GYTxMonadException
   -- | Raised during fetching/parsing datums.
   GYQueryDatumException :: GYQueryDatumError -> GYTxMonadException
+  -- | Raised when obtaining tx body content.
+  GYObtainTxBodyContentException :: GYObtainTxBodyContentError -> GYTxMonadException
   -- | When actual datum in the UTxO is different than what is mentioned for in witness.
   GYDatumMismatch :: GYOutDatum -> GYTxIn v -> GYTxMonadException
   -- | Wildcard user application specific errors. This is the "plug-in" point where an application

@@ -74,6 +74,7 @@ import GeniusYield.Types.Value
 -- | Transaction body: the part which is then signed.
 newtype GYTxBody = GYTxBody (Api.TxBody ApiEra)
   deriving Show
+  deriving newtype Eq
 
 txBodyFromApi :: Api.TxBody ApiEra -> GYTxBody
 txBodyFromApi = coerce

@@ -185,7 +185,7 @@ jobs:
         # Install docspec and run doctests.
         echo "=========================[ INSTALL DOCSPEC ]========================"
         echo " -> Started at $(date --iso-8601=seconds --utc)."
-        curl -sL https://github.com/phadej/cabal-extras/releases/download/cabal-docspec-0.0.0.20230517/cabal-docspec-0.0.0.20230517-x86_64-linux.xz > ./cabal-docspec.xz
+        curl -sL https://github.com/phadej/cabal-extras/releases/download/cabal-docspec-0.0.0.20240703/cabal-docspec-0.0.0.20240703-x86_64-linux.xz > ./cabal-docspec.xz
         xz -d < ./cabal-docspec.xz > ./cabal-docspec
         rm -f ./cabal-docspec.xz
         chmod a+x ./cabal-docspec

@@ -689,8 +689,8 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body ch
       (Just nkeys)
       & first
         ( \case
-            e@(Api.TxBodyErrorAdaBalanceNegative {}) -> if isFeeUtxo then GYBuildTxFeeUtxoAdaInsufficient e else GYBuildTxBodyErrorAutoBalance e
-            e@(Api.TxBodyErrorAdaBalanceTooSmall {}) -> if isFeeUtxo then GYBuildTxFeeUtxoAdaInsufficient e else GYBuildTxBodyErrorAutoBalance e
+            e@Api.TxBodyErrorAdaBalanceNegative {} -> if isFeeUtxo then GYBuildTxFeeUtxoAdaInsufficient e else GYBuildTxBodyErrorAutoBalance e
+            e@Api.TxBodyErrorAdaBalanceTooSmall {} -> if isFeeUtxo then GYBuildTxFeeUtxoAdaInsufficient e else GYBuildTxBodyErrorAutoBalance e
             anyOtherBuildError -> GYBuildTxBodyErrorAutoBalance anyOtherBuildError
         )
 

@@ -1,3 +1,8 @@
+## Next
+
+* Added `obtainTxBodyContentBuildTx'` to obtain `TxBodyContent BuildTx ...` from `GYTxBody`
+* Added extra build configuration to provide for fee UTxO. If such a UTxO is provided then it's used to cover for transaction fees. `GYBuildTxFeeUtxoAdaInsufficient` error is returned if it proves to be insufficient (either fee is higher than ADA available in this UTxO or that subsequent change output lacks sufficient ADA to cover minimum ADA requirements of an output).
+
 ## 0.13.0
 
 * Support of GHC 9.10 & 9.12.

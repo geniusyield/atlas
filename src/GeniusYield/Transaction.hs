@@ -769,8 +769,10 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body ch
   -- See: Cardano.Ledger.Shelley.Rules.validateMaxTxSizeUTxO
   unless (txSize <= maxTxSize) $
     Left (GYBuildTxSizeTooBig maxTxSize txSize)
-
-  first GYBuildTxCollapseExtraOutError $ collapseExtraOut extraOut txBodyContent numSkeletonOuts
+  if isFeeUtxo
+    then pure txBodyContent
+    else
+      first GYBuildTxCollapseExtraOutError $ collapseExtraOut extraOut txBodyContent numSkeletonOuts
 
 {- | Collapses the extra out generated in the last step of tx building into
     another change output (If one exists)

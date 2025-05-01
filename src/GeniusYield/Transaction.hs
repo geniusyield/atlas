@@ -29,7 +29,7 @@ Each output should be big enough
 (contain enough ADA, 'Api.calculateMinimumUTxO').
 Algorithm may adjust them to include additional value.
 
-There are also transacton fees which should also be taken into account.
+There are also transaction fees which should also be taken into account.
 We over-approximate the fees, and let 'Api.makeTransactionBodyAutoBalance' balance fees.
 (We can be more precise here, and only slightly over-approximate,
  but @cardano-api@ doesn't provide a handy helpers to fill in execution units).
@@ -202,6 +202,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub sig
           - InsufficientFunds
           - Script validation failure
           - Tx not within validity range specified timeframe
+          - If fee UTxO is provided, then it's insufficient to cover for fees and ADA of subsequent change output.
 
           No need to try again for these.
           -}
@@ -340,7 +341,10 @@ balanceTxStep
                 , mintValue = valueMint
                 , changeAddr = changeAddr
                 , ownUtxos = ownUtxos
-                , extraLovelace = extraLovelace
+                , extraLovelace =
+                    case gytxecFeeUtxo ec of
+                      Nothing -> extraLovelace
+                      Just _feeUtxo -> 0 -- We add for fee UTxO later and all the required fees must come from it.
                 , minimumUTxOF =
                     fromInteger
                       . flip valueAssetClass GYLovelace
@@ -377,7 +381,7 @@ finalizeGYBalancedTx
     , gyBTxEnvExtraConfiguration = ec
     }
   GYBalancedTx
-    { gybtxIns = ins
+    { gybtxIns = insBeforeAddingFeeUtxo
     , gybtxCollaterals = collaterals
     , gybtxOuts = outs
     , gybtxMint = mmint
@@ -402,11 +406,12 @@ finalizeGYBalancedTx
           ps
           (utxosToApi utxos)
           (gytxecPreBodyContentMapper ec body)
-          changeAddr
+          (maybe changeAddr utxoAddress $ gytxecFeeUtxo ec)
           unregisteredStakeCredsMap
           unregisteredDRepCredsMap
           estimateKeyWitnesses
           numSkeletonOuts
+          (isJust $ gytxecFeeUtxo ec)
     b <- first (GYBuildTxBodyErrorAutoBalance . Api.TxBodyError) $ Api.createTransactionBody Api.ShelleyBasedEraConway bc
     first GYBuildTxCborSimplificationError $ simplifyGYTxBodyCbor (txBodyFromApi b)
    where
@@ -460,6 +465,8 @@ finalizeGYBalancedTx
 
     inRefs' :: [Api.TxIn]
     inRefs' = [txOutRefToApi r | r <- utxosRefs utxosRefInputs]
+
+    ins = insBeforeAddingFeeUtxo <> (case gytxecFeeUtxo ec of Nothing -> mempty; Just feeUtxo -> [utxoToTxInDetailed feeUtxo GYTxInWitnessKey])
 
     -- utxos for inputs
     utxosIn :: GYUTxOs
@@ -655,8 +662,10 @@ makeTransactionBodyAutoBalanceWrapper ::
   Map.Map (Ledger.Credential Ledger.DRepRole) Ledger.Coin ->
   Word ->
   Int ->
+  -- | Whether we are using a separate UTxO solely for fees.
+  Bool ->
   Either GYBuildTxError (Api.S.TxBodyContent Api.S.BuildTx ApiEra)
-makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body changeAddr stakeDelegDeposits drepDelegDeposits nkeys numSkeletonOuts = do
+makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body changeAddr stakeDelegDeposits drepDelegDeposits nkeys numSkeletonOuts isFeeUtxo = do
   let Ledger.ExUnits
         { exUnitsSteps = maxSteps
         , exUnitsMem = maxMemory
@@ -666,19 +675,24 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body ch
 
   -- First we obtain the calculated fees to correct for our collaterals.
   bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ _ (Ledger.Coin feeOld)) <-
-    first GYBuildTxBodyErrorAutoBalance $
-      Api.makeTransactionBodyAutoBalance
-        Api.ShelleyBasedEraConway
-        ss
-        (Api.toLedgerEpochInfo eh)
-        (Api.LedgerProtocolParameters pp)
-        poolids
-        stakeDelegDeposits
-        drepDelegDeposits
-        utxos
-        body
-        changeAddrApi
-        (Just nkeys)
+    Api.makeTransactionBodyAutoBalance
+      Api.ShelleyBasedEraConway
+      ss
+      (Api.toLedgerEpochInfo eh)
+      (Api.LedgerProtocolParameters pp)
+      poolids
+      stakeDelegDeposits
+      drepDelegDeposits
+      utxos
+      body
+      changeAddrApi
+      (Just nkeys)
+      & first
+        ( \case
+            e@(Api.TxBodyErrorAdaBalanceNegative {}) -> if isFeeUtxo then GYBuildTxFeeUtxoAdaInsufficient e else GYBuildTxBodyErrorAutoBalance e
+            e@(Api.TxBodyErrorAdaBalanceTooSmall {}) -> if isFeeUtxo then GYBuildTxFeeUtxoAdaInsufficient e else GYBuildTxBodyErrorAutoBalance e
+            anyOtherBuildError -> GYBuildTxBodyErrorAutoBalance anyOtherBuildError
+        )
 
   -- We should call `makeTransactionBodyAutoBalance` again with updated values of collaterals so as to get slightly lower fee estimate.
   Api.BalancedTxBody txBodyContent unsignedLTx extraOut _ <-

@@ -10,6 +10,7 @@ module GeniusYield.Transaction.Common (
   GYBalancedTx (..),
   GYTxInDetailed (..),
   utxoFromTxInDetailed,
+  utxoToTxInDetailed,
   GYTxExtraConfiguration (..),
   GYBuildTxError (..),
   GYBalancingError (..),
@@ -76,6 +77,9 @@ data GYTxInDetailed v = GYTxInDetailed
 utxoFromTxInDetailed :: GYTxInDetailed v -> GYUTxO
 utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref _witns) addr val d ms) = GYUTxO ref addr val d ms
 
+utxoToTxInDetailed :: GYUTxO -> GYTxInWitness v -> GYTxInDetailed v
+utxoToTxInDetailed utxo witns = GYTxInDetailed (GYTxIn (utxoRef utxo) witns) (utxoAddress utxo) (utxoValue utxo) (utxoOutDatum utxo) (utxoRefScript utxo)
+
 -- | Extra configuration for transaction building.
 data GYTxExtraConfiguration v = GYTxExtraConfiguration
   { gytxecUtxoInputMapper :: GYUTxO -> GYTxInDetailed v
@@ -84,6 +88,8 @@ data GYTxExtraConfiguration v = GYTxExtraConfiguration
   -- ^ This function is called on the 'Api.TxBodyContent' before submitting it to 'makeTransactionBodyAutoBalanceWrapper'.
   , gytxecPostBodyContentMapper :: Api.TxBodyContent Api.BuildTx ApiEra -> Api.TxBodyContent Api.BuildTx ApiEra
   -- ^ This function is called on the 'Api.TxBodyContent' after submitting it to 'makeTransactionBodyAutoBalanceWrapper'.
+  , gytxecFeeUtxo :: Maybe GYUTxO
+  -- ^ UTxO to use for fees.
   }
 
 instance Default (GYTxExtraConfiguration v) where
@@ -100,6 +106,7 @@ instance Default (GYTxExtraConfiguration v) where
             }
       , gytxecPreBodyContentMapper = id
       , gytxecPostBodyContentMapper = id
+      , gytxecFeeUtxo = Nothing
       }
 
 -------------------------------------------------------------------------------
@@ -132,6 +139,8 @@ Insufficient funds and similar are considered trivial transaction building error
 data GYBuildTxError
   = GYBuildTxBalancingError !GYBalancingError
   | GYBuildTxBodyErrorAutoBalance !(Api.TxBodyErrorAutoBalance ApiEra)
+  | -- | If fee UTxO is provided for in extra build configuration, then this error is raised if it's insufficient to cover for fees and ADA of subsequent change output.
+    GYBuildTxFeeUtxoAdaInsufficient !(Api.TxBodyErrorAutoBalance ApiEra)
   | -- | Execution units required is higher than the maximum as specified by protocol params.
     GYBuildTxExUnitsTooBig
       -- | Tuple of maximum execution steps & memory as given by protocol parameters.

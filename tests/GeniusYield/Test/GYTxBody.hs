@@ -154,10 +154,12 @@ balanceTxStepTests =
           []
           mempty
           mempty
+          0
           []
           []
           GYRandomImproveMultiAsset
           2_000_000
+
       res @?= Left GYBalancingErrorEmptyOwnUTxOs
   , testCase "No collateral needed" $ do
       Right (_, collaterals, _) <-
@@ -168,6 +170,7 @@ balanceTxStepTests =
           []
           mempty
           mempty
+          0
           []
           []
           GYRandomImproveMultiAsset
@@ -182,6 +185,7 @@ balanceTxStepTests =
           []
           mempty
           mempty
+          0
           []
           []
           GYRandomImproveMultiAsset

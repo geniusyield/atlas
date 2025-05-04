@@ -159,13 +159,14 @@ buildUnsignedTxBody ::
   Maybe GYTxMetadata ->
   GYTxVotingProcedures v ->
   [(GYProposalProcedurePB, GYTxBuildWitness v)] ->
+  Natural ->
   m (Either GYBuildTxError GYTxBody)
-buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata vps pps = buildTxLoop cstrat extraLovelaceStart
+buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata vps pps donation = buildTxLoop cstrat extraLovelaceStart
  where
   certsFinalised = finaliseTxCert (gyBTxEnvProtocolParams env) <$> certs
 
   step :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))
-  step stepStrat = fmap (first GYBuildTxBalancingError) . balanceTxStep env mmint wdrls certsFinalised vps pps insOld outsOld stepStrat
+  step stepStrat = fmap (first GYBuildTxBalancingError) . balanceTxStep env mmint wdrls certsFinalised vps pps donation insOld outsOld stepStrat
 
   buildTxLoop :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError GYTxBody)
   buildTxLoop stepStrat n
@@ -229,6 +230,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub sig
             , gybtxMetadata = mbTxMetadata
             , gybtxVotingProcedures = vps
             , gybtxProposalProcedures = pps
+            , gybtxDonation = donation
             }
           (length outsOld)
 
@@ -259,6 +261,8 @@ balanceTxStep ::
   GYTxVotingProcedures v ->
   -- | proposal procedures
   [(GYProposalProcedurePB, GYTxBuildWitness v)] ->
+  -- | donation
+  Natural ->
   -- | transaction inputs
   [GYTxInDetailed v] ->
   -- | transaction outputs
@@ -282,6 +286,7 @@ balanceTxStep
   certs
   vps
   pps
+  donation
   ins
   outs
   cstrat =
@@ -323,8 +328,8 @@ balanceTxStep
         adaSource =
           let wdrlsAda = getSum $ foldMap' (coerce . gyTxWdrlAmount) wdrls
            in wdrlsAda + stakeCredDeregsAmt + drepDeregsAmt
-        -- Ada lost due to stake credential registration.
-        adaSink = stakeCredRegsAmt + drepRegsAmt + spRegsAmt + govActionsAmt
+        -- Ada lost due to stake credential registration, etc.
+        adaSink = stakeCredRegsAmt + drepRegsAmt + spRegsAmt + govActionsAmt + donation
         collaterals
           | needsCollateral = utxosFromUTxO collateral
           | otherwise = mempty
@@ -394,6 +399,7 @@ finalizeGYBalancedTx
     , gybtxMetadata = mbTxMetadata
     , gybtxVotingProcedures = vps
     , gybtxProposalProcedures = pps
+    , gybtxDonation = donation
     }
   numSkeletonOuts = do
     bc <-
@@ -642,7 +648,7 @@ finalizeGYBalancedTx
         , Api.txProposalProcedures = pps'
         , Api.txVotingProcedures = vps'
         , Api.txCurrentTreasuryValue = Nothing -- FIXME:?
-        , Api.txTreasuryDonation = Nothing -- FIXME:?
+        , Api.txTreasuryDonation = if donation == 0 then Nothing else Api.mkFeatured (fromIntegral donation)
         }
 
 {- | Wraps around 'Api.makeTransactionBodyAutoBalance' just to verify the final ex units and tx size are within limits.

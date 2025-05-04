@@ -73,6 +73,8 @@ module GeniusYield.Types.Value (
   GYAssetClass (..),
   assetClassToPlutus,
   assetClassFromPlutus,
+  assetClassToApi,
+  assetClassFromApi,
   parseAssetClassWithSep,
   parseAssetClassWithoutSep,
   parseAssetClassCore,

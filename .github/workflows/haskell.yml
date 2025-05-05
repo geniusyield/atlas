@@ -111,18 +111,6 @@ jobs:
         cabal-version: '3.14.1.1'
         enable-stack: true
         stack-version: '2.9'
-    - name: Setup cache
-      uses: actions/cache@v3
-      env:
-        cache-name: cache-cabal
-      with:
-        path: ~/.cabal
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/cabal.project') }}
-        restore-keys: |
-          ${{ runner.os }}-build-${{ env.cache-name }}-
-          ${{ runner.os }}-build-
-          ${{ runner.os }}-
-
     - name: Install LIBSODIUM
       run: |
         git clone https://github.com/input-output-hk/libsodium
@@ -167,9 +155,33 @@ jobs:
         sudo cp libblst.a /usr/local/lib
         sudo chmod u=rw,go=r /usr/local/{lib/{libblst.a,pkgconfig/libblst.pc},include/{blst.{h,hpp},blst_aux.h}}
     - name: Update dependencies (cabal)
-      run: cabal update
+      run: cabal update --enable-tests --enable-benchmarks
+    - name: Freeze dependencies (cabal)
+      run: cabal v2-freeze --enable-tests --enable-benchmarks
+    - name: Setup cache
+      uses: actions/cache@v3
+      env:
+        cache-name: cache-cabal
+      with:
+        path: ~/.cabal
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('cabal.project.freeze') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
     - name: Build dependencies (cabal)
       run: cabal build --only-dependencies --enable-tests --enable-benchmarks
+    - name: Setup cache
+      uses: actions/cache@v3
+      env:
+        cache-name: cache-cabal
+      with:
+        path: ~/.cabal
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('cabal.project.freeze') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
     - name: Build all targets (cabal)
       run: cabal build --enable-tests --enable-benchmarks all
     - name: Symlink cardano-node binaries

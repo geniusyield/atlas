@@ -106,6 +106,7 @@ jobs:
           
     - name: Setup haskell tooling
       uses: haskell-actions/setup@v2
+      id: setup-haskell-cabal
       with:
         ghc-version: '9.10.1'
         cabal-version: '3.14.1.1'
@@ -163,25 +164,15 @@ jobs:
       env:
         cache-name: cache-cabal
       with:
-        path: ~/.cabal
+        path: |
+          ${{ steps.setup-haskell-cabal.outputs.cabal-store }}
+          dist-newstyle
         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('cabal.project.freeze') }}
         restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('cabal.project.freeze') }}
           ${{ runner.os }}-build-${{ env.cache-name }}-
-          ${{ runner.os }}-build-
-          ${{ runner.os }}-
     - name: Build dependencies (cabal)
       run: cabal build --only-dependencies --enable-tests --enable-benchmarks
-    - name: Setup cache
-      uses: actions/cache@v3
-      env:
-        cache-name: cache-cabal
-      with:
-        path: ~/.cabal
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('cabal.project.freeze') }}
-        restore-keys: |
-          ${{ runner.os }}-build-${{ env.cache-name }}-
-          ${{ runner.os }}-build-
-          ${{ runner.os }}-
     - name: Build all targets (cabal)
       run: cabal build --enable-tests --enable-benchmarks all
     - name: Symlink cardano-node binaries

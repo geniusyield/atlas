@@ -62,6 +62,7 @@ data GYBalancedTx v = GYBalancedTx
   , gybtxMetadata :: !(Maybe GYTxMetadata)
   , gybtxVotingProcedures :: !(GYTxVotingProcedures v)
   , gybtxProposalProcedures :: ![(GYProposalProcedurePB, GYTxBuildWitness v)]
+  , gybtxDonation :: !Natural
   }
 
 -- | A further detailed version of 'GYTxIn', containing all information about a UTxO.

@@ -71,4 +71,10 @@ tests setup =
         info $ "body: " <> show body
         balanceAfter <- ctxQueryBalance ctx endUser
         assertEqual "User balance must have not changed" balanceBefore balanceAfter
+    , testCaseSteps "Donation" $ \info -> withSetup info setup $ \ctx -> do
+        ctxRun ctx (ctxUserF ctx) $ do
+          txBody <-
+            buildTxBody @'PlutusV3 $
+              mustHaveDonation 1_000_000
+          signAndSubmitConfirmed_ txBody
     ]

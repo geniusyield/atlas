@@ -95,6 +95,7 @@ module GeniusYield.TxBuilder.Class (
   mustBeSignedBy,
   isInvalidBefore,
   isInvalidAfter,
+  mustHaveDonation,
   gyLogDebug',
   gyLogInfo',
   gyLogWarning',
@@ -888,6 +889,9 @@ isInvalidBefore s = emptyGYTxSkeleton {gytxInvalidBefore = Just s}
 
 isInvalidAfter :: GYSlot -> GYTxSkeleton v
 isInvalidAfter s = emptyGYTxSkeleton {gytxInvalidAfter = Just s}
+
+mustHaveDonation :: VersionIsGreaterOrEqual v 'PlutusV3 => Natural -> GYTxSkeleton v
+mustHaveDonation n = emptyGYTxSkeleton {gytxDonation = GYTxSkeletonDonation n}
 
 gyLogDebug', gyLogInfo', gyLogWarning', gyLogError' :: (GYTxQueryMonad m, HasCallStack) => GYLogNamespace -> String -> m ()
 gyLogDebug' ns = withFrozenCallStack $ logMsg ns GYDebug

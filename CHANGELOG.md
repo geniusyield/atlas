@@ -1,7 +1,8 @@
-## Next
+## 0.14.0
 
-* Added `obtainTxBodyContentBuildTx'` to obtain `TxBodyContent BuildTx ...` from `GYTxBody`
-* Added extra build configuration to provide for fee UTxO. If such a UTxO is provided then it's used to cover for transaction fees. `GYBuildTxFeeUtxoAdaInsufficient` error is returned if it proves to be insufficient (either fee is higher than ADA available in this UTxO or that subsequent change output lacks sufficient ADA to cover minimum ADA requirements of an output).
+* Function to obtain `TxBodyContent BuildTx ApiEra` from `GYTxBody`, called `obtainTxBodyContentBuildTx` (also see `obtainTxBodyContentBuildTx'`). This is useful to build upon previously built transactions.
+* Add support for treasury donation. See "Donation" test in `GeniusYield.Test.Privnet.Examples.Misc` module.
+* Added extra build configuration (within `GYTxExtraConfiguration`) to provide for fee UTxO. If such a UTxO is provided then it's used to cover for transaction fees and we won't be exercising our usual logarithmic fee over approximation algorithm (see [specification](https://github.com/geniusyield/atlas/blob/main/src/GeniusYield/Transaction/CoinSelection/Specification.md) for details about this algorithm -- mainly the first few paras) since purpose of that algorithm is to select sufficient ADA from user's wallet to satisfy for fees but here we have separate fee UTxO which is expected to provide for it. `GYBuildTxFeeUtxoAdaInsufficient` error is returned if it proves to be insufficient (either fee is higher than ADA available in this UTxO or that subsequent change output lacks sufficient ADA to cover minimum ADA requirements of an output).
 
 ## 0.13.0
 

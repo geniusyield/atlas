@@ -106,23 +106,12 @@ jobs:
           
     - name: Setup haskell tooling
       uses: haskell-actions/setup@v2
+      id: setup-haskell-cabal
       with:
         ghc-version: '9.10.1'
         cabal-version: '3.14.1.1'
         enable-stack: true
         stack-version: '2.9'
-    - name: Setup cache
-      uses: actions/cache@v3
-      env:
-        cache-name: cache-cabal
-      with:
-        path: ~/.cabal
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/cabal.project') }}
-        restore-keys: |
-          ${{ runner.os }}-build-${{ env.cache-name }}-
-          ${{ runner.os }}-build-
-          ${{ runner.os }}-
-
     - name: Install LIBSODIUM
       run: |
         git clone https://github.com/input-output-hk/libsodium
@@ -167,7 +156,21 @@ jobs:
         sudo cp libblst.a /usr/local/lib
         sudo chmod u=rw,go=r /usr/local/{lib/{libblst.a,pkgconfig/libblst.pc},include/{blst.{h,hpp},blst_aux.h}}
     - name: Update dependencies (cabal)
-      run: cabal update
+      run: cabal update --enable-tests --enable-benchmarks
+    - name: Freeze dependencies (cabal)
+      run: cabal v2-freeze --enable-tests --enable-benchmarks
+    - name: Setup cache
+      uses: actions/cache@v3
+      env:
+        cache-name: cache-cabal
+      with:
+        path: |
+          ${{ steps.setup-haskell-cabal.outputs.cabal-store }}
+          dist-newstyle
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('cabal.project.freeze') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('cabal.project.freeze') }}
+          ${{ runner.os }}-build-${{ env.cache-name }}-
     - name: Build dependencies (cabal)
       run: cabal build --only-dependencies --enable-tests --enable-benchmarks
     - name: Build all targets (cabal)
@@ -205,7 +208,7 @@ jobs:
         echo "ATLAS_VERSION=${ATLAS_VERSION}" >> $GITHUB_ENV
         echo "ATLAS_VERSION=${ATLAS_VERSION}" >> $GITHUB_OUTPUT
     - name: Generate documentation (cabal haddock)
-      run: cabal haddock --html --hyperlink-source --haddock-options="--use-unicode" --haddock-quickjump
+      run: cabal v2-haddock atlas-cardano --html --hyperlink-source --haddock-options="--use-unicode" --haddock-quickjump
     - name: Upload haddock documentation
       uses: actions/upload-pages-artifact@v3
       with:

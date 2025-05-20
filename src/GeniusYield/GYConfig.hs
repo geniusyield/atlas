@@ -407,6 +407,7 @@ logTiming providers@GYProviders {..} =
       , gyQueryUtxoAtTxOutRef' = wrap "gyQueryUtxoAtTxOutRef" . gyQueryUtxoAtTxOutRef providers
       , gyQueryUtxoRefsAtAddress' = wrap "gyQueryUtxoRefsAtAddress" . gyQueryUtxoRefsAtAddress providers
       , gyQueryUtxosAtAddress' = \addr mac -> wrap "gyQueryUtxosAtAddress'" $ gyQueryUtxosAtAddress providers addr mac
+      , gyQueryUtxosWithAsset' = wrap "gyQueryUtxosWithAsset'" . gyQueryUtxosWithAsset providers
       , gyQueryUtxosAtAddressWithDatums' = case gyQueryUtxosAtAddressWithDatums' gyQueryUTxO of
           Nothing -> Nothing
           Just q -> Just $ \addr mac -> wrap "gyQueryUtxosAtAddressWithDatums'" $ q addr mac

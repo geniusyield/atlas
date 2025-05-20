@@ -107,6 +107,9 @@ providersMashupTests configs =
           utxosAtPaymentCredentials' <- gyQueryUtxosAtPaymentCredentials provider myCredList
           delayBySecond
           utxosAtPaymentCredentialsWithDatums' <- gyQueryUtxosAtPaymentCredsWithDatums provider myCredList
+          delayBySecond
+          -- Asset class is just of some token I found at always fail address above.
+          assetUtxos <- gyQueryUtxosWithAsset provider (GYNonAdaToken "5a115cf47b9c359889c18b882ce043fc25495b67429cb35026d7ae43" (unsafeTokenNameFromHex "031b02267a6b1e11922cb83778e80c31439a6218f1f7c73a284fc7ccb633ffa0"))
           -- Following is commented out due to an apparent bug in Blockfrost.
           -- delayBySecond
           -- utxosAtScriptAddressWithAssetAndDatums <- gyQueryUtxosAtAddressWithDatums provider (unsafeAddressFromText "addr_test1wz2mzj532enpgu5vgwxuh249fpknx5ft9wxse2876z0mp2q89ye7k") (Just "c6e65ba7878b2f8ea0ad39287d3e2fd256dc5c4160fc19bdf4c4d87e.7447454e53")
@@ -123,6 +126,7 @@ providersMashupTests configs =
             , utxosAtScriptCredentialWithAsset
             , utxosAtPaymentCredentials'
             , Set.fromList utxosAtPaymentCredentialsWithDatums' `Set.difference` utxoBugSet
+            , assetUtxos
             -- , Set.fromList utxosAtScriptAddressWithAssetAndDatums
             )
         assertBool "Utxos are not all equal" $ allEqual utxosProviders

@@ -48,6 +48,7 @@ module GeniusYield.Types.Providers (
   gyQueryUtxosAtPaymentCredWithDatums,
   gyQueryUtxosAtPaymentCredsWithDatums,
   gyQueryUtxosAtAddress,
+  gyQueryUtxosWithAsset,
   gyQueryUtxosAtPaymentCredential,
   gyQueryUtxosAtPaymentCredentials,
   gyQueryUtxosAtTxOutRefs,
@@ -183,6 +184,9 @@ gyWaitForNextBlock_ = void . gyWaitForNextBlock
 
 gyQueryUtxosAtAddress :: GYProviders -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
 gyQueryUtxosAtAddress = gyQueryUtxosAtAddress' . gyQueryUTxO
+
+gyQueryUtxosWithAsset :: GYProviders -> GYAssetClass -> IO GYUTxOs
+gyQueryUtxosWithAsset = gyQueryUtxosWithAsset' . gyQueryUTxO
 
 gyQueryUtxosAtAddresses :: GYProviders -> [GYAddress] -> IO GYUTxOs
 gyQueryUtxosAtAddresses = gyQueryUtxosAtAddresses' . gyQueryUTxO
@@ -449,6 +453,8 @@ data GYQueryUTxO = GYQueryUTxO
   , gyQueryUtxoAtTxOutRef' :: !(GYTxOutRef -> IO (Maybe GYUTxO))
   , gyQueryUtxoRefsAtAddress' :: !(GYAddress -> IO [GYTxOutRef])
   , gyQueryUtxosAtAddress' :: !(GYAddress -> Maybe GYAssetClass -> IO GYUTxOs)
+  , -- TODO: Should this made lazy so as not all providers (CLB) implement it?
+    gyQueryUtxosWithAsset' :: !(GYAssetClass -> IO GYUTxOs)
   , gyQueryUtxosAtAddressWithDatums' :: !(Maybe (GYAddress -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]))
   , gyQueryUtxosAtAddresses' :: !([GYAddress] -> IO GYUTxOs)
   , gyQueryUtxosAtAddressesWithDatums' :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))

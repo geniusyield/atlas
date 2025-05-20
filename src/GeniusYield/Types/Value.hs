@@ -766,6 +766,9 @@ parseAssetClassCore' msep tkParser t = Atto.parseOnly parser (TE.encodeUtf8 t)
 data GYNonAdaToken = GYNonAdaToken !GYMintingPolicyId !GYTokenName
   deriving stock (Show, Eq, Ord, Generic)
 
+instance Hashable GYNonAdaToken where
+  hashWithSalt salt nat = hashWithSalt salt $ nonAdaTokenToAssetClass nat
+
 nonAdaTokenToAssetClass :: GYNonAdaToken -> GYAssetClass
 nonAdaTokenToAssetClass (GYNonAdaToken m tn) = GYToken m tn
 

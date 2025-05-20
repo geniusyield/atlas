@@ -1,3 +1,7 @@
+## Next
+
+* Added `utxosWithAsset` to efficiently querying for UTxOs containing specified asset.
+
 ## 0.14.0
 
 * Function to obtain `TxBodyContent BuildTx ApiEra` from `GYTxBody`, called `obtainTxBodyContentBuildTx` (also see `obtainTxBodyContentBuildTx'`). This is useful to build upon previously built transactions.

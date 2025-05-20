@@ -216,7 +216,7 @@ augmentQueryUTxO GYQueryUTxO {..} dataStore fetchOutsModuloIns = do
         let mempoolFoundOuts =
               Map.filter
                 ( \(GYUTxO {..}, _mdatum) ->
-                    valueAssetClass utxoValue ac > 0
+                    valueAssetClass utxoValue (nonAdaTokenToAssetClass ac) > 0
                 )
                 mempoolOuts
                 & outsWithDatumsMapToOuts

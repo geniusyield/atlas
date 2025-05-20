@@ -79,6 +79,11 @@ module GeniusYield.Types.Value (
   parseAssetClassWithoutSep,
   parseAssetClassCore,
 
+  -- * Non-Ada token
+  GYNonAdaToken (..),
+  nonAdaTokenToAssetClass,
+  nonAdaTokenFromAssetClass,
+
   -- * Token name
   GYTokenName (..),
   tokenNameToHex,
@@ -756,6 +761,17 @@ parseAssetClassCore' msep tkParser t = Atto.parseOnly parser (TE.encodeUtf8 t)
         for_ msep (void . Atto.char)
         tn <- Atto.takeWhile isAlphaNum
         GYToken (mintingPolicyIdFromApi cs') <$> tkParser tn
+
+-- | A non-Ada token is a token that is not lovelace.
+data GYNonAdaToken = GYNonAdaToken !GYMintingPolicyId !GYTokenName
+  deriving stock (Show, Eq, Ord, Generic)
+
+nonAdaTokenToAssetClass :: GYNonAdaToken -> GYAssetClass
+nonAdaTokenToAssetClass (GYNonAdaToken m tn) = GYToken m tn
+
+nonAdaTokenFromAssetClass :: GYAssetClass -> Maybe GYNonAdaToken
+nonAdaTokenFromAssetClass (GYToken m tn) = Just $ GYNonAdaToken m tn
+nonAdaTokenFromAssetClass _ = Nothing
 
 -------------------------------------------------------------------------------
 -- TokenName

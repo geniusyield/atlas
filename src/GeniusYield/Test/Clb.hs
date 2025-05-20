@@ -289,7 +289,7 @@ instance GYTxQueryMonad GYTxMonadClb where
         Left _ -> return Nothing -- TODO: should it error?
         Right ref' -> utxoAtTxOutRef ref'
   utxosWithAsset ac = do
-    filterUTxOs (\GYUTxO {..} -> valueAssetClass utxoValue ac > 0) <$> allUTxOs
+    filterUTxOs (\GYUTxO {..} -> valueAssetClass utxoValue (nonAdaTokenToAssetClass ac) > 0) <$> allUTxOs
 
   utxosAtPaymentCredential :: GYPaymentCredential -> Maybe GYAssetClass -> GYTxMonadClb GYUTxOs
   utxosAtPaymentCredential cred mAssetClass = do

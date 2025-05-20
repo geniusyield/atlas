@@ -65,7 +65,7 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
   utxosAtAddress :: GYAddress -> Maybe GYAssetClass -> m GYUTxOs
 
   -- | Lookup 'GYUTxOs' with a given 'GYAssetClass'.
-  utxosWithAsset :: GYAssetClass -> m GYUTxOs
+  utxosWithAsset :: GYNonAdaToken -> m GYUTxOs
 
   -- | Lookup 'GYUTxO' at given 'GYAddress' with their datums. This has a default implementation using `utxosAtAddress` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
   utxosAtAddressWithDatums :: GYAddress -> Maybe GYAssetClass -> m [(GYUTxO, Maybe GYDatum)]

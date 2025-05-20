@@ -48,6 +48,7 @@ module GeniusYield.Types.Providers (
   gyQueryUtxosAtPaymentCredWithDatums,
   gyQueryUtxosAtPaymentCredsWithDatums,
   gyQueryUtxosAtAddress,
+  gyQueryUtxosWithAsset,
   gyQueryUtxosAtPaymentCredential,
   gyQueryUtxosAtPaymentCredentials,
   gyQueryUtxosAtTxOutRefs,
@@ -113,7 +114,7 @@ import GeniusYield.Types.Time (timeToPOSIX)
 import GeniusYield.Types.Tx
 import GeniusYield.Types.TxOutRef
 import GeniusYield.Types.UTxO
-import GeniusYield.Types.Value (GYAssetClass)
+import GeniusYield.Types.Value (GYAssetClass, GYNonAdaToken)
 
 {- Note [Caching and concurrently accessible MVars]
 
@@ -183,6 +184,9 @@ gyWaitForNextBlock_ = void . gyWaitForNextBlock
 
 gyQueryUtxosAtAddress :: GYProviders -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
 gyQueryUtxosAtAddress = gyQueryUtxosAtAddress' . gyQueryUTxO
+
+gyQueryUtxosWithAsset :: GYProviders -> GYNonAdaToken -> IO GYUTxOs
+gyQueryUtxosWithAsset = gyQueryUtxosWithAsset' . gyQueryUTxO
 
 gyQueryUtxosAtAddresses :: GYProviders -> [GYAddress] -> IO GYUTxOs
 gyQueryUtxosAtAddresses = gyQueryUtxosAtAddresses' . gyQueryUTxO
@@ -449,6 +453,7 @@ data GYQueryUTxO = GYQueryUTxO
   , gyQueryUtxoAtTxOutRef' :: !(GYTxOutRef -> IO (Maybe GYUTxO))
   , gyQueryUtxoRefsAtAddress' :: !(GYAddress -> IO [GYTxOutRef])
   , gyQueryUtxosAtAddress' :: !(GYAddress -> Maybe GYAssetClass -> IO GYUTxOs)
+  , gyQueryUtxosWithAsset' :: !(GYNonAdaToken -> IO GYUTxOs)
   , gyQueryUtxosAtAddressWithDatums' :: !(Maybe (GYAddress -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]))
   , gyQueryUtxosAtAddresses' :: !([GYAddress] -> IO GYUTxOs)
   , gyQueryUtxosAtAddressesWithDatums' :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))

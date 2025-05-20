@@ -210,6 +210,7 @@ blockfrostQueryUtxo proj =
     , gyQueryUtxoRefsAtAddress' = gyQueryUtxoRefsAtAddressDefault $ blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddresses' = gyQueryUtxoAtAddressesDefault $ blockfrostUtxosAtAddress proj
     , gyQueryUtxosAtAddress' = blockfrostUtxosAtAddress proj
+    , gyQueryUtxosWithAsset' = blockfrostUtxosWithAsset proj
     , gyQueryUtxosAtAddressWithDatums' = Nothing
     , gyQueryUtxosAtAddressesWithDatums' = Nothing -- Will use the default implementation.
     , gyQueryUtxosAtPaymentCredential' = blockfrostUtxosAtPaymentCredential proj
@@ -253,6 +254,25 @@ blockfrostUtxosAtAddress proj addr mAssetClass = do
     Right x -> pure $ utxosFromList x
  where
   locationIdent = "AddressUtxos"
+  -- This particular error is fine in this case, we can just return empty list.
+  handler (Left Blockfrost.BlockfrostNotFound) = pure []
+  handler other = handleBlockfrostError locationIdent other
+
+blockfrostUtxosWithAsset :: Blockfrost.Project -> GYNonAdaToken -> IO GYUTxOs
+blockfrostUtxosWithAsset proj ac = do
+  let assetId = extractNonAdaToken ac & (\(pid, tn) -> Blockfrost.mkAssetId $ pid <> tn)
+  assetAddrs <- handler
+    <=< Blockfrost.runBlockfrost proj
+      . Blockfrost.allPages
+    $ \paged -> Blockfrost.getAssetAddresses' assetId paged Blockfrost.Ascending
+  case traverse (addressFromBlockfrost . Blockfrost._assetAddressAddress) assetAddrs of
+    Left err -> throwIO $ BlpvDeserializeFailure locationIdent err
+    Right addrs -> do
+      utxos <- traverse (\addr -> blockfrostUtxosAtAddress proj addr (Just (nonAdaTokenToAssetClass ac))) addrs
+      pure $ mconcat utxos
+ where
+  locationIdent = "UtxosWithAsset"
+  addressFromBlockfrost addr = maybeToRight DeserializeErrorAddress $ addressFromTextMaybe $ Blockfrost.unAddress addr
   -- This particular error is fine in this case, we can just return empty list.
   handler (Left Blockfrost.BlockfrostNotFound) = pure []
   handler other = handleBlockfrostError locationIdent other

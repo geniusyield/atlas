@@ -27,6 +27,7 @@ import GeniusYield.Imports
 import GeniusYield.Providers.Common (
   datumFromCBOR,
   extractAssetClass,
+  extractNonAdaToken,
   newServantClientEnv,
  )
 import GeniusYield.Types (
@@ -39,6 +40,7 @@ import GeniusYield.Types (
   GYDatum,
   GYDatumHash,
   GYLookupDatum,
+  GYNonAdaToken,
   GYOutDatum (GYOutDatumHash, GYOutDatumInline, GYOutDatumNone),
   GYPaymentCredential,
   GYQueryUTxO (..),
@@ -282,6 +284,16 @@ kupoUtxosAtAddress env addr mAssetClass = do
  where
   locationIdent = "AddressesUtxo"
 
+kupoUtxosWithAsset :: KupoApiEnv -> GYNonAdaToken -> IO GYUTxOs
+kupoUtxosWithAsset env ac = do
+  let (pid, tn) = extractNonAdaToken ac
+  utxos <-
+    handleKupoError locationIdent <=< runKupoClient env $
+      fetchUtxosByPattern (pid <> "." <> tn) True Nothing Nothing
+  utxosFromList <$> traverse (transformUtxo env) (getResponse utxos)
+ where
+  locationIdent = "UtxosWithAsset"
+
 kupoUtxoAtTxOutRef :: KupoApiEnv -> GYTxOutRef -> IO (Maybe GYUTxO)
 kupoUtxoAtTxOutRef env oref = do
   let (txId, utxoIdx) = txOutRefToTuple' oref
@@ -337,6 +349,7 @@ kupoQueryUtxo :: KupoApiEnv -> GYQueryUTxO
 kupoQueryUtxo env =
   GYQueryUTxO
     { gyQueryUtxosAtAddress' = kupoUtxosAtAddress env
+    , gyQueryUtxosWithAsset' = kupoUtxosWithAsset env
     , gyQueryUtxosAtAddressWithDatums' = Nothing
     , gyQueryUtxosAtAddresses' = gyQueryUtxoAtAddressesDefault $ kupoUtxosAtAddress env
     , gyQueryUtxosAtTxOutRefs' = gyQueryUtxosAtTxOutRefsDefault $ kupoUtxoAtTxOutRef env

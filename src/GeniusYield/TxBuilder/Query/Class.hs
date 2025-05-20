@@ -33,7 +33,7 @@ import GeniusYield.Types
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock, (drepState | drepsState), constitution, proposals, mempoolTxs #-}
+  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosWithAsset, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock, (drepState | drepsState), constitution, proposals, mempoolTxs #-}
 
   -- | Get the network id
   networkId :: m GYNetworkId
@@ -63,6 +63,9 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
 
   -- | Lookup 'GYUTxOs' at 'GYAddress'.
   utxosAtAddress :: GYAddress -> Maybe GYAssetClass -> m GYUTxOs
+
+  -- | Lookup 'GYUTxOs' with a given 'GYAssetClass'.
+  utxosWithAsset :: GYNonAdaToken -> m GYUTxOs
 
   -- | Lookup 'GYUTxO' at given 'GYAddress' with their datums. This has a default implementation using `utxosAtAddress` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
   utxosAtAddressWithDatums :: GYAddress -> Maybe GYAssetClass -> m [(GYUTxO, Maybe GYDatum)]
@@ -196,6 +199,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -236,6 +240,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -302,6 +307,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -342,6 +348,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -382,6 +389,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (CPS.WriterT w m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -422,6 +430,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Strict.WriterT w m) whe
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -462,6 +471,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Lazy.WriterT w m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums

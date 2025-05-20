@@ -22,7 +22,6 @@ module GeniusYield.Test.Clb (
   logInfoS,
 ) where
 
-import Control.Lens ((^.))
 import Control.Monad.Except
 import Control.Monad.Random
 import Control.Monad.Reader
@@ -39,14 +38,8 @@ import Data.Time.Clock (
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Internal.Script qualified as Api
 import Cardano.Api.Shelley qualified as Api.S
-import Cardano.Ledger.Address qualified as L
-import Cardano.Ledger.Api qualified as L
-import Cardano.Ledger.Compactible qualified as L
 import Cardano.Ledger.Conway.Core qualified as ConwayCore
-import Cardano.Ledger.Core qualified as L
-import Cardano.Ledger.Plutus.TxInfo qualified as L
 import Cardano.Ledger.Shelley.API qualified as L.S
 import Cardano.Ledger.State qualified as L
 import Cardano.Slotting.Slot (
@@ -257,6 +250,11 @@ instance MonadError GYTxMonadException GYTxMonadClb where
 
   catchError m handler = GYTxMonadClb . catchError (unGYTxMonadClb m) $ unGYTxMonadClb . handler
 
+allUTxOs :: GYTxMonadClb GYUTxOs
+allUTxOs = do
+  utxos <- liftClb $ gets (L.unUTxO . L.S.utxosUtxo . L.S.lsUTxOState . _ledgerState . _chainState)
+  pure $ utxosFromList $ map (\(ref, o) -> utxoFromApi' (Api.S.fromShelleyTxIn ref) (Api.S.fromShelleyTxOut Api.ShelleyBasedEraConway o)) $ Map.toList utxos
+
 instance GYTxQueryMonad GYTxMonadClb where
   networkId = do
     magic <- liftClb $ gets (clbConfigNetworkId . _clbConfig)
@@ -290,6 +288,8 @@ instance GYTxQueryMonad GYTxMonadClb where
       case txOutRefFromPlutus ref of
         Left _ -> return Nothing -- TODO: should it error?
         Right ref' -> utxoAtTxOutRef ref'
+  utxosWithAsset ac = do
+    filterUTxOs (\GYUTxO {..} -> valueAssetClass utxoValue (nonAdaTokenToAssetClass ac) > 0) <$> allUTxOs
 
   utxosAtPaymentCredential :: GYPaymentCredential -> Maybe GYAssetClass -> GYTxMonadClb GYUTxOs
   utxosAtPaymentCredential cred mAssetClass = do
@@ -307,44 +307,7 @@ instance GYTxQueryMonad GYTxMonadClb where
       Right ref' -> utxoAtTxOutRef ref'
 
   utxoAtTxOutRef ref = do
-    -- All UTxOs map
-    utxos <- liftClb $ gets (L.unUTxO . L.S.utxosUtxo . L.S.lsUTxOState . _ledgerState . _chainState)
-    -- Maps keys to Plutus TxOutRef
-    let m = Map.mapKeys (txOutRefToPlutus . txOutRefFromApi . Api.S.fromShelleyTxIn) utxos
-
-    return $ do
-      o <- Map.lookup (txOutRefToPlutus ref) m
-
-      let a = addressFromApi . Api.S.fromShelleyAddrToAny . either id L.decompactAddr $ o ^. L.addrEitherTxOutL
-          v = valueFromApi . Api.S.fromMaryValue . either id L.fromCompact $ o ^. L.valueEitherTxOutL
-
-      d <- case o ^. L.datumTxOutL of
-        L.NoDatum -> pure GYOutDatumNone
-        L.DatumHash dh -> GYOutDatumHash <$> rightToMaybe (datumHashFromPlutus $ L.transDataHash dh)
-        L.Datum binaryData ->
-          pure
-            $ GYOutDatumInline
-              . datumFromPlutus
-              . Plutus.Datum
-              . Plutus.dataToBuiltinData
-              . L.getPlutusData
-              . L.binaryDataToData
-            $ binaryData
-
-      let s = case o ^. L.referenceScriptTxOutL of
-            L.S.SJust x ->
-              someScriptFromReferenceApi $
-                Api.fromShelleyScriptToReferenceScript Api.ShelleyBasedEraConway x
-            L.S.SNothing -> Nothing
-
-      return
-        GYUTxO
-          { utxoRef = ref
-          , utxoAddress = a
-          , utxoValue = v
-          , utxoOutDatum = d
-          , utxoRefScript = s
-          }
+    utxosLookup ref <$> allUTxOs
 
   stakeAddressInfo = const $ pure Nothing
 

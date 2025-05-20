@@ -17,6 +17,7 @@ import GeniusYield.Types
 
 data CachedQueryUTxO = CachedQueryUTxO
   { _cquAddrCache :: !(Cache.Cache (GYAddress, Maybe GYAssetClass) GYUTxOs)
+  , _cquAssetCache :: !(Cache.Cache GYNonAdaToken GYUTxOs)
   , _cquRefCache :: !(Cache.Cache GYTxOutRef (Maybe GYUTxO))
   , _cquPaymentCredCache :: !(Cache.Cache (GYPaymentCredential, Maybe GYAssetClass) GYUTxOs)
   , _cquInfo :: !GYQueryUTxO
@@ -27,10 +28,11 @@ data CachedQueryUTxO = CachedQueryUTxO
 makeCachedQueryUTxO :: GYQueryUTxO -> GYLogConfiguration -> IO (GYQueryUTxO, IO ())
 makeCachedQueryUTxO query log' = do
   addrCache <- Cache.newCache Nothing
+  assetCache <- Cache.newCache Nothing
   refCache <- Cache.newCache Nothing
   paymentCredCache <- Cache.newCache Nothing
-  let purge = Cache.purge addrCache >> Cache.purge refCache >> Cache.purge paymentCredCache
-  return (cachedQueryUTxO $ CachedQueryUTxO addrCache refCache paymentCredCache query log', purge)
+  let purge = Cache.purge addrCache >> Cache.purge assetCache >> Cache.purge refCache >> Cache.purge paymentCredCache
+  return (cachedQueryUTxO $ CachedQueryUTxO addrCache assetCache refCache paymentCredCache query log', purge)
 
 cachedQueryUTxO :: CachedQueryUTxO -> GYQueryUTxO
 cachedQueryUTxO q =
@@ -40,6 +42,7 @@ cachedQueryUTxO q =
     (cachedUtxoAtTxOutRef q)
     (gyQueryUtxoRefsAtAddressDefault $ cachedUtxosAtAddress q)
     (cachedUtxosAtAddress q)
+    (cachedUtxosWithAsset q)
     Nothing
     (gyQueryUtxoAtAddressesDefault $ cachedUtxosAtAddress q)
     Nothing -- Will use the default implementation.
@@ -53,7 +56,7 @@ cachedQueryUTxO q =
 -------------------------------------------------------------------------------
 
 cachedUtxoAtTxOutRef :: CachedQueryUTxO -> GYTxOutRef -> IO (Maybe GYUTxO)
-cachedUtxoAtTxOutRef (CachedQueryUTxO _ cache _ q _) ref = do
+cachedUtxoAtTxOutRef (CachedQueryUTxO _ _ cache _ q _) ref = do
   m <- Cache.lookup' cache ref
   case m of
     Nothing -> do
@@ -64,7 +67,7 @@ cachedUtxoAtTxOutRef (CachedQueryUTxO _ cache _ q _) ref = do
       return res
 
 cachedUtxosAtTxOutRefs :: CachedQueryUTxO -> [GYTxOutRef] -> IO GYUTxOs
-cachedUtxosAtTxOutRefs ctx@(CachedQueryUTxO _ cache _ q logCfg) refs = do
+cachedUtxosAtTxOutRefs ctx@(CachedQueryUTxO _ _ cache _ q logCfg) refs = do
   step1 <- forM refs $ \ref -> (ref,) <$> Cache.lookup' cache ref
 
   -- refs with no results in cache.
@@ -85,12 +88,12 @@ cachedUtxosAtTxOutRefs ctx@(CachedQueryUTxO _ cache _ q logCfg) refs = do
 -- When we query complete UTxOs,
 -- we can store the pieces of resulting UTxOs in per-txoutref cache.
 storeCacheUTxO :: CachedQueryUTxO -> GYUTxOs -> IO ()
-storeCacheUTxO (CachedQueryUTxO _ cache _ _ _) utxos = forUTxOs_ utxos $ \utxo ->
+storeCacheUTxO (CachedQueryUTxO _ _ cache _ _ _) utxos = forUTxOs_ utxos $ \utxo ->
   let ref = utxoRef utxo
    in Cache.insert cache ref (Just utxo)
 
 cachedUtxosAtAddress :: CachedQueryUTxO -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
-cachedUtxosAtAddress ctx@(CachedQueryUTxO cache _ _ q logCfg) addr mAssetClass = do
+cachedUtxosAtAddress ctx@(CachedQueryUTxO cache _ _ _ q logCfg) addr mAssetClass = do
   m <- Cache.lookup' cache (addr, mAssetClass)
   case m of
     Nothing -> do
@@ -103,8 +106,22 @@ cachedUtxosAtAddress ctx@(CachedQueryUTxO cache _ _ q logCfg) addr mAssetClass =
       logRun logCfg GYDebug $ "address cached:" <> show addr
       return res
 
+cachedUtxosWithAsset :: CachedQueryUTxO -> GYNonAdaToken -> IO GYUTxOs
+cachedUtxosWithAsset ctx@(CachedQueryUTxO _ cache _ _ q logCfg) ac = do
+  m <- Cache.lookup' cache ac
+  case m of
+    Nothing -> do
+      logRun logCfg GYDebug $ "asset not cached: " <> show ac
+      res <- gyQueryUtxosWithAsset' q ac
+      Cache.insert cache ac res
+      storeCacheUTxO ctx res
+      return res
+    Just res -> do
+      logRun logCfg GYDebug $ "asset cached:" <> show ac
+      return res
+
 cachedUtxosAtPaymentCred :: CachedQueryUTxO -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
-cachedUtxosAtPaymentCred ctx@(CachedQueryUTxO _ _ cache q logCfg) cred mAssetClass = do
+cachedUtxosAtPaymentCred ctx@(CachedQueryUTxO _ _ _ cache q logCfg) cred mAssetClass = do
   m <- Cache.lookup' cache (cred, mAssetClass)
   case m of
     Nothing -> do

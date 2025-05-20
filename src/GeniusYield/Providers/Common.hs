@@ -20,6 +20,7 @@ module GeniusYield.Providers.Common (
   mainnetEraHist,
   silenceHeadersClientError,
   extractAssetClass,
+  extractNonAdaToken,
 ) where
 
 import Data.Aeson qualified as Aeson
@@ -60,6 +61,8 @@ import GeniusYield.Types.Datum (
 import GeniusYield.Types.Script (mintingPolicyIdToText)
 import GeniusYield.Types.Value (
   GYAssetClass (..),
+  GYNonAdaToken (..),
+  nonAdaTokenFromAssetClass,
   tokenNameToHex,
  )
 import Ouroboros.Consensus.Cardano.Block qualified as Ouroboros
@@ -335,6 +338,11 @@ mainnetEraHist =
 
 -- | Extract currency symbol & token name part of an `GYAssetClass` when it is of such a form. When input is @Just GYLovelace@ or @Nothing@, this function returns @Nothing@.
 extractAssetClass :: Maybe GYAssetClass -> Maybe (Text, Text)
-extractAssetClass Nothing = Nothing
-extractAssetClass (Just GYLovelace) = Nothing
-extractAssetClass (Just (GYToken pid tn)) = Just (mintingPolicyIdToText pid, tokenNameToHex tn)
+extractAssetClass mac = do
+  ac <- mac
+  nat <- nonAdaTokenFromAssetClass ac
+  pure $ extractNonAdaToken nat
+
+-- | Extract currency symbol & token name part of a `GYNonAdaToken`.
+extractNonAdaToken :: GYNonAdaToken -> (Text, Text)
+extractNonAdaToken (GYNonAdaToken pid tn) = (mintingPolicyIdToText pid, tokenNameToHex tn)

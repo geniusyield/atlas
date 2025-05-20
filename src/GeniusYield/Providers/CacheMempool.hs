@@ -210,6 +210,17 @@ augmentQueryUTxO GYQueryUTxO {..} dataStore fetchOutsModuloIns = do
                 mempoolOuts
                 & outsWithDatumsMapToOuts
         pure $ foundOuts <> mempoolFoundOuts
+    , gyQueryUtxosWithAsset' = \ac -> do
+        mempoolOuts <- fetchOutsModuloIns dataStore
+        foundOuts <- gyQueryUtxosWithAsset' ac
+        let mempoolFoundOuts =
+              Map.filter
+                ( \(GYUTxO {..}, _mdatum) ->
+                    valueAssetClass utxoValue ac > 0
+                )
+                mempoolOuts
+                & outsWithDatumsMapToOuts
+        pure $ foundOuts <> mempoolFoundOuts
     , gyQueryUtxoRefsAtAddress' = \addr -> do
         mempoolOuts <- fetchOutsModuloIns dataStore
         foundOuts <- Set.fromList <$> gyQueryUtxoRefsAtAddress' addr

@@ -265,7 +265,10 @@ utxoFromMaestroWithDatum u = do
           pure (gyUtxo, Just d)
 
 extractedAssetClassToMaestro :: Maybe (Text, Text) -> Maybe Maestro.NonAdaNativeToken
-extractedAssetClassToMaestro = fmap (\(mp, tn) -> Maestro.NonAdaNativeToken (coerce mp) (coerce tn))
+extractedAssetClassToMaestro = fmap extractedAssetClassToMaestro'
+
+extractedAssetClassToMaestro' :: (Text, Text) -> Maestro.NonAdaNativeToken
+extractedAssetClassToMaestro' (mp, tn) = Maestro.NonAdaNativeToken (coerce mp) (coerce tn)
 
 maestroUtxosAtAddress :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
 maestroUtxosAtAddress env addr mAssetClass = do
@@ -277,6 +280,17 @@ maestroUtxosAtAddress env addr mAssetClass = do
   either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro addrUtxos)
  where
   locationIdent = "AddressUtxos"
+
+maestroUtxosWithAsset :: Maestro.MaestroEnv 'Maestro.V1 -> GYNonAdaToken -> IO GYUTxOs
+maestroUtxosWithAsset env ac = do
+  let acAsText = extractNonAdaToken ac
+  -- Here one would not get `MaestroNotFound` error.
+  assetPartialUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (Maestro.assetUTxOs env (extractedAssetClassToMaestro' acAsText))
+  either (throwIO . MspvDeserializeFailure locationIdent) (maestroUtxosAtTxOutRefs env) (traverse outRefFromAssetUTxO assetPartialUtxos)
+ where
+  locationIdent = "UtxosWithAsset"
+  outRefFromAssetUTxO :: Maestro.AssetUTxOs -> Either SomeDeserializeError GYTxOutRef
+  outRefFromAssetUTxO (Maestro.AssetUTxOs {..}) = first DeserializeErrorHex . Web.parseUrlPiece $ Web.toUrlPiece assetUTxOsTxHash <> "#" <> Web.toUrlPiece assetUTxOsIndex
 
 -- | Query UTxOs present at given address with datums.
 maestroUtxosAtAddressWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]
@@ -447,6 +461,7 @@ maestroQueryUtxo env =
   GYQueryUTxO
     { gyQueryUtxosAtAddresses' = maestroUtxosAtAddresses env
     , gyQueryUtxosAtAddress' = maestroUtxosAtAddress env
+    , gyQueryUtxosWithAsset' = maestroUtxosWithAsset env
     , gyQueryUtxosAtAddressWithDatums' = Just $ maestroUtxosAtAddressWithDatums env
     , gyQueryUtxosAtTxOutRefs' = maestroUtxosAtTxOutRefs env
     , gyQueryUtxosAtTxOutRefsWithDatums' = Just $ maestroUtxosAtTxOutRefsWithDatums env

@@ -1,6 +1,6 @@
-## Next
+## 0.14.1
 
-* Added `utxosWithAsset` to efficiently querying for UTxOs containing specified asset.
+* Added `utxosWithAsset` for efficiently querying of UTxOs containing a specified asset.
 
 ## 0.14.0
 

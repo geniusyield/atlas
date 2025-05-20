@@ -453,8 +453,7 @@ data GYQueryUTxO = GYQueryUTxO
   , gyQueryUtxoAtTxOutRef' :: !(GYTxOutRef -> IO (Maybe GYUTxO))
   , gyQueryUtxoRefsAtAddress' :: !(GYAddress -> IO [GYTxOutRef])
   , gyQueryUtxosAtAddress' :: !(GYAddress -> Maybe GYAssetClass -> IO GYUTxOs)
-  , -- TODO: Should this made lazy so as not all providers (CLB) implement it?
-    gyQueryUtxosWithAsset' :: !(GYNonAdaToken -> IO GYUTxOs)
+  , gyQueryUtxosWithAsset' :: !(GYNonAdaToken -> IO GYUTxOs)
   , gyQueryUtxosAtAddressWithDatums' :: !(Maybe (GYAddress -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]))
   , gyQueryUtxosAtAddresses' :: !([GYAddress] -> IO GYUTxOs)
   , gyQueryUtxosAtAddressesWithDatums' :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))

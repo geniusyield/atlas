@@ -290,7 +290,7 @@ maestroUtxosWithAsset env ac = do
  where
   locationIdent = "UtxosWithAsset"
   outRefFromAssetUTxO :: Maestro.AssetUTxOs -> Either SomeDeserializeError GYTxOutRef
-  outRefFromAssetUTxO (Maestro.AssetUTxOs {..}) = first DeserializeErrorHex . Web.parseUrlPiece $ Web.toUrlPiece assetUTxOsTxHash <> "#" <> Web.toUrlPiece assetUTxOsIndex
+  outRefFromAssetUTxO Maestro.AssetUTxOs {..} = first DeserializeErrorHex . Web.parseUrlPiece $ Web.toUrlPiece assetUTxOsTxHash <> "#" <> Web.toUrlPiece assetUTxOsIndex
 
 -- | Query UTxOs present at given address with datums.
 maestroUtxosAtAddressWithDatums :: Maestro.MaestroEnv 'Maestro.V1 -> GYAddress -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]

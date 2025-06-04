@@ -9,7 +9,9 @@ Maintainer  : support@geniusyield.co
 Stability   : develop
 -}
 module GeniusYield.Test.Clb (
+  GYTxMonadClbT,
   GYTxMonadClb,
+  mkTestForT,
   mkTestFor,
   asClb,
   asRandClb,
@@ -22,10 +24,12 @@ module GeniusYield.Test.Clb (
   logInfoS,
 ) where
 
-import Control.Monad.Except
-import Control.Monad.Random
-import Control.Monad.Reader
-import Control.Monad.State
+import Control.Monad.Except (ExceptT, runExceptT, tryError)
+import Control.Monad.Random (StdGen, RandT, mkStdGen, evalRandT)
+import Control.Monad.Reader (MonadReader, ReaderT, local, asks, runReaderT)
+import Control.Monad.State (MonadState, StateT, gets, get, put, runStateT)
+import Control.Monad.Trans.Class (MonadTrans(lift))
+import Control.Monad.IO.Class (MonadIO)
 import Data.Map.Strict qualified as Map
 import Data.SOP.NonEmpty (NonEmpty (NonEmptyCons, NonEmptyOne))
 import Data.Sequence qualified as Seq
@@ -51,7 +55,6 @@ import Cardano.Slotting.Time (
   mkSlotLength,
  )
 import Clb (
-  Clb,
   ClbConfig (..),
   ClbState (..),
   ClbT,
@@ -102,8 +105,6 @@ import GeniusYield.Types
 deriving newtype instance Num EpochSize
 deriving newtype instance Num EpochNo
 
-type AtlasClb = Clb ApiEra
-
 newtype GYTxClbEnv = GYTxClbEnv
   { clbEnvWallet :: User
   -- ^ The actor for a GYTxMonadClb action.
@@ -114,46 +115,58 @@ newtype GYTxClbState = GYTxClbState
   -- ^ Next integer to use with 'Clb.intToKeyPair' call in order to generate a new user.
   }
 
-newtype GYTxMonadClb a = GYTxMonadClb
-  { unGYTxMonadClb :: ReaderT GYTxClbEnv (StateT GYTxClbState (ExceptT GYTxMonadException (RandT StdGen AtlasClb))) a
+type GYTxMonadClb = GYTxMonadClbT Identity
+
+newtype GYTxMonadClbT m a = GYTxMonadClbT
+  { unGYTxMonadClbT :: ReaderT GYTxClbEnv (StateT GYTxClbState (ExceptT GYTxMonadException (RandT StdGen (ClbT ApiEra m)))) a
   }
-  deriving newtype (Functor, Applicative, Monad, MonadReader GYTxClbEnv, MonadState GYTxClbState)
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader GYTxClbEnv, MonadState GYTxClbState)
   deriving anyclass GYTxBuilderMonad
 
-instance MonadRandom GYTxMonadClb where
-  getRandomR = GYTxMonadClb . getRandomR
-  getRandom = GYTxMonadClb getRandom
-  getRandomRs = GYTxMonadClb . getRandomRs
-  getRandoms = GYTxMonadClb getRandoms
+instance MonadTrans GYTxMonadClbT where
+  lift = GYTxMonadClbT . lift . lift . lift . lift . lift
+
+instance Monad m => MonadRandom (GYTxMonadClbT m) where
+  getRandomR = GYTxMonadClbT . getRandomR
+  getRandom = GYTxMonadClbT getRandom
+  getRandomRs = GYTxMonadClbT . getRandomRs
+  getRandoms = GYTxMonadClbT getRandoms
 
 asRandClb ::
+  forall a m.
+  Monad m =>
   User ->
   Integer ->
-  GYTxMonadClb a ->
-  RandT StdGen AtlasClb (Maybe a)
+  GYTxMonadClbT m a ->
+  RandT StdGen (ClbT ApiEra m) (Maybe a)
 asRandClb w i m = do
-  e <- runExceptT $ (unGYTxMonadClb m `runReaderT` GYTxClbEnv w) `runStateT` GYTxClbState {clbNextWalletInt = i}
+  e <- runExceptT $ (unGYTxMonadClbT m `runReaderT` GYTxClbEnv w) `runStateT` GYTxClbState {clbNextWalletInt = i}
   case e of
     Left (GYApplicationException (toApiError -> GYApiError {gaeMsg})) -> lift (logError $ T.unpack gaeMsg) >> return Nothing
     Left err -> lift (logError $ show err) >> return Nothing
     Right (a, _) -> return $ Just a
 
 asClb ::
+  forall a m.
+  Monad m =>
   StdGen ->
   User ->
   Integer ->
-  GYTxMonadClb a ->
-  AtlasClb (Maybe a)
+  GYTxMonadClbT m a ->
+  ClbT ApiEra m (Maybe a)
 asClb g w i m = evalRandT (asRandClb w i m) g
 
-liftClb :: AtlasClb a -> GYTxMonadClb a
-liftClb = GYTxMonadClb . lift . lift . lift . lift
+liftClb :: forall a m. Monad m => ClbT ApiEra m a -> GYTxMonadClbT m a
+liftClb = GYTxMonadClbT . lift . lift . lift . lift
 
 {- | Given a test name, runs the trace for every wallet, checking there weren't
      errors.
 -}
-mkTestFor :: String -> (TestInfo -> GYTxMonadClb a) -> Tasty.TestTree
-mkTestFor name action =
+mkTestFor :: forall a. String -> (TestInfo -> GYTxMonadClb a) -> Tasty.TestTree
+mkTestFor name = runIdentity . mkTestForT name
+
+mkTestForT :: forall a m. Monad m => String -> (TestInfo -> GYTxMonadClbT m a) -> m Tasty.TestTree
+mkTestForT name action =
   testNoErrorsTraceClb v w Clb.defaultConwayClbConfig name $ do
     asClb pureGen (w1 testWallets) nextWalletInt $
       action TestInfo {testGoldAsset = fakeCoin fakeGold, testIronAsset = fakeCoin fakeIron, testWallets}
@@ -188,18 +201,17 @@ mkTestFor name action =
   nextWalletInt = 10
 
   -- \| Helper for building tests
-  testNoErrorsTraceClb :: GYValue -> GYValue -> Clb.ClbConfig ApiEra -> String -> AtlasClb a -> Tasty.TestTree
-  testNoErrorsTraceClb funds walletFunds cfg msg act =
-    testCaseInfo msg $
+  testNoErrorsTraceClb :: forall b. GYValue -> GYValue -> Clb.ClbConfig ApiEra -> String -> ClbT ApiEra m b -> m Tasty.TestTree
+  testNoErrorsTraceClb funds walletFunds cfg msg act = do
+    (mbErrors, mock) <- Clb.runClbT (act >> Clb.checkErrors) $ Clb.initClb cfg (valueToApi funds) (valueToApi walletFunds) Nothing
+    let
+      mockLog = "\nEmulator log :\n--------------\n" <> logString
+      options = defaultLayoutOptions {layoutPageWidth = AvailablePerLine 150 1.0}
+      logDoc = Clb.ppLog $ Clb._clbLog mock
+      logString = renderString $ layoutPretty options logDoc
+    pure $ testCaseInfo msg $
       maybe (pure mockLog) assertFailure $
         mbErrors >>= \errors -> pure (mockLog <> "\n\nError :\n-------\n" <> errors)
-   where
-    -- _errors since we decided to store errors in the log as well.
-    (mbErrors, mock) = Clb.runClb (act >> Clb.checkErrors) $ Clb.initClb cfg (valueToApi funds) (valueToApi walletFunds) Nothing
-    mockLog = "\nEmulator log :\n--------------\n" <> logString
-    options = defaultLayoutOptions {layoutPageWidth = AvailablePerLine 150 1.0}
-    logDoc = Clb.ppLog $ Clb._clbLog mock
-    logString = renderString $ layoutPretty options logDoc
 
 mkSimpleWallet :: TL.KeyPair L.S.Payment -> User
 mkSimpleWallet kp =
@@ -218,10 +230,10 @@ mkSimpleWallet kp =
  error message or/and failure action name.
  FIXME: should we move it to CLB?
 -}
-mustFail :: GYTxMonadClb a -> GYTxMonadClb ()
+mustFail :: forall a m. Monad m => GYTxMonadClbT m a -> GYTxMonadClbT m ()
 mustFail = mustFailWith (const True)
 
-mustFailWith :: (GYTxMonadException -> Bool) -> GYTxMonadClb a -> GYTxMonadClb ()
+mustFailWith :: forall a m. Monad m => (GYTxMonadException -> Bool) -> GYTxMonadClbT m a -> GYTxMonadClbT m ()
 mustFailWith isExpectedError act = do
   (st, preFails) <- liftClb $ do
     st <- get
@@ -245,17 +257,17 @@ mustFailWith isExpectedError act = do
     Log $ second (LogEntry Error . ((msg <> ":") <>) . show) <$> Seq.drop (Seq.length pre) post
   msg = "Unnamed failure action"
 
-instance MonadError GYTxMonadException GYTxMonadClb where
-  throwError = GYTxMonadClb . throwError
+instance Monad m => MonadError GYTxMonadException (GYTxMonadClbT m) where
+  throwError = GYTxMonadClbT . throwError
 
-  catchError m handler = GYTxMonadClb . catchError (unGYTxMonadClb m) $ unGYTxMonadClb . handler
+  catchError m handler = GYTxMonadClbT . catchError (unGYTxMonadClbT m) $ unGYTxMonadClbT . handler
 
-allUTxOs :: GYTxMonadClb GYUTxOs
+allUTxOs :: Monad m => GYTxMonadClbT m GYUTxOs
 allUTxOs = do
   utxos <- liftClb $ gets (L.unUTxO . L.S.utxosUtxo . L.S.lsUTxOState . _ledgerState . _chainState)
   pure $ utxosFromList $ map (\(ref, o) -> utxoFromApi' (Api.S.fromShelleyTxIn ref) (Api.S.fromShelleyTxOut Api.ShelleyBasedEraConway o)) $ Map.toList utxos
 
-instance GYTxQueryMonad GYTxMonadClb where
+instance Monad m => GYTxQueryMonad (GYTxMonadClbT m) where
   networkId = do
     magic <- liftClb $ gets (clbConfigNetworkId . _clbConfig)
     -- TODO: Add epoch slots and network era to clb and retrieve from there.
@@ -265,7 +277,7 @@ instance GYTxQueryMonad GYTxMonadClb where
         , gyNetworkEpochSlots = 500
         }
 
-  lookupDatum :: GYDatumHash -> GYTxMonadClb (Maybe GYDatum)
+  lookupDatum :: GYDatumHash -> GYTxMonadClbT m (Maybe GYDatum)
   lookupDatum h = liftClb $ do
     mdh <- gets _knownDatums
     return $ do
@@ -283,7 +295,7 @@ instance GYTxQueryMonad GYTxMonadClb where
             Just ac -> filter (\GYUTxO {..} -> valueAssetClass utxoValue ac > 0) utxos
     return $ utxosFromList utxos'
    where
-    f :: Plutus.TxOutRef -> GYTxMonadClb (Maybe GYUTxO)
+    f :: Plutus.TxOutRef -> GYTxMonadClbT m (Maybe GYUTxO)
     f ref = do
       case txOutRefFromPlutus ref of
         Left _ -> return Nothing -- TODO: should it error?
@@ -291,7 +303,7 @@ instance GYTxQueryMonad GYTxMonadClb where
   utxosWithAsset ac = do
     filterUTxOs (\GYUTxO {..} -> valueAssetClass utxoValue (nonAdaTokenToAssetClass ac) > 0) <$> allUTxOs
 
-  utxosAtPaymentCredential :: GYPaymentCredential -> Maybe GYAssetClass -> GYTxMonadClb GYUTxOs
+  utxosAtPaymentCredential :: GYPaymentCredential -> Maybe GYAssetClass -> GYTxMonadClbT m GYUTxOs
   utxosAtPaymentCredential cred mAssetClass = do
     refs <- liftClb $ txOutRefAtPaymentCred $ paymentCredentialToPlutus cred
     utxos <- wither f refs
@@ -301,7 +313,7 @@ instance GYTxQueryMonad GYTxMonadClb where
         (\GYUTxO {utxoValue} -> maybe True ((> 0) . valueAssetClass utxoValue) mAssetClass)
         utxos
    where
-    f :: Plutus.TxOutRef -> GYTxMonadClb (Maybe GYUTxO)
+    f :: Plutus.TxOutRef -> GYTxMonadClbT m (Maybe GYUTxO)
     f ref = case txOutRefFromPlutus ref of
       Left _ -> return Nothing
       Right ref' -> utxoAtTxOutRef ref'
@@ -341,7 +353,7 @@ instance GYTxQueryMonad GYTxMonadClb where
     pure slot
   waitForNextBlock = slotOfCurrentBlock
 
-instance GYTxUserQueryMonad GYTxMonadClb where
+instance Monad m => GYTxUserQueryMonad (GYTxMonadClbT m) where
   ownAddresses = asks $ userAddresses' . clbEnvWallet
 
   ownChangeAddress = asks $ userChangeAddress . clbEnvWallet
@@ -376,7 +388,7 @@ instance GYTxUserQueryMonad GYTxMonadClb where
         Nothing -> throwError $ GYQueryUTxOException $ GYNoUtxosAtAddress addrs
         Just (ref, _) -> return ref
 
-instance GYTxMonad GYTxMonadClb where
+instance Monad m => GYTxMonad (GYTxMonadClbT m) where
   signTxBody = signTxBodyImpl . asks $ AGYPaymentSigningKey . userPaymentSKey . clbEnvWallet
   signTxBodyWithStake = signTxBodyWithStakeImpl $ asks ((,) . AGYPaymentSigningKey . userPaymentSKey . clbEnvWallet) <*> asks (fmap AGYStakeSigningKey . userStakeSKey . clbEnvWallet)
   submitTx tx = do
@@ -389,7 +401,7 @@ instance GYTxMonad GYTxMonadClb where
       Fail _ err -> throwAppError . someBackendError . T.pack $ show err
    where
     -- TODO: use Prettyprinter
-    dumpBody :: GYTxBody -> GYTxMonadClb ()
+    dumpBody :: GYTxBody -> GYTxMonadClbT m ()
     dumpBody body = do
       ins <- mapM utxoAtTxOutRef' $ txBodyTxIns body
       refIns <- mapM utxoAtTxOutRef' $ txBodyTxInsReference body
@@ -423,8 +435,8 @@ instance GYTxMonad GYTxMonadClb where
   -- Transaction submission and confirmation is immediate in CLB.
   awaitTxConfirmed' _ _ = pure ()
 
-instance GYTxGameMonad GYTxMonadClb where
-  type TxMonadOf GYTxMonadClb = GYTxMonadClb
+instance Monad m => GYTxGameMonad (GYTxMonadClbT m) where
+  type TxMonadOf (GYTxMonadClbT m) = GYTxMonadClbT m
   createUser = do
     st <- get
     let i = clbNextWalletInt st
@@ -438,19 +450,19 @@ instance GYTxGameMonad GYTxMonadClb where
       (\x -> x {clbEnvWallet = u})
       act
 
-slotConfig' :: GYTxMonadClb (UTCTime, NominalDiffTime)
+slotConfig' :: Monad m => GYTxMonadClbT m (UTCTime, NominalDiffTime)
 slotConfig' = liftClb $ do
   sc <- gets $ clbConfigSlotConfig . _clbConfig
   let len = fromInteger (scSlotLength sc) / 1000
       zero = posixSecondsToUTCTime $ timeToPOSIX $ timeFromPlutus $ scSlotZeroTime sc
   return (zero, len)
 
-protocolParameters :: GYTxMonadClb (ConwayCore.PParams (Api.S.ShelleyLedgerEra ApiEra))
+protocolParameters :: Monad m => GYTxMonadClbT m (ConwayCore.PParams (Api.S.ShelleyLedgerEra ApiEra))
 protocolParameters = do
   pparams <- liftClb $ gets $ clbConfigProtocol . _clbConfig
   pure $ coerce pparams
 
-instance GYTxSpecialQueryMonad GYTxMonadClb where
+instance Monad m => GYTxSpecialQueryMonad (GYTxMonadClbT m) where
   systemStart = gyscSystemStart <$> slotConfig
 
   protocolParams = protocolParameters
@@ -461,7 +473,7 @@ instance GYTxSpecialQueryMonad GYTxMonadClb where
   --     pids <- liftClb $ gets $ Map.keys . stake'pools . mockStake
   --     foldM f Set.empty pids
   --   where
-  --     f :: Set Api.S.PoolId -> Api.S.PoolId -> GYTxMonadClb (Set Api.S.PoolId)
+  --     f :: Set Api.S.PoolId -> Api.S.PoolId -> GYTxMonadClbT m (Set Api.S.PoolId)
   --     f s pid = either
   --         (\e -> throwError $ GYConversionException $ GYLedgerToCardanoError $ DeserialiseRawBytesError ("stakePools, error: " <> fromString (show e)))
   --         (\pid' -> return $ Set.insert pid' s)
@@ -529,7 +541,7 @@ instance GYTxSpecialQueryMonad GYTxMonadClb where
         , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
         }
 
-dumpUtxoState :: GYTxMonadClb ()
+dumpUtxoState :: Monad m => GYTxMonadClbT m ()
 dumpUtxoState = liftClb Clb.dumpUtxoState
 
 -------------------------------------------------------------------------------

@@ -12,6 +12,7 @@ module GeniusYield.Providers.Common (
   SubmitTxException (..),
   datumFromCBOR,
   newServantClientEnv,
+  newManager,
   fromJson,
   makeLastEraEndUnbounded,
   parseEraHist,
@@ -112,11 +113,14 @@ silenceHeadersClientError other = other
 newServantClientEnv :: String -> IO Servant.ClientEnv
 newServantClientEnv baseUrl = do
   url <- Servant.parseBaseUrl baseUrl
-  manager <-
-    if Servant.baseUrlScheme url == Servant.Https
-      then HttpClient.newManager HttpClientTLS.tlsManagerSettings
-      else HttpClient.newManager HttpClient.defaultManagerSettings
+  manager <- newManager url
   pure $ Servant.mkClientEnv manager url
+
+newManager :: Servant.BaseUrl -> IO HttpClient.Manager
+newManager url =
+  if Servant.baseUrlScheme url == Servant.Https
+    then HttpClient.newManager HttpClientTLS.tlsManagerSettings
+    else HttpClient.newManager HttpClient.defaultManagerSettings
 
 fromJson :: FromData a => LBS.ByteString -> Either SomeDeserializeError a
 fromJson b = do

@@ -79,6 +79,7 @@ library
     GeniusYield.Providers.CachedQueryUTxOs
     GeniusYield.Providers.Common
     GeniusYield.Providers.GCP
+    GeniusYield.Providers.Hydra
     GeniusYield.Providers.Kupo
     GeniusYield.Providers.Maestro
     GeniusYield.Providers.Node

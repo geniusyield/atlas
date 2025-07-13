@@ -6,13 +6,14 @@ module GeniusYield.Providers.Hydra (
   hydraProtocolParameters,
 ) where
 
+import Cardano.Api qualified as Api
 import Data.Aeson qualified as Aeson
 import Data.ByteString.Lazy qualified as BSL
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TE
-import GeniusYield.Imports (Exception, throwIO)
+import GeniusYield.Imports (Exception, Generic, throwIO, (&))
 import GeniusYield.Providers.Common (
   newManager,
   newServantClientEnv,
@@ -93,4 +94,22 @@ hydraProtocolParameters env = do
     Left err -> throwIO $ HydraApiError "hydraProtocolParameters" $ Right $ Text.pack err
     Right params -> pure params
 
-hydraSubmitTx = undefined
+newtype HydraTransactionId = HydraTransactionId {transactionId :: GYTxId}
+  deriving newtype Show
+  deriving stock Generic
+  deriving anyclass Aeson.FromJSON
+
+hydraSubmitTx :: HydraApiEnv -> GYSubmitTx
+hydraSubmitTx (baseUrl . clientEnv -> BaseUrl {..}) tx = do
+  let newTxJson =
+        Aeson.object
+          [ "tag" Aeson..= ("NewTx" :: Text)
+          , "transaction" Aeson..= Aeson.toJSON (txToApi tx & Api.serialiseToTextEnvelope Nothing)
+          ]
+  WS.runClient baseUrlHost baseUrlPort baseUrlPath $ \conn -> do
+    WS.sendTextData conn $ TE.decodeUtf8 $ BSL.toStrict $ Aeson.encode newTxJson
+    -- ignore the greetings response.
+    (_ :: Text) <- WS.receiveData conn
+    txResponse <- WS.receiveData conn
+    txId <- processWSResponse @HydraTransactionId txResponse
+    pure $ transactionId txId

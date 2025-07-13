@@ -12,7 +12,7 @@ module GeniusYield.GYConfig (
   Confidential (..),
   GYLayer1ProviderInfo (..),
   GYLayer2ProviderInfo (..),
-  GYCoreProviderInfo,
+  GYCoreProviderInfo (..),
   withCfgProviders,
   coreConfigIO,
   coreProviderIO,
@@ -43,6 +43,7 @@ import GeniusYield.Providers.Blockfrost qualified as Blockfrost
 
 -- import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
 
+import Control.Applicative ((<|>))
 import Data.Sequence qualified as Seq
 import GeniusYield.Providers.CacheLocal
 import GeniusYield.Providers.CacheMempool (augmentQueryUTxOWithMempool)
@@ -139,26 +140,31 @@ In JSON format, this essentially corresponds to:
 
 The constructor tags don't need to appear in the JSON.
 -}
-type GYCoreProviderInfo =
-  Either GYLayer1ProviderInfo GYLayer2ProviderInfo
+data GYCoreProviderInfo
+  = GYCoreLayer1ProviderInfo GYLayer1ProviderInfo
+  | GYCoreLayer2ProviderInfo GYLayer2ProviderInfo
+  deriving stock Show
+
+instance FromJSON GYCoreProviderInfo where
+  parseJSON v = (GYCoreLayer1ProviderInfo <$> parseJSON v) <|> (GYCoreLayer2ProviderInfo <$> parseJSON v)
 
 coreProviderIO :: FilePath -> IO GYCoreProviderInfo
 coreProviderIO = readJSON
 
 isNodeKupo :: GYCoreProviderInfo -> Bool
-isNodeKupo (Left GYNodeKupo {}) = True
+isNodeKupo (GYCoreLayer1ProviderInfo GYNodeKupo {}) = True
 isNodeKupo _ = False
 
 isOgmiosKupo :: GYCoreProviderInfo -> Bool
-isOgmiosKupo (Left GYOgmiosKupo {}) = True
+isOgmiosKupo (GYCoreLayer1ProviderInfo GYOgmiosKupo {}) = True
 isOgmiosKupo _ = False
 
 isMaestro :: GYCoreProviderInfo -> Bool
-isMaestro (Left GYMaestro {}) = True
+isMaestro (GYCoreLayer1ProviderInfo GYMaestro {}) = True
 isMaestro _ = False
 
 isBlockfrost :: GYCoreProviderInfo -> Bool
-isBlockfrost (Left GYBlockfrost {}) = True
+isBlockfrost (GYCoreLayer1ProviderInfo GYBlockfrost {}) = True
 isBlockfrost _ = False
 
 findMaestroTokenAndNetId :: [GYCoreConfig] -> IO (Text, GYNetworkId)
@@ -169,7 +175,7 @@ findMaestroTokenAndNetId configs = do
     Just conf -> do
       let netId = cfgNetworkId conf
       case cfgCoreProvider conf of
-        Left (GYMaestro (Confidential token) _) -> return (token, netId)
+        GYCoreLayer1ProviderInfo (GYMaestro (Confidential token) _) -> return (token, netId)
         _ -> throwIO $ userError "Missing Maestro Token"
 
 {- |
@@ -221,8 +227,8 @@ withCfgProviders
   f =
     do
       (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution, gyGetProposals, gyGetMempoolTxs) <- case cfgCoreProvider of
-        Left l1ProviderInfo -> resolveLayer1ProviderInfo l1ProviderInfo
-        Right (GYHydraNodeKupo headNodeUrl kupoUrl l1i) -> do
+        GYCoreLayer1ProviderInfo l1ProviderInfo -> resolveLayer1ProviderInfo l1ProviderInfo
+        GYCoreLayer2ProviderInfo (GYHydraNodeKupo headNodeUrl kupoUrl l1i) -> do
           (l1gyGetParameters, l1gySlotActions, _l1gyQueryUTxO, _l1gyLookupDatum, _l1gySubmitTx, _l1gyAwaitTxConfirmed, l1gyGetStakeAddressInfo, l1gyGetDRepState, l1gyGetDRepsState, l1gyGetStakePools, l1gyGetConstitution, l1gyGetProposals, l1gyGetMempoolTxs) <- resolveLayer1ProviderInfo l1i
           henv <- newHydraApiEnv $ Text.unpack headNodeUrl
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl

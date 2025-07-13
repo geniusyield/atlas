@@ -310,6 +310,7 @@ test-suite atlas-tests
     GeniusYield.Test.GYTxBody
     GeniusYield.Test.GYTxOutRefCbor
     GeniusYield.Test.GYTxSkeleton
+    GeniusYield.Test.Hydra
     GeniusYield.Test.Providers
     GeniusYield.Test.Providers.Mashup
     GeniusYield.Test.RefInput

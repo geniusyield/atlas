@@ -12,7 +12,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertBool, assertFailure, testCase)
 
 aliceKey :: GYSigningKey 'GYKeyRolePayment
-aliceKey = "e4c36e5403e6a02ef4821a34bb71d504916df0ddea476f797a5639110bc1bd52"
+aliceKey = "5f9b911a636479ed83ba601ccfcba0ab9a558269dc19fdea910d27e5cdbb5fc8"
 
 aliceVKey = getVerificationKey aliceKey
 
@@ -26,20 +26,16 @@ hydraTests config =
         withCfgProviders config mempty $ \provider@GYProviders {..} -> do
           let nid = cfgNetworkId config
               aliceAddress = addressFromPaymentKeyHash nid aliceVKeyHash
-              aliceActualAddress = unsafeAddressFromText "addr_test1vqx5tu4nzz5cuanvac4t9an4djghrx7hkdvjnnhstqm9kegvm6g6c" -- Not really sure if this is of alice, could be of bob or carol.
-          print aliceKey
-          print aliceVKey
-          print aliceVKeyHash
-          print aliceAddress
-          utxos <- runGYTxQueryMonadIO nid provider $ do
-            utxosAtPaymentCredential (GYCredentialByKey aliceVKeyHash) Nothing
-          print utxos
           txBody <-
-            runGYTxBuilderMonadIO nid provider [aliceActualAddress] aliceActualAddress Nothing $ do
-              aliceUtxos <- utxosAtAddress aliceActualAddress Nothing
+            runGYTxBuilderMonadIO nid provider [aliceAddress] aliceAddress Nothing $ do
+              aliceUtxos <- utxosAtAddress aliceAddress Nothing
               gyLogInfo' "" (show aliceUtxos)
               let aliceUtxo = utxosToList aliceUtxos & head
               let skel = mustHaveInput (GYTxIn (utxoRef aliceUtxo) GYTxInWitnessKey)
               buildTxBody skel
           print txBody
+          txId <- runGYTxMonadIO nid provider (AGYPaymentSigningKey aliceKey) Nothing [aliceAddress] aliceAddress Nothing $ do
+            signedTx <- signTxBody txBody
+            submitTx signedTx
+          print txId
     ]

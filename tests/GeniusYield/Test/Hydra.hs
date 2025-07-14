@@ -4,6 +4,7 @@ module GeniusYield.Test.Hydra (
 
 import Data.Foldable (for_)
 import GeniusYield.GYConfig
+import GeniusYield.Imports ((&))
 import GeniusYield.Transaction (GYCoinSelectionStrategy)
 import GeniusYield.TxBuilder
 import GeniusYield.Types
@@ -25,15 +26,20 @@ hydraTests config =
         withCfgProviders config mempty $ \provider@GYProviders {..} -> do
           let nid = cfgNetworkId config
               aliceAddress = addressFromPaymentKeyHash nid aliceVKeyHash
-          print $ aliceKey
-          print $ aliceVKey
-          print $ aliceVKeyHash
-          print $ aliceAddress
+              aliceActualAddress = unsafeAddressFromText "addr_test1vqx5tu4nzz5cuanvac4t9an4djghrx7hkdvjnnhstqm9kegvm6g6c" -- Not really sure if this is of alice, could be of bob or carol.
+          print aliceKey
+          print aliceVKey
+          print aliceVKeyHash
+          print aliceAddress
           utxos <- runGYTxQueryMonadIO nid provider $ do
             utxosAtPaymentCredential (GYCredentialByKey aliceVKeyHash) Nothing
           print utxos
-          utxos2 <-
-            runGYTxQueryMonadIO nid provider $ do
-              utxoAtTxOutRef $ txOutRefFromTuple ("f0a39560ea80ccc68e8dffb6a4a077c8927811f06c5d9058d0fa2d1a8d047d20", 0)
-          print utxos2
+          txBody <-
+            runGYTxBuilderMonadIO nid provider [aliceActualAddress] aliceActualAddress Nothing $ do
+              aliceUtxos <- utxosAtAddress aliceActualAddress Nothing
+              gyLogInfo' "" (show aliceUtxos)
+              let aliceUtxo = utxosToList aliceUtxos & head
+              let skel = mustHaveInput (GYTxIn (utxoRef aliceUtxo) GYTxInWitnessKey)
+              buildTxBody skel
+          print txBody
     ]

@@ -93,8 +93,8 @@ apiHashFromPlutus (PlutusV1.ScriptHash (BuiltinByteString bs)) = Api.deserialise
 scriptHashToPlutus :: GYScriptHash -> PlutusV1.ScriptHash
 scriptHashToPlutus = scriptHashToApi >>> apiHashToPlutus
 
-scriptHashFromPlutus :: PlutusV1.ScriptHash -> Either Api.SerialiseAsRawBytesError GYScriptHash
-scriptHashFromPlutus sh = scriptHashFromApi <$> apiHashFromPlutus sh
+scriptHashFromPlutus :: PlutusV1.ScriptHash -> Either PlutusToCardanoError GYScriptHash
+scriptHashFromPlutus = validatorHashFromPlutus
 
 {-# DEPRECATED GYValidatorHash "Use GYScriptHash." #-}
 type GYValidatorHash = GYScriptHash

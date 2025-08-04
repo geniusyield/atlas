@@ -36,7 +36,7 @@ import Web.HttpApiData (FromHttpApiData, ToHttpApiData)
 -- Error "parsing Word64 failed, value is either floating or will cause over or underflow 4.2e29"
 newtype GYSlot = GYSlot Word64
   deriving (Show, Read, Eq, Ord)
-  deriving newtype (Swagger.ToParamSchema, Swagger.ToSchema, ToJSON, FromJSON, ToHttpApiData, FromHttpApiData, Num)
+  deriving newtype (Swagger.ToParamSchema, Swagger.ToSchema, ToJSON, FromJSON, ToHttpApiData, FromHttpApiData)
 
 instance Printf.PrintfArg GYSlot where
   formatArg (GYSlot n) = Printf.formatArg (show n)

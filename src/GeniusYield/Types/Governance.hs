@@ -48,12 +48,13 @@ import Cardano.Api.Ledger (maybeToStrictMaybe, strictMaybeToMaybe)
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api
 import Cardano.Ledger.Conway qualified as Conway
+import Data.Aeson (FromJSON, ToJSON, object, withObject, withText, (.:), (.=))
+import Data.Aeson.Types (FromJSON (parseJSON), ToJSON (toJSON))
 import Data.Either.Combinators (mapLeft)
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Word (Word16)
-import Deriving.Aeson qualified as Aeson
 import GHC.Generics (Generic)
 import GeniusYield.Imports (Map, Natural, Set, (&))
 import GeniusYield.Types.Address (GYStakeAddress, stakeAddressFromLedger, stakeAddressToLedger)
@@ -73,7 +74,19 @@ import PlutusTx.Builtins.Internal (BuiltinByteString (BuiltinByteString))
 -- | Vote on a governance proposal.
 data GYVote = Yes | No | Abstain
   deriving (Eq, Show, Ord, Enum, Bounded, Generic)
-  deriving anyclass (Aeson.FromJSON, Aeson.ToJSON)
+
+instance FromJSON GYVote where
+  parseJSON = withText "GYVote" $
+    \case
+      "yes" -> return Yes
+      "no" -> return No
+      "abstain" -> return Abstain
+      _ -> fail "string is not one of known GYVote enum values"
+
+instance ToJSON GYVote where
+  toJSON Yes = "yes"
+  toJSON No = "no"
+  toJSON Abstain = "abstain"
 
 voteToPlutus :: GYVote -> PlutusV3.Vote
 voteToPlutus Yes = PlutusV3.VoteYes
@@ -115,7 +128,19 @@ voterFromLedger (Ledger.StakePoolVoter k) = StakePoolVoter (keyHashFromLedger k)
 data GYGovActionId = GYGovActionId
   {gaidTxId :: !GYTxId, gaidIx :: !Word16}
   deriving (Eq, Show, Ord, Generic)
-  deriving anyclass (Aeson.FromJSON, Aeson.ToJSON)
+
+instance FromJSON GYGovActionId where
+  parseJSON = withObject "GYGovActionId" $ \v -> do
+    gaidTxId <- v .: "txId"
+    gaidIx <- v .: "ix"
+    return GYGovActionId {gaidTxId, gaidIx}
+
+instance ToJSON GYGovActionId where
+  toJSON (GYGovActionId {gaidTxId, gaidIx}) =
+    object
+      [ "txId" .= gaidTxId
+      , "ix" .= gaidIx
+      ]
 
 govActionIdToLedger :: GYGovActionId -> Ledger.GovActionId
 govActionIdToLedger (GYGovActionId txId ix) = Ledger.GovActionId (txIdToApi txId & Api.toShelleyTxId) (Ledger.GovActionIx ix)

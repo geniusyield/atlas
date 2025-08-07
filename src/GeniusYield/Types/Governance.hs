@@ -372,6 +372,7 @@ data GYGovState = GYGovState
   , cgsFuturePParams :: !(ConwayState.FuturePParams Conway.ConwayEra)
   , cgsDRepPulsingState :: !(ConwayGovernance.DRepPulsingState Conway.ConwayEra)
   }
+  deriving stock (Eq, Show)
 
 govStateToLedger :: GYGovState -> Ledger.GovState Conway.ConwayEra
 govStateToLedger = undefined

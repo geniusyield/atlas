@@ -42,7 +42,7 @@ module GeniusYield.Types.Governance (
   GYGovActionState (..),
   govActionStateToLedger,
   govActionStateFromLedger,
-  GYGovState,
+  GYGovState (..),
   govStateFromLedger,
   govStateToLedger,
 ) where

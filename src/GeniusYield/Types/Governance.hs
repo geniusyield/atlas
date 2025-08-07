@@ -42,12 +42,18 @@ module GeniusYield.Types.Governance (
   GYGovActionState (..),
   govActionStateToLedger,
   govActionStateFromLedger,
+  GYGovState,
+  govStateFromLedger,
+  govStateToLedger,
 ) where
 
 import Cardano.Api.Ledger (maybeToStrictMaybe, strictMaybeToMaybe)
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api
+import Cardano.Ledger.Api qualified as Ledger
 import Cardano.Ledger.Conway qualified as Conway
+import Cardano.Ledger.Conway.Governance qualified as ConwayGovernance
+import Cardano.Ledger.Conway.State qualified as ConwayState
 import Data.Aeson (FromJSON, ToJSON, object, withObject, withText, (.:), (.=))
 import Data.Aeson.Types (FromJSON (parseJSON), ToJSON (toJSON))
 import Data.Either.Combinators (mapLeft)
@@ -355,4 +361,29 @@ govActionStateFromLedger Ledger.GovActionState {..} =
     , gasProposalProcedure = propProcFromLedger gasProposalProcedure
     , gasProposedIn = epochNoFromLedger gasProposedIn
     , gasExpiresAfter = epochNoFromLedger gasExpiresAfter
+    }
+
+data GYGovState = GYGovState
+  { cgsProposals :: !(ConwayGovernance.Proposals Conway.ConwayEra)
+  , cgsCommittee :: !(Maybe (Ledger.Committee Conway.ConwayEra))
+  , cgsConstitution :: !(Ledger.Constitution Conway.ConwayEra)
+  , cgsCurPParams :: !(Ledger.PParams Conway.ConwayEra)
+  , cgsPrevPParams :: !(Ledger.PParams Conway.ConwayEra)
+  , cgsFuturePParams :: !(ConwayState.FuturePParams Conway.ConwayEra)
+  , cgsDRepPulsingState :: !(ConwayGovernance.DRepPulsingState Conway.ConwayEra)
+  }
+
+govStateToLedger :: GYGovState -> Ledger.GovState Conway.ConwayEra
+govStateToLedger = undefined
+
+govStateFromLedger :: Ledger.GovState Conway.ConwayEra -> GYGovState
+govStateFromLedger Ledger.ConwayGovState {..} =
+  GYGovState
+    { cgsProposals = cgsProposals
+    , cgsCommittee = strictMaybeToMaybe cgsCommittee
+    , cgsConstitution = cgsConstitution
+    , cgsCurPParams = cgsCurPParams
+    , cgsPrevPParams = cgsPrevPParams
+    , cgsFuturePParams = cgsFuturePParams
+    , cgsDRepPulsingState = cgsDRepPulsingState
     }

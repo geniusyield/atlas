@@ -135,6 +135,11 @@ instance GYTxQueryMonad GYTxQueryMonadIO where
     providers <- asks envProviders
     ioToQueryMonad $ gyGetStakeAddressInfo providers saddr
 
+  govState = do
+    logMsg mempty GYDebug $ "Querying governance state"
+    providers <- asks envProviders
+    ioToQueryMonad $ gyGetGovState providers
+
   drepState drep = do
     logMsg mempty GYDebug $ printf "Querying DRep State: %s" drep
     providers <- asks envProviders

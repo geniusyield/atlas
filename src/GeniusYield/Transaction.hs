@@ -161,8 +161,20 @@ buildUnsignedTxBody ::
   [(GYProposalProcedurePB, GYTxBuildWitness v)] ->
   Natural ->
   m (Either GYBuildTxError GYTxBody)
-buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata vps pps donation = buildTxLoop cstrat extraLovelaceStart
+buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub signers mbTxMetadata vps pps donation =
+  buildTxLoop
+    cstrat
+    ( if feea + feeb + ceiling (Ledger.unboundRational prMem) + ceiling (Ledger.unboundRational prSteps) == 0
+        then
+          -- Fee not at all required.
+          0
+        else extraLovelaceStart
+    )
  where
+  pp = gyBTxEnvProtocolParams env
+  feea = pp ^. ppMinFeeAL
+  feeb = pp ^. ppMinFeeBL
+  Ledger.Prices {prMem, prSteps} = pp ^. ppPricesL
   certsFinalised = finaliseTxCert (gyBTxEnvProtocolParams env) <$> certs
 
   step :: GYCoinSelectionStrategy -> Natural -> m (Either GYBuildTxError ([GYTxInDetailed v], GYUTxOs, [GYTxOut v]))

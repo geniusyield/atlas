@@ -11,7 +11,9 @@ module GeniusYield.Types.Script.ScriptHash (
   scriptHashToApi,
   scriptHashToLedger,
   scriptHashFromLedger,
+  apiHashFromPlutus,
   apiHashToPlutus,
+  scriptHashFromPlutus,
   scriptHashToPlutus,
   GYValidatorHash,
   validatorHashToPlutus,
@@ -33,6 +35,7 @@ import GeniusYield.Imports
 import GeniusYield.Types.Ledger (PlutusToCardanoError (..))
 import PlutusLedgerApi.V1 qualified as PlutusV1
 import PlutusTx.Builtins qualified as PlutusTx
+import PlutusTx.Builtins.Internal (BuiltinByteString (BuiltinByteString))
 import Text.Printf qualified as Printf
 import Web.HttpApiData qualified as Web
 
@@ -84,8 +87,14 @@ scriptHashFromLedger = Api.fromShelleyScriptHash >>> scriptHashFromApi
 apiHashToPlutus :: Api.ScriptHash -> PlutusV1.ScriptHash
 apiHashToPlutus h = PlutusV1.ScriptHash $ PlutusTx.toBuiltin $ Api.serialiseToRawBytes h
 
+apiHashFromPlutus :: PlutusV1.ScriptHash -> Either Api.SerialiseAsRawBytesError Api.ScriptHash
+apiHashFromPlutus (PlutusV1.ScriptHash (BuiltinByteString bs)) = Api.deserialiseFromRawBytes Api.AsScriptHash bs
+
 scriptHashToPlutus :: GYScriptHash -> PlutusV1.ScriptHash
 scriptHashToPlutus = scriptHashToApi >>> apiHashToPlutus
+
+scriptHashFromPlutus :: PlutusV1.ScriptHash -> Either PlutusToCardanoError GYScriptHash
+scriptHashFromPlutus = validatorHashFromPlutus
 
 {-# DEPRECATED GYValidatorHash "Use GYScriptHash." #-}
 type GYValidatorHash = GYScriptHash

@@ -9,12 +9,16 @@ module GeniusYield.Types.Governance (
   GYVote (..),
   voteFromLedger,
   voteToLedger,
+  voteFromPlutus,
+  voteToPlutus,
   GYVoter (..),
   voterFromLedger,
   voterToLedger,
   GYGovActionId (..),
   govActionIdFromLedger,
   govActionIdToLedger,
+  govActionIdFromPlutus,
+  govActionIdToPlutus,
   GYVotingProcedure (..),
   votingProcedureFromLedger,
   votingProcedureToLedger,
@@ -44,9 +48,14 @@ import Cardano.Api.Ledger (maybeToStrictMaybe, strictMaybeToMaybe)
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api
 import Cardano.Ledger.Conway qualified as Conway
+import Data.Aeson (FromJSON, ToJSON, object, withObject, withText, (.:), (.=))
+import Data.Aeson.Types (FromJSON (parseJSON), ToJSON (toJSON))
+import Data.Either.Combinators (mapLeft)
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
+import Data.Text qualified as Text
 import Data.Word (Word16)
+import GHC.Generics (Generic)
 import GeniusYield.Imports (Map, Natural, Set, (&))
 import GeniusYield.Types.Address (GYStakeAddress, stakeAddressFromLedger, stakeAddressToLedger)
 import GeniusYield.Types.Anchor
@@ -55,13 +64,39 @@ import GeniusYield.Types.Credential (GYCredential, credentialFromLedger, credent
 import GeniusYield.Types.Epoch (GYEpochNo, epochNoFromLedger, epochNoToLedger)
 import GeniusYield.Types.KeyHash
 import GeniusYield.Types.KeyRole (GYKeyRole (..))
+import GeniusYield.Types.Ledger (PlutusToCardanoError (UnknownPlutusToCardanoError))
 import GeniusYield.Types.Reexpose (ProtVer, UnitInterval)
 import GeniusYield.Types.Script (GYScriptHash, scriptHashFromLedger, scriptHashToLedger)
 import GeniusYield.Types.Tx (GYTxId, txIdFromApi, txIdToApi)
+import PlutusLedgerApi.V3 qualified as PlutusV3
+import PlutusTx.Builtins.Internal (BuiltinByteString (BuiltinByteString))
 
 -- | Vote on a governance proposal.
 data GYVote = Yes | No | Abstain
-  deriving (Eq, Show, Ord, Enum, Bounded)
+  deriving (Eq, Show, Ord, Enum, Bounded, Generic)
+
+instance FromJSON GYVote where
+  parseJSON = withText "GYVote" $
+    \case
+      "yes" -> return Yes
+      "no" -> return No
+      "abstain" -> return Abstain
+      _ -> fail "string is not one of known GYVote enum values"
+
+instance ToJSON GYVote where
+  toJSON Yes = "yes"
+  toJSON No = "no"
+  toJSON Abstain = "abstain"
+
+voteToPlutus :: GYVote -> PlutusV3.Vote
+voteToPlutus Yes = PlutusV3.VoteYes
+voteToPlutus No = PlutusV3.VoteNo
+voteToPlutus Abstain = PlutusV3.Abstain
+
+voteFromPlutus :: PlutusV3.Vote -> GYVote
+voteFromPlutus PlutusV3.VoteYes = Yes
+voteFromPlutus PlutusV3.VoteNo = No
+voteFromPlutus PlutusV3.Abstain = Abstain
 
 voteToLedger :: GYVote -> Ledger.Vote
 voteToLedger Yes = Ledger.VoteYes
@@ -92,13 +127,47 @@ voterFromLedger (Ledger.StakePoolVoter k) = StakePoolVoter (keyHashFromLedger k)
 
 data GYGovActionId = GYGovActionId
   {gaidTxId :: !GYTxId, gaidIx :: !Word16}
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show, Ord, Generic)
+
+instance FromJSON GYGovActionId where
+  parseJSON = withObject "GYGovActionId" $ \v -> do
+    gaidTxId <- v .: "txId"
+    gaidIx <- v .: "ix"
+    return GYGovActionId {gaidTxId, gaidIx}
+
+instance ToJSON GYGovActionId where
+  toJSON (GYGovActionId {gaidTxId, gaidIx}) =
+    object
+      [ "txId" .= gaidTxId
+      , "ix" .= gaidIx
+      ]
 
 govActionIdToLedger :: GYGovActionId -> Ledger.GovActionId
 govActionIdToLedger (GYGovActionId txId ix) = Ledger.GovActionId (txIdToApi txId & Api.toShelleyTxId) (Ledger.GovActionIx ix)
 
 govActionIdFromLedger :: Ledger.GovActionId -> GYGovActionId
 govActionIdFromLedger (Ledger.GovActionId txId (Ledger.GovActionIx ix)) = GYGovActionId (txIdFromApi (Api.fromShelleyTxId txId)) ix
+
+govActionIdFromPlutus :: PlutusV3.GovernanceActionId -> Either PlutusToCardanoError GYGovActionId
+govActionIdFromPlutus (PlutusV3.GovernanceActionId tid@(PlutusV3.TxId (BuiltinByteString bs)) ix) = GYGovActionId <$> etid <*> eix
+ where
+  etid :: Either PlutusToCardanoError GYTxId
+  etid =
+    mapLeft (\e -> UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: invalid txOutRefId " <> show tid <> ", error: " <> show e) $
+      txIdFromApi
+        <$> Api.deserialiseFromRawBytes Api.AsTxId bs
+
+  eix :: Either PlutusToCardanoError Word16
+  eix
+    | ix < 0 = Left $ UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: negative txOutRefIdx " ++ show ix
+    | ix > toInteger (maxBound @Word) = Left $ UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: txOutRefIdx " ++ show ix ++ " too large"
+    | otherwise = Right $ fromInteger ix
+
+govActionIdToPlutus :: GYGovActionId -> PlutusV3.GovernanceActionId
+govActionIdToPlutus (GYGovActionId tid ix) =
+  PlutusV3.GovernanceActionId
+    (PlutusV3.TxId . BuiltinByteString . Api.serialiseToRawBytes . txIdToApi $ tid)
+    (toInteger ix)
 
 -- | Voting procedure.
 data GYVotingProcedure = GYVotingProcedure

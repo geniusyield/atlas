@@ -259,7 +259,7 @@ withCfgProviders
             , submitTx
             , KupoApi.kupoAwaitTxConfirmed kEnv
             , OgmiosApi.ogmiosStakeAddressInfo oEnv
-            , pure Nothing
+            , OgmiosApi.ogmiosGovState oEnv
             , OgmiosApi.ogmiosGetDRepState oEnv
             , OgmiosApi.ogmiosGetDRepsState oEnv
             , OgmiosApi.ogmiosStakePools oEnv
@@ -284,7 +284,7 @@ withCfgProviders
             , MaestroApi.maestroSubmitTx (Just True == turboSubmit) maestroApiEnv
             , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
             , MaestroApi.maestroStakeAddressInfo maestroApiEnv
-            , pure Nothing
+            , MaestroApi.maestroGovState maestroApiEnv
             , MaestroApi.maestroDRepState maestroApiEnv
             , MaestroApi.maestroDRepsState maestroApiEnv
             , MaestroApi.maestroStakePools maestroApiEnv
@@ -309,7 +309,7 @@ withCfgProviders
             , Blockfrost.blockfrostSubmitTx proj
             , Blockfrost.blockfrostAwaitTxConfirmed proj
             , Blockfrost.blockfrostStakeAddressInfo proj
-            , pure Nothing
+            , Blockfrost.blockfrostGovState proj
             , Blockfrost.blockfrostDRepState proj
             , Blockfrost.blockfrostDRepsState proj
             , Blockfrost.blockfrostStakePools proj

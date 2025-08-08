@@ -10,6 +10,7 @@ module GeniusYield.Providers.Blockfrost (
   blockfrostSubmitTx,
   blockfrostAwaitTxConfirmed,
   blockfrostStakeAddressInfo,
+  blockfrostGovState,
   blockfrostDRepState,
   blockfrostDRepsState,
   blockfrostConstitution,
@@ -612,6 +613,9 @@ blockfrostStakeAddressInfo p saddr = do
 -------------------------------------------------------------------------------
 -- Governance
 -------------------------------------------------------------------------------
+
+blockfrostGovState :: Blockfrost.Project -> IO (Maybe GYGovState)
+blockfrostGovState _c = error "Blockfrost SDK does not support fetching the governance state"
 
 blockfrostDRepState :: Blockfrost.Project -> GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
 blockfrostDRepState _p _c = error "Blockfrost SDK does not support fetching the DRep state"

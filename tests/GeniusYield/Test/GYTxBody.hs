@@ -56,6 +56,7 @@ import GeniusYield.Types.Value (
   valueSingleton,
  )
 
+import Data.Default (Default (..))
 import GeniusYield.Providers.Common (mainnetEraHist)
 import GeniusYield.Transaction (
   GYBuildTxEnv (..),
@@ -153,10 +154,12 @@ balanceTxStepTests =
           []
           mempty
           mempty
+          0
           []
           []
           GYRandomImproveMultiAsset
           2_000_000
+
       res @?= Left GYBalancingErrorEmptyOwnUTxOs
   , testCase "No collateral needed" $ do
       Right (_, collaterals, _) <-
@@ -167,6 +170,7 @@ balanceTxStepTests =
           []
           mempty
           mempty
+          0
           []
           []
           GYRandomImproveMultiAsset
@@ -181,6 +185,7 @@ balanceTxStepTests =
           []
           mempty
           mempty
+          0
           []
           []
           GYRandomImproveMultiAsset
@@ -226,7 +231,7 @@ collateralUtxo =
     , utxoRefScript = Nothing
     }
 
-mockBuildTxEnv :: [GYValue] -> GYBuildTxEnv
+mockBuildTxEnv :: [GYValue] -> GYBuildTxEnv v
 mockBuildTxEnv wallet =
   GYBuildTxEnv
     { gyBTxEnvSystemStart = mockSystemStart
@@ -236,6 +241,7 @@ mockBuildTxEnv wallet =
     , gyBTxEnvOwnUtxos = buildOwnUtxos wallet
     , gyBTxEnvChangeAddr = mockChangeAddress
     , gyBTxEnvCollateral = collateralUtxo
+    , gyBTxEnvExtraConfiguration = def
     }
  where
   slotLen = fromInteger (scSlotLength defaultSlotConfig) / 1000

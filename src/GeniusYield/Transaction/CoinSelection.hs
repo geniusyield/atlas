@@ -15,7 +15,7 @@ module GeniusYield.Transaction.CoinSelection (
 
 import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Binary qualified as CBOR
-import Cardano.Ledger.Conway (Conway)
+import Cardano.Ledger.Conway (ConwayEra)
 import Cardano.Ledger.Conway.Core (eraProtVerHigh)
 import Control.Monad.Random (MonadRandom)
 import Control.Monad.Trans.Except (
@@ -59,6 +59,7 @@ data GYCoinSelectionEnv v = GYCoinSelectionEnv
   , maxValueSize :: Natural
   , adaSource :: Natural
   , adaSink :: Natural
+  , inputMapper :: GYUTxO -> GYTxInDetailed v
   }
 
 data GYCoinSelectionStrategy
@@ -97,6 +98,7 @@ selectInputs
     , minimumUTxOF
     , adaSource
     , adaSink
+    , inputMapper
     }
   GYLegacy = do
     additionalInputForReplayProtection <-
@@ -107,7 +109,7 @@ selectInputs
             let ownUtxosList = utxosToList ownUtxos
              in case ownUtxosList of
                   [] -> Left GYBalancingErrorEmptyOwnUTxOs
-                  _ -> pure . pure $ utxoAsPubKeyInp $ maximumBy (compare `on` utxoValue) ownUtxosList
+                  _ -> pure . pure $ inputMapper $ maximumBy (compare `on` utxoValue) ownUtxosList
           else pure Nothing
     let
       additionalInputForReplayProtectionAsList = maybe [] pure additionalInputForReplayProtection
@@ -121,6 +123,7 @@ selectInputs
         selectInputsLegacy
           ownUtxos
           valueMissing
+          inputMapper
           existingInputs
     let valueIn' = valueIn <> addVal
         tokenChange = removeAda $ (valueIn' <> mintValue) `valueMinus` valueOut
@@ -152,6 +155,7 @@ selectInputs
     , maxValueSize
     , adaSource
     , adaSink
+    , inputMapper
     }
   cstrat = do
     SelectionResult
@@ -175,15 +179,15 @@ selectInputs
               Thus, if this txIn doesn't exist in ownUtxos, it must already be in 'existingInputs',
               so we don't need it in additional inputs -}
               Nothing -> acc
-              Just utxo -> utxoAsPubKeyInp utxo : acc
+              Just utxo -> inputMapper utxo : acc
         -- Set of additional inputs chosen by the balancer that should be added to the transaction.
         addIns = foldl' foldHelper [] inputsSelected
     pure (addIns, changeOuts)
    where
     selectionConstraints =
       SelectionConstraints
-        { tokenBundleSizeAssessor =
-            tokenBundleSizeAssessor' maxValueSize
+        { valueSizeAssessor =
+            valueSizeAssessor' maxValueSize
         , computeMinimumAdaQuantity = \addr tkMap -> do
             -- This function is ran for generated change outputs which do not have datum & reference script.
             -- This first parameter can actually be ignored as it will always be @toCWalletAddress changeAddr@.
@@ -224,7 +228,7 @@ computeTokenBundleSerializedLengthBytes :: GYValue -> Natural
 computeTokenBundleSerializedLengthBytes =
   safeCast
     . BS.length
-    . CBOR.serialize' (eraProtVerHigh @Conway)
+    . CBOR.serialize' (eraProtVerHigh @ConwayEra)
     . Api.S.toMaryValue
     . valueToApi
  where
@@ -232,14 +236,16 @@ computeTokenBundleSerializedLengthBytes =
   safeCast = fromIntegral
 
 selectInputsLegacy ::
+  forall v.
   -- | Set of own utxos to select additional inputs from.
   GYUTxOs ->
   -- | Target value total inputs must sum up to.
   Map GYAssetClass Natural ->
+  (GYUTxO -> GYTxInDetailed v) ->
   -- | List of existing inputs that must be used.
   [GYTxInDetailed v] ->
   Either GYBalancingError ([GYTxInDetailed v], GYValue)
-selectInputsLegacy ownUtxos targetOut existingIns = go targetOut [] mempty $ utxosToList ownUtxos
+selectInputsLegacy ownUtxos targetOut inputMapper existingIns = go targetOut [] mempty $ utxosToList ownUtxos
  where
   inRefs = map (gyTxInTxOutRef . gyTxInDet) existingIns
   ownValueMap :: Map GYTxOutRef GYValue
@@ -270,7 +276,7 @@ selectInputsLegacy ownUtxos targetOut existingIns = go targetOut [] mempty $ utx
               else
                 go
                   m'
-                  (utxoAsPubKeyInp utxo : addIns)
+                  (inputMapper utxo : addIns)
                   (addVal <> v)
                   ys
 
@@ -278,19 +284,8 @@ selectInputsLegacy ownUtxos targetOut existingIns = go targetOut [] mempty $ utx
 -- Utilities
 -------------------------------------------------------------------------------
 
-utxoAsPubKeyInp :: GYUTxO -> GYTxInDetailed v
-utxoAsPubKeyInp GYUTxO {utxoRef, utxoAddress, utxoValue, utxoOutDatum, utxoRefScript} =
-  GYTxInDetailed
-    { -- It is assumed the 'GYUTxOs' arg designates key wallet utxos.
-      gyTxInDet = GYTxIn utxoRef GYTxInWitnessKey
-    , gyTxInDetAddress = utxoAddress
-    , gyTxInDetValue = fst $ valueSplitSign utxoValue
-    , gyTxInDetDatum = utxoOutDatum
-    , gyTxInDetScriptRef = utxoRefScript
-    }
-
-tokenBundleSizeAssessor' :: Natural -> ValueSizeAssessor
-tokenBundleSizeAssessor' maxSize = assessTokenBundleSize
+valueSizeAssessor' :: Natural -> ValueSizeAssessor
+valueSizeAssessor' maxSize = assessTokenBundleSize
  where
   assessTokenBundleSize tb
     | serializedLengthBytes <= maxSize =

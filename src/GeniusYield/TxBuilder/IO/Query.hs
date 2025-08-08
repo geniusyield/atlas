@@ -70,6 +70,11 @@ instance GYTxQueryMonad GYTxQueryMonadIO where
     providers <- asks envProviders
     ioToQueryMonad $ gyQueryUtxosAtAddress providers addr mAssetClass
 
+  utxosWithAsset assetClass = do
+    logMsg mempty GYDebug $ printf "Querying utxos with asset class: %s" (show assetClass)
+    providers <- asks envProviders
+    ioToQueryMonad $ gyQueryUtxosWithAsset providers assetClass
+
   utxosAtAddressWithDatums addr mAssetClass = do
     logMsg mempty GYDebug $ printf "Querying utxos (with datums) at address: %s" addr
     providers <- asks envProviders
@@ -149,6 +154,11 @@ instance GYTxQueryMonad GYTxQueryMonadIO where
     logMsg mempty GYDebug "Querying Proposals"
     providers <- asks envProviders
     ioToQueryMonad $ gyGetProposals providers actionIds
+
+  mempoolTxs = do
+    logMsg mempty GYDebug "Querying Mempool Transactions"
+    providers <- asks envProviders
+    ioToQueryMonad $ gyGetMempoolTxs providers
 
   slotConfig = do
     providers <- asks envProviders

@@ -19,6 +19,7 @@ module GeniusYield.TxBuilder.Class (
   GYTxSkeleton (..),
   GYTxSkeletonRefIns (..),
   buildTxBody,
+  buildTxBodyWithExtraConfiguration,
   buildTxBodyParallel,
   buildTxBodyChaining,
   waitNSlots,
@@ -94,6 +95,7 @@ module GeniusYield.TxBuilder.Class (
   mustBeSignedBy,
   isInvalidBefore,
   isInvalidAfter,
+  mustHaveDonation,
   gyLogDebug',
   gyLogInfo',
   gyLogWarning',
@@ -101,8 +103,21 @@ module GeniusYield.TxBuilder.Class (
   skeletonToRefScriptsORefs,
   wrapReqWithTimeLog,
   wt,
+  obtainTxBodyContentBuildTx,
+  obtainTxBodyContentBuildTx',
 ) where
 
+import Cardano.Api qualified as CApi
+import Cardano.Api.Ledger qualified as Ledger
+import Cardano.Api.Shelley qualified as CApi
+import Cardano.Api.Shelley qualified as CApi.S
+import Cardano.Ledger.Alonzo.Scripts qualified as Ledger
+import Cardano.Ledger.Alonzo.TxWits qualified as Ledger
+import Cardano.Ledger.Api qualified as Ledger
+import Cardano.Ledger.Conway.Scripts qualified as Ledger
+import Cardano.Ledger.Plutus.Language qualified as Ledger
+import Control.Lens ((^.))
+import Control.Monad (zipWithM)
 import Control.Monad.Except (MonadError (..), liftEither)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Random (
@@ -119,14 +134,16 @@ import Control.Monad.Writer.Strict qualified as Strict
 import Data.Default (Default, def)
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
-import Data.Maybe (maybeToList)
+import Data.Maybe (fromJust, maybeToList)
 import Data.Set qualified as Set
 import Data.Text qualified as Txt
 import Data.Time (diffUTCTime, getCurrentTime)
 import Data.Word (Word64)
+import GHC.IsList (fromList, toList)
 import GHC.Stack (withFrozenCallStack)
-import GeniusYield.Imports
+import GeniusYield.Imports hiding (toList)
 import GeniusYield.Transaction
+import GeniusYield.Transaction.Common (GYTxExtraConfiguration)
 import GeniusYield.TxBuilder.Common
 import GeniusYield.TxBuilder.Errors
 import GeniusYield.TxBuilder.Query.Class
@@ -171,6 +188,16 @@ class (Default (TxBuilderStrategy m), GYTxSpecialQueryMonad m, GYTxUserQueryMona
     m GYTxBody
   buildTxBodyWithStrategy = buildTxBodyWithStrategy'
 
+  buildTxBodyWithStrategyAndExtraConfiguration :: forall v. TxBuilderStrategy m -> GYTxExtraConfiguration v -> GYTxSkeleton v -> m GYTxBody
+  default buildTxBodyWithStrategyAndExtraConfiguration ::
+    forall v.
+    (MonadRandom m, TxBuilderStrategy m ~ GYCoinSelectionStrategy) =>
+    TxBuilderStrategy m ->
+    GYTxExtraConfiguration v ->
+    GYTxSkeleton v ->
+    m GYTxBody
+  buildTxBodyWithStrategyAndExtraConfiguration = buildTxBodyWithStrategyAndExtraConfiguration'
+
   -- | A multi 'GYTxSkeleton' builder. The result containing built bodies must be in the same order as the skeletons.
   --
   --     This does not perform chaining, i.e does not use utxos created by one of the given transactions in the next one.
@@ -204,6 +231,10 @@ class (Default (TxBuilderStrategy m), GYTxSpecialQueryMonad m, GYTxUserQueryMona
 -- | 'buildTxBodyWithStrategy' with the default coin selection strategy.
 buildTxBody :: forall v m. GYTxBuilderMonad m => GYTxSkeleton v -> m GYTxBody
 buildTxBody = buildTxBodyWithStrategy def
+
+-- | 'buildTxBodyWithStrategyAndExtraConfiguration' with the default coin selection strategy.
+buildTxBodyWithExtraConfiguration :: forall v m. GYTxBuilderMonad m => GYTxExtraConfiguration v -> GYTxSkeleton v -> m GYTxBody
+buildTxBodyWithExtraConfiguration = buildTxBodyWithStrategyAndExtraConfiguration def
 
 -- | 'buildTxBodyParallelWithStrategy' with the default coin selection strategy.
 buildTxBodyParallel :: forall v m. GYTxBuilderMonad m => [GYTxSkeleton v] -> m GYTxBuildResult
@@ -393,6 +424,7 @@ Since these wrapper data types are usage specific, and 'GYTxGameMonad' instances
 instance GYTxBuilderMonad m => GYTxBuilderMonad (RandT g m) where
   type TxBuilderStrategy (RandT g m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -405,6 +437,7 @@ instance GYTxMonad m => GYTxMonad (RandT g m) where
 instance GYTxBuilderMonad m => GYTxBuilderMonad (ReaderT env m) where
   type TxBuilderStrategy (ReaderT env m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -423,6 +456,7 @@ instance GYTxMonad m => GYTxMonad (ReaderT env m) where
 instance GYTxBuilderMonad m => GYTxBuilderMonad (Strict.StateT s m) where
   type TxBuilderStrategy (Strict.StateT s m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -435,6 +469,7 @@ instance GYTxMonad m => GYTxMonad (Strict.StateT s m) where
 instance GYTxBuilderMonad m => GYTxBuilderMonad (Lazy.StateT s m) where
   type TxBuilderStrategy (Lazy.StateT s m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -447,6 +482,7 @@ instance GYTxMonad m => GYTxMonad (Lazy.StateT s m) where
 instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (CPS.WriterT w m) where
   type TxBuilderStrategy (CPS.WriterT w m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -459,6 +495,7 @@ instance (GYTxMonad m, Monoid w) => GYTxMonad (CPS.WriterT w m) where
 instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (Strict.WriterT w m) where
   type TxBuilderStrategy (Strict.WriterT w m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -471,6 +508,7 @@ instance (GYTxMonad m, Monoid w) => GYTxMonad (Strict.WriterT w m) where
 instance (GYTxBuilderMonad m, Monoid w) => GYTxBuilderMonad (Lazy.WriterT w m) where
   type TxBuilderStrategy (Lazy.WriterT w m) = TxBuilderStrategy m
   buildTxBodyWithStrategy x = lift . buildTxBodyWithStrategy x
+  buildTxBodyWithStrategyAndExtraConfiguration x ec = lift . buildTxBodyWithStrategyAndExtraConfiguration x ec
   buildTxBodyParallelWithStrategy x = lift . buildTxBodyParallelWithStrategy x
   buildTxBodyChainingWithStrategy x = lift . buildTxBodyChainingWithStrategy x
 
@@ -812,7 +850,7 @@ utxoDatumHushed = fmap hush . utxoDatum
 mustHaveInput :: GYTxIn v -> GYTxSkeleton v
 mustHaveInput i = emptyGYTxSkeleton {gytxIns = [i]}
 
-mustHaveRefInput :: VersionIsGreaterOrEqual v 'PlutusV2 => GYTxOutRef -> GYTxSkeleton v
+mustHaveRefInput :: GYTxOutRef -> GYTxSkeleton v
 mustHaveRefInput i = emptyGYTxSkeleton {gytxRefIns = GYTxSkeletonRefIns (Set.singleton i)}
 
 mustHaveOutput :: GYTxOut v -> GYTxSkeleton v
@@ -851,6 +889,9 @@ isInvalidBefore s = emptyGYTxSkeleton {gytxInvalidBefore = Just s}
 
 isInvalidAfter :: GYSlot -> GYTxSkeleton v
 isInvalidAfter s = emptyGYTxSkeleton {gytxInvalidAfter = Just s}
+
+mustHaveDonation :: VersionIsGreaterOrEqual v 'PlutusV3 => Natural -> GYTxSkeleton v
+mustHaveDonation n = emptyGYTxSkeleton {gytxDonation = GYTxSkeletonDonation n}
 
 gyLogDebug', gyLogInfo', gyLogWarning', gyLogError' :: (GYTxQueryMonad m, HasCallStack) => GYLogNamespace -> String -> m ()
 gyLogDebug' ns = withFrozenCallStack $ logMsg ns GYDebug
@@ -898,14 +939,23 @@ buildTxBodyWithStrategy' ::
   GYCoinSelectionStrategy ->
   GYTxSkeleton v ->
   m GYTxBody
-buildTxBodyWithStrategy' cstrat m = do
-  x <- buildTxBodyCore (const id) cstrat [m]
+buildTxBodyWithStrategy' cstrat = buildTxBodyWithStrategyAndExtraConfiguration' cstrat def
+
+buildTxBodyWithStrategyAndExtraConfiguration' ::
+  forall v m.
+  (GYTxSpecialQueryMonad m, GYTxUserQueryMonad m, MonadRandom m) =>
+  GYCoinSelectionStrategy ->
+  GYTxExtraConfiguration v ->
+  GYTxSkeleton v ->
+  m GYTxBody
+buildTxBodyWithStrategyAndExtraConfiguration' cstrat ec m = do
+  x <- buildTxBodyCore (const id) cstrat ec [m]
   case x of
     GYTxBuildSuccess ne -> pure $ NE.head ne
     GYTxBuildPartialSuccess be _ -> throwError . GYBuildTxException $ GYBuildTxBalancingError be
     GYTxBuildFailure be -> throwError . GYBuildTxException $ GYBuildTxBalancingError be
     -- We know there is precisely one input.
-    GYTxBuildNoInputs -> error "buildTxBodyWithStrategy': absurd"
+    GYTxBuildNoInputs -> error "buildTxBodyWithStrategyAndExtraConfiguration': absurd"
 
 {- | A multi 'GYTxSkeleton' builder.
 
@@ -921,7 +971,7 @@ buildTxBodyParallelWithStrategy' ::
   [GYTxSkeleton v] ->
   m GYTxBuildResult
 buildTxBodyParallelWithStrategy' cstrat m = do
-  buildTxBodyCore updateOwnUtxosParallel cstrat m
+  buildTxBodyCore updateOwnUtxosParallel cstrat def m
 
 {- | A chaining 'GYTxSkeleton' builder.
 
@@ -938,7 +988,7 @@ buildTxBodyChainingWithStrategy' ::
   m GYTxBuildResult
 buildTxBodyChainingWithStrategy' cstrat m = do
   addrs <- ownAddresses
-  buildTxBodyCore (updateOwnUtxosChaining $ Set.fromList addrs) cstrat m
+  buildTxBodyCore (updateOwnUtxosChaining $ Set.fromList addrs) cstrat def m
 
 {- | The core implementation of buildTxBody: Building 'GYTxBody's out of one or more 'GYTxSkeleton's.
 
@@ -966,10 +1016,11 @@ buildTxBodyCore ::
   (GYTxBody -> GYUTxOs -> GYUTxOs) ->
   -- | Coin selection strategy.
   GYCoinSelectionStrategy ->
+  GYTxExtraConfiguration v ->
   -- | Skeleton(s).
   [GYTxSkeleton v] ->
   m GYTxBuildResult
-buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
+buildTxBodyCore ownUtxoUpdateF cstrat ec skeletons = do
   logSkeletons skeletons
 
   -- Obtain constant parameters to be used across several 'GYTxBody' generations.
@@ -988,7 +1039,7 @@ buildTxBodyCore ownUtxoUpdateF cstrat skeletons = do
   addrs <- ownAddresses
   change <- ownChangeAddress
 
-  e <- buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral skeletons
+  e <- buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change collateral ec skeletons
   case e of
     Left err -> throwError $ GYBuildTxException err
     Right res -> pure res
@@ -1011,3 +1062,210 @@ updateOwnUtxosChaining ownAddrs txBody utxos = utxosRemoveTxOutRefs (Set.fromLis
   txIns = txBodyTxIns txBody
   txOuts = txBodyUTxOs txBody
   txOutsOwn = filterUTxOs (\GYUTxO {utxoAddress} -> utxoAddress `Set.member` ownAddrs) txOuts
+
+-- | See 'obtainTxBodyContentBuildTx'' for details.
+obtainTxBodyContentBuildTx :: forall m. GYTxSpecialQueryMonad m => GYTxBody -> m (CApi.TxBodyContent CApi.BuildTx ApiEra)
+obtainTxBodyContentBuildTx txBody = fst <$> obtainTxBodyContentBuildTx' txBody
+
+{- | Obtain 'TxBodyContent BuildTx ApiEra' from 'GYTxBody'. Also returns the set of UTxOs used as input in this transaction (reference and spending inputs).
+
+__CAUTION__: This does not account for voting procedures and proposal procedures present inside the original transaction.
+-}
+obtainTxBodyContentBuildTx' :: forall m. GYTxSpecialQueryMonad m => GYTxBody -> m (CApi.TxBodyContent CApi.BuildTx ApiEra, GYUTxOs)
+obtainTxBodyContentBuildTx' (txBodyToApi -> txBody@(CApi.ShelleyTxBody _sbe _ltxBody lscripts scriptData _ _)) = do
+  let
+    -- We obtained `TxBodyContent ViewTx`. Now we need to obtain `BuildTx` version of it.
+    txBodyContentViewTx = CApi.getTxBodyContent txBody
+
+  resolvedSpendIns <- utxosAtTxOutRefsWithDatums $ map (txOutRefFromApi . fst) (CApi.txIns txBodyContentViewTx)
+  resolvedRefIns <- utxosAtTxOutRefs $ map txOutRefFromApi $ case CApi.txInsReference txBodyContentViewTx of
+    CApi.TxInsReferenceNone -> []
+    CApi.TxInsReference _ refIns -> refIns
+
+  let totalIns = resolvedRefIns <> utxosFromList (map fst resolvedSpendIns)
+      refScripts :: Map GYScriptHash (GYTxOutRef, GYAnyScript) =
+        foldlUTxOs'
+          ( \acc GYUTxO {..} -> case utxoRefScript of
+              Nothing -> acc
+              Just as -> Map.insert (hashAnyScript as) (utxoRef, as) acc
+          )
+          mempty
+          totalIns
+  pp <- protocolParams
+  wdrls' <- case CApi.txWithdrawals txBodyContentViewTx of
+    CApi.TxWithdrawalsNone -> pure CApi.TxWithdrawalsNone
+    CApi.TxWithdrawals wsbe wdrls -> do
+      wdrls' <- zipWithM (curry (wdrlFromApi refScripts)) [0 ..] wdrls
+      pure $ CApi.TxWithdrawals wsbe wdrls'
+  ins' <- zipWithM (curry (inFromApi refScripts)) [0 ..] resolvedSpendIns
+  certs' <- case CApi.txCertificates txBodyContentViewTx of
+    CApi.TxCertificatesNone -> pure CApi.TxCertificatesNone
+    CApi.TxCertificates csbe cs -> do
+      certs' <- zipWithM (curry (certFromApi refScripts)) [0 ..] (toList cs)
+      pure $ CApi.TxCertificates csbe (fromList certs')
+  mints' <- case CApi.txMintValue txBodyContentViewTx of
+    CApi.TxMintNone -> pure CApi.TxMintNone
+    CApi.TxMintValue meo mapPolicyIdAssetWit -> do
+      mints' <- zipWithM (curry (mintFromApi refScripts)) [0 ..] (toList mapPolicyIdAssetWit)
+      pure $ CApi.mkTxMintValue meo mints'
+  pure
+    ( CApi.TxBodyContent
+        { txWithdrawals = wdrls'
+        , txVotingProcedures = Nothing
+        , txValidityUpperBound = CApi.txValidityUpperBound txBodyContentViewTx
+        , txValidityLowerBound = CApi.txValidityLowerBound txBodyContentViewTx
+        , txUpdateProposal = CApi.txUpdateProposal txBodyContentViewTx
+        , txTreasuryDonation = CApi.txTreasuryDonation txBodyContentViewTx
+        , txTotalCollateral = CApi.txTotalCollateral txBodyContentViewTx
+        , txScriptValidity = CApi.txScriptValidity txBodyContentViewTx
+        , txReturnCollateral = CApi.txReturnCollateral txBodyContentViewTx
+        , txProtocolParams = CApi.BuildTxWith $ Just $ CApi.S.LedgerProtocolParameters pp
+        , txProposalProcedures = Nothing
+        , txOuts = CApi.txOuts txBodyContentViewTx
+        , txMintValue = mints'
+        , txMetadata = CApi.txMetadata txBodyContentViewTx
+        , txInsReference = CApi.txInsReference txBodyContentViewTx
+        , txInsCollateral = CApi.txInsCollateral txBodyContentViewTx
+        , txIns = ins'
+        , txFee = CApi.txFee txBodyContentViewTx
+        , txExtraKeyWits = CApi.txExtraKeyWits txBodyContentViewTx
+        , txCurrentTreasuryValue = CApi.txCurrentTreasuryValue txBodyContentViewTx
+        , txCertificates = certs'
+        , txAuxScripts = CApi.txAuxScripts txBodyContentViewTx
+        }
+    , totalIns
+    )
+ where
+  findScript sh =
+    find
+      ( \case
+          Ledger.TimelockScript ts -> CApi.fromAllegraTimelock ts & simpleScriptFromApi & hashSimpleScript & \sh' -> sh' == sh
+          Ledger.PlutusScript ps ->
+            Ledger.withPlutusScript
+              ps
+              ( \ps' ->
+                  scriptHashFromLedger (Ledger.hashPlutusScript ps') == sh
+              )
+      )
+      lscripts
+
+  resolveRedeemer purp = case scriptData of
+    CApi.TxBodyNoScriptData -> throwError $ GYObtainTxBodyContentException $ GYNoRedeemerForPurpose purp
+    CApi.TxBodyScriptData _aeo _dats reds ->
+      case Map.lookup purp (reds ^. Ledger.unRedeemersL) of
+        Nothing -> throwError $ GYObtainTxBodyContentException $ GYNoRedeemerForPurpose purp
+        Just red -> pure $ bimap (CApi.unsafeHashableScriptData . CApi.fromPlutusData . Ledger.unData) CApi.fromAlonzoExUnits red
+
+  resolveScriptWitness ::
+    forall witRole.
+    Map GYScriptHash (GYTxOutRef, GYAnyScript) ->
+    GYScriptHash ->
+    Ledger.ConwayPlutusPurpose Ledger.AsIx Ledger.ConwayEra ->
+    CApi.ScriptDatum witRole ->
+    m (CApi.BuildTxWith CApi.BuildTx (CApi.ScriptWitness witRole CApi.ConwayEra))
+  resolveScriptWitness refScripts sh purp dat = do
+    (red, exUnits) <- resolveRedeemer purp
+    case Map.lookup sh refScripts of
+      Nothing ->
+        case findScript sh of
+          Nothing -> throwError $ GYObtainTxBodyContentException $ GYNoScriptForHash sh
+          Just (Ledger.TimelockScript ts) ->
+            pure $ CApi.BuildTxWith $ CApi.SimpleScriptWitness CApi.SimpleScriptInConway $ CApi.SScript (CApi.fromAllegraTimelock ts)
+          Just (Ledger.PlutusScript ps) ->
+            pure $
+              CApi.BuildTxWith $
+                ( case ps of
+                    Ledger.ConwayPlutusV1 ps' -> Ledger.plutusBinary ps' & Ledger.unPlutusBinary & scriptFromSerialisedScript @'PlutusV1 & scriptToApiPlutusScriptWitness
+                    Ledger.ConwayPlutusV2 ps' -> Ledger.plutusBinary ps' & Ledger.unPlutusBinary & scriptFromSerialisedScript @'PlutusV2 & scriptToApiPlutusScriptWitness
+                    Ledger.ConwayPlutusV3 ps' -> Ledger.plutusBinary ps' & Ledger.unPlutusBinary & scriptFromSerialisedScript @'PlutusV3 & scriptToApiPlutusScriptWitness
+                )
+                  dat
+                  red
+                  exUnits
+      Just (ref, as) -> pure $
+        CApi.BuildTxWith $
+          case as of
+            GYPlutusScript ps ->
+              referenceScriptToApiPlutusScriptWitness
+                ref
+                ps
+                dat
+                red
+                exUnits
+            GYSimpleScript _ss -> CApi.SimpleScriptWitness CApi.SimpleScriptInConway $ CApi.SReferenceScript $ txOutRefToApi ref
+
+  resolveKeyAndScriptWitness ::
+    forall kr witRole.
+    Map GYScriptHash (GYTxOutRef, GYAnyScript) ->
+    GYCredential kr ->
+    CApi.KeyWitnessInCtx witRole ->
+    CApi.ScriptWitnessInCtx witRole ->
+    Ledger.ConwayPlutusPurpose Ledger.AsIx Ledger.ConwayEra ->
+    CApi.ScriptDatum witRole ->
+    m (CApi.BuildTxWith CApi.BuildTx (CApi.Witness witRole CApi.ConwayEra))
+  resolveKeyAndScriptWitness refScripts cred keyWitFor scriptWitFor purp dat = case cred of
+    GYCredentialByKey _ -> pure $ CApi.BuildTxWith $ CApi.KeyWitness keyWitFor
+    GYCredentialByScript sh -> fmap (CApi.ScriptWitness scriptWitFor) <$> resolveScriptWitness refScripts sh purp dat
+
+  inFromApi refScripts (ix, (utxo, mdatum)) = do
+    resolvedKeyAndScriptWitness <-
+      resolveKeyAndScriptWitness
+        refScripts
+        (fromJust $ addressToPaymentCredential $ utxoAddress utxo)
+        CApi.KeyWitnessForSpending
+        CApi.ScriptWitnessForSpending
+        (Ledger.ConwaySpending (Ledger.AsIx ix)) -- Only used if it's a script based credential.
+        ( case utxoOutDatum utxo of
+            GYOutDatumInline _ -> CApi.InlineScriptDatum
+            GYOutDatumNone -> CApi.ScriptDatumForTxIn Nothing
+            GYOutDatumHash _ -> CApi.ScriptDatumForTxIn $ datumToApi' <$> mdatum
+        )
+    pure
+      ( utxoRef utxo & txOutRefToApi
+      , resolvedKeyAndScriptWitness
+      )
+
+  wdrlFromApi refScripts (ix, (stakeAddr, coin, _)) = do
+    resolvedKeyAndScriptWitness <-
+      resolveKeyAndScriptWitness
+        refScripts
+        (stakeAddressToCredential (stakeAddressFromApi stakeAddr))
+        CApi.KeyWitnessForStakeAddr
+        CApi.ScriptWitnessForStakeAddr
+        (Ledger.ConwayRewarding (Ledger.AsIx ix))
+        CApi.NoScriptDatumForStake
+    pure
+      ( stakeAddr
+      , coin
+      , resolvedKeyAndScriptWitness
+      )
+
+  certFromApi refScripts (ix, (cert, _)) = do
+    scred <- case certificateFromApiMaybe cert of
+      Nothing -> throwError $ GYObtainTxBodyContentException $ GYInvalidCertificate cert
+      Just cert' -> pure $ certificateToStakeCredential cert'
+    resolvedKeyAndScriptWitness <-
+      resolveKeyAndScriptWitness
+        refScripts
+        scred
+        CApi.KeyWitnessForStakeAddr
+        CApi.ScriptWitnessForStakeAddr
+        (Ledger.ConwayCertifying (Ledger.AsIx ix))
+        CApi.NoScriptDatumForStake
+    pure
+      ( cert
+      , (\wit -> Just (scred & stakeCredentialToApi, wit)) <$> resolvedKeyAndScriptWitness
+      )
+
+  mintFromApi refScripts (ix, (pid, (pas, _))) = do
+    resolvedScriptWitness <-
+      resolveScriptWitness
+        refScripts
+        (CApi.unPolicyId pid & scriptHashFromApi)
+        (Ledger.ConwayMinting (Ledger.AsIx ix))
+        CApi.NoScriptDatumForMint
+    pure
+      ( pid
+      , pas
+      , resolvedScriptWitness
+      )

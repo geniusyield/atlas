@@ -1,7 +1,38 @@
-## Next
+## 0.14.1
+
+* Added `utxosWithAsset` for efficiently querying of UTxOs containing a specified asset.
+
+## 0.14.0
+
+* Function to obtain `TxBodyContent BuildTx ApiEra` from `GYTxBody`, called `obtainTxBodyContentBuildTx` (also see `obtainTxBodyContentBuildTx'`). This is useful to build upon previously built transactions.
+* Add support for treasury donation. See "Donation" test in `GeniusYield.Test.Privnet.Examples.Misc` module.
+* Added extra build configuration (within `GYTxExtraConfiguration`) to provide for fee UTxO. If such a UTxO is provided then it's used to cover for transaction fees and we won't be exercising our usual logarithmic fee over approximation algorithm (see [specification](https://github.com/geniusyield/atlas/blob/main/src/GeniusYield/Transaction/CoinSelection/Specification.md) for details about this algorithm -- mainly the first few paras) since purpose of that algorithm is to select sufficient ADA from user's wallet to satisfy for fees but here we have separate fee UTxO which is expected to provide for it. `GYBuildTxFeeUtxoAdaInsufficient` error is returned if it proves to be insufficient (either fee is higher than ADA available in this UTxO or that subsequent change output lacks sufficient ADA to cover minimum ADA requirements of an output).
+
+## 0.13.0
+
+* Support of GHC 9.10 & 9.12.
+* Updated to latest IOG libraries, in particular `cardano-api` version >= 10.13 & `cardano-node` version >= 10.3.
+* Usage of reference scripts no longer prohibit PlutusV1 scripts which can now also be given via reference.
+* On-chain code is now split into a separate package so that Atlas no longer depends upon `plutus-tx-plugin` which is constrained to a very specific GHC version. User's of Atlas, should have following `subdir` stanza when specifying Atlas dependency in their `cabal.project` file:
+  ```
+  subdir:
+    plutus/atlas-onchain-common
+    .
+  ```
+* Support of advanced transaction building configuration. Currently Atlas assumes that extra wallet inputs selected by coin selection algorithm are coming from key based wallet but these inputs could also come from script based wallet instead. Type `GYTxExtraConfiguration` has field `gytxecUtxoInputMapper` to allow for this configuration. Other fields included in `GYTxExtraConfiguration` provides advanced configuration, please see corresponding haddock for more details. Transaction building functions such as `buildTxBodyWithExtraConfiguration` allow passing this extra configuration.
+* Support of extended verification keys. See `GYExtendedVerificationKey` type and related utilities such as `getExtendedVerificationKey`.
+* Added `applyParam` to apply data encoded script parameter to a plutus script.
+* Added `readScript'`, which is a variant of `readScript` where file contents are already loaded.
+
+## 0.12.0
 
 * `valueAdjust` now omits for entries if result of adjustment is zero.
 * Port coin selection algorithm from [`cardano-wallet`](https://github.com/cardano-foundation/cardano-wallet) to Atlas. This is done in sync with our 3rd Milestone and allows us to support latest versions of node & other IOG tooling.
+* Update to latest IOG dependencies.
+* Support of monitoring mempool transactions (`mempoolTxs` query function).
+* Support of government related queries such as `constitution` (to query the current constitution definition) and `proposals` (to fetch for proposals that are considered for ratification)
+* Support of mempool based caching, enabled by setting `mempoolCache` in provider's configuration.
+* Support of local transaction submission based caching (i.e., submitted transactions are considered to know for to be made available outputs & spent outputs), enabled by setting `localTxSubmissionCache` in provider's configuration.
 
 ## 0.11.1
 

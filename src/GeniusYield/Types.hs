@@ -162,6 +162,7 @@ import Cardano.Ledger.Api (
 import Cardano.Ledger.Conway.PParams (ppGovActionDepositL)
 import GeniusYield.Types.Ada as X
 import GeniusYield.Types.Address as X
+import GeniusYield.Types.Aeson as X
 import GeniusYield.Types.Anchor as X
 import GeniusYield.Types.Blueprint as X
 import GeniusYield.Types.BuildScript as X
@@ -169,6 +170,7 @@ import GeniusYield.Types.BuildWitness as X
 import GeniusYield.Types.Certificate as X
 import GeniusYield.Types.Credential as X
 import GeniusYield.Types.DRep as X
+import GeniusYield.Types.DataStore as X
 import GeniusYield.Types.Datum as X
 import GeniusYield.Types.Delegatee as X
 import GeniusYield.Types.Epoch as X

@@ -36,5 +36,6 @@ The team will do their best to help you get your PRs across the finish line!
 ## Discussions
 Feel free to participate in [discussions](https://github.com/geniusyield/atlas/discussions) with the team and community! 
 
-## Roadmap
-Finally, code owners will work together closely to maintain a [roadmap](https://github.com/orgs/geniusyield/projects/14/views/1) for Atlas!
+## Project structure
+
+We aim to keep all high-level on-chain code in [`plutus`](./plutus/) folder which is independent of main Atlas code (Atlas only refers to final low level compiled UPLC). This is helpful in avoiding dependency upon Plinth plugin which is locked to a very specific GHC version.

@@ -2,7 +2,6 @@ module GeniusYield.Test.GYTxSkeleton (
   gyTxSkeletonTests,
 ) where
 
-import Data.Either (fromRight)
 import Data.Map as Map (
   Map,
   empty,
@@ -21,7 +20,6 @@ import GeniusYield.Types.Address (
 import GeniusYield.Types.PlutusVersion (PlutusVersion (PlutusV2))
 import GeniusYield.Types.PubKeyHash (
   GYPubKeyHash,
-  pubKeyHashFromPlutus,
  )
 import GeniusYield.Types.Redeemer (GYRedeemer, unitRedeemer)
 import GeniusYield.Types.Script (
@@ -242,14 +240,10 @@ mockTxOut2 :: GYTxOut v
 mockTxOut2 = mkGYTxOutNoDatum mockOutAddress (mockOutValue <> mockOutValue)
 
 mockPkh1 :: GYPubKeyHash
-mockPkh1 = fromRight err $ pubKeyHashFromPlutus "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
- where
-  err = error "absurd"
+mockPkh1 = "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
 
 mockPkh2 :: GYPubKeyHash
-mockPkh2 = fromRight err $ pubKeyHashFromPlutus "69aeb93ec15eb963dda5176b66949fe1c2a6a38de1cbb80db89e2922"
- where
-  err = error "absurd"
+mockPkh2 = "69aeb93ec15eb963dda5176b66949fe1c2a6a38de1cbb80db89e2922"
 
 mockSlot :: GYSlot
 mockSlot = mockSlot' 1000

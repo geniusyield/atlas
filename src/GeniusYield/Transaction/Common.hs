@@ -10,6 +10,8 @@ module GeniusYield.Transaction.Common (
   GYBalancedTx (..),
   GYTxInDetailed (..),
   utxoFromTxInDetailed,
+  utxoToTxInDetailed,
+  GYTxExtraConfiguration (..),
   GYBuildTxError (..),
   GYBalancingError (..),
   minimumUTxO,
@@ -19,6 +21,7 @@ module GeniusYield.Transaction.Common (
 
 import Cardano.Api qualified as Api
 import Cardano.Ledger.Coin qualified as Ledger
+import Data.Default (Default (..))
 import GeniusYield.Imports
 import GeniusYield.Transaction.CBOR
 import GeniusYield.Types.Address
@@ -59,6 +62,7 @@ data GYBalancedTx v = GYBalancedTx
   , gybtxMetadata :: !(Maybe GYTxMetadata)
   , gybtxVotingProcedures :: !(GYTxVotingProcedures v)
   , gybtxProposalProcedures :: ![(GYProposalProcedurePB, GYTxBuildWitness v)]
+  , gybtxDonation :: !Natural
   }
 
 -- | A further detailed version of 'GYTxIn', containing all information about a UTxO.
@@ -73,6 +77,38 @@ data GYTxInDetailed v = GYTxInDetailed
 
 utxoFromTxInDetailed :: GYTxInDetailed v -> GYUTxO
 utxoFromTxInDetailed (GYTxInDetailed (GYTxIn ref _witns) addr val d ms) = GYUTxO ref addr val d ms
+
+utxoToTxInDetailed :: GYUTxO -> GYTxInWitness v -> GYTxInDetailed v
+utxoToTxInDetailed utxo witns = GYTxInDetailed (GYTxIn (utxoRef utxo) witns) (utxoAddress utxo) (utxoValue utxo) (utxoOutDatum utxo) (utxoRefScript utxo)
+
+-- | Extra configuration for transaction building.
+data GYTxExtraConfiguration v = GYTxExtraConfiguration
+  { gytxecUtxoInputMapper :: GYUTxO -> GYTxInDetailed v
+  -- ^ When coin selection selects additional UTxOs, this function is used to map them to 'GYTxInDetailed'. This in particular is useful, when inputs are selected from a contract based wallet.
+  , gytxecPreBodyContentMapper :: Api.TxBodyContent Api.BuildTx ApiEra -> Api.TxBodyContent Api.BuildTx ApiEra
+  -- ^ This function is called on the 'Api.TxBodyContent' before submitting it to 'makeTransactionBodyAutoBalanceWrapper'.
+  , gytxecPostBodyContentMapper :: Api.TxBodyContent Api.BuildTx ApiEra -> Api.TxBodyContent Api.BuildTx ApiEra
+  -- ^ This function is called on the 'Api.TxBodyContent' after submitting it to 'makeTransactionBodyAutoBalanceWrapper'.
+  , gytxecFeeUtxo :: Maybe GYUTxO
+  -- ^ UTxO to use for fees.
+  }
+
+instance Default (GYTxExtraConfiguration v) where
+  def =
+    GYTxExtraConfiguration
+      { gytxecUtxoInputMapper = \GYUTxO {utxoRef, utxoAddress, utxoValue, utxoOutDatum, utxoRefScript} ->
+          GYTxInDetailed
+            { -- It is assumed the 'GYUTxOs' arg designates key wallet utxos.
+              gyTxInDet = GYTxIn utxoRef GYTxInWitnessKey
+            , gyTxInDetAddress = utxoAddress
+            , gyTxInDetValue = fst $ valueSplitSign utxoValue -- TODO: Is this split required?
+            , gyTxInDetDatum = utxoOutDatum
+            , gyTxInDetScriptRef = utxoRefScript
+            }
+      , gytxecPreBodyContentMapper = id
+      , gytxecPostBodyContentMapper = id
+      , gytxecFeeUtxo = Nothing
+      }
 
 -------------------------------------------------------------------------------
 -- Transaction Building Errors
@@ -104,6 +140,8 @@ Insufficient funds and similar are considered trivial transaction building error
 data GYBuildTxError
   = GYBuildTxBalancingError !GYBalancingError
   | GYBuildTxBodyErrorAutoBalance !(Api.TxBodyErrorAutoBalance ApiEra)
+  | -- | If fee UTxO is provided for in extra build configuration, then this error is raised if it's insufficient to cover for fees and ADA of subsequent change output.
+    GYBuildTxFeeUtxoAdaInsufficient !(Api.TxBodyErrorAutoBalance ApiEra)
   | -- | Execution units required is higher than the maximum as specified by protocol params.
     GYBuildTxExUnitsTooBig
       -- | Tuple of maximum execution steps & memory as given by protocol parameters.

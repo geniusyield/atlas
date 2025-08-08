@@ -11,7 +11,9 @@ module GeniusYield.Types.Script.ScriptHash (
   scriptHashToApi,
   scriptHashToLedger,
   scriptHashFromLedger,
+  apiHashFromPlutus,
   apiHashToPlutus,
+  scriptHashFromPlutus,
   scriptHashToPlutus,
   GYValidatorHash,
   validatorHashToPlutus,
@@ -26,14 +28,14 @@ module GeniusYield.Types.Script.ScriptHash (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Ledger qualified as Ledger
-import Cardano.Api.Script qualified as Api
+import Cardano.Api.Internal.Script qualified as Api
 import Cardano.Ledger.Hashes qualified as Ledger
 import Data.Text qualified as Text
 import GeniusYield.Imports
 import GeniusYield.Types.Ledger (PlutusToCardanoError (..))
 import PlutusLedgerApi.V1 qualified as PlutusV1
 import PlutusTx.Builtins qualified as PlutusTx
+import PlutusTx.Builtins.Internal (BuiltinByteString (BuiltinByteString))
 import Text.Printf qualified as Printf
 import Web.HttpApiData qualified as Web
 
@@ -75,18 +77,24 @@ scriptHashFromApi :: Api.ScriptHash -> GYScriptHash
 scriptHashFromApi = coerce
 
 -- | Convert to corresponding ledger representation.
-scriptHashToLedger :: GYScriptHash -> Ledger.ScriptHash Ledger.StandardCrypto
+scriptHashToLedger :: GYScriptHash -> Ledger.ScriptHash
 scriptHashToLedger = scriptHashToApi >>> Api.toShelleyScriptHash
 
 -- | Convert from corresponding ledger representation.
-scriptHashFromLedger :: Ledger.ScriptHash Ledger.StandardCrypto -> GYScriptHash
+scriptHashFromLedger :: Ledger.ScriptHash -> GYScriptHash
 scriptHashFromLedger = Api.fromShelleyScriptHash >>> scriptHashFromApi
 
 apiHashToPlutus :: Api.ScriptHash -> PlutusV1.ScriptHash
 apiHashToPlutus h = PlutusV1.ScriptHash $ PlutusTx.toBuiltin $ Api.serialiseToRawBytes h
 
+apiHashFromPlutus :: PlutusV1.ScriptHash -> Either Api.SerialiseAsRawBytesError Api.ScriptHash
+apiHashFromPlutus (PlutusV1.ScriptHash (BuiltinByteString bs)) = Api.deserialiseFromRawBytes Api.AsScriptHash bs
+
 scriptHashToPlutus :: GYScriptHash -> PlutusV1.ScriptHash
 scriptHashToPlutus = scriptHashToApi >>> apiHashToPlutus
+
+scriptHashFromPlutus :: PlutusV1.ScriptHash -> Either PlutusToCardanoError GYScriptHash
+scriptHashFromPlutus = validatorHashFromPlutus
 
 {-# DEPRECATED GYValidatorHash "Use GYScriptHash." #-}
 type GYValidatorHash = GYScriptHash

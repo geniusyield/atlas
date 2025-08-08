@@ -1,0 +1,62 @@
+cabal-version: 3.8
+name: atlas-onchain-common
+version: 0.1.0
+synopsis: On-chain code referred by Atlas.
+copyright: (c) 2025 GYELD GMBH
+author: Lars Bruenjes
+maintainer: support@geniusyield.co
+build-type: Simple
+category: Blockchain, Cardano, Framework
+homepage: https://github.com/geniusyield/atlas#readme
+bug-reports: https://github.com/geniusyield/atlas/issues
+extra-source-files:
+  CHANGELOG.md
+  README.md
+
+tested-with:
+  ghc ==9.6.5 || ==9.6.6 || ==9.10.1 || ==9.12.1
+
+source-repository head
+  type: git
+  location: https://github.com/geniusyield/atlas
+
+common common
+  default-language: GHC2021
+  default-extensions:
+    DataKinds
+    DefaultSignatures
+    DeriveAnyClass
+    DerivingStrategies
+    DerivingVia
+    GADTs
+    LambdaCase
+    MultiWayIf
+    OverloadedStrings
+    PatternSynonyms
+    RecordWildCards
+    RoleAnnotations
+    TemplateHaskell
+    TypeFamilyDependencies
+    UndecidableInstances
+    ViewPatterns
+
+  ghc-options:
+    -Wall
+    -Wincomplete-uni-patterns
+    -Wunused-packages
+
+  -- speed-ups GHCi considerably
+  ghc-options: -fno-show-valid-hole-fits
+
+library
+  import: common
+  hs-source-dirs: src
+  exposed-modules:
+    GeniusYield.OnChain.BetRef.Types
+    GeniusYield.OnChain.GuessRefInputDatum.Types
+
+  build-depends: base >=4.18.2 && <5
+  -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
+  build-depends:
+    plutus-ledger-api,
+    plutus-tx,

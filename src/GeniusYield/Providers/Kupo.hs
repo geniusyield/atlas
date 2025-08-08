@@ -19,7 +19,6 @@ import Cardano.Api qualified as Api
 import Control.Concurrent (threadDelay)
 import Control.Monad ((<=<))
 import Data.Aeson (Value (Null), withObject, (.:))
-import Data.Char (toLower)
 import Data.Maybe (listToMaybe)
 import Data.Text qualified as Text
 import Data.Word (Word64)
@@ -28,6 +27,7 @@ import GeniusYield.Imports
 import GeniusYield.Providers.Common (
   datumFromCBOR,
   extractAssetClass,
+  extractNonAdaToken,
   newServantClientEnv,
  )
 import GeniusYield.Types (
@@ -40,6 +40,7 @@ import GeniusYield.Types (
   GYDatum,
   GYDatumHash,
   GYLookupDatum,
+  GYNonAdaToken,
   GYOutDatum (GYOutDatumHash, GYOutDatumInline, GYOutDatumNone),
   GYPaymentCredential,
   GYQueryUTxO (..),
@@ -49,6 +50,7 @@ import GeniusYield.Types (
   GYUTxO (..),
   GYUTxOs,
   GYValue,
+  LowerFirst,
   addressFromBech32,
   addressToText,
   gyQueryUtxoAtAddressesDefault,
@@ -123,12 +125,6 @@ runKupoClient (KupoApiEnv cEnv) c = runClientM c cEnv
 
 -- | Pattern to match kupo results against.
 type Pattern = Text
-
--- Will lower the first character for your type.
-data LowerFirst
-instance StringModifier LowerFirst where
-  getStringModifier "" = ""
-  getStringModifier (c : cs) = toLower c : cs
 
 newtype KupoDatum = KupoDatum (Maybe GYDatum)
   deriving stock (Eq, Ord, Show, Generic)
@@ -288,6 +284,16 @@ kupoUtxosAtAddress env addr mAssetClass = do
  where
   locationIdent = "AddressesUtxo"
 
+kupoUtxosWithAsset :: KupoApiEnv -> GYNonAdaToken -> IO GYUTxOs
+kupoUtxosWithAsset env ac = do
+  let (pid, tn) = extractNonAdaToken ac
+  utxos <-
+    handleKupoError locationIdent <=< runKupoClient env $
+      fetchUtxosByPattern (pid <> "." <> tn) True Nothing Nothing
+  utxosFromList <$> traverse (transformUtxo env) (getResponse utxos)
+ where
+  locationIdent = "UtxosWithAsset"
+
 kupoUtxoAtTxOutRef :: KupoApiEnv -> GYTxOutRef -> IO (Maybe GYUTxO)
 kupoUtxoAtTxOutRef env oref = do
   let (txId, utxoIdx) = txOutRefToTuple' oref
@@ -343,6 +349,7 @@ kupoQueryUtxo :: KupoApiEnv -> GYQueryUTxO
 kupoQueryUtxo env =
   GYQueryUTxO
     { gyQueryUtxosAtAddress' = kupoUtxosAtAddress env
+    , gyQueryUtxosWithAsset' = kupoUtxosWithAsset env
     , gyQueryUtxosAtAddressWithDatums' = Nothing
     , gyQueryUtxosAtAddresses' = gyQueryUtxoAtAddressesDefault $ kupoUtxosAtAddress env
     , gyQueryUtxosAtTxOutRefs' = gyQueryUtxosAtTxOutRefsDefault $ kupoUtxoAtTxOutRef env

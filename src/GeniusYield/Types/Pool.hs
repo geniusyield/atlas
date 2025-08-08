@@ -12,9 +12,10 @@ module GeniusYield.Types.Pool (
   poolParamsFromLedger,
 ) where
 
-import Cardano.Api.Address qualified as Api
-import Cardano.Api.ReexposeLedger qualified as Ledger
+import Cardano.Api.Internal.Address qualified as Api
+import Cardano.Ledger.Address qualified as Ledger
 import Cardano.Ledger.BaseTypes
+import Cardano.Ledger.PoolParams qualified as Ledger
 import Data.IP (IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Set qualified as Set
@@ -49,7 +50,7 @@ data GYPoolParams = GYPoolParams
   }
   deriving stock (Show, Eq, Ord)
 
-poolParamsToLedger :: GYPoolParams -> Ledger.PoolParams Ledger.StandardCrypto
+poolParamsToLedger :: GYPoolParams -> Ledger.PoolParams
 poolParamsToLedger GYPoolParams {..} =
   Ledger.PoolParams
     { Ledger.ppId = keyHashToLedger poolId
@@ -80,7 +81,7 @@ poolParamsToLedger GYPoolParams {..} =
       }
   ms = maybeToStrictMaybe
 
-poolParamsFromLedger :: Ledger.PoolParams Ledger.StandardCrypto -> GYPoolParams
+poolParamsFromLedger :: Ledger.PoolParams -> GYPoolParams
 poolParamsFromLedger Ledger.PoolParams {..} =
   GYPoolParams
     { poolId = keyHashFromLedger ppId

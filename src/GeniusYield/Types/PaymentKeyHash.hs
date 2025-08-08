@@ -43,8 +43,8 @@ paymentKeyHashToApi = keyHashToApi
 paymentKeyHashFromApi :: Api.Hash Api.PaymentKey -> GYPaymentKeyHash
 paymentKeyHashFromApi = keyHashFromApi
 
-paymentKeyHashToLedger :: GYPaymentKeyHash -> Ledger.KeyHash Ledger.Payment Ledger.StandardCrypto
+paymentKeyHashToLedger :: GYPaymentKeyHash -> Ledger.KeyHash Ledger.Payment
 paymentKeyHashToLedger = keyHashToLedger
 
-paymentKeyHashFromLedger :: Ledger.KeyHash Ledger.Payment Ledger.StandardCrypto -> GYPaymentKeyHash
+paymentKeyHashFromLedger :: Ledger.KeyHash Ledger.Payment -> GYPaymentKeyHash
 paymentKeyHashFromLedger = keyHashFromLedger

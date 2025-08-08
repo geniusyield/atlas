@@ -1,3 +1,6 @@
+-- IOG didn't use ExplicitNamespaces to deprecate only pattern synonyms
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 {- |
 Module      : GeniusYield.Providers.LiteChainIndex
 Description : Lite-chain index. In memory chain index. Used in tests
@@ -71,7 +74,7 @@ newLCIClient info resumePoints = do
   return $ LCIClient a slotVar dataVar
 
 chainSyncCallback :: STM.TVar Api.SlotNo -> STM.TVar (Map (Api.Hash Api.ScriptData) Api.HashableScriptData) -> ChainSyncCallback
-chainSyncCallback slotVar dataVar (RollForward block@(Api.BlockInMode Api.ConwayEra (Api.Block (Api.BlockHeader slot _ _) _txs)) _tip) =
+chainSyncCallback slotVar dataVar (RollForward block@(Api.BlockInMode Api.ConwayEra (Api.getBlockHeader -> Api.BlockHeader slot _ _)) _tip) =
   STM.atomically $ do
     STM.writeTVar slotVar slot
     STM.modifyTVar' dataVar $ \m ->

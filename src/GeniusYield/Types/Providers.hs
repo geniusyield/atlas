@@ -48,6 +48,7 @@ module GeniusYield.Types.Providers (
   gyQueryUtxosAtPaymentCredWithDatums,
   gyQueryUtxosAtPaymentCredsWithDatums,
   gyQueryUtxosAtAddress,
+  gyQueryUtxosWithAsset,
   gyQueryUtxosAtPaymentCredential,
   gyQueryUtxosAtPaymentCredentials,
   gyQueryUtxosAtTxOutRefs,
@@ -99,6 +100,7 @@ import GeniusYield.TxBuilder.Errors
 import GeniusYield.Types.Address
 import GeniusYield.Types.Credential (GYCredential, GYPaymentCredential)
 import GeniusYield.Types.DRep
+import GeniusYield.Types.DataStore (GYDataStore (..), fetchFromDataStore, mkDataStoreVar)
 import GeniusYield.Types.Datum
 import GeniusYield.Types.Epoch (GYEpochNo (GYEpochNo))
 import GeniusYield.Types.Governance (GYConstitution, GYGovActionId, GYGovActionState)
@@ -112,7 +114,7 @@ import GeniusYield.Types.Time (timeToPOSIX)
 import GeniusYield.Types.Tx
 import GeniusYield.Types.TxOutRef
 import GeniusYield.Types.UTxO
-import GeniusYield.Types.Value (GYAssetClass)
+import GeniusYield.Types.Value (GYAssetClass, GYNonAdaToken)
 
 {- Note [Caching and concurrently accessible MVars]
 
@@ -162,6 +164,8 @@ data GYProviders = GYProviders
   , gyGetConstitution :: IO GYConstitution
   , -- Don't make this strict since it's not defined for all providers!
     gyGetProposals :: Set GYGovActionId -> IO (Seq.Seq GYGovActionState)
+  , -- Don't make this strict since it's not defined for all providers!
+    gyGetMempoolTxs :: IO [GYTx]
     -- Don't make this strict since it's not defined for all providers!
   }
 
@@ -180,6 +184,9 @@ gyWaitForNextBlock_ = void . gyWaitForNextBlock
 
 gyQueryUtxosAtAddress :: GYProviders -> GYAddress -> Maybe GYAssetClass -> IO GYUTxOs
 gyQueryUtxosAtAddress = gyQueryUtxosAtAddress' . gyQueryUTxO
+
+gyQueryUtxosWithAsset :: GYProviders -> GYNonAdaToken -> IO GYUTxOs
+gyQueryUtxosWithAsset = gyQueryUtxosWithAsset' . gyQueryUTxO
 
 gyQueryUtxosAtAddresses :: GYProviders -> [GYAddress] -> IO GYUTxOs
 gyQueryUtxosAtAddresses = gyQueryUtxosAtAddresses' . gyQueryUTxO
@@ -332,9 +339,6 @@ gyWaitUntilSlotDefault getSlotOfCurrentBlock s = loop
         threadDelay 100_000
         loop
 
--- | Contains the data, alongside the time after which it should be refetched.
-data GYSlotStore = GYSlotStore !UTCTime !GYSlot
-
 {- | Construct efficient 'GYSlotActions' methods by ensuring the supplied getSlotOfCurrentBlock is only made after
 a given duration of time has passed.
 
@@ -350,29 +354,14 @@ makeSlotActions t getSlotOfCurrentBlock = do
   getTime <- mkAutoUpdate defaultUpdateSettings {updateAction = getCurrentTime}
   slotRefetchTime <- addUTCTime t <$> getTime
   initSlot <- getSlotOfCurrentBlock
-  slotStoreRef <- newMVar $ GYSlotStore slotRefetchTime initSlot
-  let gcs = getSlotOfCurrentBlock' getTime slotStoreRef
+  slotStoreRef <- mkDataStoreVar $ GYDataStore slotRefetchTime t initSlot getSlotOfCurrentBlock getTime
+  let gcs = fetchFromDataStore slotStoreRef
   pure
     GYSlotActions
       { gyGetSlotOfCurrentBlock' = gcs
       , gyWaitForNextBlock' = gyWaitForNextBlockDefault gcs
       , gyWaitUntilSlot' = gyWaitUntilSlotDefault gcs
       }
- where
-  getSlotOfCurrentBlock' :: IO UTCTime -> StrictMVar IO GYSlotStore -> IO GYSlot
-  getSlotOfCurrentBlock' getTime var = do
-    -- See note: [Caching and concurrently accessible MVars].
-    modifyMVar var $ \(GYSlotStore slotRefetchTime slotData) -> do
-      now <- getTime
-      if now < slotRefetchTime
-        then do
-          -- Return unmodified.
-          pure (GYSlotStore slotRefetchTime slotData, slotData)
-        else do
-          newSlot <- getSlotOfCurrentBlock
-          newNow <- getTime
-          let newSlotRefetchTime = addUTCTime t newNow
-          pure (GYSlotStore newSlotRefetchTime newSlot, newSlot)
 
 -------------------------------------------------------------------------------
 -- Protocol parameters
@@ -464,6 +453,7 @@ data GYQueryUTxO = GYQueryUTxO
   , gyQueryUtxoAtTxOutRef' :: !(GYTxOutRef -> IO (Maybe GYUTxO))
   , gyQueryUtxoRefsAtAddress' :: !(GYAddress -> IO [GYTxOutRef])
   , gyQueryUtxosAtAddress' :: !(GYAddress -> Maybe GYAssetClass -> IO GYUTxOs)
+  , gyQueryUtxosWithAsset' :: !(GYNonAdaToken -> IO GYUTxOs)
   , gyQueryUtxosAtAddressWithDatums' :: !(Maybe (GYAddress -> Maybe GYAssetClass -> IO [(GYUTxO, Maybe GYDatum)]))
   , gyQueryUtxosAtAddresses' :: !([GYAddress] -> IO GYUTxOs)
   , gyQueryUtxosAtAddressesWithDatums' :: !(Maybe ([GYAddress] -> IO [(GYUTxO, Maybe GYDatum)]))

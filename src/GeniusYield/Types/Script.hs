@@ -69,6 +69,7 @@ module GeniusYield.Types.Script (
   mintingPolicyIdToCurrencySymbol,
   mintingPolicyIdFromCurrencySymbol,
   mintingPolicyIdCurrencySymbol,
+  mintingPolicyIdToScriptHash,
 
   -- * StakeValidator
   GYStakeValidator,
@@ -113,6 +114,7 @@ module GeniusYield.Types.Script (
   scriptFromPlutus,
   scriptFromSerialisedScript,
   scriptToSerialisedScript,
+  applyParam,
   scriptApiHash,
   scriptPlutusHash,
   someScriptPlutusHash,
@@ -121,10 +123,12 @@ module GeniusYield.Types.Script (
   referenceScriptToApiPlutusScriptWitness,
   apiHashToPlutus,
   scriptSize,
+  scriptToApiPlutusScriptWitness,
 
   -- ** File operations
   writeScript,
   readScript,
+  readScript',
 
   -- * Any Script
   GYAnyScript (..),
@@ -136,10 +140,11 @@ module GeniusYield.Types.Script (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Script qualified as Api
+import Cardano.Api.Internal.Script qualified as Api
 import Cardano.Api.Shelley qualified as Api.S
-import Cardano.Ledger.SafeHash (SafeToHash (originalBytesSize))
+import Cardano.Ledger.Hashes (SafeToHash (originalBytesSize))
 import Control.Lens ((?~))
+import Data.Aeson qualified as Aeson
 import Data.Aeson.Types (
   FromJSONKey (fromJSONKey),
   FromJSONKeyFunction (FromJSONKeyTextParser),
@@ -166,10 +171,12 @@ import GeniusYield.Types.TxOutRef (
   GYTxOutRef,
   txOutRefToApi,
  )
+import PlutusCore qualified as PLC
 import PlutusLedgerApi.Common qualified as Plutus
 import PlutusLedgerApi.V1 qualified as PlutusV1
 import PlutusTx qualified
 import PlutusTx.Builtins qualified as PlutusTx
+import UntypedPlutusCore qualified as UPLC
 import Web.HttpApiData qualified as Web
 
 {- $setup
@@ -384,6 +391,10 @@ mintingPolicyIdFromText policyid =
  where
   customError err = "Invalid minting policy: " ++ show policyid ++ "; Reason: " ++ show err
 
+-- | Obtain 'GYScriptHash' from 'GYMintingPolicyId'.
+mintingPolicyIdToScriptHash :: GYMintingPolicyId -> GYScriptHash
+mintingPolicyIdToScriptHash = mintingPolicyIdToApi >>> Api.unPolicyId >>> scriptHashFromApi
+
 -------------------------------------------------------------------------------
 -- Stake validator
 -------------------------------------------------------------------------------
@@ -511,6 +522,15 @@ scriptToSerialisedScript :: GYScript v -> ShortByteString
 scriptToSerialisedScript script =
   scriptToApi script & \case
     (Api.S.PlutusScriptSerialised s) -> s
+
+type UPLCProgram = UPLC.Program UPLC.DeBruijn UPLC.DefaultUni UPLC.DefaultFun ()
+
+-- | Apply a (data-encoded) parameter to a script.
+applyParam :: (PlutusTx.ToData p, SingPlutusVersionI v) => GYScript v -> p -> GYScript v
+applyParam (Plutus.uncheckedDeserialiseUPLC . scriptToSerialisedScript -> prog) param = scriptFromSerialisedScript $ Plutus.serialiseUPLC (prog `applyConstant` PLC.someValue (PlutusTx.toData param))
+ where
+  applyConstant :: UPLCProgram -> PLC.Some (PLC.ValueOf UPLC.DefaultUni) -> UPLCProgram
+  applyConstant (UPLC.Program () v f) c = UPLC.Program () v . UPLC.Apply () f $ UPLC.Constant () c
 
 scriptVersion :: GYScript v -> SingPlutusVersion v
 scriptVersion (GYScript v _ _) = v
@@ -642,7 +662,6 @@ scriptToApiPlutusScriptWitness (GYScript v api _) = case v of
       (Api.S.PScript api)
 
 referenceScriptToApiPlutusScriptWitness ::
-  VersionIsGreaterOrEqual v 'PlutusV2 =>
   GYTxOutRef ->
   GYScript v ->
   Api.S.ScriptDatum witctx ->
@@ -674,6 +693,15 @@ scriptSize s = anyScriptToApiScriptInEra s & Api.toShelleyScript & originalBytes
 -- | Writes a script to a file.
 writeScript :: forall v. FilePath -> GYScript v -> IO ()
 writeScript = writeScriptCore "Script"
+
+-- | Reads a script as represented by a 'ByteString'.
+readScript' :: forall v. SingPlutusVersionI v => ByteString -> Either Api.TextEnvelopeError (GYScript v)
+readScript' bs = case Aeson.eitherDecodeStrict bs of
+  Left e -> Left $ Api.TextEnvelopeAesonDecodeError e
+  Right (te :: Api.TextEnvelope) -> case singPlutusVersion @v of
+    SingPlutusV1 -> scriptFromApi <$> Api.deserialiseFromTextEnvelope (Api.AsPlutusScript Api.AsPlutusScriptV1) te
+    SingPlutusV2 -> scriptFromApi <$> Api.deserialiseFromTextEnvelope (Api.AsPlutusScript Api.AsPlutusScriptV2) te
+    SingPlutusV3 -> scriptFromApi <$> Api.deserialiseFromTextEnvelope (Api.AsPlutusScript Api.AsPlutusScriptV3) te
 
 -- | Reads a script from a file.
 readScript :: forall v. SingPlutusVersionI v => FilePath -> IO (GYScript v)

@@ -15,9 +15,11 @@ module GeniusYield.Types.Certificate (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.ReexposeLedger qualified as Ledger
 import Cardano.Ledger.Api qualified as Ledger
+import Cardano.Ledger.BaseTypes qualified as Ledger
+import Cardano.Ledger.Coin qualified as Ledger
 import Cardano.Ledger.Conway.Core qualified as Ledger
+import Cardano.Ledger.Conway.TxCert qualified as Ledger
 import Cardano.Ledger.Keys qualified as Ledger
 import Control.Lens ((^.))
 import GHC.Natural (Natural)

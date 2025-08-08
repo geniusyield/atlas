@@ -37,6 +37,11 @@ nodeUtxosAtAddress info addr mAssetClass = do
     Nothing -> utxos
     Just assetClass -> filterUTxOs (\GYUTxO {utxoValue} -> valueAssetClass utxoValue assetClass /= 0) utxos
 
+nodeUtxosWithAsset :: Api.LocalNodeConnectInfo -> GYNonAdaToken -> IO GYUTxOs
+nodeUtxosWithAsset info (nonAdaTokenToAssetClass -> ac) = do
+  utxos <- queryUTxO info Api.QueryUTxOWhole
+  pure $ filterUTxOs (\GYUTxO {utxoValue} -> valueAssetClass utxoValue ac > 0) utxos
+
 nodeUtxosAtAddresses :: Api.LocalNodeConnectInfo -> [GYAddress] -> IO GYUTxOs
 nodeUtxosAtAddresses info addrs = do
   queryUTxO info $ Api.QueryUTxOByAddress $ Set.fromList $ addressToApi <$> addrs
@@ -82,6 +87,7 @@ nodeQueryUTxO info =
     , gyQueryUtxosAtAddresses' = nodeUtxosAtAddresses info
     , gyQueryUtxosAtAddressWithDatums' = Nothing
     , gyQueryUtxosAtAddress' = nodeUtxosAtAddress info
+    , gyQueryUtxosWithAsset' = nodeUtxosWithAsset info
     , gyQueryUtxoRefsAtAddress' = gyQueryUtxoRefsAtAddressDefault $ nodeUtxosAtAddress info
     , gyQueryUtxoAtTxOutRef' = nodeUtxoAtTxOutRef info
     }

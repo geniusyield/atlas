@@ -9,12 +9,16 @@ module GeniusYield.Types.Governance (
   GYVote (..),
   voteFromLedger,
   voteToLedger,
+  voteFromPlutus,
+  voteToPlutus,
   GYVoter (..),
   voterFromLedger,
   voterToLedger,
   GYGovActionId (..),
   govActionIdFromLedger,
   govActionIdToLedger,
+  govActionIdFromPlutus,
+  govActionIdToPlutus,
   GYVotingProcedure (..),
   votingProcedureFromLedger,
   votingProcedureToLedger,
@@ -43,10 +47,15 @@ module GeniusYield.Types.Governance (
 import Cardano.Api.Ledger (maybeToStrictMaybe, strictMaybeToMaybe)
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api
-import Cardano.Ledger.Api qualified as Ledger
+import Cardano.Ledger.Conway qualified as Conway
+import Data.Aeson (FromJSON, ToJSON, object, withObject, withText, (.:), (.=))
+import Data.Aeson.Types (FromJSON (parseJSON), ToJSON (toJSON))
+import Data.Either.Combinators (mapLeft)
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
+import Data.Text qualified as Text
 import Data.Word (Word16)
+import GHC.Generics (Generic)
 import GeniusYield.Imports (Map, Natural, Set, (&))
 import GeniusYield.Types.Address (GYStakeAddress, stakeAddressFromLedger, stakeAddressToLedger)
 import GeniusYield.Types.Anchor
@@ -55,14 +64,39 @@ import GeniusYield.Types.Credential (GYCredential, credentialFromLedger, credent
 import GeniusYield.Types.Epoch (GYEpochNo, epochNoFromLedger, epochNoToLedger)
 import GeniusYield.Types.KeyHash
 import GeniusYield.Types.KeyRole (GYKeyRole (..))
+import GeniusYield.Types.Ledger (PlutusToCardanoError (UnknownPlutusToCardanoError))
 import GeniusYield.Types.Reexpose (ProtVer, UnitInterval)
 import GeniusYield.Types.Script (GYScriptHash, scriptHashFromLedger, scriptHashToLedger)
 import GeniusYield.Types.Tx (GYTxId, txIdFromApi, txIdToApi)
-import Ouroboros.Consensus.Shelley.Eras qualified as Consensus
+import PlutusLedgerApi.V3 qualified as PlutusV3
+import PlutusTx.Builtins.Internal (BuiltinByteString (BuiltinByteString))
 
 -- | Vote on a governance proposal.
 data GYVote = Yes | No | Abstain
-  deriving (Eq, Show, Ord, Enum, Bounded)
+  deriving (Eq, Show, Ord, Enum, Bounded, Generic)
+
+instance FromJSON GYVote where
+  parseJSON = withText "GYVote" $
+    \case
+      "yes" -> return Yes
+      "no" -> return No
+      "abstain" -> return Abstain
+      _ -> fail "string is not one of known GYVote enum values"
+
+instance ToJSON GYVote where
+  toJSON Yes = "yes"
+  toJSON No = "no"
+  toJSON Abstain = "abstain"
+
+voteToPlutus :: GYVote -> PlutusV3.Vote
+voteToPlutus Yes = PlutusV3.VoteYes
+voteToPlutus No = PlutusV3.VoteNo
+voteToPlutus Abstain = PlutusV3.Abstain
+
+voteFromPlutus :: PlutusV3.Vote -> GYVote
+voteFromPlutus PlutusV3.VoteYes = Yes
+voteFromPlutus PlutusV3.VoteNo = No
+voteFromPlutus PlutusV3.Abstain = Abstain
 
 voteToLedger :: GYVote -> Ledger.Vote
 voteToLedger Yes = Ledger.VoteYes
@@ -81,27 +115,59 @@ data GYVoter
   | StakePoolVoter !(GYKeyHash 'GYKeyRoleStakePool)
   deriving (Eq, Show, Ord)
 
-type Era = Ledger.EraCrypto Consensus.StandardConway
-
-voterToLedger :: GYVoter -> Ledger.Voter Era
+voterToLedger :: GYVoter -> Ledger.Voter
 voterToLedger (CommitteeVoter c) = Ledger.CommitteeVoter (credentialToLedger c)
 voterToLedger (DRepVoter c) = Ledger.DRepVoter (credentialToLedger c)
 voterToLedger (StakePoolVoter k) = Ledger.StakePoolVoter (keyHashToLedger k)
 
-voterFromLedger :: Ledger.Voter (Ledger.EraCrypto Consensus.StandardConway) -> GYVoter
+voterFromLedger :: Ledger.Voter -> GYVoter
 voterFromLedger (Ledger.CommitteeVoter c) = CommitteeVoter (credentialFromLedger c)
 voterFromLedger (Ledger.DRepVoter c) = DRepVoter (credentialFromLedger c)
 voterFromLedger (Ledger.StakePoolVoter k) = StakePoolVoter (keyHashFromLedger k)
 
 data GYGovActionId = GYGovActionId
   {gaidTxId :: !GYTxId, gaidIx :: !Word16}
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show, Ord, Generic)
 
-govActionIdToLedger :: GYGovActionId -> Ledger.GovActionId Era
+instance FromJSON GYGovActionId where
+  parseJSON = withObject "GYGovActionId" $ \v -> do
+    gaidTxId <- v .: "txId"
+    gaidIx <- v .: "ix"
+    return GYGovActionId {gaidTxId, gaidIx}
+
+instance ToJSON GYGovActionId where
+  toJSON (GYGovActionId {gaidTxId, gaidIx}) =
+    object
+      [ "txId" .= gaidTxId
+      , "ix" .= gaidIx
+      ]
+
+govActionIdToLedger :: GYGovActionId -> Ledger.GovActionId
 govActionIdToLedger (GYGovActionId txId ix) = Ledger.GovActionId (txIdToApi txId & Api.toShelleyTxId) (Ledger.GovActionIx ix)
 
-govActionIdFromLedger :: Ledger.GovActionId Era -> GYGovActionId
+govActionIdFromLedger :: Ledger.GovActionId -> GYGovActionId
 govActionIdFromLedger (Ledger.GovActionId txId (Ledger.GovActionIx ix)) = GYGovActionId (txIdFromApi (Api.fromShelleyTxId txId)) ix
+
+govActionIdFromPlutus :: PlutusV3.GovernanceActionId -> Either PlutusToCardanoError GYGovActionId
+govActionIdFromPlutus (PlutusV3.GovernanceActionId tid@(PlutusV3.TxId (BuiltinByteString bs)) ix) = GYGovActionId <$> etid <*> eix
+ where
+  etid :: Either PlutusToCardanoError GYTxId
+  etid =
+    mapLeft (\e -> UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: invalid txOutRefId " <> show tid <> ", error: " <> show e) $
+      txIdFromApi
+        <$> Api.deserialiseFromRawBytes Api.AsTxId bs
+
+  eix :: Either PlutusToCardanoError Word16
+  eix
+    | ix < 0 = Left $ UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: negative txOutRefIdx " ++ show ix
+    | ix > toInteger (maxBound @Word) = Left $ UnknownPlutusToCardanoError $ Text.pack $ "txOutRefFromPlutus: txOutRefIdx " ++ show ix ++ " too large"
+    | otherwise = Right $ fromInteger ix
+
+govActionIdToPlutus :: GYGovActionId -> PlutusV3.GovernanceActionId
+govActionIdToPlutus (GYGovActionId tid ix) =
+  PlutusV3.GovernanceActionId
+    (PlutusV3.TxId . BuiltinByteString . Api.serialiseToRawBytes . txIdToApi $ tid)
+    (toInteger ix)
 
 -- | Voting procedure.
 data GYVotingProcedure = GYVotingProcedure
@@ -110,18 +176,18 @@ data GYVotingProcedure = GYVotingProcedure
   }
   deriving stock (Show, Eq, Ord)
 
-votingProcedureToLedger :: GYVotingProcedure -> Ledger.VotingProcedure Consensus.StandardConway
+votingProcedureToLedger :: GYVotingProcedure -> Ledger.VotingProcedure Conway.ConwayEra
 votingProcedureToLedger (GYVotingProcedure v a) = Ledger.VotingProcedure (voteToLedger v) (maybeToStrictMaybe (anchorToLedger <$> a))
 
-votingProcedureFromLedger :: Ledger.VotingProcedure Consensus.StandardConway -> GYVotingProcedure
+votingProcedureFromLedger :: Ledger.VotingProcedure Conway.ConwayEra -> GYVotingProcedure
 votingProcedureFromLedger (Ledger.VotingProcedure v a) = GYVotingProcedure (voteFromLedger v) (strictMaybeToMaybe (anchorFromLedger <$> a))
 
 type GYVotingProcedures = Map GYVoter (Map GYGovActionId GYVotingProcedure)
 
-votingProceduresToLedger :: GYVotingProcedures -> Ledger.VotingProcedures Consensus.StandardConway
+votingProceduresToLedger :: GYVotingProcedures -> Ledger.VotingProcedures Conway.ConwayEra
 votingProceduresToLedger vp = Ledger.VotingProcedures $ Map.mapKeys voterToLedger $ Map.map (Map.mapKeys govActionIdToLedger . Map.map votingProcedureToLedger) vp
 
-votingProceduresFromLedger :: Ledger.VotingProcedures Consensus.StandardConway -> GYVotingProcedures
+votingProceduresFromLedger :: Ledger.VotingProcedures Conway.ConwayEra -> GYVotingProcedures
 votingProceduresFromLedger (Ledger.VotingProcedures vp) = Map.mapKeys voterFromLedger $ Map.map (Map.mapKeys govActionIdFromLedger . Map.map votingProcedureFromLedger) vp
 
 -- | Combine two voting procedures. Here if a voter has voted on the same proposal in both procedures, the vote from the second procedure is taken.
@@ -158,7 +224,7 @@ completeProposalProcedure GYProposalProcedurePB {..} dep =
     , propProcAnchor = propProcPBAnchor
     }
 
-propProcToLedger :: GYProposalProcedure -> Ledger.ProposalProcedure Consensus.StandardConway
+propProcToLedger :: GYProposalProcedure -> Ledger.ProposalProcedure Conway.ConwayEra
 propProcToLedger GYProposalProcedure {..} =
   Ledger.ProposalProcedure
     { Ledger.pProcDeposit = fromIntegral propProcDeposit
@@ -167,7 +233,7 @@ propProcToLedger GYProposalProcedure {..} =
     , Ledger.pProcAnchor = anchorToLedger propProcAnchor
     }
 
-propProcFromLedger :: Ledger.ProposalProcedure Consensus.StandardConway -> GYProposalProcedure
+propProcFromLedger :: Ledger.ProposalProcedure Conway.ConwayEra -> GYProposalProcedure
 propProcFromLedger Ledger.ProposalProcedure {..} =
   GYProposalProcedure
     { propProcDeposit = fromIntegral pProcDeposit
@@ -182,10 +248,10 @@ data GYConstitution = GYConstitution
   }
   deriving stock (Eq, Ord, Show)
 
-constitutionToLedger :: GYConstitution -> Ledger.Constitution Consensus.StandardConway
+constitutionToLedger :: GYConstitution -> Ledger.Constitution Conway.ConwayEra
 constitutionToLedger GYConstitution {..} = Ledger.Constitution (anchorToLedger constitutionAnchor) (maybeToStrictMaybe $ scriptHashToLedger <$> constitutionScript)
 
-constitutionFromLedger :: Ledger.Constitution Consensus.StandardConway -> GYConstitution
+constitutionFromLedger :: Ledger.Constitution Conway.ConwayEra -> GYConstitution
 constitutionFromLedger (Ledger.Constitution a s) = GYConstitution (anchorFromLedger a) (strictMaybeToMaybe $ scriptHashFromLedger <$> s)
 
 data GYGovAction
@@ -193,7 +259,7 @@ data GYGovAction
       -- | Previous governance action id of `ParameterChange` type.
       !(Maybe GYGovActionId)
       -- | Proposed changes to PParams
-      !(Ledger.PParamsUpdate Consensus.StandardConway)
+      !(Ledger.PParamsUpdate Conway.ConwayEra)
       -- | Policy hash protection
       !(Maybe GYScriptHash)
   | HardForkInitiation
@@ -225,7 +291,7 @@ data GYGovAction
   | InfoAction
   deriving stock (Eq, Show, Ord)
 
-govActionToLedger :: GYGovAction -> Ledger.GovAction Consensus.StandardConway
+govActionToLedger :: GYGovAction -> Ledger.GovAction Conway.ConwayEra
 govActionToLedger ga = case ga of
   ParameterChange mgaid ppup msh -> Ledger.ParameterChange (castPurposeM mgaid) ppup (castScriptHashM msh)
   HardForkInitiation mgaid pv -> Ledger.HardForkInitiation (castPurposeM mgaid) pv
@@ -237,14 +303,14 @@ govActionToLedger ga = case ga of
  where
   ms = maybeToStrictMaybe
 
-  castPurpose :: GYGovActionId -> Ledger.GovPurposeId p Consensus.StandardConway
+  castPurpose :: GYGovActionId -> Ledger.GovPurposeId p Conway.ConwayEra
   castPurpose = Ledger.GovPurposeId . govActionIdToLedger
 
   castPurposeM mgid = ms $ castPurpose <$> mgid
 
   castScriptHashM sh = ms $ scriptHashToLedger <$> sh
 
-govActionFromLedger :: Ledger.GovAction Consensus.StandardConway -> GYGovAction
+govActionFromLedger :: Ledger.GovAction Conway.ConwayEra -> GYGovAction
 govActionFromLedger ga = case ga of
   Ledger.ParameterChange mgaid ppup msh -> ParameterChange (govActionIdFromLedger' <$> strictMaybeToMaybe mgaid) ppup (scriptHashFromLedger <$> strictMaybeToMaybe msh)
   Ledger.HardForkInitiation mgaid pv -> HardForkInitiation (govActionIdFromLedger' <$> strictMaybeToMaybe mgaid) pv
@@ -267,7 +333,7 @@ data GYGovActionState = GYGovActionState
   }
   deriving stock (Eq, Show, Ord)
 
-govActionStateToLedger :: GYGovActionState -> Ledger.GovActionState Consensus.StandardConway
+govActionStateToLedger :: GYGovActionState -> Ledger.GovActionState Conway.ConwayEra
 govActionStateToLedger GYGovActionState {..} =
   Ledger.GovActionState
     { Ledger.gasId = govActionIdToLedger gasId
@@ -279,7 +345,7 @@ govActionStateToLedger GYGovActionState {..} =
     , Ledger.gasExpiresAfter = epochNoToLedger gasExpiresAfter
     }
 
-govActionStateFromLedger :: Ledger.GovActionState Consensus.StandardConway -> GYGovActionState
+govActionStateFromLedger :: Ledger.GovActionState Conway.ConwayEra -> GYGovActionState
 govActionStateFromLedger Ledger.GovActionState {..} =
   GYGovActionState
     { gasId = govActionIdFromLedger gasId

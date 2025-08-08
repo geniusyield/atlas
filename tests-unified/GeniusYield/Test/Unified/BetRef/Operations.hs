@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module GeniusYield.Test.Unified.BetRef.Operations (
   mkScript,
   mkBetRefValidator,
@@ -6,11 +8,11 @@ module GeniusYield.Test.Unified.BetRef.Operations (
   takeBets,
 ) where
 
+import Data.FileEmbed
 import GeniusYield.Imports
+import GeniusYield.OnChain.BetRef.Types
 import GeniusYield.TxBuilder
 import GeniusYield.Types
-
-import GeniusYield.Test.Unified.OnChain.BetRef.Compiled
 
 {- | Queries the cuurent slot, calculates parameters and builds
 a script that is ready to be deployed.
@@ -44,7 +46,11 @@ mkScript betUntil betReveal oraclePkh betStep = do
 
 -- | Validator in question, obtained after giving required parameters.
 mkBetRefValidator :: BetRefParams -> GYScript PlutusV2
-mkBetRefValidator brp = validatorFromPlutus $ betRefValidator brp
+mkBetRefValidator brp =
+  let fileBS = $(makeRelativeToProject "./data/compiled-scripts/bet-ref-validator.bp" >>= embedFile)
+   in case extractBlueprintValidator fileBS of
+        Left e -> error $ "unable to read bet-ref validator, " <> e
+        Right s -> applyParam s brp
 
 -- | Address of the validator, given params.
 betRefAddress :: (HasCallStack, GYTxQueryMonad m) => BetRefParams -> m GYAddress

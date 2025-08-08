@@ -1,6 +1,6 @@
 cabal-version: 3.8
 name: atlas-cardano
-version: 0.11.1
+version: 0.14.1
 synopsis: Application backend for Plutus smart contracts on Cardano
 description:
   Atlas is an all-in-one, Haskell-native application backend for writing off-chain code for on-chain Plutus smart contracts.
@@ -14,12 +14,16 @@ build-type: Simple
 category: Blockchain, Cardano, Framework
 homepage: https://github.com/geniusyield/atlas#readme
 bug-reports: https://github.com/geniusyield/atlas/issues
+data-dir: data
+data-files:
+  compiled-scripts/*.bp
+
 extra-source-files:
   CHANGELOG.md
   README.md
 
 tested-with:
-  ghc ==9.6.5 || ==9.6.6
+  ghc ==9.6.5 || ==9.6.6 || ==9.10.1 || ==9.12.1
 
 source-repository head
   type: git
@@ -52,25 +56,6 @@ common common
   -- speed-ups GHCi considerably
   ghc-options: -fno-show-valid-hole-fits
 
-common plutus-ghc-options
-  -- so unfoldings are present even when compiled without optmizations
-  ghc-options:
-    -fno-ignore-interface-pragmas
-    -fno-omit-interface-pragmas
-    -Wno-partial-type-signatures
-
-  -- expose all unfoldings, so plutustx compiler can do its job
-  ghc-options:
-    -fexpose-all-unfoldings
-    -fobject-code
-    -fplugin-opt
-    PlutusTx.Plugin:defer-errors
-
-  -- set target plutus-core version
-  ghc-options:
-    -fplugin-opt
-    PlutusTx.Plugin:target-version=1.0.0
-
 library
   import: common
   hs-source-dirs: src
@@ -89,6 +74,8 @@ library
     GeniusYield.Imports
     GeniusYield.Providers
     GeniusYield.Providers.Blockfrost
+    GeniusYield.Providers.CacheLocal
+    GeniusYield.Providers.CacheMempool
     GeniusYield.Providers.CachedQueryUTxOs
     GeniusYield.Providers.Common
     GeniusYield.Providers.GCP
@@ -135,6 +122,7 @@ library
     GeniusYield.Types
     GeniusYield.Types.Ada
     GeniusYield.Types.Address
+    GeniusYield.Types.Aeson
     GeniusYield.Types.Anchor
     GeniusYield.Types.Blueprint
     GeniusYield.Types.Blueprint.Argument
@@ -151,6 +139,7 @@ library
     GeniusYield.Types.Certificate
     GeniusYield.Types.Credential
     GeniusYield.Types.DRep
+    GeniusYield.Types.DataStore
     GeniusYield.Types.Datum
     GeniusYield.Types.Delegatee
     GeniusYield.Types.Epoch
@@ -212,7 +201,7 @@ library
     async,
     attoparsec,
     auto-update,
-    base ^>=4.18.2,
+    base >=4.18.2 && <5,
     base16-bytestring,
     blockfrost-client,
     bytestring,
@@ -225,6 +214,7 @@ library
     deriving-aeson,
     either,
     extra,
+    file-embed,
     generic-lens,
     hashable,
     hedgehog,
@@ -264,6 +254,7 @@ library
     transformers,
     unordered-containers,
     vector,
+    websockets,
     witherable,
 
   -- Dependencies whose version is fixed/constrained by @cabal.project@ file.
@@ -276,8 +267,7 @@ library
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file or derived from other related dependencies.
   build-depends:
     cardano-addresses,
-    cardano-api,
-    cardano-api:internal,
+    cardano-api ^>=10.13.1,
     cardano-crypto,
     cardano-crypto-class,
     cardano-ledger-alonzo,
@@ -295,34 +285,13 @@ library
     ouroboros-network-protocols,
     plutus-ledger-api,
     plutus-tx,
-    plutus-tx-plugin,
 
   -- needed for examples
   -- Version of @plutus-core@ is pinned in @cabal.project@ file.
   build-depends: plutus-core
-  build-depends: atlas-cardano:framework-onchain-plutustx
-
-library framework-onchain-plutustx
-  import: common, plutus-ghc-options
-  hs-source-dirs: src-plutustx
-  exposed-modules:
-    GeniusYield.OnChain.AStakeValidator
-    GeniusYield.OnChain.AStakeValidator.Compiled
-    GeniusYield.OnChain.Examples.ReadOracle
-    GeniusYield.OnChain.Examples.ReadOracle.Compiled
-    GeniusYield.OnChain.TestToken
-    GeniusYield.OnChain.TestToken.Compiled
-
-  build-depends: base ^>=4.18.2
-  -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file.
-  build-depends:
-    plutus-core,
-    plutus-ledger-api,
-    plutus-tx,
-    plutus-tx-plugin,
 
 test-suite atlas-tests
-  import: common, plutus-ghc-options
+  import: common
   type: exitcode-stdio-1.0
   main-is: atlas-tests.hs
   hs-source-dirs: tests
@@ -331,23 +300,15 @@ test-suite atlas-tests
     -rtsopts
     -Wall
 
-  -- set target plutus-core version
-  ghc-options:
-    -fplugin-opt
-    PlutusTx.Plugin:target-version=1.0.0
-
   other-modules:
     GeniusYield.Test.Blueprint
+    GeniusYield.Test.BuildTxBodyContent
     GeniusYield.Test.CoinSelection
     GeniusYield.Test.Config
     GeniusYield.Test.FeeTracking
     GeniusYield.Test.GYTxBody
     GeniusYield.Test.GYTxOutRefCbor
     GeniusYield.Test.GYTxSkeleton
-    GeniusYield.Test.OnChain.AlwaysSucceeds
-    GeniusYield.Test.OnChain.AlwaysSucceeds.Compiled
-    GeniusYield.Test.OnChain.GuessRefInputDatum
-    GeniusYield.Test.OnChain.GuessRefInputDatum.Compiled
     GeniusYield.Test.Providers
     GeniusYield.Test.Providers.Mashup
     GeniusYield.Test.RefInput
@@ -360,6 +321,7 @@ test-suite atlas-tests
     MonadRandom,
     aeson,
     atlas-cardano,
+    atlas-onchain-common,
     base,
     bytestring,
     cardano-api,
@@ -367,13 +329,12 @@ test-suite atlas-tests
     containers,
     data-default,
     directory,
+    file-embed,
     filepath,
     http-api-data,
     maestro-sdk,
     ouroboros-consensus,
-    plutus-ledger-api,
     plutus-tx,
-    plutus-tx-plugin,
     tasty,
     tasty-hunit,
     tasty-quickcheck,
@@ -410,11 +371,12 @@ test-suite atlas-privnet-tests
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
-    atlas-cardano:{atlas-cardano, framework-onchain-plutustx},
+    atlas-cardano,
     base,
     base16-bytestring,
     bytestring,
     containers,
+    file-embed,
     lens,
     mtl,
     plutus-tx,
@@ -422,7 +384,7 @@ test-suite atlas-privnet-tests
     tasty-hunit,
 
 test-suite atlas-unified-tests
-  import: common, plutus-ghc-options
+  import: common
   type: exitcode-stdio-1.0
   main-is: atlas-unified-tests.hs
   hs-source-dirs: tests-unified
@@ -431,28 +393,19 @@ test-suite atlas-unified-tests
     -rtsopts
     -Wall
 
-  -- set target plutus-core version
-  ghc-options:
-    -fplugin-opt
-    PlutusTx.Plugin:target-version=1.0.0
-
   other-modules:
     GeniusYield.Test.Unified.BetRef.Operations
     GeniusYield.Test.Unified.BetRef.PlaceBet
     GeniusYield.Test.Unified.BetRef.TakePot
-    GeniusYield.Test.Unified.OnChain.BetRef
-    GeniusYield.Test.Unified.OnChain.BetRef.Compiled
 
   -- Dependencies inherited from the library. No need to specify bounds.
   build-depends:
     atlas-cardano,
+    atlas-onchain-common,
     base,
     containers,
     extra,
+    file-embed,
     mtl,
-    plutus-core,
-    plutus-ledger-api,
-    plutus-tx,
-    plutus-tx-plugin,
     tasty,
     text,

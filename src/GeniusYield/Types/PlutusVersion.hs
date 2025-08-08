@@ -80,6 +80,7 @@ type family CmpPlutusVersion (v :: PlutusVersion) (u :: PlutusVersion) :: Orderi
   CmpPlutusVersion 'PlutusV3 'PlutusV1 = 'GT
   CmpPlutusVersion 'PlutusV3 'PlutusV2 = 'GT
   CmpPlutusVersion 'PlutusV3 'PlutusV3 = 'EQ
+  CmpPlutusVersion v v = 'EQ
 
 type family GreaterOrEqual (v :: Ordering) :: Bool where
   GreaterOrEqual 'GT = 'True

@@ -27,8 +27,8 @@ stakeKeyHashToApi = keyHashToApi
 stakeKeyHashFromApi :: Api.Hash Api.StakeKey -> GYStakeKeyHash
 stakeKeyHashFromApi = keyHashFromApi
 
-stakeKeyHashToLedger :: GYStakeKeyHash -> Ledger.KeyHash Ledger.Staking Ledger.StandardCrypto
+stakeKeyHashToLedger :: GYStakeKeyHash -> Ledger.KeyHash Ledger.Staking
 stakeKeyHashToLedger = keyHashToLedger
 
-stakeKeyHashFromLedger :: Ledger.KeyHash Ledger.Staking Ledger.StandardCrypto -> GYStakeKeyHash
+stakeKeyHashFromLedger :: Ledger.KeyHash Ledger.Staking -> GYStakeKeyHash
 stakeKeyHashFromLedger = keyHashFromLedger

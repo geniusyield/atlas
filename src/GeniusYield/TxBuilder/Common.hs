@@ -10,6 +10,7 @@ module GeniusYield.TxBuilder.Common (
   GYTxSkeletonRefIns (..),
   GYTxSkeletonVotingProcedures (..),
   GYTxSkeletonProposalProcedures (..),
+  GYTxSkeletonDonation (..),
   emptyGYTxSkeleton,
   gyTxSkeletonRefInsToList,
   gyTxSkeletonRefInsSet,
@@ -41,6 +42,7 @@ import Data.Set qualified as Set
 import GeniusYield.Imports
 import GeniusYield.Transaction
 import GeniusYield.Transaction.Common (
+  GYTxExtraConfiguration,
   minimumUTxO,
   utxoFromTxInDetailed,
  )
@@ -73,6 +75,7 @@ data GYTxSkeleton (v :: PlutusVersion) = GYTxSkeleton
   , gytxMetadata :: !(Maybe GYTxMetadata)
   , gytxVotingProcedures :: !(GYTxSkeletonVotingProcedures v)
   , gytxProposalProcedures :: !(GYTxSkeletonProposalProcedures v)
+  , gytxDonation :: !(GYTxSkeletonDonation v)
   }
   deriving Show
 
@@ -102,8 +105,20 @@ instance Semigroup (GYTxSkeletonProposalProcedures v) where
   GYTxSkeletonProposalProceduresNone <> GYTxSkeletonProposalProcedures b = GYTxSkeletonProposalProcedures b
   GYTxSkeletonProposalProceduresNone <> GYTxSkeletonProposalProceduresNone = GYTxSkeletonProposalProceduresNone
 
+data GYTxSkeletonDonation :: PlutusVersion -> Type where
+  GYTxSkeletonDonationNone :: GYTxSkeletonDonation v
+  GYTxSkeletonDonation :: VersionIsGreaterOrEqual v 'PlutusV3 => !Natural -> GYTxSkeletonDonation v
+
+deriving instance Show (GYTxSkeletonDonation v)
+deriving instance Eq (GYTxSkeletonDonation v)
+
+instance Semigroup (GYTxSkeletonDonation v) where
+  GYTxSkeletonDonation a <> GYTxSkeletonDonation b = GYTxSkeletonDonation (a + b)
+  GYTxSkeletonDonation a <> GYTxSkeletonDonationNone = GYTxSkeletonDonation a
+  GYTxSkeletonDonationNone <> GYTxSkeletonDonation b = GYTxSkeletonDonation b
+  GYTxSkeletonDonationNone <> GYTxSkeletonDonationNone = GYTxSkeletonDonationNone
 data GYTxSkeletonRefIns :: PlutusVersion -> Type where
-  GYTxSkeletonRefIns :: VersionIsGreaterOrEqual v 'PlutusV2 => !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
+  GYTxSkeletonRefIns :: !(Set GYTxOutRef) -> GYTxSkeletonRefIns v
   GYTxSkeletonNoRefIns :: GYTxSkeletonRefIns v
 
 deriving instance Show (GYTxSkeletonRefIns v)
@@ -137,6 +152,7 @@ emptyGYTxSkeleton =
     , gytxMetadata = Nothing
     , gytxVotingProcedures = GYTxSkeletonVotingProceduresNone
     , gytxProposalProcedures = GYTxSkeletonProposalProceduresNone
+    , gytxDonation = GYTxSkeletonDonationNone
     }
 
 instance Semigroup (GYTxSkeleton v) where
@@ -154,6 +170,7 @@ instance Semigroup (GYTxSkeleton v) where
       , gytxMetadata = gytxMetadata x <> gytxMetadata y
       , gytxVotingProcedures = gytxVotingProcedures x <> gytxVotingProcedures y
       , gytxProposalProcedures = gytxProposalProcedures x <> gytxProposalProcedures y
+      , gytxDonation = gytxDonation x <> gytxDonation y
       }
    where
     -- we keep only one input per utxo to spend
@@ -221,9 +238,10 @@ buildTxCore ::
   GYAddress ->
   -- | Is `Nothing` if there was no 5 ada collateral returned by browser wallet.
   Maybe GYUTxO ->
+  GYTxExtraConfiguration v ->
   [GYTxSkeleton v] ->
   m (Either GYBuildTxError GYTxBuildResult)
-buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral skeletons = do
+buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ec skeletons = do
   ownUtxos <- utxosAtAddresses addrs
 
   let buildEnvWith ownUtxos' refIns collateralUtxo =
@@ -235,6 +253,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
           , gyBTxEnvOwnUtxos = utxosRemoveTxOutRefs refIns $ utxosRemoveRefScripts $ maybe ownUtxos' ((`utxosRemoveTxOutRef` ownUtxos') . utxoRef) reservedCollateral
           , gyBTxEnvChangeAddr = change
           , gyBTxEnvCollateral = collateralUtxo
+          , gyBTxEnvExtraConfiguration = ec
           }
 
       helper :: GYUTxOs -> GYTxSkeleton v -> m (Either GYBuildTxError GYTxBody)
@@ -254,6 +273,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
             extractReferenceFromWitness _anyOther = Nothing
             gytxVotingProcedures' = case gytxVotingProcedures of GYTxSkeletonVotingProceduresNone -> mempty; GYTxSkeletonVotingProcedures vp -> vp
             gytxProposalProcedures' = case gytxProposalProcedures of GYTxSkeletonProposalProceduresNone -> mempty; GYTxSkeletonProposalProcedures pps -> pps
+            gytxDonation' = case gytxDonation of GYTxSkeletonDonationNone -> 0; GYTxSkeletonDonation d -> d
             refIns =
               -- We want to filter out the references that are already in the txIns.
               filter (\oref -> all (\txIn -> gyTxInTxOutRef txIn /= oref) gytxIns) $
@@ -345,7 +365,7 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral sk
               gytxMetadata
               gytxVotingProcedures'
               gytxProposalProcedures'
-
+              gytxDonation'
       go :: GYUTxOs -> GYTxBuildResult -> [GYTxSkeleton v] -> m (Either GYBuildTxError GYTxBuildResult)
       go _ acc [] = pure $ Right $ reverseResult acc
       go ownUtxos' acc (skeleton : rest) = do

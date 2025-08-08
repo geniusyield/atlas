@@ -33,7 +33,7 @@ import GeniusYield.Types
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock, (drepState | drepsState), constitution, proposals #-}
+  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosWithAsset, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock, (drepState | drepsState), constitution, proposals, mempoolTxs #-}
 
   -- | Get the network id
   networkId :: m GYNetworkId
@@ -63,6 +63,9 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
 
   -- | Lookup 'GYUTxOs' at 'GYAddress'.
   utxosAtAddress :: GYAddress -> Maybe GYAssetClass -> m GYUTxOs
+
+  -- | Lookup 'GYUTxOs' with a given 'GYAssetClass'.
+  utxosWithAsset :: GYNonAdaToken -> m GYUTxOs
 
   -- | Lookup 'GYUTxO' at given 'GYAddress' with their datums. This has a default implementation using `utxosAtAddress` and `lookupDatum` but should be overridden for efficiency if provider provides suitable option.
   utxosAtAddressWithDatums :: GYAddress -> Maybe GYAssetClass -> m [(GYUTxO, Maybe GYDatum)]
@@ -136,12 +139,15 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
   -- | Query the current constitution definition.
   constitution :: m GYConstitution
 
-  -- | Query proposals that are considered for ratification..
+  -- | Query proposals that are considered for ratification.
   proposals ::
     -- | Specify a set of Governance Action IDs to filter the proposals. When this set is
     -- empty, all the proposals considered for ratification will be returned.
     Set GYGovActionId ->
     m (Seq.Seq GYGovActionState)
+
+  -- | Query the transactions in mempool.
+  mempoolTxs :: m [GYTx]
 
 -- | Class of monads for querying special chain data.
 
@@ -193,6 +199,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -211,6 +218,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (RandT g m) where
   ownAddresses = lift ownAddresses
@@ -232,6 +240,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -250,6 +259,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (ReaderT env m) where
   ownAddresses = lift ownAddresses
@@ -297,6 +307,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -315,6 +326,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (Strict.StateT s m) where
   ownAddresses = lift ownAddresses
@@ -336,6 +348,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -354,6 +367,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance GYTxUserQueryMonad m => GYTxUserQueryMonad (Lazy.StateT s m) where
   ownAddresses = lift ownAddresses
@@ -375,6 +389,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (CPS.WriterT w m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -393,6 +408,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (CPS.WriterT w m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (CPS.WriterT w m) where
   ownAddresses = lift ownAddresses
@@ -414,6 +430,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Strict.WriterT w m) whe
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -432,6 +449,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Strict.WriterT w m) whe
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (Strict.WriterT w m) where
   ownAddresses = lift ownAddresses
@@ -453,6 +471,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Lazy.WriterT w m) where
   utxosAtTxOutRefs = lift . utxosAtTxOutRefs
   utxosAtTxOutRefsWithDatums = lift . utxosAtTxOutRefsWithDatums
   utxosAtAddress addr = lift . utxosAtAddress addr
+  utxosWithAsset = lift . utxosWithAsset
   utxosAtAddressWithDatums addr = lift . utxosAtAddressWithDatums addr
   utxosAtAddresses = lift . utxosAtAddresses
   utxosAtAddressesWithDatums = lift . utxosAtAddressesWithDatums
@@ -471,6 +490,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Lazy.WriterT w m) where
   waitForNextBlock = lift waitForNextBlock
   constitution = lift constitution
   proposals = lift . proposals
+  mempoolTxs = lift mempoolTxs
 
 instance (GYTxUserQueryMonad m, Monoid w) => GYTxUserQueryMonad (Lazy.WriterT w m) where
   ownAddresses = lift ownAddresses

@@ -230,7 +230,6 @@ library
     monoidmap,
     mtl,
     network-uri,
-    ordered-containers,
     postgresql-simple,
     prettyprinter,
     raven-haskell,

@@ -21,6 +21,7 @@ module GeniusYield.Providers.Maestro (
   maestroUtxosAtAddressesWithDatums,
   maestroUtxosAtPaymentCredentialsWithDatums,
   maestroStakeAddressInfo,
+  maestroGovState,
   maestroDRepState,
   maestroDRepsState,
   maestroConstitution,
@@ -676,6 +677,9 @@ maestroStakeAddressInfo env saddr = do
 -------------------------------------------------------------------------------
 -- Governance
 -------------------------------------------------------------------------------
+
+maestroGovState :: Maestro.MaestroEnv 'Maestro.V1 -> IO (Maybe GYGovState)
+maestroGovState _c = error "Maestro does not support fetching the governance state"
 
 maestroDRepState :: Maestro.MaestroEnv 'Maestro.V1 -> GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
 maestroDRepState _p _c = error "Maestro does not support fetching the DRep state"

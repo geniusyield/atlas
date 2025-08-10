@@ -42,12 +42,21 @@ module GeniusYield.Types.Governance (
   GYGovActionState (..),
   govActionStateToLedger,
   govActionStateFromLedger,
+  GYGovState (..),
+  govStateFromLedger,
+  GYProposals (..),
+  proposalsFromLedger,
 ) where
 
 import Cardano.Api.Ledger (maybeToStrictMaybe, strictMaybeToMaybe)
 import Cardano.Api.Ledger qualified as Ledger
 import Cardano.Api.Shelley qualified as Api
+import Cardano.Ledger.Api qualified as Ledger
 import Cardano.Ledger.Conway qualified as Conway
+import Cardano.Ledger.Conway.Governance (proposalsActionsMap)
+import Cardano.Ledger.Conway.Governance qualified as Conway
+import Cardano.Ledger.Conway.State qualified as ConwayState
+import Control.Lens ((^.))
 import Data.Aeson (FromJSON, ToJSON, object, withObject, withText, (.:), (.=))
 import Data.Aeson.Types (FromJSON (parseJSON), ToJSON (toJSON))
 import Data.Either.Combinators (mapLeft)
@@ -355,4 +364,45 @@ govActionStateFromLedger Ledger.GovActionState {..} =
     , gasProposalProcedure = propProcFromLedger gasProposalProcedure
     , gasProposedIn = epochNoFromLedger gasProposedIn
     , gasExpiresAfter = epochNoFromLedger gasExpiresAfter
+    }
+
+data GYGovState = GYGovState
+  { cgsProposals :: !GYProposals
+  , cgsCommittee :: !(Maybe (Ledger.Committee Conway.ConwayEra))
+  , cgsConstitution :: !(Ledger.Constitution Conway.ConwayEra)
+  , cgsCurPParams :: !(Ledger.PParams Conway.ConwayEra)
+  , cgsPrevPParams :: !(Ledger.PParams Conway.ConwayEra)
+  , cgsFuturePParams :: !(ConwayState.FuturePParams Conway.ConwayEra)
+  , cgsDRepPulsingState :: !(Conway.DRepPulsingState Conway.ConwayEra)
+  }
+  deriving stock (Eq, Show)
+
+govStateFromLedger :: Ledger.GovState Conway.ConwayEra -> GYGovState
+govStateFromLedger Ledger.ConwayGovState {..} =
+  GYGovState
+    { cgsProposals = proposalsFromLedger cgsProposals
+    , cgsCommittee = strictMaybeToMaybe cgsCommittee
+    , cgsConstitution = cgsConstitution
+    , cgsCurPParams = cgsCurPParams
+    , cgsPrevPParams = cgsPrevPParams
+    , cgsFuturePParams = cgsFuturePParams
+    , cgsDRepPulsingState = cgsDRepPulsingState
+    }
+
+data GYProposals = GYProposals
+  { pProps :: !(Map GYGovActionId GYGovActionState)
+  , pRoots :: !(Ledger.GovRelation Conway.PRoot Conway.ConwayEra)
+  , pGraph :: !(Ledger.GovRelation Conway.PGraph Conway.ConwayEra)
+  }
+  deriving stock (Eq, Show)
+
+proposalsFromLedger :: Conway.Proposals Conway.ConwayEra -> GYProposals
+proposalsFromLedger proposals =
+  GYProposals
+    { pProps =
+        Map.mapKeys govActionIdFromLedger
+          . Map.map govActionStateFromLedger
+          $ proposalsActionsMap proposals
+    , pRoots = proposals ^. Conway.pRootsL
+    , pGraph = proposals ^. Conway.pGraphL
     }

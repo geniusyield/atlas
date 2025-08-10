@@ -14,6 +14,7 @@ module GeniusYield.Providers.Ogmios (
   ogmiosProtocolParameters,
   ogmiosGetSlotOfCurrentBlock,
   ogmiosStakePools,
+  ogmiosGovState,
   ogmiosGetDRepsState,
   ogmiosGetDRepState,
   ogmiosStakeAddressInfo,
@@ -835,6 +836,9 @@ ogmiosStakePools env = do
   pure $ Set.map (stakePoolIdToApi . stakePoolIdFromBech32) $ Map.keysSet sps
  where
   fn = "ogmiosStakePools"
+
+ogmiosGovState :: OgmiosApiEnv -> IO (Maybe GYGovState)
+ogmiosGovState _c = error "Ogmios does not support fetching the governance state"
 
 ogmiosGetDRepsState :: OgmiosApiEnv -> Set.Set (GYCredential 'GYKeyRoleDRep) -> IO (Map.Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState))
 ogmiosGetDRepsState env dreps = do

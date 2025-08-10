@@ -103,7 +103,7 @@ import GeniusYield.Types.DRep
 import GeniusYield.Types.DataStore (GYDataStore (..), fetchFromDataStore, mkDataStoreVar)
 import GeniusYield.Types.Datum
 import GeniusYield.Types.Epoch (GYEpochNo (GYEpochNo))
-import GeniusYield.Types.Governance (GYConstitution, GYGovActionId, GYGovActionState)
+import GeniusYield.Types.Governance (GYConstitution, GYGovActionId, GYGovActionState, GYGovState)
 import GeniusYield.Types.KeyRole
 import GeniusYield.Types.Logging
 import GeniusYield.Types.ProtocolParameters
@@ -155,7 +155,9 @@ data GYProviders = GYProviders
   , gyGetParameters :: !GYGetParameters
   , gyQueryUTxO :: !GYQueryUTxO
   , gyGetStakeAddressInfo :: !(GYStakeAddress -> IO (Maybe GYStakeAddressInfo))
-  , gyGetDRepState :: GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
+  , gyGetGovState :: IO (Maybe GYGovState)
+  , -- Don't make this strict since it's not defined for all providers!
+    gyGetDRepState :: GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
   , -- Don't make this strict since it's not defined for all providers!
     gyGetDRepsState :: Set (GYCredential 'GYKeyRoleDRep) -> IO (Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState))
   , -- Don't make this strict since it's not defined for all providers!

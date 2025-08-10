@@ -33,7 +33,7 @@ import GeniusYield.Types
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosWithAsset, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock, (drepState | drepsState), constitution, proposals, mempoolTxs #-}
+  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosWithAsset, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock, govState, (drepState | drepsState), constitution, proposals, mempoolTxs #-}
 
   -- | Get the network id
   networkId :: m GYNetworkId
@@ -106,6 +106,9 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
 
   -- | Obtain delegation information for a stake address. Note that in case stake address is not registered, this function should return `Nothing`.
   stakeAddressInfo :: GYStakeAddress -> m (Maybe GYStakeAddressInfo)
+
+  -- | Obtain full governance state
+  govState :: m (Maybe GYGovState)
 
   -- | Obtain state of drep.
   drepState :: GYCredential 'GYKeyRoleDRep -> m (Maybe GYDRepState)
@@ -209,6 +212,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -250,6 +254,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -317,6 +322,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -358,6 +364,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -399,6 +406,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (CPS.WriterT w m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -440,6 +448,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Strict.WriterT w m) whe
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -481,6 +490,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Lazy.WriterT w m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig

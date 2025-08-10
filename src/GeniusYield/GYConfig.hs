@@ -46,7 +46,7 @@ import GeniusYield.Providers.CacheLocal
 import GeniusYield.Providers.CacheMempool (augmentQueryUTxOWithMempool)
 import GeniusYield.Providers.Kupo qualified as KupoApi
 import GeniusYield.Providers.Maestro qualified as MaestroApi
-import GeniusYield.Providers.Node (nodeGetDRepState, nodeGetDRepsState, nodeStakeAddressInfo)
+import GeniusYield.Providers.Node (nodeGetDRepState, nodeGetDRepsState, nodeGetGovState, nodeStakeAddressInfo)
 import GeniusYield.Providers.Node qualified as Node
 import GeniusYield.Providers.Ogmios qualified as OgmiosApi
 import GeniusYield.ReadJSON (readJSON)
@@ -199,7 +199,7 @@ withCfgProviders
   ns
   f =
     do
-      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution, gyGetProposals, gyGetMempoolTxs) <- case cfgCoreProvider of
+      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetGovState, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution, gyGetProposals, gyGetMempoolTxs) <- case cfgCoreProvider of
         GYNodeKupo path kupoUrl mmempoolCache mlocalTxSubCache -> do
           let info = nodeConnectInfo path cfgNetworkId
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
@@ -223,6 +223,7 @@ withCfgProviders
             , submitTx
             , KupoApi.kupoAwaitTxConfirmed kEnv
             , nodeStakeAddressInfo info
+            , nodeGetGovState info
             , nodeGetDRepState info
             , nodeGetDRepsState info
             , Node.nodeStakePools info
@@ -258,6 +259,7 @@ withCfgProviders
             , submitTx
             , KupoApi.kupoAwaitTxConfirmed kEnv
             , OgmiosApi.ogmiosStakeAddressInfo oEnv
+            , OgmiosApi.ogmiosGovState oEnv
             , OgmiosApi.ogmiosGetDRepState oEnv
             , OgmiosApi.ogmiosGetDRepsState oEnv
             , OgmiosApi.ogmiosStakePools oEnv
@@ -282,6 +284,7 @@ withCfgProviders
             , MaestroApi.maestroSubmitTx (Just True == turboSubmit) maestroApiEnv
             , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
             , MaestroApi.maestroStakeAddressInfo maestroApiEnv
+            , MaestroApi.maestroGovState maestroApiEnv
             , MaestroApi.maestroDRepState maestroApiEnv
             , MaestroApi.maestroDRepsState maestroApiEnv
             , MaestroApi.maestroStakePools maestroApiEnv
@@ -306,6 +309,7 @@ withCfgProviders
             , Blockfrost.blockfrostSubmitTx proj
             , Blockfrost.blockfrostAwaitTxConfirmed proj
             , Blockfrost.blockfrostStakeAddressInfo proj
+            , Blockfrost.blockfrostGovState proj
             , Blockfrost.blockfrostDRepState proj
             , Blockfrost.blockfrostDRepsState proj
             , Blockfrost.blockfrostStakePools proj
@@ -354,6 +358,7 @@ logTiming providers@GYProviders {..} =
     , gyGetParameters = gyGetParameters'
     , gyQueryUTxO = gyQueryUTxO'
     , gyGetStakeAddressInfo = gyGetStakeAddressInfo'
+    , gyGetGovState = gyGetGovState'
     , gyGetDRepState = gyGetDRepState'
     , gyGetDRepsState = gyGetDRepsState'
     , gyLog' = gyLog'
@@ -427,6 +432,9 @@ logTiming providers@GYProviders {..} =
 
   gyGetStakeAddressInfo' :: GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
   gyGetStakeAddressInfo' = wrap "gyGetStakeAddressInfo" . gyGetStakeAddressInfo
+
+  gyGetGovState' :: IO (Maybe GYGovState)
+  gyGetGovState' = wrap "gyGetGovState" gyGetGovState
 
   gyGetDRepState' :: GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
   gyGetDRepState' = wrap "gyGetDRepState" . gyGetDRepState

@@ -228,6 +228,7 @@ ctxProviders ctx =
     , gyQueryUTxO = ctxQueryUtxos ctx
     , gyLog' = ctxLog ctx
     , gyGetStakeAddressInfo = nodeStakeAddressInfo (ctxInfo ctx)
+    , gyGetGovState = nodeGetGovState (ctxInfo ctx)
     , gyGetDRepState = nodeGetDRepState (ctxInfo ctx)
     , gyGetDRepsState = nodeGetDRepsState (ctxInfo ctx)
     , gyGetStakePools = nodeStakePools (ctxInfo ctx)

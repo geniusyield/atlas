@@ -1,3 +1,7 @@
+## Next
+
+* `utxosAtAddresses` doesn't throw error when querying for empty addresses list against Maestro provider.
+
 ## 0.14.1
 
 * Added `utxosWithAsset` for efficiently querying of UTxOs containing a specified asset.

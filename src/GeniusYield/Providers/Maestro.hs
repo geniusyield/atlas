@@ -313,7 +313,12 @@ maestroUtxosAtAddresses :: Maestro.MaestroEnv 'Maestro.V1 -> [GYAddress] -> IO G
 maestroUtxosAtAddresses env addrs = do
   let addrsInText = map addressToText addrs
   -- Here one would not get `MaestroNotFound` error.
-  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosAtMultiAddresses env (Just False) (Just False)) $ coerce addrsInText)
+  addrUtxos <-
+    if null addrs
+      then
+        pure []
+      else
+        handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosAtMultiAddresses env (Just False) (Just False)) $ coerce addrsInText)
 
   either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro addrUtxos)
  where

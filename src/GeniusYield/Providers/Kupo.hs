@@ -19,6 +19,7 @@ module GeniusYield.Providers.Kupo (
   KupoValue (..),
   KupoDatumType (..),
   KupoCreatedAt (..),
+  KupoSpentAt (..),
   KupoUtxo (..),
   findDatumByHash,
   findScriptByHash,

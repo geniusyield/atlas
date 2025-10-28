@@ -9,6 +9,21 @@ Stability   : develop
 module GeniusYield.Providers.Kupo (
   KupoApiEnv,
   newKupoApiEnv,
+  KupoProviderException (..),
+  handleKupoError,
+  handleKupoAbsurdResponse,
+  runKupoClient,
+  KupoDatum (..),
+  KupoScriptLanguage (..),
+  KupoScript (..),
+  KupoValue (..),
+  KupoDatumType (..),
+  KupoCreatedAt (..),
+  KupoUtxo (..),
+  findDatumByHash,
+  findScriptByHash,
+  fetchUtxosByPattern,
+  transformUtxo,
   kupoLookupDatum,
   kupoLookupScript,
   kupoQueryUtxo,
@@ -219,6 +234,12 @@ newtype KupoCreatedAt = KupoCreatedAt
   deriving stock (Show, Eq, Ord, Generic)
   deriving FromJSON via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoCreatedAt
 
+data KupoSpentAt = KupoSpentAt
+  { kpaTransactionId :: !GYTxId
+  }
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving FromJSON via CustomJSON '[FieldLabelModifier '[StripPrefix "kpa", LowerFirst, CamelToSnake]] KupoSpentAt
+
 data KupoUtxo = KupoUtxo
   { transactionId :: !GYTxId
   , outputIndex :: !Api.TxIx
@@ -228,6 +249,7 @@ data KupoUtxo = KupoUtxo
   , datumType :: !(Maybe KupoDatumType)
   , scriptHash :: !(Maybe GYScriptHash)
   , createdAt :: !KupoCreatedAt
+  , spentAt :: !(Maybe KupoSpentAt)
   }
   deriving stock (Show, Eq, Ord, Generic)
   deriving FromJSON via CustomJSON '[FieldLabelModifier '[CamelToSnake]] KupoUtxo

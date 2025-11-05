@@ -294,7 +294,7 @@ newtype PoolId = PoolId
   deriving stock (Show, Eq, Generic)
   deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "pool", LowerFirst]] PoolId
 data OgmiosStakeAddressInfo = OgmiosStakeAddressInfo
-  { delegate :: PoolId
+  { stakePool :: Maybe PoolId
   , rewards :: AsAda
   }
   deriving stock (Show, Eq, Generic)
@@ -515,7 +515,7 @@ protocolParams :: OgmiosRequest OgmiosPP -> ClientM (OgmiosResponse ProtocolPara
 tip :: OgmiosRequest OgmiosTip -> ClientM (OgmiosResponse OgmiosTipResponse)
 stakePools :: OgmiosRequest OgmiosStakePools -> ClientM (OgmiosResponse OgmiosStakePoolsResponse)
 drepState :: OgmiosRequest (Set.Set (GYCredential 'GYKeyRoleDRep)) -> ClientM (OgmiosResponse [OgmiosDRepStateResponse])
-stakeAddressInfo :: OgmiosRequest GYStakeAddress -> ClientM (OgmiosResponse (Map Text OgmiosStakeAddressInfo))
+stakeAddressInfo :: OgmiosRequest GYStakeAddress -> ClientM (OgmiosResponse [OgmiosStakeAddressInfo])
 startTime :: OgmiosRequest OgmiosStartTime -> ClientM (OgmiosResponse GYTime)
 eraSummaries :: OgmiosRequest OgmiosEraSummaries -> ClientM (OgmiosResponse [EraSummary])
 constitution :: OgmiosRequest OgmiosConstitution -> ClientM (OgmiosResponse OgmiosConstitutionResponse)
@@ -531,7 +531,7 @@ type OgmiosApi =
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosTip) :> Post '[JSON] (OgmiosResponse OgmiosTipResponse)
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosStakePools) :> Post '[JSON] (OgmiosResponse OgmiosStakePoolsResponse)
     :<|> ReqBody '[JSON] (OgmiosRequest (Set.Set (GYCredential 'GYKeyRoleDRep))) :> Post '[JSON] (OgmiosResponse [OgmiosDRepStateResponse])
-    :<|> ReqBody '[JSON] (OgmiosRequest GYStakeAddress) :> Post '[JSON] (OgmiosResponse (Map Text OgmiosStakeAddressInfo))
+    :<|> ReqBody '[JSON] (OgmiosRequest GYStakeAddress) :> Post '[JSON] (OgmiosResponse [OgmiosStakeAddressInfo])
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosStartTime) :> Post '[JSON] (OgmiosResponse GYTime)
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosEraSummaries) :> Post '[JSON] (OgmiosResponse [EraSummary])
     :<|> ReqBody '[JSON] (OgmiosRequest OgmiosConstitution) :> Post '[JSON] (OgmiosResponse OgmiosConstitutionResponse)
@@ -872,8 +872,8 @@ ogmiosGetDRepState env drep = do
 
 ogmiosStakeAddressInfo :: OgmiosApiEnv -> GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
 ogmiosStakeAddressInfo env addr = do
-  mstakeAddressInfo <- handleOgmiosError fn <=< runOgmiosClient env $ stakeAddressInfo (OgmiosRequest addr)
-  pure $ listToMaybe $ map (\OgmiosStakeAddressInfo {..} -> GYStakeAddressInfo {gyStakeAddressInfoDelegatedPool = delegate & poolId & stakePoolIdFromBech32 & Just, gyStakeAddressInfoAvailableRewards = asAdaAda rewards & asLovelaceLovelace}) $ Map.elems mstakeAddressInfo
+  stakeAddressInfos <- handleOgmiosError fn <=< runOgmiosClient env $ stakeAddressInfo (OgmiosRequest addr)
+  pure $ listToMaybe $ map (\OgmiosStakeAddressInfo {..} -> GYStakeAddressInfo {gyStakeAddressInfoDelegatedPool = stakePool <&> stakePoolIdFromBech32 . poolId, gyStakeAddressInfoAvailableRewards = asAdaAda rewards & asLovelaceLovelace}) stakeAddressInfos
  where
   fn = "ogmiosStakeAddressInfo"
 

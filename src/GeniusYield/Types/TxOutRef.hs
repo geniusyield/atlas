@@ -8,6 +8,7 @@ Stability   : develop
 module GeniusYield.Types.TxOutRef (
   GYTxOutRef,
   txOutRefToPlutus,
+  txOutRefToPlutusV3,
   txOutRefFromPlutus,
   txOutRefFromApi,
   txOutRefFromApiTxIdIx,
@@ -50,6 +51,7 @@ import Data.Either.Combinators (mapLeft)
 import GeniusYield.Imports
 import GeniusYield.Types.Ledger
 import GeniusYield.Types.Tx
+import PlutusLedgerApi.V3 qualified as PlutusV3
 
 {- $setup
 
@@ -111,6 +113,17 @@ txOutRefToPlutus :: GYTxOutRef -> Plutus.TxOutRef
 txOutRefToPlutus (GYTxOutRef (Api.TxIn tid (Api.TxIx ix))) =
   Plutus.TxOutRef
     (Plutus.TxId $ Plutus.BuiltinByteString $ Api.serialiseToRawBytes tid)
+    (toInteger ix)
+
+{- |
+
+>>> txOutRefToPlutusV3 "4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189#1"
+TxOutRef {txOutRefId = 4293386fef391299c9886dc0ef3e8676cbdbc2c9f2773507f1f838e00043a189, txOutRefIdx = 1}
+-}
+txOutRefToPlutusV3 :: GYTxOutRef -> PlutusV3.TxOutRef
+txOutRefToPlutusV3 (GYTxOutRef (Api.TxIn tid (Api.TxIx ix))) =
+  PlutusV3.TxOutRef
+    (PlutusV3.TxId $ Plutus.BuiltinByteString $ Api.serialiseToRawBytes tid)
     (toInteger ix)
 
 txOutRefFromApi :: Api.TxIn -> GYTxOutRef

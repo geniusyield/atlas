@@ -31,7 +31,7 @@ jobs:
     - name: Check source code is formatted correctly (fourmolu)
       uses: haskell-actions/run-fourmolu@v11
       with:
-        version: "0.16.2.0"
+        version: "0.18.0.0"
     - name: Install dependencies (apt-get)
       run: |
         sudo apt-get update

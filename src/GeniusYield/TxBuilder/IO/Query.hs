@@ -136,7 +136,7 @@ instance GYTxQueryMonad GYTxQueryMonadIO where
     ioToQueryMonad $ gyGetStakeAddressInfo providers saddr
 
   govState = do
-    logMsg mempty GYDebug $ "Querying governance state"
+    logMsg mempty GYDebug "Querying governance state"
     providers <- asks envProviders
     ioToQueryMonad $ gyGetGovState providers
 

@@ -145,7 +145,7 @@ instance FromJSON GYGovActionId where
     return GYGovActionId {gaidTxId, gaidIx}
 
 instance ToJSON GYGovActionId where
-  toJSON (GYGovActionId {gaidTxId, gaidIx}) =
+  toJSON GYGovActionId {gaidTxId, gaidIx} =
     object
       [ "txId" .= gaidTxId
       , "ix" .= gaidIx

@@ -93,8 +93,9 @@ emptyIntegerSchema = MkIntegerSchema Nothing Nothing Nothing Nothing Nothing
 
 data BytesSchema = MkBytesSchema
   { bsEnum :: [ByteString]
-  -- ^ An instance validates successfully if once hex-encoded,
-  -- its value matches one of the specified values.
+  {- ^ An instance validates successfully if once hex-encoded,
+  its value matches one of the specified values.
+  -}
   , bsMinLength :: Maybe Natural
   -- ^ An instance is valid if its length is greater than, or equal to, this value.
   , bsMaxLength :: Maybe Natural
@@ -128,8 +129,9 @@ data ListSchema = MkListSchema
   , lsMaxItems :: Maybe Natural
   -- ^ An array instance is valid if its size is less than, or equal to, this value.
   , lsUniqueItems :: Maybe Bool
-  -- ^ If this value is false, the instance validates successfully.
-  -- If it is set to True, the instance validates successfully if all of its elements are unique.
+  {- ^ If this value is false, the instance validates successfully.
+  If it is set to True, the instance validates successfully if all of its elements are unique.
+  -}
   }
   deriving stock (Eq, Ord, Show)
 

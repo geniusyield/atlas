@@ -281,16 +281,16 @@ buildTxCore ss eh pp ps cstrat ownUtxoUpdateF addrs change reservedCollateral ec
                   <> [ r
                      | GYTxIn {gyTxInWitness = wit} <- gytxIns
                      , r <- case wit of
-                        GYTxInWitnessScript (GYBuildPlutusScriptReference r _) _ _ -> [r]
-                        GYTxInWitnessSimpleScript (GYBuildSimpleScriptReference r _) -> [r]
-                        _anyOther -> []
+                         GYTxInWitnessScript (GYBuildPlutusScriptReference r _) _ _ -> [r]
+                         GYTxInWitnessSimpleScript (GYBuildSimpleScriptReference r _) -> [r]
+                         _anyOther -> []
                      ]
                   <> [ r
                      | wit <- Map.keys gytxMint
                      , r <- case wit of
-                        GYBuildPlutusScript (GYBuildPlutusScriptReference r _) -> [r]
-                        GYBuildSimpleScript (GYBuildSimpleScriptReference r _) -> [r]
-                        _anyOther -> []
+                         GYBuildPlutusScript (GYBuildPlutusScriptReference r _) -> [r]
+                         GYBuildSimpleScript (GYBuildSimpleScriptReference r _) -> [r]
+                         _anyOther -> []
                      ]
                   <> [r | wdrl <- gytxWdrls, r <- maybeToList (extractReferenceFromWitness $ gyTxWdrlWitness wdrl)]
                   <> [r | cert <- gytxCerts, r <- maybeToList (gyTxCertWitness cert >>= extractReferenceFromWitness)]

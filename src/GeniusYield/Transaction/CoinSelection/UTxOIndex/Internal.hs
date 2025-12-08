@@ -396,11 +396,13 @@ disjoint i1 i2 = universe i1 `Map.disjoint` universe i2
 data SelectionFilter asset
   = -- | Matches UTxOs that contain only the given asset and no other assets.
     SelectSingleton asset
-  | -- | Matches UTxOs that contain the given asset and exactly one other
-    -- asset.
+  | {- | Matches UTxOs that contain the given asset and exactly one other
+    asset.
+    -}
     SelectPairWith asset
-  | -- | Matches UTxOs that contain the given asset and any number of other
-    -- assets.
+  | {- | Matches UTxOs that contain the given asset and any number of other
+    assets.
+    -}
     SelectAnyWith asset
   | -- | Matches all UTxOs regardless of what assets they contain.
     SelectAny
@@ -457,8 +459,9 @@ list of filters without successfully selecting a UTxO entry.
 selectRandomWithPriority ::
   (MonadRandom m, Ord u) =>
   UTxOIndex u ->
-  -- | A list of selection filters to be traversed in descending order of
-  -- priority, from left to right.
+  {- | A list of selection filters to be traversed in descending order of
+  priority, from left to right.
+  -}
   NonEmpty (SelectionFilter GYAssetClass) ->
   m (Maybe ((u, GYValue), UTxOIndex u))
 selectRandomWithPriority i =
@@ -561,8 +564,9 @@ data InvariantStatus
     InvariantIndexNonMinimal
   | -- | Indicates that the index sets are not consistent.
     InvariantIndexInconsistent
-  | -- | Indicates that the 'index' and the cached 'balance' value disagree
-    --   about which assets are included.
+  | {- | Indicates that the 'index' and the cached 'balance' value disagree
+    about which assets are included.
+    -}
     InvariantAssetsInconsistent
   deriving (Eq, Show)
 

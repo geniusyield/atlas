@@ -102,11 +102,11 @@ data GYLayer1ProviderInfo
   deriving stock Show
 
 $( deriveFromJSON
-    defaultOptions
-      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
-      , sumEncoding = UntaggedValue
-      }
-    ''GYLayer1ProviderInfo
+     defaultOptions
+       { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+       , sumEncoding = UntaggedValue
+       }
+     ''GYLayer1ProviderInfo
  )
 
 data GYLayer2ProviderInfo
@@ -114,11 +114,11 @@ data GYLayer2ProviderInfo
   deriving stock Show
 
 $( deriveFromJSON
-    defaultOptions
-      { fieldLabelModifier = \fldName -> case drop 4 fldName of x : xs -> toLower x : xs; [] -> []
-      , sumEncoding = UntaggedValue
-      }
-    ''GYLayer2ProviderInfo
+     defaultOptions
+       { fieldLabelModifier = \fldName -> case drop 4 fldName of x : xs -> toLower x : xs; [] -> []
+       , sumEncoding = UntaggedValue
+       }
+     ''GYLayer2ProviderInfo
  )
 
 -- TODO: Update this haddock? Or just share link to atlas docs.

@@ -15,20 +15,14 @@ import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TE
 import GeniusYield.Imports (Exception, Generic, throwIO, (&))
 import GeniusYield.Providers.Common (
-  newManager,
   newServantClientEnv,
  )
 import GeniusYield.Types
-import Network.HTTP.Client qualified as HttpClient
 import Network.WebSockets qualified as WS
 import Servant.API (
   Get,
   JSON,
-  OctetStream,
-  Post,
-  ReqBody,
   (:>),
-  type (:<|>) (..),
  )
 import Servant.Client (
   BaseUrl (..),
@@ -38,7 +32,6 @@ import Servant.Client (
   baseUrl,
   client,
   runClientM,
-  showBaseUrl,
  )
 
 newtype HydraApiEnv = HydraApiEnv {clientEnv :: ClientEnv}
@@ -85,14 +78,7 @@ protocolParams = client @HydraApi Proxy
 
 hydraProtocolParameters :: HydraApiEnv -> IO ApiProtocolParameters
 hydraProtocolParameters env = do
-  -- Due to a big, following has been commented out and we have a separate logic. Bug: https://github.com/cardano-scaling/hydra/issues/2094. Once it is fixed, `HydraApiError` should also just be returning for `ClientError`.
-  -- runHydraClient env protocolParams >>= handleHydraError "hydraProtocolParameters"
-  manager <- newManager (baseUrl (clientEnv env))
-  request <- HttpClient.parseRequest $ showBaseUrl (baseUrl (clientEnv env)) ++ "/protocol-parameters"
-  response <- HttpClient.httpLbs request manager
-  case Aeson.eitherDecode $ HttpClient.responseBody response of
-    Left err -> throwIO $ HydraApiError "hydraProtocolParameters" $ Right $ Text.pack err
-    Right params -> pure params
+  runHydraClient env protocolParams >>= handleHydraError "hydraProtocolParameters"
 
 newtype HydraTransactionId = HydraTransactionId {transactionId :: GYTxId}
   deriving newtype Show

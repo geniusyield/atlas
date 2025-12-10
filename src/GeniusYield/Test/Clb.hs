@@ -331,6 +331,8 @@ instance Monad m => GYTxQueryMonad (GYTxMonadClbT m) where
 
   proposals _actionIds = error "CLB does not support fetching of proposals"
 
+  govState = error "CLB does not support fetching of governance state"
+
   -- Note, we need to define only one of drepState or drepsState unless required for performace reasons as they have default definition in terms of each other.
 
   slotConfig = do

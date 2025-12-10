@@ -75,7 +75,7 @@ handleHydraError locationInfo =
 processWSResponse :: Aeson.FromJSON a => Text -> IO a
 processWSResponse msg =
   case Aeson.eitherDecode (BSL.fromStrict $ TE.encodeUtf8 msg) of
-    Left err -> throwIO . HydraWebsocketDecodeError $ Text.pack err
+    Left err -> throwIO . HydraWebsocketDecodeError $ "error: " <> Text.pack err <> " while processing message: " <> msg
     Right a -> pure a
 
 type HydraApi = "protocol-parameters" :> Get '[JSON] ApiProtocolParameters

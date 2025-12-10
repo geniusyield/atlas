@@ -18,11 +18,12 @@ aliceVKey = getVerificationKey aliceKey
 aliceVKeyHash :: GYKeyHash GYKeyRolePayment
 aliceVKeyHash = verificationKeyHash aliceVKey
 
-hydraTests :: GYCoreConfig -> TestTree
-hydraTests config =
+hydraTests :: TestTree
+hydraTests =
   testGroup
     "hydra"
     [ testCase "able to query, build and submit a hydra transaction" $ do
+        config <- coreConfigIO "secrets/hydra-config.json"
         withCfgProviders config mempty $ \provider -> do
           let nid = cfgNetworkId config
               aliceAddress = addressFromPaymentKeyHash nid aliceVKeyHash

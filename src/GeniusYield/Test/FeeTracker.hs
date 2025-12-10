@@ -43,8 +43,9 @@ data UserExtraLovelace = UserExtraLovelace
   { uelFees :: !FeesLovelace
   -- ^ Lovelaces lost to fees.
   , uelMinAda :: !MinAdaLovelace
-  -- ^ Lovelaces lost to min ada deposit(s).
-  -- Also takes into account any min ada deposit _gained_ from utxo(s).
+  {- ^ Lovelaces lost to min ada deposit(s).
+  Also takes into account any min ada deposit _gained_ from utxo(s).
+  -}
   }
   deriving stock (Eq, Ord, Show)
 

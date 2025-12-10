@@ -172,13 +172,14 @@ class (Default (TxBuilderStrategy m), GYTxSpecialQueryMonad m, GYTxUserQueryMona
   type TxBuilderStrategy m :: Type
   type TxBuilderStrategy m = GYCoinSelectionStrategy
 
-  -- | The most basic version of 'GYTxSkeleton' builder.
-  --
-  --     == NOTE ==
-  --     This is not meant to be called multiple times with several 'GYTxSkeleton's before submission.
-  --     Because the balancer will end up using the same utxos across the different txs.
-  --
-  --     Consider using 'buildTxBodyParallel' or 'buildTxBodyChaining' instead.
+  {- | The most basic version of 'GYTxSkeleton' builder.
+
+    == NOTE ==
+    This is not meant to be called multiple times with several 'GYTxSkeleton's before submission.
+    Because the balancer will end up using the same utxos across the different txs.
+
+    Consider using 'buildTxBodyParallel' or 'buildTxBodyChaining' instead.
+  -}
   buildTxBodyWithStrategy :: forall v. TxBuilderStrategy m -> GYTxSkeleton v -> m GYTxBody
   default buildTxBodyWithStrategy ::
     forall v.
@@ -198,13 +199,14 @@ class (Default (TxBuilderStrategy m), GYTxSpecialQueryMonad m, GYTxUserQueryMona
     m GYTxBody
   buildTxBodyWithStrategyAndExtraConfiguration = buildTxBodyWithStrategyAndExtraConfiguration'
 
-  -- | A multi 'GYTxSkeleton' builder. The result containing built bodies must be in the same order as the skeletons.
-  --
-  --     This does not perform chaining, i.e does not use utxos created by one of the given transactions in the next one.
-  --     However, it does ensure that the balancer does not end up using the same own utxos when building multiple
-  --     transactions at once.
-  --
-  --     This supports failure recovery by utilizing 'GYTxBuildResult'.
+  {- | A multi 'GYTxSkeleton' builder. The result containing built bodies must be in the same order as the skeletons.
+
+    This does not perform chaining, i.e does not use utxos created by one of the given transactions in the next one.
+    However, it does ensure that the balancer does not end up using the same own utxos when building multiple
+    transactions at once.
+
+    This supports failure recovery by utilizing 'GYTxBuildResult'.
+  -}
   buildTxBodyParallelWithStrategy :: forall v. TxBuilderStrategy m -> [GYTxSkeleton v] -> m GYTxBuildResult
   default buildTxBodyParallelWithStrategy ::
     forall v.
@@ -214,11 +216,12 @@ class (Default (TxBuilderStrategy m), GYTxSpecialQueryMonad m, GYTxUserQueryMona
     m GYTxBuildResult
   buildTxBodyParallelWithStrategy = buildTxBodyParallelWithStrategy'
 
-  -- | A chaining 'GYTxSkeleton' builder. The result containing built bodies must be in the same order as the skeletons.
-  --
-  --     This will perform chaining, i.e it will use utxos created by one of the given transactions, when building the next one.
-  --
-  --     This supports failure recovery by utilizing 'GYTxBuildResult'.
+  {- | A chaining 'GYTxSkeleton' builder. The result containing built bodies must be in the same order as the skeletons.
+
+    This will perform chaining, i.e it will use utxos created by one of the given transactions, when building the next one.
+
+    This supports failure recovery by utilizing 'GYTxBuildResult'.
+  -}
   buildTxBodyChainingWithStrategy :: forall v. TxBuilderStrategy m -> [GYTxSkeleton v] -> m GYTxBuildResult
   default buildTxBodyChainingWithStrategy ::
     forall v.
@@ -246,38 +249,42 @@ buildTxBodyChaining = buildTxBodyChainingWithStrategy def
 
 -- | Class of monads for interacting with the blockchain using transactions.
 class GYTxBuilderMonad m => GYTxMonad m where
-  -- | Sign a transaction body with the user payment key to produce a transaction with witnesses.
-  --
-  -- /Note:/ The key is not meant to be exposed to the monad, so it is only held
-  -- within the closure that signs a given transaction.
-  -- It is recommended to use 'signGYTxBody' and similar to implement this method.
+  {- | Sign a transaction body with the user payment key to produce a transaction with witnesses.
+
+  /Note:/ The key is not meant to be exposed to the monad, so it is only held
+  within the closure that signs a given transaction.
+  It is recommended to use 'signGYTxBody' and similar to implement this method.
+  -}
   signTxBody :: GYTxBody -> m GYTx
 
-  -- | Sign a transaction body with the user payment key AND user stake key to produce
-  -- a transaction with witnesses.
-  -- If the user wallet does not have a stake key, this function should be equivalent to
-  -- 'signTxBody'.
-  --
-  -- See note on 'signTxBody'
+  {- | Sign a transaction body with the user payment key AND user stake key to produce
+  a transaction with witnesses.
+  If the user wallet does not have a stake key, this function should be equivalent to
+  'signTxBody'.
+
+  See note on 'signTxBody'
+  -}
   signTxBodyWithStake :: GYTxBody -> m GYTx
 
-  -- | Submit a fully built transaction to the chain.
-  --   Use 'buildTxBody' to build a transaction body, and 'signGYTxBody' to
-  --   sign it before submitting.
-  --
-  -- /Note:/ Changes made to the chain by the submitted transaction may not be reflected immediately,
-  -- see 'awaitTxConfirmed'.
-  --
-  -- /Law:/ 'someUTxO' calls made after a call to 'submitTx' may return previously returned UTxOs
-  -- if they were not affected by the submitted transaction.
+  {- | Submit a fully built transaction to the chain.
+  Use 'buildTxBody' to build a transaction body, and 'signGYTxBody' to
+  sign it before submitting.
+
+  /Note:/ Changes made to the chain by the submitted transaction may not be reflected immediately,
+  see 'awaitTxConfirmed'.
+
+  /Law:/ 'someUTxO' calls made after a call to 'submitTx' may return previously returned UTxOs
+  if they were not affected by the submitted transaction.
+  -}
   submitTx :: GYTx -> m GYTxId
 
-  -- | Wait for a _recently_ submitted transaction to be confirmed.
-  --
-  -- /Note:/ If used on a transaction submitted long ago, the behavior is undefined.
-  --
-  -- /Law:/ Queries made after a call to 'awaitTxConfirmed'' should reflect changes made to the chain
-  -- by the identified transaction.
+  {- | Wait for a _recently_ submitted transaction to be confirmed.
+
+  /Note:/ If used on a transaction submitted long ago, the behavior is undefined.
+
+  /Law:/ Queries made after a call to 'awaitTxConfirmed'' should reflect changes made to the chain
+  by the identified transaction.
+  -}
   awaitTxConfirmed' :: GYAwaitTxParameters -> GYTxId -> m ()
 
 signTxBodyImpl :: GYTxMonad m => m GYSomePaymentSigningKey -> GYTxBody -> m GYTx
@@ -297,11 +304,12 @@ class (GYTxMonad (TxMonadOf m), GYTxSpecialQueryMonad m) => GYTxGameMonad m wher
 
   -- TODO: Maybe introduce a user generation config type that this function can take?
 
-  -- | Create a new user within the chain. This does not fund the user. See "GeniusYield.Test.Utils.createUserWithLovelace"
-  --       or "GeniusYield.Test.Utils.createUserWithAssets".
-  --
-  --       This _must not_ fund the user.
-  --       Note: The generated user may be arbitrarily complex. i.e may have zero or more stake keys (and thus one or more addresses).
+  {- | Create a new user within the chain. This does not fund the user. See "GeniusYield.Test.Utils.createUserWithLovelace"
+      or "GeniusYield.Test.Utils.createUserWithAssets".
+
+      This _must not_ fund the user.
+      Note: The generated user may be arbitrarily complex. i.e may have zero or more stake keys (and thus one or more addresses).
+  -}
   createUser :: m User
 
   -- | Lift the supported 'GYTxMonad' instance into the game, as a participating user wallet.

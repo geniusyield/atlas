@@ -124,8 +124,8 @@ augmentQueryUTxO GYQueryUTxO {..} dataStore fetchOutsModuloIns = do
                         Just pc ->
                           pc == cred
                             && ( case massetClass of
-                                  Nothing -> True
-                                  Just ac -> Set.member ac (valueAssets utxoValue)
+                                   Nothing -> True
+                                   Just ac -> Set.member ac (valueAssets utxoValue)
                                )
                 )
                 mempoolOuts
@@ -147,8 +147,8 @@ augmentQueryUTxO GYQueryUTxO {..} dataStore fetchOutsModuloIns = do
                           Just pc ->
                             pc == cred
                               && ( case massetClass of
-                                    Nothing -> True
-                                    Just ac -> Set.member ac (valueAssets utxoValue)
+                                     Nothing -> True
+                                     Just ac -> Set.member ac (valueAssets utxoValue)
                                  )
                   )
                   mempoolOuts
@@ -188,8 +188,8 @@ augmentQueryUTxO GYQueryUTxO {..} dataStore fetchOutsModuloIns = do
                   ( \(GYUTxO {..}, _mdatum) ->
                       utxoAddress == addr
                         && ( case massetClass of
-                              Nothing -> True
-                              Just ac -> Set.member ac (valueAssets utxoValue)
+                               Nothing -> True
+                               Just ac -> Set.member ac (valueAssets utxoValue)
                            )
                   )
                   mempoolOuts
@@ -203,8 +203,8 @@ augmentQueryUTxO GYQueryUTxO {..} dataStore fetchOutsModuloIns = do
                 ( \(GYUTxO {..}, _mdatum) ->
                     utxoAddress == addr
                       && ( case massetClass of
-                            Nothing -> True
-                            Just ac -> Set.member ac (valueAssets utxoValue)
+                             Nothing -> True
+                             Just ac -> Set.member ac (valueAssets utxoValue)
                          )
                 )
                 mempoolOuts

@@ -32,8 +32,9 @@ import GeniusYield.Types.TxOutRef (GYTxOutRef)
 data UserCollateral = UserCollateral
   { userCollateralRef :: GYTxOutRef
   , userCollateralCheck :: Bool
-  -- ^ If `False` then the given `GYTxOutRef` will be used and reserved as collateral.
-  -- If `True`, then collateral will only be used and reserved, if value in the given UTxO is exactly 5 ada.
+  {- ^ If `False` then the given `GYTxOutRef` will be used and reserved as collateral.
+  If `True`, then collateral will only be used and reserved, if value in the given UTxO is exactly 5 ada.
+  -}
   }
   deriving stock (Eq, Show)
 

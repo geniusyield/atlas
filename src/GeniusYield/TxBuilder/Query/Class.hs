@@ -120,14 +120,16 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
   drepsState :: Set.Set (GYCredential 'GYKeyRoleDRep) -> m (Map.Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState))
   drepsState dreps = Map.fromList <$> traverse (\drep -> (drep,) <$> drepState drep) (Set.toList dreps)
 
-  -- | Obtain the slot config for the network.
-  --
-  --     Implementations using era history to create slot config may raise 'GYEraSummariesToSlotConfigError'.
+  {- | Obtain the slot config for the network.
+
+    Implementations using era history to create slot config may raise 'GYEraSummariesToSlotConfigError'.
+  -}
   slotConfig :: m GYSlotConfig
 
-  -- | This is expected to give the slot of the latest block. We say "expected" as we cache the result for 5 seconds, that is to say, suppose slot was cached at time @T@, now if query for current block's slot comes within time duration @(T, T + 5)@, then we'll return the cached slot but if say, query happened at time @(T + 5, T + 21)@ where @21@ was taken as an arbitrary number above 5, then we'll query the chain tip and get the slot of the latest block seen by the provider and then store it in our cache, thus new cached value would be served for requests coming within time interval of @(T + 21, T + 26)@.
-  --
-  -- __NOTE:__ It's behaviour is slightly different, solely for our plutus simple model provider where it actually returns the value of the @currentSlot@ variable maintained inside plutus simple model library.
+  {- | This is expected to give the slot of the latest block. We say "expected" as we cache the result for 5 seconds, that is to say, suppose slot was cached at time @T@, now if query for current block's slot comes within time duration @(T, T + 5)@, then we'll return the cached slot but if say, query happened at time @(T + 5, T + 21)@ where @21@ was taken as an arbitrary number above 5, then we'll query the chain tip and get the slot of the latest block seen by the provider and then store it in our cache, thus new cached value would be served for requests coming within time interval of @(T + 21, T + 26)@.
+
+  __NOTE:__ It's behaviour is slightly different, solely for our plutus simple model provider where it actually returns the value of the @currentSlot@ variable maintained inside plutus simple model library.
+  -}
   slotOfCurrentBlock :: m GYSlot
 
   -- | Log a message with specified namespace and severity.
@@ -144,8 +146,9 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
 
   -- | Query proposals that are considered for ratification.
   proposals ::
-    -- | Specify a set of Governance Action IDs to filter the proposals. When this set is
-    -- empty, all the proposals considered for ratification will be returned.
+    {- | Specify a set of Governance Action IDs to filter the proposals. When this set is
+    empty, all the proposals considered for ratification will be returned.
+    -}
     Set GYGovActionId ->
     m (Seq.Seq GYGovActionState)
 
@@ -186,9 +189,10 @@ class GYTxQueryMonad m => GYTxUserQueryMonad m where
   -- | Get available own UTxOs that can be operated upon.
   availableUTxOs :: m GYUTxOs
 
-  -- | Return some unspent transaction output translatable to the given language corresponding to the script in question.
-  --
-  -- /Law:/ Must return the different values.
+  {- | Return some unspent transaction output translatable to the given language corresponding to the script in question.
+
+  /Law:/ Must return the different values.
+  -}
   someUTxO :: PlutusVersion -> m GYTxOutRef
 
 -------------------------------------------------------------------------------

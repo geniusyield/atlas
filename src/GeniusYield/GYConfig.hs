@@ -69,11 +69,11 @@ newtype MempoolCacheSettings = MempoolCacheSettings
   deriving stock Show
 
 $( deriveFromJSON
-    defaultOptions
-      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
-      , sumEncoding = UntaggedValue
-      }
-    ''MempoolCacheSettings
+     defaultOptions
+       { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+       , sumEncoding = UntaggedValue
+       }
+     ''MempoolCacheSettings
  )
 
 newtype LocalTxSubmissionCacheSettings = LocalTxSubmissionCacheSettings
@@ -82,11 +82,11 @@ newtype LocalTxSubmissionCacheSettings = LocalTxSubmissionCacheSettings
   deriving stock Show
 
 $( deriveFromJSON
-    defaultOptions
-      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
-      , sumEncoding = UntaggedValue
-      }
-    ''LocalTxSubmissionCacheSettings
+     defaultOptions
+       { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+       , sumEncoding = UntaggedValue
+       }
+     ''LocalTxSubmissionCacheSettings
  )
 
 {- |
@@ -114,11 +114,11 @@ data GYCoreProviderInfo
   deriving stock Show
 
 $( deriveFromJSON
-    defaultOptions
-      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
-      , sumEncoding = UntaggedValue
-      }
-    ''GYCoreProviderInfo
+     defaultOptions
+       { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+       , sumEncoding = UntaggedValue
+       }
+     ''GYCoreProviderInfo
  )
 
 coreProviderIO :: FilePath -> IO GYCoreProviderInfo
@@ -172,10 +172,10 @@ data GYCoreConfig = GYCoreConfig
   deriving stock Show
 
 $( deriveFromJSON
-    defaultOptions
-      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
-      }
-    ''GYCoreConfig
+     defaultOptions
+       { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+       }
+     ''GYCoreConfig
  )
 
 coreConfigIO :: FilePath -> IO GYCoreConfig

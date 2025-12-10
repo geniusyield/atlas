@@ -104,21 +104,24 @@ module GeniusYield.Types (
 
   -- ** @MaxValSize@
 
-  -- | The new parameter maxValSize replaces the constant @maxValSize@ used Mary era to
-  -- limit the size of the Value part of an output in a serialised transaction.
+  {- | The new parameter maxValSize replaces the constant @maxValSize@ used Mary era to
+  limit the size of the Value part of an output in a serialised transaction.
+  -}
   ppMaxValSizeL,
 
   -- ** @CollateralPercentage@
 
-  -- | The parameter collateralPercent is used to specify the percentage of the total
-  -- transaction fee its collateral must (at minimum) cover.
+  {- | The parameter collateralPercent is used to specify the percentage of the total
+  transaction fee its collateral must (at minimum) cover.
+  -}
   ppCollateralPercentageL,
 
   -- ** @MaxCollateralInputs@
 
-  -- | The parameter @maxCollateralInputs@ is used to limit, additionally, the total number
-  -- of collateral inputs, and thus the total number of additional signatures that must be
-  -- checked during validation.
+  {- | The parameter @maxCollateralInputs@ is used to limit, additionally, the total number
+  of collateral inputs, and thus the total number of additional signatures that must be
+  checked during validation.
+  -}
   ppMaxCollateralInputsL,
 
   -- * Babbage params

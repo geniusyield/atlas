@@ -12,8 +12,12 @@ module GeniusYield.Types.Reexpose (
   BoundedRational (..),
   UnitInterval,
   ProtVer (..),
+  GovRelation (..),
+  PRoot (..),
+  PGraph (..),
   module X,
 ) where
 
 import Cardano.Ledger.BaseTypes
 import Cardano.Ledger.Binary.Version as X
+import Cardano.Ledger.Conway.Governance

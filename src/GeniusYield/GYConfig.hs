@@ -51,7 +51,7 @@ import GeniusYield.Providers.Hydra
 import GeniusYield.Providers.Hydra qualified as Hydra
 import GeniusYield.Providers.Kupo qualified as KupoApi
 import GeniusYield.Providers.Maestro qualified as MaestroApi
-import GeniusYield.Providers.Node (nodeGetDRepState, nodeGetDRepsState, nodeStakeAddressInfo)
+import GeniusYield.Providers.Node (nodeGetDRepState, nodeGetDRepsState, nodeGetGovState, nodeStakeAddressInfo)
 import GeniusYield.Providers.Node qualified as Node
 import GeniusYield.Providers.Ogmios qualified as OgmiosApi
 import GeniusYield.ReadJSON (readJSON)
@@ -74,11 +74,11 @@ newtype MempoolCacheSettings = MempoolCacheSettings
   deriving stock Show
 
 $( deriveFromJSON
-    defaultOptions
-      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
-      , sumEncoding = UntaggedValue
-      }
-    ''MempoolCacheSettings
+     defaultOptions
+       { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+       , sumEncoding = UntaggedValue
+       }
+     ''MempoolCacheSettings
  )
 
 newtype LocalTxSubmissionCacheSettings = LocalTxSubmissionCacheSettings
@@ -87,11 +87,11 @@ newtype LocalTxSubmissionCacheSettings = LocalTxSubmissionCacheSettings
   deriving stock Show
 
 $( deriveFromJSON
-    defaultOptions
-      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
-      , sumEncoding = UntaggedValue
-      }
-    ''LocalTxSubmissionCacheSettings
+     defaultOptions
+       { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+       , sumEncoding = UntaggedValue
+       }
+     ''LocalTxSubmissionCacheSettings
  )
 
 data GYLayer1ProviderInfo
@@ -199,10 +199,10 @@ data GYCoreConfig = GYCoreConfig
   deriving stock Show
 
 $( deriveFromJSON
-    defaultOptions
-      { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
-      }
-    ''GYCoreConfig
+     defaultOptions
+       { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+       }
+     ''GYCoreConfig
  )
 
 coreConfigIO :: FilePath -> IO GYCoreConfig
@@ -226,10 +226,10 @@ withCfgProviders
   ns
   f =
     do
-      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution, gyGetProposals, gyGetMempoolTxs) <- case cfgCoreProvider of
+      (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetGovState, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution, gyGetProposals, gyGetMempoolTxs) <- case cfgCoreProvider of
         GYCoreLayer1ProviderInfo l1ProviderInfo -> resolveLayer1ProviderInfo l1ProviderInfo
         GYCoreLayer2ProviderInfo (GYHydraNodeKupo headNodeUrl kupoUrl l1i) -> do
-          (l1gyGetParameters, l1gySlotActions, _l1gyQueryUTxO, _l1gyLookupDatum, _l1gySubmitTx, _l1gyAwaitTxConfirmed, l1gyGetStakeAddressInfo, l1gyGetDRepState, l1gyGetDRepsState, l1gyGetStakePools, l1gyGetConstitution, l1gyGetProposals, l1gyGetMempoolTxs) <- resolveLayer1ProviderInfo l1i
+          (l1gyGetParameters, l1gySlotActions, _l1gyQueryUTxO, _l1gyLookupDatum, _l1gySubmitTx, _l1gyAwaitTxConfirmed, l1gyGetStakeAddressInfo, l1gyGetGovState, l1gyGetDRepState, l1gyGetDRepsState, l1gyGetStakePools, l1gyGetConstitution, l1gyGetProposals, l1gyGetMempoolTxs) <- resolveLayer1ProviderInfo l1i
           henv <- newHydraApiEnv $ Text.unpack headNodeUrl
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
           let queryUtxo = KupoApi.kupoQueryUtxo kEnv
@@ -241,6 +241,7 @@ withCfgProviders
             , Hydra.hydraSubmitTx henv
             , KupoApi.kupoAwaitTxConfirmed kEnv
             , l1gyGetStakeAddressInfo
+            , l1gyGetGoveState
             , l1gyGetDRepState
             , l1gyGetDRepsState
             , l1gyGetStakePools
@@ -304,6 +305,7 @@ withCfgProviders
             , submitTx
             , KupoApi.kupoAwaitTxConfirmed kEnv
             , nodeStakeAddressInfo info
+            , nodeGetGovState info
             , nodeGetDRepState info
             , nodeGetDRepsState info
             , Node.nodeStakePools info
@@ -339,6 +341,7 @@ withCfgProviders
             , submitTx
             , KupoApi.kupoAwaitTxConfirmed kEnv
             , OgmiosApi.ogmiosStakeAddressInfo oEnv
+            , OgmiosApi.ogmiosGovState oEnv
             , OgmiosApi.ogmiosGetDRepState oEnv
             , OgmiosApi.ogmiosGetDRepsState oEnv
             , OgmiosApi.ogmiosStakePools oEnv
@@ -363,6 +366,7 @@ withCfgProviders
             , MaestroApi.maestroSubmitTx (Just True == turboSubmit) maestroApiEnv
             , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
             , MaestroApi.maestroStakeAddressInfo maestroApiEnv
+            , MaestroApi.maestroGovState maestroApiEnv
             , MaestroApi.maestroDRepState maestroApiEnv
             , MaestroApi.maestroDRepsState maestroApiEnv
             , MaestroApi.maestroStakePools maestroApiEnv
@@ -387,6 +391,7 @@ withCfgProviders
             , Blockfrost.blockfrostSubmitTx proj
             , Blockfrost.blockfrostAwaitTxConfirmed proj
             , Blockfrost.blockfrostStakeAddressInfo proj
+            , Blockfrost.blockfrostGovState proj
             , Blockfrost.blockfrostDRepState proj
             , Blockfrost.blockfrostDRepsState proj
             , Blockfrost.blockfrostStakePools proj
@@ -405,6 +410,7 @@ logTiming providers@GYProviders {..} =
     , gyGetParameters = gyGetParameters'
     , gyQueryUTxO = gyQueryUTxO'
     , gyGetStakeAddressInfo = gyGetStakeAddressInfo'
+    , gyGetGovState = gyGetGovState'
     , gyGetDRepState = gyGetDRepState'
     , gyGetDRepsState = gyGetDRepsState'
     , gyLog' = gyLog'
@@ -478,6 +484,9 @@ logTiming providers@GYProviders {..} =
 
   gyGetStakeAddressInfo' :: GYStakeAddress -> IO (Maybe GYStakeAddressInfo)
   gyGetStakeAddressInfo' = wrap "gyGetStakeAddressInfo" . gyGetStakeAddressInfo
+
+  gyGetGovState' :: IO (Maybe GYGovState)
+  gyGetGovState' = wrap "gyGetGovState" gyGetGovState
 
   gyGetDRepState' :: GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
   gyGetDRepState' = wrap "gyGetDRepState" . gyGetDRepState

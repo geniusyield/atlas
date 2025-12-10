@@ -120,8 +120,9 @@ data GYTxMonadException :: Type where
   GYObtainTxBodyContentException :: GYObtainTxBodyContentError -> GYTxMonadException
   -- | When actual datum in the UTxO is different than what is mentioned for in witness.
   GYDatumMismatch :: GYOutDatum -> GYTxIn v -> GYTxMonadException
-  -- | Wildcard user application specific errors. This is the "plug-in" point where an application
-  --     using the GY framework, can raise its own protocol specific errors within 'GeniusYield.TxBuilder.Class.GYTxMonad'.
+  {- | Wildcard user application specific errors. This is the "plug-in" point where an application
+    using the GY framework, can raise its own protocol specific errors within 'GeniusYield.TxBuilder.Class.GYTxMonad'.
+  -}
   GYApplicationException :: (Exception e, IsGYApiError e) => e -> GYTxMonadException
 
 deriving instance Show GYTxMonadException

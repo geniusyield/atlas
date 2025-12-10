@@ -171,47 +171,47 @@ mainnetSlotConfig zero =
       , gyEraEpochSize = GYEpochSize 21600
       }
       :| [ GYEraSlotConfig
-            { gyEraSlotStart = slotFromApi 4492800
-            , gyEraSlotZeroTime = CSlot.RelativeTime 89856000
-            , gyEraSlotLength = CSlot.mkSlotLength 1
-            , gyEraStartEpoch = GYEpochNo 208
-            , gyEraEpochSize = GYEpochSize 432000
-            }
+             { gyEraSlotStart = slotFromApi 4492800
+             , gyEraSlotZeroTime = CSlot.RelativeTime 89856000
+             , gyEraSlotLength = CSlot.mkSlotLength 1
+             , gyEraStartEpoch = GYEpochNo 208
+             , gyEraEpochSize = GYEpochSize 432000
+             }
          , GYEraSlotConfig
-            { gyEraSlotStart = slotFromApi 16588800
-            , gyEraSlotZeroTime = CSlot.RelativeTime 101952000
-            , gyEraSlotLength = CSlot.mkSlotLength 1
-            , gyEraStartEpoch = GYEpochNo 236
-            , gyEraEpochSize = GYEpochSize 432000
-            }
+             { gyEraSlotStart = slotFromApi 16588800
+             , gyEraSlotZeroTime = CSlot.RelativeTime 101952000
+             , gyEraSlotLength = CSlot.mkSlotLength 1
+             , gyEraStartEpoch = GYEpochNo 236
+             , gyEraEpochSize = GYEpochSize 432000
+             }
          , GYEraSlotConfig
-            { gyEraSlotStart = slotFromApi 23068800
-            , gyEraSlotZeroTime = CSlot.RelativeTime 108432000
-            , gyEraSlotLength = CSlot.mkSlotLength 1
-            , gyEraStartEpoch = GYEpochNo 251
-            , gyEraEpochSize = GYEpochSize 432000
-            }
+             { gyEraSlotStart = slotFromApi 23068800
+             , gyEraSlotZeroTime = CSlot.RelativeTime 108432000
+             , gyEraSlotLength = CSlot.mkSlotLength 1
+             , gyEraStartEpoch = GYEpochNo 251
+             , gyEraEpochSize = GYEpochSize 432000
+             }
          , GYEraSlotConfig
-            { gyEraSlotStart = slotFromApi 39916800
-            , gyEraSlotZeroTime = CSlot.RelativeTime 125280000
-            , gyEraSlotLength = CSlot.mkSlotLength 1
-            , gyEraStartEpoch = GYEpochNo 290
-            , gyEraEpochSize = GYEpochSize 432000
-            }
+             { gyEraSlotStart = slotFromApi 39916800
+             , gyEraSlotZeroTime = CSlot.RelativeTime 125280000
+             , gyEraSlotLength = CSlot.mkSlotLength 1
+             , gyEraStartEpoch = GYEpochNo 290
+             , gyEraEpochSize = GYEpochSize 432000
+             }
          , GYEraSlotConfig
-            { gyEraSlotStart = slotFromApi 72316800
-            , gyEraSlotZeroTime = CSlot.RelativeTime 157680000
-            , gyEraSlotLength = CSlot.mkSlotLength 1
-            , gyEraStartEpoch = GYEpochNo 365
-            , gyEraEpochSize = GYEpochSize 432000
-            }
+             { gyEraSlotStart = slotFromApi 72316800
+             , gyEraSlotZeroTime = CSlot.RelativeTime 157680000
+             , gyEraSlotLength = CSlot.mkSlotLength 1
+             , gyEraStartEpoch = GYEpochNo 365
+             , gyEraEpochSize = GYEpochSize 432000
+             }
          , GYEraSlotConfig
-            { gyEraSlotStart = slotFromApi 133660800
-            , gyEraSlotZeroTime = CSlot.RelativeTime 219024000
-            , gyEraSlotLength = CSlot.mkSlotLength 1
-            , gyEraStartEpoch = GYEpochNo 507
-            , gyEraEpochSize = GYEpochSize 432000
-            }
+             { gyEraSlotStart = slotFromApi 133660800
+             , gyEraSlotZeroTime = CSlot.RelativeTime 219024000
+             , gyEraSlotLength = CSlot.mkSlotLength 1
+             , gyEraStartEpoch = GYEpochNo 507
+             , gyEraEpochSize = GYEpochSize 432000
+             }
          ]
 
 {- Finds the slot config for the given slot. Essentially, the chosen slot config must have its starting slot

@@ -33,7 +33,7 @@ import GeniusYield.Types
 
 -- | Class of monads for querying chain data.
 class MonadError GYTxMonadException m => GYTxQueryMonad m where
-  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosWithAsset, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock, (drepState | drepsState), constitution, proposals, mempoolTxs #-}
+  {-# MINIMAL networkId, lookupDatum, (utxoAtTxOutRef | utxosAtTxOutRefs), utxosAtAddress, utxosWithAsset, utxosAtPaymentCredential, stakeAddressInfo, slotConfig, slotOfCurrentBlock, logMsg, waitUntilSlot, waitForNextBlock, govState, (drepState | drepsState), constitution, proposals, mempoolTxs #-}
 
   -- | Get the network id
   networkId :: m GYNetworkId
@@ -107,6 +107,9 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
   -- | Obtain delegation information for a stake address. Note that in case stake address is not registered, this function should return `Nothing`.
   stakeAddressInfo :: GYStakeAddress -> m (Maybe GYStakeAddressInfo)
 
+  -- | Obtain full governance state
+  govState :: m (Maybe GYGovState)
+
   -- | Obtain state of drep.
   drepState :: GYCredential 'GYKeyRoleDRep -> m (Maybe GYDRepState)
   drepState drep = do
@@ -117,14 +120,16 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
   drepsState :: Set.Set (GYCredential 'GYKeyRoleDRep) -> m (Map.Map (GYCredential 'GYKeyRoleDRep) (Maybe GYDRepState))
   drepsState dreps = Map.fromList <$> traverse (\drep -> (drep,) <$> drepState drep) (Set.toList dreps)
 
-  -- | Obtain the slot config for the network.
-  --
-  --     Implementations using era history to create slot config may raise 'GYEraSummariesToSlotConfigError'.
+  {- | Obtain the slot config for the network.
+
+    Implementations using era history to create slot config may raise 'GYEraSummariesToSlotConfigError'.
+  -}
   slotConfig :: m GYSlotConfig
 
-  -- | This is expected to give the slot of the latest block. We say "expected" as we cache the result for 5 seconds, that is to say, suppose slot was cached at time @T@, now if query for current block's slot comes within time duration @(T, T + 5)@, then we'll return the cached slot but if say, query happened at time @(T + 5, T + 21)@ where @21@ was taken as an arbitrary number above 5, then we'll query the chain tip and get the slot of the latest block seen by the provider and then store it in our cache, thus new cached value would be served for requests coming within time interval of @(T + 21, T + 26)@.
-  --
-  -- __NOTE:__ It's behaviour is slightly different, solely for our plutus simple model provider where it actually returns the value of the @currentSlot@ variable maintained inside plutus simple model library.
+  {- | This is expected to give the slot of the latest block. We say "expected" as we cache the result for 5 seconds, that is to say, suppose slot was cached at time @T@, now if query for current block's slot comes within time duration @(T, T + 5)@, then we'll return the cached slot but if say, query happened at time @(T + 5, T + 21)@ where @21@ was taken as an arbitrary number above 5, then we'll query the chain tip and get the slot of the latest block seen by the provider and then store it in our cache, thus new cached value would be served for requests coming within time interval of @(T + 21, T + 26)@.
+
+  __NOTE:__ It's behaviour is slightly different, solely for our plutus simple model provider where it actually returns the value of the @currentSlot@ variable maintained inside plutus simple model library.
+  -}
   slotOfCurrentBlock :: m GYSlot
 
   -- | Log a message with specified namespace and severity.
@@ -141,8 +146,9 @@ class MonadError GYTxMonadException m => GYTxQueryMonad m where
 
   -- | Query proposals that are considered for ratification.
   proposals ::
-    -- | Specify a set of Governance Action IDs to filter the proposals. When this set is
-    -- empty, all the proposals considered for ratification will be returned.
+    {- | Specify a set of Governance Action IDs to filter the proposals. When this set is
+    empty, all the proposals considered for ratification will be returned.
+    -}
     Set GYGovActionId ->
     m (Seq.Seq GYGovActionState)
 
@@ -183,9 +189,10 @@ class GYTxQueryMonad m => GYTxUserQueryMonad m where
   -- | Get available own UTxOs that can be operated upon.
   availableUTxOs :: m GYUTxOs
 
-  -- | Return some unspent transaction output translatable to the given language corresponding to the script in question.
-  --
-  -- /Law:/ Must return the different values.
+  {- | Return some unspent transaction output translatable to the given language corresponding to the script in question.
+
+  /Law:/ Must return the different values.
+  -}
   someUTxO :: PlutusVersion -> m GYTxOutRef
 
 -------------------------------------------------------------------------------
@@ -209,6 +216,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (RandT g m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -250,6 +258,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (ReaderT env m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -317,6 +326,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Strict.StateT s m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -358,6 +368,7 @@ instance GYTxQueryMonad m => GYTxQueryMonad (Lazy.StateT s m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -399,6 +410,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (CPS.WriterT w m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -440,6 +452,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Strict.WriterT w m) whe
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig
@@ -481,6 +494,7 @@ instance (GYTxQueryMonad m, Monoid w) => GYTxQueryMonad (Lazy.WriterT w m) where
   utxosAtPaymentCredentials = lift . utxosAtPaymentCredentials
   utxosAtPaymentCredentialsWithDatums = lift . utxosAtPaymentCredentialsWithDatums
   stakeAddressInfo = lift . stakeAddressInfo
+  govState = lift govState
   drepState = lift . drepState
   drepsState = lift . drepsState
   slotConfig = lift slotConfig

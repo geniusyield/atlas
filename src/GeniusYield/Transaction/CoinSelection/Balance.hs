@@ -64,11 +64,13 @@ import GeniusYield.Types
 type UTxO = GYTxOutRef
 
 data ValueSizeAssessment
-  = -- | Indicates that the size of a value does not exceed the maximum
-    -- size that can be included in a transaction output.
+  = {- | Indicates that the size of a value does not exceed the maximum
+    size that can be included in a transaction output.
+    -}
     ValueSizeWithinLimit
-  | -- | Indicates that the size of a value exceeds the maximum size
-    -- that can be included in a transaction output.
+  | {- | Indicates that the size of a value exceeds the maximum size
+    that can be included in a transaction output.
+    -}
     ValueSizeExceedsLimit
   deriving (Eq, Generic, Show)
 
@@ -81,9 +83,10 @@ type GYValueWithoutLovelace = GYValue
 data SelectionConstraints = SelectionConstraints
   { valueSizeAssessor ::
       ValueSizeAssessor
-  -- ^ Assesses the size of a value relative to the upper limit of
-  -- what can be included in a transaction output.
-  -- TODO: Get rid of "bundle" keyword as we "value" (instead of tokenbundle) to denote it...
+  {- ^ Assesses the size of a value relative to the upper limit of
+  what can be included in a transaction output.
+  TODO: Get rid of "bundle" keyword as we "value" (instead of tokenbundle) to denote it...
+  -}
   , computeMinimumAdaQuantity ::
       GYAddress ->
       GYValue ->
@@ -92,19 +95,22 @@ data SelectionConstraints = SelectionConstraints
   , computeMinimumCost ::
       SelectionSkeleton ->
       Natural
-  -- ^ Computes the minimum cost of a given selection skeleton.
-  -- TODO: This can be cleverly used to not make use of logarithmic overestimation function. To study if it's only for fees or also for min deposits, if min deposit then which one?
-  -- TODO: Whether I can be precise here also depends upon how many times is this called. Our initial implementation had logarithmic iteration.
+  {- ^ Computes the minimum cost of a given selection skeleton.
+  TODO: This can be cleverly used to not make use of logarithmic overestimation function. To study if it's only for fees or also for min deposits, if min deposit then which one?
+  TODO: Whether I can be precise here also depends upon how many times is this called. Our initial implementation had logarithmic iteration.
+  -}
   , changeAddress ::
       GYAddress
   , maximumOutputAdaQuantity ::
       Natural
-  -- ^ Specifies the largest ada quantity that can appear in the token
-  -- bundle of an output.
+  {- ^ Specifies the largest ada quantity that can appear in the token
+  bundle of an output.
+  -}
   , maximumOutputTokenQuantity ::
       Natural
-  -- ^ Specifies the largest non-ada quantity that can appear in the
-  -- token bundle of an output.
+  {- ^ Specifies the largest non-ada quantity that can appear in the
+  token bundle of an output.
+  -}
   , nullAddress ::
       GYAddress
       -- TODO: This is supposed to be an empty bytestring, not a complete gyaddress.
@@ -115,14 +121,16 @@ data SelectionConstraints = SelectionConstraints
 data SelectionParams f = SelectionParams
   { outputsToCover ::
       !(f (GYAddress, GYValue))
-  -- ^ The complete set of outputs to be covered.
-  -- TODO: Shall I be changing it's representation to say GYTxOut v? Or just GYValue?
+  {- ^ The complete set of outputs to be covered.
+  TODO: Shall I be changing it's representation to say GYTxOut v? Or just GYValue?
+  -}
   , utxoAvailable ::
       !(UTxOSelection UTxO)
-  -- ^ Specifies a set of UTxOs that are available for selection as
-  -- inputs and optionally, a subset that has already been selected.
-  --
-  -- Further entries from this set will be selected to cover any deficit.
+  {- ^ Specifies a set of UTxOs that are available for selection as
+  inputs and optionally, a subset that has already been selected.
+
+  Further entries from this set will be selected to cover any deficit.
+  -}
   , extraCoinSource ::
       !Natural
   -- ^ An extra source of ada.
@@ -131,20 +139,22 @@ data SelectionParams f = SelectionParams
   -- ^ An extra sink for ada.
   , assetsToMint ::
       !GYValue
-  -- ^ Assets to mint: these provide input value to a transaction.
-  --
-  -- By minting tokens, we generally decrease the burden of the selection
-  -- algorithm, allowing it to select fewer UTxO entries in order to
-  -- cover the required outputs.
+  {- ^ Assets to mint: these provide input value to a transaction.
+
+  By minting tokens, we generally decrease the burden of the selection
+  algorithm, allowing it to select fewer UTxO entries in order to
+  cover the required outputs.
+  -}
   , assetsToBurn ::
       !GYValue
-  -- ^ Assets to burn: these consume output value from a transaction.
-  --
-  -- By burning tokens, we generally increase the burden of the selection
-  -- algorithm, requiring it to select more UTxO entries in order to
-  -- cover the burn.
-  --
-  -- Note that it contains positive entries only.
+  {- ^ Assets to burn: these consume output value from a transaction.
+
+  By burning tokens, we generally increase the burden of the selection
+  algorithm, requiring it to select more UTxO entries in order to
+  cover the burn.
+
+  Note that it contains positive entries only.
+  -}
   , selectionStrategy ::
       SelectionStrategy
   -- ^ Specifies which selection strategy to use. See 'SelectionStrategy'.
@@ -503,11 +513,12 @@ data BalanceInsufficientError = BalanceInsufficientError
   -- ^ The balance of 'outputsToCover'.
   , utxoBalanceShortfall ::
       !GYValue
-  -- ^ The shortfall between 'utxoBalanceAvailable' and
-  -- 'utxoBalanceRequired'.
-  --
-  -- Equal to the 'valueMonus' of 'utxoBalanceAvailable' from
-  -- 'utxoBalanceRequired'.
+  {- ^ The shortfall between 'utxoBalanceAvailable' and
+  'utxoBalanceRequired'.
+
+  Equal to the 'valueMonus' of 'utxoBalanceAvailable' from
+  'utxoBalanceRequired'.
+  -}
   }
   deriving (Generic, Eq, Show)
 
@@ -526,12 +537,14 @@ mkBalanceInsufficientError utxoBalanceAvailable utxoBalanceRequired =
 data UnableToConstructChangeError = UnableToConstructChangeError
   { requiredCost ::
       !Natural
-  -- ^ The minimal required cost needed for the transaction to be
-  -- considered valid. This does not include min Ada values.
+  {- ^ The minimal required cost needed for the transaction to be
+  considered valid. This does not include min Ada values.
+  -}
   , shortfall ::
       !Natural
-  -- ^ The additional coin quantity that would be required to cover the
-  -- selection cost and minimum coin quantity of each change output.
+  {- ^ The additional coin quantity that would be required to cover the
+  selection cost and minimum coin quantity of each change output.
+  -}
   }
   deriving (Generic, Eq, Show)
 
@@ -1006,13 +1019,15 @@ selectMatchingQuantity ::
   forall m utxoSelection u.
   (MonadRandom m, Ord u) =>
   IsUTxOSelection utxoSelection u =>
-  -- | A list of selection filters to be traversed from left-to-right,
-  -- in descending order of priority.
+  {- | A list of selection filters to be traversed from left-to-right,
+  in descending order of priority.
+  -}
   NonEmpty (SelectionFilter GYAssetClass) ->
   -- | The current selection state.
   utxoSelection u ->
-  -- | An updated selection state that includes a matching UTxO entry,
-  -- or 'Nothing' if no such entry could be found.
+  {- | An updated selection state that includes a matching UTxO entry,
+  or 'Nothing' if no such entry could be found.
+  -}
   m (Maybe (UTxOSelectionNonEmpty u))
 selectMatchingQuantity filters s =
   (updateState =<<)
@@ -1112,20 +1127,22 @@ runSelectionStep lens s
 -- | Criteria for the 'makeChange' function.
 data MakeChangeCriteria minCoinFor valueSizeAssessor = MakeChangeCriteria
   { minCoinFor :: minCoinFor
-  -- ^ A function that computes the minimum required ada quantity for a
-  -- particular output.
+  {- ^ A function that computes the minimum required ada quantity for a
+  particular output.
+  -}
   , valueSizeAssessor :: valueSizeAssessor
   -- ^ A function to assess the size of a value.
   , requiredCost :: Natural
-  -- ^ The minimal (and optimal) delta between the total ada balance
-  -- of all input values and the total ada balance of all output and
-  -- change values, where:
-  --
-  --    delta = getCoin (fold inputValues)
-  --          - getCoin (fold outputValues)
-  --          - getCoin (fold changeValues)
-  --
-  -- This typically captures fees plus key deposits.
+  {- ^ The minimal (and optimal) delta between the total ada balance
+  of all input values and the total ada balance of all output and
+  change values, where:
+
+   delta = getCoin (fold inputValues)
+         - getCoin (fold outputValues)
+         - getCoin (fold changeValues)
+
+  This typically captures fees plus key deposits.
+  -}
   , extraCoinSource :: Natural
   -- ^ An extra source of ada.
   , extraCoinSink :: Natural
@@ -1140,12 +1157,14 @@ data MakeChangeCriteria minCoinFor valueSizeAssessor = MakeChangeCriteria
   -- ^ Assets to burn: these consume output value from a transaction.
   , maximumOutputAdaQuantity ::
       Natural
-  -- ^ Specifies the largest ada quantity that can appear in the
-  -- value of an output.
+  {- ^ Specifies the largest ada quantity that can appear in the
+  value of an output.
+  -}
   , maximumOutputTokenQuantity ::
       Natural
-  -- ^ Specifies the largest non-ada quantity that can appear in the
-  -- value of an output.
+  {- ^ Specifies the largest non-ada quantity that can appear in the
+  value of an output.
+  -}
   }
   deriving (Eq, Generic, Show)
 
@@ -1441,16 +1460,19 @@ assignCoinsToChangeMaps ::
   HasCallStack =>
   -- | The total quantity of ada available, including any extra source of ada.
   Natural ->
-  -- | A function to calculate the minimum required ada quantity for any
-  -- token map.
+  {- | A function to calculate the minimum required ada quantity for any
+  token map.
+  -}
   (GYValueWithoutLovelace -> Natural) ->
-  -- | A list of pre-computed asset change maps paired with original output
-  -- coins, sorted into an order that ensures all empty token maps are at the
-  -- start of the list.
+  {- | A list of pre-computed asset change maps paired with original output
+  coins, sorted into an order that ensures all empty token maps are at the
+  start of the list.
+  -}
   NonEmpty (GYValueWithoutLovelace, Natural) ->
-  -- | Resulting change bundles, or the shortfall quantity if there was not
-  -- enough ada available to assign a minimum ada quantity to all non-empty
-  -- token maps.
+  {- | Resulting change bundles, or the shortfall quantity if there was not
+  enough ada available to assign a minimum ada quantity to all non-empty
+  token maps.
+  -}
   Either Natural [GYValue]
 assignCoinsToChangeMaps adaAvailable minCoinFor pairsAtStart
   | not changeMapsCorrectlyOrdered =
@@ -1542,9 +1564,10 @@ input list, and the sum of its quantities is either zero, or exactly equal
 to the token quantity in the second argument.
 -}
 makeChangeForUserSpecifiedAsset ::
-  -- | A list of weights for the distribution. Conveniently captures both
-  -- the weights, and the number of elements amongst which the quantity
-  -- should be distributed.
+  {- | A list of weights for the distribution. Conveniently captures both
+  the weights, and the number of elements amongst which the quantity
+  should be distributed.
+  -}
   NonEmpty GYValueWithoutLovelace ->
   -- | A surplus token quantity to distribute.
   (GYAssetClass, Natural) ->
@@ -1613,9 +1636,10 @@ value given as the second argument.
 -}
 makeChangeForCoin ::
   HasCallStack =>
-  -- | A list of weights for the distribution. Conveniently captures both
-  -- the weights, and the number of elements amongst which the surplus
-  -- ada quantity should be distributed.
+  {- | A list of weights for the distribution. Conveniently captures both
+  the weights, and the number of elements amongst which the surplus
+  ada quantity should be distributed.
+  -}
   NonEmpty Natural ->
   -- | A surplus ada quantity to be distributed.
   Natural ->
@@ -1901,8 +1925,9 @@ Returns a list of smaller values for which 'isExcessive' returns 'False'.
 splitValueIfAssetCountExcessive ::
   -- | The value suspected to have an excessive number of assets.
   GYValue ->
-  -- | A function that returns 'True' if (and only if) the asset count of
-  -- the given value is excessive.
+  {- | A function that returns 'True' if (and only if) the asset count of
+  the given value is excessive.
+  -}
   (GYValue -> Bool) ->
   NonEmpty GYValue
 splitValueIfAssetCountExcessive b isExcessive
@@ -2051,8 +2076,9 @@ this function will return the original list.
 splitValuesWithExcessiveAssetCounts ::
   -- | Values.
   NonEmpty GYValue ->
-  -- | A function that returns 'True' if (and only if) the asset count of
-  -- the given value is excessive.
+  {- | A function that returns 'True' if (and only if) the asset count of
+  the given value is excessive.
+  -}
   (GYValue -> Bool) ->
   NonEmpty GYValue
 splitValuesWithExcessiveAssetCounts bs isExcessive =

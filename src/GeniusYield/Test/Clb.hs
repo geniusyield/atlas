@@ -25,11 +25,11 @@ module GeniusYield.Test.Clb (
 ) where
 
 import Control.Monad.Except (ExceptT, runExceptT, tryError)
-import Control.Monad.Random (StdGen, RandT, mkStdGen, evalRandT)
-import Control.Monad.Reader (MonadReader, ReaderT, local, asks, runReaderT)
-import Control.Monad.State (MonadState, StateT, gets, get, put, runStateT)
-import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.Random (RandT, StdGen, evalRandT, mkStdGen)
+import Control.Monad.Reader (MonadReader, ReaderT, asks, local, runReaderT)
+import Control.Monad.State (MonadState, StateT, get, gets, put, runStateT)
+import Control.Monad.Trans.Class (MonadTrans (lift))
 import Data.Map.Strict qualified as Map
 import Data.SOP.NonEmpty (NonEmpty (NonEmptyCons, NonEmptyOne))
 import Data.Sequence qualified as Seq
@@ -209,9 +209,10 @@ mkTestForT name action =
       options = defaultLayoutOptions {layoutPageWidth = AvailablePerLine 150 1.0}
       logDoc = Clb.ppLog $ Clb._clbLog mock
       logString = renderString $ layoutPretty options logDoc
-    pure $ testCaseInfo msg $
-      maybe (pure mockLog) assertFailure $
-        mbErrors >>= \errors -> pure (mockLog <> "\n\nError :\n-------\n" <> errors)
+    pure $
+      testCaseInfo msg $
+        maybe (pure mockLog) assertFailure $
+          mbErrors >>= \errors -> pure (mockLog <> "\n\nError :\n-------\n" <> errors)
 
 mkSimpleWallet :: TL.KeyPair L.S.Payment -> User
 mkSimpleWallet kp =

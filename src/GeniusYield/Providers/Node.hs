@@ -13,6 +13,7 @@ module GeniusYield.Providers.Node (
   nodeGetSlotOfCurrentBlock,
   nodeStakeAddressInfo,
   nodeStakePools,
+  nodeGetGovState,
   nodeGetDRepState,
   nodeGetDRepsState,
   nodeConstitution,
@@ -80,6 +81,9 @@ nodeGetParameters info = makeGetParameters (nodeGetProtocolParameters info) (sys
 
 nodeGetProtocolParameters :: Api.LocalNodeConnectInfo -> IO ApiProtocolParameters
 nodeGetProtocolParameters info = queryConwayEra info Api.QueryProtocolParameters
+
+nodeGetGovState :: Api.LocalNodeConnectInfo -> IO (Maybe GYGovState)
+nodeGetGovState info = Just . govStateFromLedger <$> queryConwayEra info Api.QueryGovState
 
 nodeGetDRepState :: Api.LocalNodeConnectInfo -> GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
 nodeGetDRepState info drep = do

@@ -21,6 +21,7 @@ module GeniusYield.Providers.Maestro (
   maestroUtxosAtAddressesWithDatums,
   maestroUtxosAtPaymentCredentialsWithDatums,
   maestroStakeAddressInfo,
+  maestroGovState,
   maestroDRepState,
   maestroDRepsState,
   maestroConstitution,
@@ -312,7 +313,12 @@ maestroUtxosAtAddresses :: Maestro.MaestroEnv 'Maestro.V1 -> [GYAddress] -> IO G
 maestroUtxosAtAddresses env addrs = do
   let addrsInText = map addressToText addrs
   -- Here one would not get `MaestroNotFound` error.
-  addrUtxos <- handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosAtMultiAddresses env (Just False) (Just False)) $ coerce addrsInText)
+  addrUtxos <-
+    if null addrs
+      then
+        pure []
+      else
+        handleMaestroError locationIdent <=< try $ Maestro.allPages (flip (Maestro.utxosAtMultiAddresses env (Just False) (Just False)) $ coerce addrsInText)
 
   either (throwIO . MspvDeserializeFailure locationIdent) (pure . utxosFromList) (traverse utxoFromMaestro addrUtxos)
  where
@@ -676,6 +682,9 @@ maestroStakeAddressInfo env saddr = do
 -------------------------------------------------------------------------------
 -- Governance
 -------------------------------------------------------------------------------
+
+maestroGovState :: Maestro.MaestroEnv 'Maestro.V1 -> IO (Maybe GYGovState)
+maestroGovState _c = error "Maestro does not support fetching the governance state"
 
 maestroDRepState :: Maestro.MaestroEnv 'Maestro.V1 -> GYCredential 'GYKeyRoleDRep -> IO (Maybe GYDRepState)
 maestroDRepState _p _c = error "Maestro does not support fetching the DRep state"

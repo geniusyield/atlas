@@ -241,7 +241,7 @@ withCfgProviders
             , Hydra.hydraSubmitTx henv
             , KupoApi.kupoAwaitTxConfirmed kEnv
             , l1gyGetStakeAddressInfo
-            , l1gyGetGoveState
+            , l1gyGetGovState
             , l1gyGetDRepState
             , l1gyGetDRepsState
             , l1gyGetStakePools

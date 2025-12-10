@@ -10,6 +10,8 @@ Stability   : develop
 module GeniusYield.GYConfig (
   GYCoreConfig (..),
   Confidential (..),
+  GYLayer1ProviderInfo (..),
+  GYLayer2ProviderInfo (..),
   GYCoreProviderInfo (..),
   withCfgProviders,
   coreConfigIO,
@@ -41,9 +43,12 @@ import GeniusYield.Providers.Blockfrost qualified as Blockfrost
 
 -- import qualified GeniusYield.Providers.CachedQueryUTxOs as CachedQuery
 
+import Control.Applicative ((<|>))
 import Data.Sequence qualified as Seq
 import GeniusYield.Providers.CacheLocal
 import GeniusYield.Providers.CacheMempool (augmentQueryUTxOWithMempool)
+import GeniusYield.Providers.Hydra
+import GeniusYield.Providers.Hydra qualified as Hydra
 import GeniusYield.Providers.Kupo qualified as KupoApi
 import GeniusYield.Providers.Maestro qualified as MaestroApi
 import GeniusYield.Providers.Node (nodeGetDRepState, nodeGetDRepsState, nodeGetGovState, nodeStakeAddressInfo)
@@ -89,6 +94,35 @@ $( deriveFromJSON
      ''LocalTxSubmissionCacheSettings
  )
 
+data GYLayer1ProviderInfo
+  = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text, cpiMempoolCache :: !(Maybe MempoolCacheSettings), cpiLocalTxSubmissionCache :: !(Maybe LocalTxSubmissionCacheSettings)}
+  | GYOgmiosKupo {cpiOgmiosUrl :: !Text, cpiKupoUrl :: !Text, cpiMempoolCache :: !(Maybe MempoolCacheSettings), cpiLocalTxSubmissionCache :: !(Maybe LocalTxSubmissionCacheSettings)}
+  | GYMaestro {cpiMaestroToken :: !(Confidential Text), cpiTurboSubmit :: !(Maybe Bool)}
+  | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
+  deriving stock Show
+
+$( deriveFromJSON
+     defaultOptions
+       { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
+       , sumEncoding = UntaggedValue
+       }
+     ''GYLayer1ProviderInfo
+ )
+
+data GYLayer2ProviderInfo
+  = GYHydraNodeKupo {l2piHydraHeadNodeUrl :: !Text, l2piHydraKupoUrl :: !Text, l2piLayer1ProviderInfo :: !GYLayer1ProviderInfo}
+  deriving stock Show
+
+$( deriveFromJSON
+     defaultOptions
+       { fieldLabelModifier = \fldName -> case drop 4 fldName of x : xs -> toLower x : xs; [] -> []
+       , sumEncoding = UntaggedValue
+       }
+     ''GYLayer2ProviderInfo
+ )
+
+-- TODO: Update this haddock? Or just share link to atlas docs.
+
 {- |
 The supported providers. The options are:
 
@@ -107,37 +141,30 @@ In JSON format, this essentially corresponds to:
 The constructor tags don't need to appear in the JSON.
 -}
 data GYCoreProviderInfo
-  = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text, cpiMempoolCache :: !(Maybe MempoolCacheSettings), cpiLocalTxSubmissionCache :: !(Maybe LocalTxSubmissionCacheSettings)}
-  | GYOgmiosKupo {cpiOgmiosUrl :: !Text, cpiKupoUrl :: !Text, cpiMempoolCache :: !(Maybe MempoolCacheSettings), cpiLocalTxSubmissionCache :: !(Maybe LocalTxSubmissionCacheSettings)}
-  | GYMaestro {cpiMaestroToken :: !(Confidential Text), cpiTurboSubmit :: !(Maybe Bool)}
-  | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
+  = GYCoreLayer1ProviderInfo GYLayer1ProviderInfo
+  | GYCoreLayer2ProviderInfo GYLayer2ProviderInfo
   deriving stock Show
 
-$( deriveFromJSON
-     defaultOptions
-       { fieldLabelModifier = \fldName -> case drop 3 fldName of x : xs -> toLower x : xs; [] -> []
-       , sumEncoding = UntaggedValue
-       }
-     ''GYCoreProviderInfo
- )
+instance FromJSON GYCoreProviderInfo where
+  parseJSON v = (GYCoreLayer1ProviderInfo <$> parseJSON v) <|> (GYCoreLayer2ProviderInfo <$> parseJSON v)
 
 coreProviderIO :: FilePath -> IO GYCoreProviderInfo
 coreProviderIO = readJSON
 
 isNodeKupo :: GYCoreProviderInfo -> Bool
-isNodeKupo GYNodeKupo {} = True
+isNodeKupo (GYCoreLayer1ProviderInfo GYNodeKupo {}) = True
 isNodeKupo _ = False
 
 isOgmiosKupo :: GYCoreProviderInfo -> Bool
-isOgmiosKupo GYOgmiosKupo {} = True
+isOgmiosKupo (GYCoreLayer1ProviderInfo GYOgmiosKupo {}) = True
 isOgmiosKupo _ = False
 
 isMaestro :: GYCoreProviderInfo -> Bool
-isMaestro GYMaestro {} = True
+isMaestro (GYCoreLayer1ProviderInfo GYMaestro {}) = True
 isMaestro _ = False
 
 isBlockfrost :: GYCoreProviderInfo -> Bool
-isBlockfrost GYBlockfrost {} = True
+isBlockfrost (GYCoreLayer1ProviderInfo GYBlockfrost {}) = True
 isBlockfrost _ = False
 
 findMaestroTokenAndNetId :: [GYCoreConfig] -> IO (Text, GYNetworkId)
@@ -148,7 +175,7 @@ findMaestroTokenAndNetId configs = do
     Just conf -> do
       let netId = cfgNetworkId conf
       case cfgCoreProvider conf of
-        GYMaestro (Confidential token) _ -> return (token, netId)
+        GYCoreLayer1ProviderInfo (GYMaestro (Confidential token) _) -> return (token, netId)
         _ -> throwIO $ userError "Missing Maestro Token"
 
 {- |
@@ -200,7 +227,62 @@ withCfgProviders
   f =
     do
       (gyGetParameters, gySlotActions', gyQueryUTxO', gyLookupDatum, gySubmitTx, gyAwaitTxConfirmed, gyGetStakeAddressInfo, gyGetGovState, gyGetDRepState, gyGetDRepsState, gyGetStakePools, gyGetConstitution, gyGetProposals, gyGetMempoolTxs) <- case cfgCoreProvider of
-        GYNodeKupo path kupoUrl mmempoolCache mlocalTxSubCache -> do
+        GYCoreLayer1ProviderInfo l1ProviderInfo -> resolveLayer1ProviderInfo l1ProviderInfo
+        GYCoreLayer2ProviderInfo (GYHydraNodeKupo headNodeUrl kupoUrl l1i) -> do
+          (l1gyGetParameters, l1gySlotActions, _l1gyQueryUTxO, _l1gyLookupDatum, _l1gySubmitTx, _l1gyAwaitTxConfirmed, l1gyGetStakeAddressInfo, l1gyGetGovState, l1gyGetDRepState, l1gyGetDRepsState, l1gyGetStakePools, l1gyGetConstitution, l1gyGetProposals, l1gyGetMempoolTxs) <- resolveLayer1ProviderInfo l1i
+          henv <- newHydraApiEnv $ Text.unpack headNodeUrl
+          kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
+          let queryUtxo = KupoApi.kupoQueryUtxo kEnv
+          pure
+            ( l1gyGetParameters {gyGetProtocolParameters' = Hydra.hydraProtocolParameters henv} -- Hack for now.
+            , l1gySlotActions
+            , queryUtxo
+            , KupoApi.kupoLookupDatum kEnv
+            , Hydra.hydraSubmitTx henv
+            , KupoApi.kupoAwaitTxConfirmed kEnv
+            , l1gyGetStakeAddressInfo
+            , l1gyGetGovState
+            , l1gyGetDRepState
+            , l1gyGetDRepsState
+            , l1gyGetStakePools
+            , l1gyGetConstitution
+            , l1gyGetProposals
+            , l1gyGetMempoolTxs
+            )
+
+      bracket (mkLogEnv ns cfgLogging) closeScribes $ \logEnv -> do
+        let gyLog' =
+              GYLogConfiguration
+                { cfgLogNamespace = mempty
+                , cfgLogContexts = mempty
+                , cfgLogDirector = Left logEnv
+                }
+        (gyQueryUTxO, gySlotActions) <-
+          {-if cfgUtxoCacheEnable
+          then do
+              (gyQueryUTxO, purgeCache) <- CachedQuery.makeCachedQueryUTxO gyQueryUTxO' gyLog'
+              -- waiting for the next block will purge the utxo cache.
+              let gySlotActions = gySlotActions' { gyWaitForNextBlock' = purgeCache >> gyWaitForNextBlock' gySlotActions'}
+              pure (gyQueryUTxO, gySlotActions, f)
+          else -} pure (gyQueryUTxO', gySlotActions')
+        let f' =
+              maybe
+                f
+                ( \case
+                    True -> f . logTiming
+                    False -> f
+                )
+                cfgLogTiming
+        e <- try $ f' GYProviders {..}
+        case e of
+          Right a -> pure a
+          Left (err :: SomeException) -> do
+            logRun gyLog' GYError ((printf "ERROR: %s" $ show err) :: String)
+            throwIO err
+   where
+    resolveLayer1ProviderInfo cfgCoreL1Provider = do
+      case cfgCoreL1Provider of
+        (GYNodeKupo path kupoUrl mmempoolCache mlocalTxSubCache) -> do
           let info = nodeConnectInfo path cfgNetworkId
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
           nodeSlotActions <- makeSlotActions slotCachingTime $ Node.nodeGetSlotOfCurrentBlock info
@@ -231,7 +313,7 @@ withCfgProviders
             , Node.nodeProposals info
             , Node.nodeMempoolTxs info
             )
-        GYOgmiosKupo ogmiosUrl kupoUrl mmempoolCache mlocalTxSubCache -> do
+        (GYOgmiosKupo ogmiosUrl kupoUrl mmempoolCache mlocalTxSubCache) -> do
           oEnv <- OgmiosApi.newOgmiosApiEnv $ Text.unpack ogmiosUrl
           kEnv <- KupoApi.newKupoApiEnv $ Text.unpack kupoUrl
           ogmiosSlotActions <- makeSlotActions slotCachingTime $ OgmiosApi.ogmiosGetSlotOfCurrentBlock oEnv
@@ -267,7 +349,7 @@ withCfgProviders
             , OgmiosApi.ogmiosProposals oEnv
             , OgmiosApi.ogmiosMempoolTxsWs oEnv
             )
-        GYMaestro (Confidential apiToken) turboSubmit -> do
+        (GYMaestro (Confidential apiToken) turboSubmit) -> do
           maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
           maestroSlotActions <- makeSlotActions slotCachingTime $ MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv
           maestroGetParams <-
@@ -292,7 +374,7 @@ withCfgProviders
             , MaestroApi.maestroProposals maestroApiEnv
             , MaestroApi.maestroMempoolTxs maestroApiEnv
             )
-        GYBlockfrost (Confidential key) -> do
+        (GYBlockfrost (Confidential key)) -> do
           let proj = Blockfrost.networkIdToProject cfgNetworkId key
           blockfrostSlotActions <- makeSlotActions slotCachingTime $ Blockfrost.blockfrostGetSlotOfCurrentBlock proj
           blockfrostGetParams <-
@@ -317,36 +399,6 @@ withCfgProviders
             , Blockfrost.blockfrostProposals proj
             , Blockfrost.blockfrostMempoolTxs proj
             )
-
-      bracket (mkLogEnv ns cfgLogging) closeScribes $ \logEnv -> do
-        let gyLog' =
-              GYLogConfiguration
-                { cfgLogNamespace = mempty
-                , cfgLogContexts = mempty
-                , cfgLogDirector = Left logEnv
-                }
-        (gyQueryUTxO, gySlotActions) <-
-          {-if cfgUtxoCacheEnable
-          then do
-              (gyQueryUTxO, purgeCache) <- CachedQuery.makeCachedQueryUTxO gyQueryUTxO' gyLog'
-              -- waiting for the next block will purge the utxo cache.
-              let gySlotActions = gySlotActions' { gyWaitForNextBlock' = purgeCache >> gyWaitForNextBlock' gySlotActions'}
-              pure (gyQueryUTxO, gySlotActions, f)
-          else -} pure (gyQueryUTxO', gySlotActions')
-        let f' =
-              maybe
-                f
-                ( \case
-                    True -> f . logTiming
-                    False -> f
-                )
-                cfgLogTiming
-        e <- try $ f' GYProviders {..}
-        case e of
-          Right a -> pure a
-          Left (err :: SomeException) -> do
-            logRun gyLog' GYError ((printf "ERROR: %s" $ show err) :: String)
-            throwIO err
 
 logTiming :: GYProviders -> GYProviders
 logTiming providers@GYProviders {..} =

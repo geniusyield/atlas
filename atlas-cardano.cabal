@@ -79,6 +79,7 @@ library
     GeniusYield.Providers.CachedQueryUTxOs
     GeniusYield.Providers.Common
     GeniusYield.Providers.GCP
+    GeniusYield.Providers.Hydra
     GeniusYield.Providers.Kupo
     GeniusYield.Providers.Maestro
     GeniusYield.Providers.Node
@@ -309,6 +310,7 @@ test-suite atlas-tests
     GeniusYield.Test.GYTxBody
     GeniusYield.Test.GYTxOutRefCbor
     GeniusYield.Test.GYTxSkeleton
+    GeniusYield.Test.Hydra
     GeniusYield.Test.Providers
     GeniusYield.Test.Providers.Mashup
     GeniusYield.Test.RefInput

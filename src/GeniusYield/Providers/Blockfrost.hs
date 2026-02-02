@@ -17,6 +17,7 @@ module GeniusYield.Providers.Blockfrost (
   blockfrostProposals,
   blockfrostMempoolTxs,
   networkIdToProject,
+  BlockfrostProviderException (..),
 ) where
 
 import Blockfrost.Client (unQuantity)

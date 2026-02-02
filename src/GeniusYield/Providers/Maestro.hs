@@ -27,6 +27,7 @@ module GeniusYield.Providers.Maestro (
   maestroConstitution,
   maestroProposals,
   maestroMempoolTxs,
+  MaestroProviderException (..),
 ) where
 
 import Cardano.Api qualified as Api

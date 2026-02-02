@@ -13,6 +13,7 @@ module GeniusYield.Providers.Kupo (
   kupoLookupScript,
   kupoQueryUtxo,
   kupoAwaitTxConfirmed,
+  KupoProviderException (..),
 ) where
 
 import Cardano.Api qualified as Api

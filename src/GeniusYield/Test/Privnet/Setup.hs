@@ -24,6 +24,7 @@ module GeniusYield.Test.Privnet.Setup (
 
 import Cardano.Api qualified as Api
 import Cardano.Api.Ledger
+import Cardano.Ledger.Alonzo.Genesis (AlonzoGenesis (agMaxTxExUnits, agPrices), agMaxBlockExUnits)
 import Cardano.Ledger.Conway.Governance qualified as Ledger
 import Cardano.Ledger.Plutus qualified as Ledger
 import Cardano.Testnet
@@ -43,6 +44,7 @@ import Control.Monad.Trans.Resource (
 import Data.Default (Default (..))
 import Data.Default.Class qualified as DefaultClass
 import Data.Map.Strict qualified as Map
+import Data.Ratio ((%))
 import Data.Text qualified as Txt
 import Data.Vector qualified as V
 import GeniusYield.Api.TestTokens qualified as GY.TestTokens
@@ -128,6 +130,28 @@ debug :: String -> IO ()
 -- debug = putStrLn
 debug _ = return ()
 
+customAlonzoGenesis :: H.MonadTest m => Api.ShelleyBasedEra era -> m AlonzoGenesis
+customAlonzoGenesis sbe = do
+  defaultGenesis <- getDefaultAlonzoGenesis sbe
+  let highExUnits =
+        Ledger.ExUnits
+          { Ledger.exUnitsMem = 14_000_000_000 -- 14 billion memory units
+          , Ledger.exUnitsSteps = 10_000_000_000_000 -- 10 trillion CPU steps
+          }
+  -- Set very low execution prices (essentially free)
+  -- Using tiny fractions like 1/10000000000 (or even 0 if the type allows)
+  let lowPrices =
+        Ledger.Prices
+          { Ledger.prSteps = Api.unsafeBoundedRational (1 % 10_000_000_000) -- ~0 lovelace per step
+          , Ledger.prMem = Api.unsafeBoundedRational (1 % 10_000_000_000) -- ~0 lovelace per memory unit
+          }
+  return
+    defaultGenesis
+      { agMaxTxExUnits = highExUnits
+      , agMaxBlockExUnits = highExUnits -- or even higher for block limits
+      , agPrices = lowPrices
+      }
+
 conwayGenesis :: ConwayGenesis -> CtxCommittee -> ConwayGenesis
 conwayGenesis cg ctxCommittee =
   let
@@ -210,13 +234,13 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
 
     -- Fork a thread to keep alive indefinitely any resources allocated by testnet.
     threadId <- H.evalM . liftResourceT . resourceForkIO . forever . liftIO $ threadDelay 10000000
-
+    customAlonzoGenesis' <- customAlonzoGenesis Api.ShelleyBasedEraConway
     TestnetRuntime
       { wallets
       , testnetNodes
       , testnetMagic
       } <-
-      cardanoTestnet' testnetOpts genesisOpts conf ctxCommittee
+      cardanoTestnet' testnetOpts genesisOpts conf customAlonzoGenesis' ctxCommittee
 
     liftIO . STM.atomically $
       STM.writeTMVar
@@ -371,13 +395,13 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
       setupUser setup
  where
   -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
-  cardanoTestnet' testnetOptions genesisOptions conf ctxCommittee = do
+  cardanoTestnet' testnetOptions genesisOptions conf customAlonzoGenesis' ctxCommittee = do
     -- -- FIXME: Instead of `DefaultedOrigin`, this should be `UserProvidedOrigin` but for now that is leading to issues, see https://github.com/IntersectMBO/cardano-node/issues/6130#issuecomment-2692010489. Issue at Atlas side: https://github.com/geniusyield/atlas/issues/415.
     cardanoTestnet
       testnetOptions
       genesisOptions
       NoUserProvidedData
-      NoUserProvidedData
+      (UserProvidedData customAlonzoGenesis')
       (UserProvidedData (conwayGenesis defaultConwayGenesis ctxCommittee))
       conf
 

@@ -193,4 +193,5 @@ isProviderSupported :: GYCoreConfig -> Bool
 isProviderSupported (cfgCoreProvider -> cp) = case cp of
   GYCoreLayer1ProviderInfo GYMaestro {} -> False
   GYCoreLayer1ProviderInfo GYBlockfrost {} -> False
+  GYCoreLayer1ProviderInfo GYBlockfrostCustom {} -> False
   _anyOther -> True

@@ -17,6 +17,7 @@ module GeniusYield.Providers.Blockfrost (
   blockfrostProposals,
   blockfrostMempoolTxs,
   networkIdToProject,
+  networkIdToProjectCustom,
   BlockfrostProviderException (..),
 ) where
 
@@ -141,7 +142,7 @@ blockfrostAwaitTxConfirmed proj p@GYAwaitTxParameters {..} txId = blpAwaitTx 0
   blpAwaitTx attempt = do
     eTxInfo <- blockfrostQueryTx proj txId
     case eTxInfo of
-      Left Blockfrost.BlockfrostNotFound ->
+      Left (Blockfrost.BlockfrostNotFound _) ->
         threadDelay checkInterval
           >> blpAwaitTx (attempt + 1)
       Left err -> throwBlpvApiError "AwaitTx" err
@@ -154,7 +155,7 @@ blockfrostAwaitTxConfirmed proj p@GYAwaitTxParameters {..} txId = blpAwaitTx 0
   blpAwaitBlock attempt blockHash = do
     eBlockInfo <- blockfrostQueryBlock proj blockHash
     case eBlockInfo of
-      Left Blockfrost.BlockfrostNotFound ->
+      Left (Blockfrost.BlockfrostNotFound _) ->
         threadDelay checkInterval
           >> blpAwaitBlock (attempt + 1) blockHash
       Left err -> throwBlpvApiError "AwaitBlock" err
@@ -257,7 +258,7 @@ blockfrostUtxosAtAddress proj addr mAssetClass = do
  where
   locationIdent = "AddressUtxos"
   -- This particular error is fine in this case, we can just return empty list.
-  handler (Left Blockfrost.BlockfrostNotFound) = pure []
+  handler (Left (Blockfrost.BlockfrostNotFound _)) = pure []
   handler other = handleBlockfrostError locationIdent other
 
 blockfrostUtxosWithAsset :: Blockfrost.Project -> GYNonAdaToken -> IO GYUTxOs
@@ -276,7 +277,7 @@ blockfrostUtxosWithAsset proj ac = do
   locationIdent = "UtxosWithAsset"
   addressFromBlockfrost addr = maybeToRight DeserializeErrorAddress $ addressFromTextMaybe $ Blockfrost.unAddress addr
   -- This particular error is fine in this case, we can just return empty list.
-  handler (Left Blockfrost.BlockfrostNotFound) = pure []
+  handler (Left (Blockfrost.BlockfrostNotFound _)) = pure []
   handler other = handleBlockfrostError locationIdent other
 
 blockfrostUtxosAtPaymentCredential :: Blockfrost.Project -> GYPaymentCredential -> Maybe GYAssetClass -> IO GYUTxOs
@@ -298,7 +299,7 @@ blockfrostUtxosAtPaymentCredential proj cred mAssetClass = do
  where
   locationIdent = "PaymentCredentialUtxos"
   -- This particular error is fine in this case, we can just return empty list.
-  handler (Left Blockfrost.BlockfrostNotFound) = pure []
+  handler (Left (Blockfrost.BlockfrostNotFound _)) = pure []
   handler other = handleBlockfrostError locationIdent other
 
 blockfrostUtxosAtTxOutRef :: Blockfrost.Project -> GYTxOutRef -> IO (Maybe GYUTxO)
@@ -346,7 +347,7 @@ blockfrostUtxosAtTxOutRef proj ref = do
             }
  where
   -- This particular error is fine in this case, we can just return 'Nothing'.
-  handler (Left Blockfrost.BlockfrostNotFound) = pure Nothing
+  handler (Left (Blockfrost.BlockfrostNotFound _)) = pure Nothing
   handler other = handleBlockfrostError locationIdent $ Just <$> other
   locationIdent = "TxUtxos(single)"
 
@@ -372,7 +373,7 @@ blockfrostUtxosAtTxOutRefs proj refs = do
           Blockfrost.getTxUtxos . Blockfrost.TxHash $
             Api.serialiseToRawBytesHexText txId
       case res of
-        Left Blockfrost.BlockfrostNotFound -> pure []
+        Left (Blockfrost.BlockfrostNotFound _) -> pure []
         Left err -> throwError err
         Right (Blockfrost._transactionUtxosOutputs -> outs) ->
           pure $
@@ -585,7 +586,7 @@ blockfrostLookupDatum p dh = do
     datumMaybe
  where
   -- This particular error is fine in this case, we can just return 'Nothing'.
-  handler (Left Blockfrost.BlockfrostNotFound) = pure Nothing
+  handler (Left (Blockfrost.BlockfrostNotFound _)) = pure Nothing
   handler other = handleBlockfrostError locationIdent $ Just <$> other
   locationIdent = "LookupDatum"
 
@@ -598,7 +599,7 @@ blockfrostStakeAddressInfo p saddr = do
   Blockfrost.runBlockfrost p (Blockfrost.getAccount (Blockfrost.mkAddress $ stakeAddressToText saddr)) >>= handler
  where
   -- This particular error is fine.
-  handler (Left Blockfrost.BlockfrostNotFound) = pure Nothing
+  handler (Left (Blockfrost.BlockfrostNotFound _)) = pure Nothing
   handler other =
     handleBlockfrostError "Account" $
       other <&> \accInfo ->
@@ -647,6 +648,20 @@ networkIdToProject ::
 networkIdToProject nid pid =
   Blockfrost.Project
     { projectEnv = networkIdToBlockfrost nid
+    , projectId = pid
+    }
+
+-- | Constructs a Blockfrost client with a custom URL.
+-- The custom URL should be the base URL for the Blockfrost instance (e.g., "https://custom.blockfrost.io")
+networkIdToProjectCustom ::
+  -- | The custom Blockfrost URL.
+  Text ->
+  -- | The Blockfrost project identifier (API key).
+  Text ->
+  Blockfrost.Project
+networkIdToProjectCustom url pid =
+  Blockfrost.Project
+    { projectEnv = Blockfrost.CustomURL (Text.unpack url)
     , projectId = pid
     }
 

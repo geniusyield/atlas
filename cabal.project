@@ -46,6 +46,14 @@ source-repository-package
 package postgresql-libpq
   flags: +use-pkg-config
 
+source-repository-package
+  type: git
+  location: https://github.com/blockfrost/blockfrost-haskell
+  tag: client-0.11.0.0
+  subdir: blockfrost-client
+          blockfrost-client-core
+          blockfrost-api
+
 -- Temporary until latest version is available on Hackage (or CHaP for that matter). Track https://github.com/IntersectMBO/cardano-addresses/issues/294.
 source-repository-package
   type: git

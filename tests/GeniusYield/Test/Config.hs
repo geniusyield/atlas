@@ -17,6 +17,7 @@ configTests =
     [ testCase "core-local" $ testParseResult isNodeKupo "core-local.json"
     , testCase "core-maestro" $ testParseResult isMaestro "core-maestro.json"
     , testCase "core-blockfrost" $ testParseResult isBlockfrost "core-blockfrost.json"
+    , testCase "core-blockfrost-custom" $ testParseResult isBlockfrost "core-blockfrost-custom.json"
     ]
 
 testParseResult :: (GYCoreProviderInfo -> Bool) -> FilePath -> IO ()

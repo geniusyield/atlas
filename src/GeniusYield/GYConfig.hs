@@ -131,6 +131,7 @@ The supported providers. The options are:
 - Ogmios node instance along with Kupo
 - Maestro blockchain API, provided its API token.
 - Blockfrost API, provided its API key.
+- Custom Blockfrost instance, provided its URL and optional API key.
 
 In JSON format, this essentially corresponds to:
 
@@ -138,6 +139,7 @@ In JSON format, this essentially corresponds to:
 | { ogmiosUrl: string, kupoUrl: string, mempoolCache: { cacheInterval: number }, localTxSubmissionCache: { cacheInterval: number } }
 | { maestroToken: string, turboSubmit: boolean }
 | { blockfrostKey: string }
+| { blockfrostUrl: string, maybeBlockfrostKey: string? }
 
 The constructor tags don't need to appear in the JSON.
 -}

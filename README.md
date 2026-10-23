@@ -58,7 +58,7 @@ Use an intuitive API to abstract away the complexity around building transaction
 Avoid code duplication between on-chain and off-chain code, interoperate with advanced functionalities offered by IOG's Cardano/Plutus libraries, and easily convert between Atlas and Cardano/Plutus types.
 
 ### Utilize modular data providers
-Query ledger state information from [Maestro](https://www.gomaestro.org/dapp-platform), a local node or [Cardano DB Sync](https://github.com/input-output-hk/cardano-db-sync). You can also build and contribute your own data provider!
+Query ledger state information from [Blockfrost](https://blockfrost.io/), a local node with [Kupo](https://cardanosolutions.github.io/kupo/), or [Ogmios](https://ogmios.dev/). You can also build and contribute your own data provider!
 
 ### Test extensively
 Use Atlas' test harness to write realistic [unit tests](https://atlas-app.io/getting-started/unit-tests) that correspond to on-chain behavior, and execute [integration tests](https://atlas-app.io/getting-started/integration-tests) against cardano node in a private network.
@@ -80,7 +80,6 @@ Atlas has been made possible through support and expertise from:
 | [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/mlabs.svg" width="140" />](https://mlabs.city/)         | [MLabs](https://mlabs.city/)           |
 | [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/well-typed.svg" width="140" />](https://well-typed.com/)| [Well-Typed](https://well-typed.com/)  |
 | [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/plank.svg" width="140" />](https://www.joinplank.com/)  | [Plank](https://www.joinplank.com/)    |
-| [<img src="https://storage.googleapis.com/geniusyield-atlas/logos/maestro.svg" width="140" />](https://www.gomaestro.org/)| [Maestro](https://www.gomaestro.org/)  |
 
 
 ## License

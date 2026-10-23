@@ -1,6 +1,3 @@
--- IOG didn't use ExplicitNamespaces to deprecate only pattern synonyms
-{-# OPTIONS_GHC -Wno-deprecations #-}
-
 {- |
 Module      : GeniusYield.Providers.LiteChainIndex
 Description : Lite-chain index. In memory chain index. Used in tests
@@ -24,10 +21,11 @@ import GeniusYield.Imports
 import GeniusYield.Types
 
 import Cardano.Api qualified as Api
-import Cardano.Api.ChainSync.Client qualified as Api.Sync
+import Cardano.Api.Block qualified as Api.Block
 import Control.Concurrent.Async qualified as Async
 import Control.Concurrent.STM qualified as STM
 import Data.Map.Strict qualified as Map
+import Ouroboros.Network.Protocol.ChainSync.Client qualified as ChainSync
 
 -- | A very simple chain index client, which only maintains a datum hashes.
 data LCIClient
@@ -161,30 +159,30 @@ newChainSync info resumePoints callback =
 chainSyncClient ::
   [Api.ChainPoint] ->
   ChainSyncCallback ->
-  Api.ChainSyncClient Api.BlockInMode Api.ChainPoint Api.ChainTip IO ()
+  ChainSync.ChainSyncClient Api.BlockInMode Api.ChainPoint Api.ChainTip IO ()
 chainSyncClient [] cb = chainSyncClient [Api.ChainPointAtGenesis] cb
 chainSyncClient resumePoints cb =
-  Api.ChainSyncClient $ pure initialise
+  ChainSync.ChainSyncClient $ pure initialise
  where
   initialise =
-    Api.Sync.SendMsgFindIntersect resumePoints $
-      Api.Sync.ClientStIntersect
-        { Api.Sync.recvMsgIntersectFound = \point _tip -> Api.ChainSyncClient $ do
+    ChainSync.SendMsgFindIntersect resumePoints $
+      ChainSync.ClientStIntersect
+        { ChainSync.recvMsgIntersectFound = \point _tip -> ChainSync.ChainSyncClient $ do
             cb (Resume point)
             pure requestNext
-        , Api.Sync.recvMsgIntersectNotFound = \_tip ->
-            Api.ChainSyncClient $ pure requestNext
+        , ChainSync.recvMsgIntersectNotFound = \_tip ->
+            ChainSync.ChainSyncClient $ pure requestNext
         }
 
-  requestNext :: Api.Sync.ClientStIdle Api.BlockInMode Api.ChainPoint Api.ChainTip IO ()
-  requestNext = Api.Sync.SendMsgRequestNext (pure ()) handleNext
+  requestNext :: ChainSync.ClientStIdle Api.BlockInMode Api.ChainPoint Api.ChainTip IO ()
+  requestNext = ChainSync.SendMsgRequestNext (pure ()) handleNext
 
   handleNext =
-    Api.Sync.ClientStNext
-      { Api.Sync.recvMsgRollForward = \block tip -> Api.ChainSyncClient $ do
+    ChainSync.ClientStNext
+      { ChainSync.recvMsgRollForward = \block tip -> ChainSync.ChainSyncClient $ do
           cb (RollForward block tip)
           pure requestNext
-      , Api.Sync.recvMsgRollBackward = \point tip -> Api.ChainSyncClient $ do
+      , ChainSync.recvMsgRollBackward = \point tip -> ChainSync.ChainSyncClient $ do
           cb (RollBackward point tip)
           pure requestNext
       }
@@ -194,13 +192,10 @@ chainSyncClient resumePoints cb =
 -------------------------------------------------------------------------------
 
 blockDatums :: Api.BlockInMode -> [Api.HashableScriptData]
-blockDatums (Api.BlockInMode _ block) = goBlock block
+blockDatums (Api.BlockInMode _ block) = concatMap goTx $ Api.Block.getBlockTxs block
  where
-  goBlock :: Api.Block era -> [Api.HashableScriptData]
-  goBlock (Api.Block _header txs) = concatMap goTx txs
-
   goTx :: Api.Tx era -> [Api.HashableScriptData]
-  goTx (Api.Tx (Api.TxBody body) _witnesses) = goTxBody body
+  goTx tx = goTxBody $ Api.getTxBodyContent $ Api.getTxBody tx
 
   goTxBody :: Api.TxBodyContent Api.ViewTx era -> [Api.HashableScriptData]
   goTxBody body = concatMap goTxOut (Api.txOuts body)

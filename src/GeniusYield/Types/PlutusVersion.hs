@@ -19,7 +19,7 @@ module GeniusYield.Types.PlutusVersion (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Api qualified as Api.S
 import Data.GADT.Compare
 import GeniusYield.Imports
 
@@ -80,7 +80,6 @@ type family CmpPlutusVersion (v :: PlutusVersion) (u :: PlutusVersion) :: Orderi
   CmpPlutusVersion 'PlutusV3 'PlutusV1 = 'GT
   CmpPlutusVersion 'PlutusV3 'PlutusV2 = 'GT
   CmpPlutusVersion 'PlutusV3 'PlutusV3 = 'EQ
-  CmpPlutusVersion v v = 'EQ
 
 type family GreaterOrEqual (v :: Ordering) :: Bool where
   GreaterOrEqual 'GT = 'True

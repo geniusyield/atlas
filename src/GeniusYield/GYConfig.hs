@@ -16,10 +16,8 @@ module GeniusYield.GYConfig (
   withCfgProviders,
   coreConfigIO,
   coreProviderIO,
-  findMaestroTokenAndNetId,
   isNodeKupo,
   isOgmiosKupo,
-  isMaestro,
   isBlockfrost,
 ) where
 
@@ -50,7 +48,6 @@ import GeniusYield.Providers.CacheMempool (augmentQueryUTxOWithMempool)
 import GeniusYield.Providers.Hydra
 import GeniusYield.Providers.Hydra qualified as Hydra
 import GeniusYield.Providers.Kupo qualified as KupoApi
-import GeniusYield.Providers.Maestro qualified as MaestroApi
 import GeniusYield.Providers.Node (nodeGetDRepState, nodeGetDRepsState, nodeGetGovState, nodeStakeAddressInfo)
 import GeniusYield.Providers.Node qualified as Node
 import GeniusYield.Providers.Ogmios qualified as OgmiosApi
@@ -97,7 +94,6 @@ $( deriveFromJSON
 data GYLayer1ProviderInfo
   = GYNodeKupo {cpiSocketPath :: !FilePath, cpiKupoUrl :: !Text, cpiMempoolCache :: !(Maybe MempoolCacheSettings), cpiLocalTxSubmissionCache :: !(Maybe LocalTxSubmissionCacheSettings)}
   | GYOgmiosKupo {cpiOgmiosUrl :: !Text, cpiKupoUrl :: !Text, cpiMempoolCache :: !(Maybe MempoolCacheSettings), cpiLocalTxSubmissionCache :: !(Maybe LocalTxSubmissionCacheSettings)}
-  | GYMaestro {cpiMaestroToken :: !(Confidential Text), cpiTurboSubmit :: !(Maybe Bool)}
   | GYBlockfrost {cpiBlockfrostKey :: !(Confidential Text)}
   deriving stock Show
 
@@ -128,14 +124,12 @@ The supported providers. The options are:
 
 - Local node.socket along with Kupo
 - Ogmios node instance along with Kupo
-- Maestro blockchain API, provided its API token.
 - Blockfrost API, provided its API key.
 
 In JSON format, this essentially corresponds to:
 
 = { socketPath: FilePath, kupoUrl: string, mempoolCache: { cacheInterval: number }, localTxSubmissionCache: { cacheInterval: number } }
 | { ogmiosUrl: string, kupoUrl: string, mempoolCache: { cacheInterval: number }, localTxSubmissionCache: { cacheInterval: number } }
-| { maestroToken: string, turboSubmit: boolean }
 | { blockfrostKey: string }
 
 The constructor tags don't need to appear in the JSON.
@@ -159,24 +153,9 @@ isOgmiosKupo :: GYCoreProviderInfo -> Bool
 isOgmiosKupo (GYCoreLayer1ProviderInfo GYOgmiosKupo {}) = True
 isOgmiosKupo _ = False
 
-isMaestro :: GYCoreProviderInfo -> Bool
-isMaestro (GYCoreLayer1ProviderInfo GYMaestro {}) = True
-isMaestro _ = False
-
 isBlockfrost :: GYCoreProviderInfo -> Bool
 isBlockfrost (GYCoreLayer1ProviderInfo GYBlockfrost {}) = True
 isBlockfrost _ = False
-
-findMaestroTokenAndNetId :: [GYCoreConfig] -> IO (Text, GYNetworkId)
-findMaestroTokenAndNetId configs = do
-  let config = find (isMaestro . cfgCoreProvider) configs
-  case config of
-    Nothing -> throwIO $ userError "Missing Maestro Configuration"
-    Just conf -> do
-      let netId = cfgNetworkId conf
-      case cfgCoreProvider conf of
-        GYCoreLayer1ProviderInfo (GYMaestro (Confidential token) _) -> return (token, netId)
-        _ -> throwIO $ userError "Missing Maestro Token"
 
 {- |
 The config to initialize the GY framework with.
@@ -348,31 +327,6 @@ withCfgProviders
             , OgmiosApi.ogmiosConstitution oEnv
             , OgmiosApi.ogmiosProposals oEnv
             , OgmiosApi.ogmiosMempoolTxsWs oEnv
-            )
-        (GYMaestro (Confidential apiToken) turboSubmit) -> do
-          maestroApiEnv <- MaestroApi.networkIdToMaestroEnv apiToken cfgNetworkId
-          maestroSlotActions <- makeSlotActions slotCachingTime $ MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv
-          maestroGetParams <-
-            makeGetParameters
-              (MaestroApi.maestroProtocolParams maestroApiEnv)
-              (MaestroApi.maestroSystemStart maestroApiEnv)
-              (MaestroApi.maestroEraHistory maestroApiEnv)
-              (MaestroApi.maestroGetSlotOfCurrentBlock maestroApiEnv)
-          pure
-            ( maestroGetParams
-            , maestroSlotActions
-            , MaestroApi.maestroQueryUtxo maestroApiEnv
-            , MaestroApi.maestroLookupDatum maestroApiEnv
-            , MaestroApi.maestroSubmitTx (Just True == turboSubmit) maestroApiEnv
-            , MaestroApi.maestroAwaitTxConfirmed maestroApiEnv
-            , MaestroApi.maestroStakeAddressInfo maestroApiEnv
-            , MaestroApi.maestroGovState maestroApiEnv
-            , MaestroApi.maestroDRepState maestroApiEnv
-            , MaestroApi.maestroDRepsState maestroApiEnv
-            , MaestroApi.maestroStakePools maestroApiEnv
-            , MaestroApi.maestroConstitution maestroApiEnv
-            , MaestroApi.maestroProposals maestroApiEnv
-            , MaestroApi.maestroMempoolTxs maestroApiEnv
             )
         (GYBlockfrost (Confidential key)) -> do
           let proj = Blockfrost.networkIdToProject cfgNetworkId key

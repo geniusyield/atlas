@@ -37,7 +37,7 @@ oracle = w8 -- A user that is going to reveal the answer
 holder = w9 -- A user to store the reference script
 
 betUntilDelta :: Integer
-betUntilDelta = 300
+betUntilDelta = 400
 betRevealDelta :: Integer
 betRevealDelta = 300
 

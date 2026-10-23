@@ -246,8 +246,8 @@ valueFromApiTxOutValue (Api.TxOutValueShelleyBased e v) =
 valueToApiTxOutValue :: GYValue -> Api.TxOutValue ApiEra
 valueToApiTxOutValue v =
   Api.TxOutValueShelleyBased
-    Api.ShelleyBasedEraConway
-    (Api.toLedgerValue Api.MaryEraOnwardsConway $ valueToApi v)
+    apiSBE
+    (Api.toLedgerValue apiMaryEraOnwards $ valueToApi v)
 
 {- | Create 'GYValue' from a list of asset class and amount.
 Duplicates are merged.
@@ -755,7 +755,7 @@ parseAssetClassCore' msep tkParser t = Atto.parseOnly parser (TE.encodeUtf8 t)
   parser :: Atto.Parser GYAssetClass
   parser = do
     cs <- Atto.take 56
-    case Api.deserialiseFromRawBytesHex Api.AsPolicyId cs of
+    case Api.deserialiseFromRawBytesHex cs of
       Left x -> fail $ "Invalid currency symbol: " ++ show cs ++ "; Reason: " ++ show x
       Right cs' -> do
         for_ msep (void . Atto.char)
@@ -883,7 +883,7 @@ tokenNameToPlutus :: GYTokenName -> Plutus.TokenName
 tokenNameToPlutus (GYTokenName bs) = Plutus.TokenName (toBuiltin bs)
 
 -- | Convert Plutus 'Plutus.TokenName' to 'GYTokenName'.
-tokenNameFromPlutus :: HasCallStack => Plutus.TokenName -> Maybe GYTokenName
+tokenNameFromPlutus :: Plutus.TokenName -> Maybe GYTokenName
 tokenNameFromPlutus (Plutus.TokenName bbs) = tokenNameFromBS (fromBuiltin bbs)
 
 tokenNameFromBS :: BS.ByteString -> Maybe GYTokenName

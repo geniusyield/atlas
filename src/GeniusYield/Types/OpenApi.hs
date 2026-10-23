@@ -1,3 +1,4 @@
+{-# LANGUAGE PackageImports #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module GeniusYield.Types.OpenApi where
@@ -10,6 +11,8 @@ import Data.OpenApi.Declare qualified as OpenApi
 import Data.Swagger qualified as Swagger
 import Data.Swagger.Declare qualified as Swagger
 import Data.Swagger.Internal qualified as Swagger
+import "openapi3" Data.HashMap.Strict.InsOrd.Compat qualified as OpenApiMap
+import "swagger2" Data.HashMap.Strict.InsOrd.Compat qualified as SwaggerMap
 
 -- | Lift a @Swagger.Schema@ to an @OpenApi.Schema@.
 liftSwaggerSchema :: Swagger.Schema -> OpenApi.Schema
@@ -19,7 +22,7 @@ liftSwaggerSchema swaggerSchema =
     & OpenApi.description .~ swaggerSchema ^. Swagger.description
     & OpenApi.required .~ swaggerSchema ^. Swagger.required
     & OpenApi.allOf .~ (fmap convertSwaggerReferencedSchema <$> swaggerSchema ^. Swagger.allOf)
-    & OpenApi.properties .~ (convertSwaggerReferencedSchema <$> swaggerSchema ^. Swagger.properties)
+    & OpenApi.properties .~ convertSwaggerProperties (swaggerSchema ^. Swagger.properties)
     & OpenApi.additionalProperties .~ (convertSwaggerAdditionalProperties <$> swaggerSchema ^. Swagger.additionalProperties)
     & OpenApi.readOnly .~ swaggerSchema ^. Swagger.readOnly
     & OpenApi.example .~ swaggerSchema ^. Swagger.example
@@ -52,6 +55,11 @@ liftSwaggerSchema swaggerSchema =
   convertSwaggerReferencedSchema (Swagger.Inline s) = OpenApi.Inline (liftSwaggerSchema s)
   convertSwaggerReferencedSchema (Swagger.Ref r) = OpenApi.Ref (convertSwaggerRef r)
 
+  convertSwaggerProperties :: Swagger.Definitions (Swagger.Referenced Swagger.Schema) -> OpenApi.Definitions (OpenApi.Referenced OpenApi.Schema)
+  convertSwaggerProperties =
+    convertSwaggerMap
+      . fmap convertSwaggerReferencedSchema
+
   convertSwaggerRef :: Swagger.Reference -> OpenApi.Reference
   convertSwaggerRef (Swagger.Reference ref) = OpenApi.Reference ref
 
@@ -77,11 +85,19 @@ liftSwaggerDec :: Swagger.Declare (Swagger.Definitions Swagger.Schema) Swagger.N
 liftSwaggerDec swaggerDeclare =
   let (swaggerSchemas, swaggerNamedSchema) = Swagger.runDeclare swaggerDeclare mempty
       openApiNamedSchema = convertNamedSchema swaggerNamedSchema
-      openApiSchemas = liftSwaggerSchema <$> swaggerSchemas
+      openApiSchemas = convertSwaggerDefinitions swaggerSchemas
    in OpenApi.DeclareT $ \_ -> pure (openApiSchemas, openApiNamedSchema)
+
+convertSwaggerDefinitions :: Swagger.Definitions Swagger.Schema -> OpenApi.Definitions OpenApi.Schema
+convertSwaggerDefinitions =
+  convertSwaggerMap
+    . fmap liftSwaggerSchema
+
+convertSwaggerMap :: Swagger.Definitions v -> OpenApi.Definitions v
+convertSwaggerMap = OpenApiMap.fromList . SwaggerMap.toList
 
 instance {-# OVERLAPPABLE #-} (Swagger.ToSchema a, Typeable a) => OpenApi.ToSchema a where
   declareNamedSchema p = liftSwaggerDec (Swagger.declareNamedSchema p)
 
-instance {-# OVERLAPPABLE #-} (Swagger.ToParamSchema a, Swagger.ToSchema a) => OpenApi.ToParamSchema a where
+instance {-# OVERLAPPABLE #-} Swagger.ToSchema a => OpenApi.ToParamSchema a where
   toParamSchema p = liftSwaggerSchema $ Swagger.toSchema p

@@ -17,15 +17,13 @@ module GeniusYield.Test.Privnet.Setup (
   -- * "Cardano.Testnet" re-exports
   cardanoDefaultTestnetOptionsConway,
   cardanoDefaultTestnetNodeOptions,
-  CardanoTestnetOptions (..),
-  TestnetNodeOptions (..),
+  TestnetCreationOptions (..),
+  TestnetRuntimeOptions (..),
+  NodeOption (..),
   NodeLoggingFormat (..),
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Ledger
-import Cardano.Ledger.Conway.Governance qualified as Ledger
-import Cardano.Ledger.Plutus qualified as Ledger
 import Cardano.Testnet
 import Control.Concurrent (
   ThreadId,
@@ -41,7 +39,6 @@ import Control.Monad.Trans.Resource (
   resourceForkIO,
  )
 import Data.Default (Default (..))
-import Data.Default.Class qualified as DefaultClass
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Txt
 import Data.Vector qualified as V
@@ -58,12 +55,11 @@ import GeniusYield.TxBuilder
 import GeniusYield.Types
 import Hedgehog qualified as H
 import Hedgehog.Extras.Stock qualified as H'
-import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational, (%!))
+import Test.Cardano.Ledger.Core.Rational (unsafeBoundRational)
 import Test.Tasty (TestName, TestTree)
 import Test.Tasty.HUnit (testCaseSteps)
-import Testnet.Defaults (defaultConwayGenesis)
 import Testnet.Property.Util
-import Testnet.Start.Types (GenesisOptions (..), UserProvidedData (NoUserProvidedData, UserProvidedData))
+import Testnet.Start.Types (GenesisOptions (..))
 import Testnet.Types hiding (shelleyGenesis)
 
 -------------------------------------------------------------------------------
@@ -78,8 +74,14 @@ The first argument is the log severity filter. Only logs of this severity or hig
 -}
 newtype Setup = Setup (GYLogSeverity -> (String -> IO ()) -> (Ctx -> IO ()) -> IO ())
 
-cardanoDefaultTestnetOptionsConway :: (CardanoTestnetOptions, GenesisOptions)
-cardanoDefaultTestnetOptionsConway = (def {cardanoNodeEra = Api.AnyShelleyBasedEra Api.ShelleyBasedEraConway}, def {genesisEpochLength = 2000})
+cardanoDefaultTestnetOptionsConway :: (TestnetCreationOptions, TestnetRuntimeOptions)
+cardanoDefaultTestnetOptionsConway =
+  ( def
+      { creationEra = apiAnyShelleyBasedEra
+      , creationGenesisOptions = def {genesisEpochLength = 2000}
+      }
+  , def
+  )
 data PrivnetRuntime = PrivnetRuntime
   { runtimeNodeSocket :: !FilePath
   , runtimeNetworkInfo :: !GYNetworkInfo
@@ -128,70 +130,19 @@ debug :: String -> IO ()
 -- debug = putStrLn
 debug _ = return ()
 
-conwayGenesis :: ConwayGenesis -> CtxCommittee -> ConwayGenesis
-conwayGenesis cg ctxCommittee =
-  let
-    upPParams :: UpgradeConwayPParams Identity
-    upPParams =
-      UpgradeConwayPParams
-        { ucppPoolVotingThresholds = poolVotingThresholds
-        , ucppDRepVotingThresholds = drepVotingThresholds
-        , ucppCommitteeMinSize = 0
-        , ucppCommitteeMaxTermLength = EpochInterval 200
-        , ucppGovActionLifetime = EpochInterval 1 -- One Epoch
-        , ucppGovActionDeposit = Coin 1_000_000
-        , ucppDRepDeposit = Coin 500_000_000
-        , ucppDRepActivity = EpochInterval 100
-        , ucppMinFeeRefScriptCostPerByte = 15 %! 1
-        , ucppPlutusV3CostModel = either (error "Couldn't build PlutusV3 cost models") id $ Ledger.mkCostModel Ledger.PlutusV3 [100788, 420, 1, 1, 1000, 173, 0, 1, 1000, 59957, 4, 1, 11183, 32, 201305, 8356, 4, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 100, 100, 16000, 100, 94375, 32, 132994, 32, 61462, 4, 72010, 178, 0, 1, 22151, 32, 91189, 769, 4, 2, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1, 1000, 42921, 4, 2, 24548, 29498, 38, 1, 898148, 27279, 1, 51775, 558, 1, 39184, 1000, 60594, 1, 141895, 32, 83150, 32, 15299, 32, 76049, 1, 13169, 4, 22100, 10, 28999, 74, 1, 28999, 74, 1, 43285, 552, 1, 44749, 541, 1, 33852, 32, 68246, 32, 72362, 32, 7243, 32, 7391, 32, 11546, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 90434, 519, 0, 1, 74433, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 955506, 213312, 0, 2, 270652, 22588, 4, 1457325, 64566, 4, 20467, 1, 4, 0, 141992, 32, 100788, 420, 1, 1, 81663, 32, 59498, 32, 20142, 32, 24588, 32, 20744, 32, 25933, 32, 24623, 32, 43053543, 10, 53384111, 14333, 10, 43574283, 26308, 10, 16000, 100, 16000, 100, 962335, 18, 2780678, 6, 442008, 1, 52538055, 3756, 18, 267929, 18, 76433006, 8868, 18, 52948122, 18, 1995836, 36, 3227919, 12, 901022, 1, 166917843, 4307, 36, 284546, 36, 158221314, 26549, 36, 74698472, 36, 333849714, 1, 254006273, 72, 2174038, 72, 2261318, 64571, 4, 207616, 8310, 4, 1293828, 28716, 63, 0, 1, 1006041, 43623, 251, 0, 1]
-        }
-    drepVotingThresholds =
-      DRepVotingThresholds
-        { dvtMotionNoConfidence = 67 %! 100
-        , dvtCommitteeNormal = 67 %! 100
-        , dvtCommitteeNoConfidence = 6 %! 10
-        , dvtUpdateToConstitution = 75 %! 100
-        , dvtHardForkInitiation = 6 %! 10
-        , dvtPPNetworkGroup = 67 %! 100
-        , dvtPPEconomicGroup = 67 %! 100
-        , dvtPPTechnicalGroup = 67 %! 100
-        , dvtPPGovGroup = 75 %! 100
-        , dvtTreasuryWithdrawal = 67 %! 100
-        }
-    poolVotingThresholds =
-      PoolVotingThresholds
-        { pvtMotionNoConfidence = commonPoolVotingThreshold
-        , pvtCommitteeNormal = commonPoolVotingThreshold
-        , pvtCommitteeNoConfidence = commonPoolVotingThreshold
-        , pvtHardForkInitiation = commonPoolVotingThreshold
-        , pvtPPSecurityGroup = commonPoolVotingThreshold
-        }
-    commonPoolVotingThreshold = 51 %! 100
-   in
-    cg
-      { cgUpgradePParams = upPParams
-      , cgConstitution = DefaultClass.def
-      , cgCommittee =
-          Ledger.Committee
-            { Ledger.committeeMembers = Map.map epochNoToLedger $ Map.mapKeys (\sk -> let vkh = verificationKeyHash $ getVerificationKey sk in credentialToLedger $ GYCredentialByKey vkh) $ ctxCommitteeMembers ctxCommittee
-            , Ledger.committeeThreshold = ctxCommitteeThreshold ctxCommittee
-            }
-      , cgDelegs = mempty
-      , cgInitialDReps = mempty
-      }
-
 {- | Spawn a resource managed privnet and do things with it (closing it in the end).
 
-Privnet can be configured using "Cardano.Testnet.CardanoTestnetOptions". Pass 'cardanoDefaultTestnetOptionsConway'
+Privnet can be configured using "Cardano.Testnet.TestnetCreationOptions" and "Cardano.Testnet.TestnetRuntimeOptions".
+Pass 'cardanoDefaultTestnetOptionsConway'
 for default configuration.
 
-Note that passed @CardanoTestnetOptions@ must imply Conway era.
+Note that passed @TestnetCreationOptions@ must imply Conway era.
 
 Returns continuation on `Setup`, which is essentially a function that performs an action
 given a logging -- function and the action itself (which receives the Privnet Ctx).
 -}
-withPrivnet :: (CardanoTestnetOptions, GenesisOptions) -> (Setup -> IO ()) -> IO ()
-withPrivnet (testnetOpts, genesisOpts) setupUser = do
+withPrivnet :: (TestnetCreationOptions, TestnetRuntimeOptions) -> (Setup -> IO ()) -> IO ()
+withPrivnet (creationOpts, runtimeOpts) setupUser = do
   coldCommitteeMembers :: [GYSigningKey 'GYKeyRoleColdCommittee] <- replicateM 3 generateSigningKey
   let ctxCommittee :: CtxCommittee
       ctxCommittee =
@@ -216,7 +167,7 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
       , testnetNodes
       , testnetMagic
       } <-
-      cardanoTestnet' testnetOpts genesisOpts conf ctxCommittee
+      createAndRunTestnet creationOpts runtimeOpts conf
 
     liftIO . STM.atomically $
       STM.writeTMVar
@@ -231,7 +182,7 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
                 $ head testnetNodes
           , runtimeNetworkInfo =
               GYNetworkInfo
-                { gyNetworkEpochSlots = fromIntegral $ genesisEpochLength genesisOpts
+                { gyNetworkEpochSlots = fromIntegral . genesisEpochLength . creationGenesisOptions $ creationOpts
                 , gyNetworkMagic = fromIntegral testnetMagic
                 }
           , runtimeWallets = wallets
@@ -369,17 +320,6 @@ withPrivnet (testnetOpts, genesisOpts) setupUser = do
 
       let setup = Setup $ \targetSev putLog kont -> kont $ ctx {ctxLog = simpleLogging targetSev (putLog . Txt.unpack)}
       setupUser setup
- where
-  -- \| This is defined same as `cardanoTestnetDefault` except we use our own conway genesis parameters.
-  cardanoTestnet' testnetOptions genesisOptions conf ctxCommittee = do
-    -- -- FIXME: Instead of `DefaultedOrigin`, this should be `UserProvidedOrigin` but for now that is leading to issues, see https://github.com/IntersectMBO/cardano-node/issues/6130#issuecomment-2692010489. Issue at Atlas side: https://github.com/geniusyield/atlas/issues/415.
-    cardanoTestnet
-      testnetOptions
-      genesisOptions
-      NoUserProvidedData
-      NoUserProvidedData
-      (UserProvidedData (conwayGenesis defaultConwayGenesis ctxCommittee))
-      conf
 
 -------------------------------------------------------------------------------
 -- Generating users
@@ -399,7 +339,7 @@ generateUser network = do
       addr =
         addressFromApi' $
           Api.AddressInEra
-            (Api.ShelleyAddressInEra Api.ShelleyBasedEraConway)
+            (Api.ShelleyAddressInEra apiSBE)
             ( Api.makeShelleyAddress
                 (networkIdToApi network)
                 (Api.PaymentCredentialByKey vkeyHash)

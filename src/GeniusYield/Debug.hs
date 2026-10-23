@@ -19,7 +19,7 @@ Utils to use with ghci to run Atlas' operations from repl.
 Based on https://stackoverflow.com/questions/42425939/how-can-i-use-repl-with-cps-function
 
 ghci> :m + GeniusYield.Debug GeniusYield.Types.UTxO GeniusYield.Types.Address GeniusYield.TxBuilder
-ghci> cfg <- coreConfigIO "maestro-config.json"
+ghci> cfg <- coreConfigIO "blockfrost-config.json"
 ghci> (providers, ctrl) <- startDebugCps @_ @() $ testCps cfg
 ghci> eval = eval' GYTestnetPreview providers
 ghci> take 1 . utxosToList <$> eval (utxosAtAddresses [unsafeAddressFromText "addr_test1wqtcz4vq80zxr3dskdcuw7wtfq0vwssd7rrpnnvcvrjhp5sx7leew"] )

@@ -23,14 +23,14 @@ import Cardano.Slotting.Time (SystemStart)
 import PlutusLedgerApi.V1.Value qualified as Plutus (Value)
 
 import Cardano.Api qualified as Api
+import Cardano.Api.Experimental.Certificate qualified as Api.Cert
 import Cardano.Api.Ledger qualified as Ledger
-import Cardano.Ledger.Conway qualified as Ledger
 import GeniusYield.HTTP.Errors
 import GeniusYield.Imports
 import GeniusYield.Transaction.Common
 import GeniusYield.Types.Address (GYAddress)
 import GeniusYield.Types.Datum (GYDatum, GYDatumHash)
-import GeniusYield.Types.Era (ApiEra)
+import GeniusYield.Types.Era (ApiEra, ApiLedgerEra)
 import GeniusYield.Types.Ledger (PlutusToCardanoError (..))
 import GeniusYield.Types.Script.ScriptHash (GYScriptHash)
 import GeniusYield.Types.Slot (GYSlot)
@@ -88,9 +88,9 @@ data GYObtainTxBodyContentError
   = -- | No script found for given hash.
     GYNoScriptForHash !GYScriptHash
   | -- | No redeemer found for given purpose.
-    GYNoRedeemerForPurpose !(Ledger.ConwayPlutusPurpose Ledger.AsIx Ledger.ConwayEra)
+    GYNoRedeemerForPurpose !(Ledger.ConwayPlutusPurpose Ledger.AsIx ApiLedgerEra)
   | -- | 'GYCertificate' can't be obtained from given api certificate.
-    GYInvalidCertificate !(Api.Certificate ApiEra)
+    GYInvalidCertificate !(Api.Cert.Certificate (Api.ShelleyLedgerEra ApiEra))
   deriving stock Show
 
 {- | Exceptions raised within the 'GeniusYield.TxBuilder.Class.GYTxMonad' computation.

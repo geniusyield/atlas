@@ -19,7 +19,6 @@ module GeniusYield.Types.Redeemer (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api
 import GeniusYield.Imports ((>>>))
 import PlutusLedgerApi.V1 qualified as PlutusV1
 import PlutusTx qualified

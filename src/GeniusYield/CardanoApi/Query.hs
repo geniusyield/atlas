@@ -21,7 +21,7 @@ import Control.Exception (
  )
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Api qualified as Api.S
 import Ouroboros.Network.Protocol.LocalStateQuery.Type qualified as Ouroboros
 
 import GeniusYield.Types
@@ -47,7 +47,7 @@ queryCardanoMode info q = do
 
 queryConwayEra :: Api.LocalNodeConnectInfo -> Api.QueryInShelleyBasedEra ApiEra a -> IO a
 queryConwayEra info q = do
-  e <- queryCardanoMode info $ Api.QueryInEra $ Api.QueryInShelleyBasedEra Api.ShelleyBasedEraConway q
+  e <- queryCardanoMode info $ Api.QueryInEra $ Api.QueryInShelleyBasedEra apiSBE q
   case e of
     Left err -> throwIO $ CardanoQueryException $ show err
     Right x -> return x

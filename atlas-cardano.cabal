@@ -60,6 +60,13 @@ library
   import: common
   hs-source-dirs: src
   exposed-modules:
+    Clb
+    Clb.Config
+    Clb.EmulatedLedgerState
+    Clb.Era
+    Clb.Params
+    Clb.TimeSlot
+    Clb.Tx
     GeniusYield.Aeson.Utils
     GeniusYield.Api.TestTokens
     GeniusYield.CardanoApi.EraHistory
@@ -81,7 +88,6 @@ library
     GeniusYield.Providers.GCP
     GeniusYield.Providers.Hydra
     GeniusYield.Providers.Kupo
-    GeniusYield.Providers.Maestro
     GeniusYield.Providers.Node
     GeniusYield.Providers.Ogmios
     GeniusYield.Providers.Sentry
@@ -211,7 +217,6 @@ library
     cborg,
     containers,
     data-default,
-    data-default-class,
     deriving-aeson,
     either,
     extra,
@@ -225,6 +230,7 @@ library
     http-client-tls,
     http-types,
     indexed-traversable,
+    io-classes:strict-mvar,
     iproute,
     katip,
     lens,
@@ -232,18 +238,19 @@ library
     mtl,
     network-uri,
     postgresql-simple,
+    pretty-show,
     prettyprinter,
     raven-haskell,
     resourcet,
     safe-money,
     scientific,
+    serialise,
     servant,
     servant-client,
     servant-client-core,
     some,
     sop-extras,
     stm,
-    strict-mvar,
     string-conv,
     swagger2,
     tasty,
@@ -261,31 +268,34 @@ library
   -- Dependencies whose version is fixed/constrained by @cabal.project@ file.
   build-depends:
     bech32,
-    clb,
-    maestro-sdk,
     openapi3,
 
   -- Cardano libraries which are not on hackage. Their version is pinned in @cabal.project@ file or derived from other related dependencies.
   build-depends:
     cardano-addresses,
-    cardano-api ^>=10.13.1,
+    cardano-api ^>=11.0.0,
+    cardano-binary,
     cardano-crypto,
     cardano-crypto-class,
+    cardano-crypto-wrapper,
+    cardano-data,
     cardano-ledger-alonzo,
     cardano-ledger-api,
+    cardano-ledger-babbage,
     cardano-ledger-binary,
     cardano-ledger-byron,
     cardano-ledger-conway,
     cardano-ledger-core,
     cardano-ledger-core:{cardano-ledger-core, testlib},
+    cardano-ledger-mary,
     cardano-ledger-shelley,
     cardano-slotting,
     cardano-testnet,
-    ouroboros-consensus,
-    ouroboros-consensus-cardano,
-    ouroboros-network-protocols,
+    ouroboros-consensus:{cardano, ouroboros-consensus},
+    ouroboros-network:protocols,
     plutus-ledger-api,
     plutus-tx,
+    small-steps,
 
   -- needed for examples
   -- Version of @plutus-core@ is pinned in @cabal.project@ file.
@@ -311,7 +321,6 @@ test-suite atlas-tests
     GeniusYield.Test.GYTxOutRefCbor
     GeniusYield.Test.GYTxSkeleton
     GeniusYield.Test.Hydra
-    GeniusYield.Test.Providers
     GeniusYield.Test.Providers.Mashup
     GeniusYield.Test.RefInput
     GeniusYield.Test.SimpleScript
@@ -327,20 +336,15 @@ test-suite atlas-tests
     base,
     bytestring,
     cardano-api,
-    clb,
     containers,
     data-default,
     directory,
     file-embed,
     filepath,
-    http-api-data,
-    maestro-sdk,
     ouroboros-consensus,
-    plutus-tx,
     tasty,
     tasty-hunit,
     tasty-quickcheck,
-    text,
     time,
     transformers,
 
@@ -378,6 +382,7 @@ test-suite atlas-privnet-tests
     base16-bytestring,
     bytestring,
     containers,
+    directory,
     file-embed,
     lens,
     mtl,
@@ -406,6 +411,7 @@ test-suite atlas-unified-tests
     atlas-onchain-common,
     base,
     containers,
+    directory,
     extra,
     file-embed,
     mtl,

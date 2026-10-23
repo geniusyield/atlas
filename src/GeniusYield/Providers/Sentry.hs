@@ -38,7 +38,7 @@ mkSentryScribe ss pf vb = return $ Katip.Scribe logger (return ()) pf
     Raven.register ss nmSpace lvl msg (`updateRecord` item)
 
   -- send Ktip.Loc data to sentry
-  locAttr :: Katip.LogItem a => Katip.Item a -> HashMap T.Text Aeson.Value
+  locAttr :: Katip.Item a -> HashMap T.Text Aeson.Value
   locAttr item = foldMap (HM.singleton "loc" . Aeson.toJSON . Katip.Core.LocJs) (Katip._itemLoc item)
 
   -- extra attributes we can send to sentry

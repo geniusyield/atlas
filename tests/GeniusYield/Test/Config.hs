@@ -15,7 +15,6 @@ configTests =
   testGroup
     "Config"
     [ testCase "core-local" $ testParseResult isNodeKupo "core-local.json"
-    , testCase "core-maestro" $ testParseResult isMaestro "core-maestro.json"
     , testCase "core-blockfrost" $ testParseResult isBlockfrost "core-blockfrost.json"
     ]
 

@@ -16,6 +16,7 @@ module GeniusYield.Types.TxCert.Internal (
 ) where
 
 import Cardano.Api qualified as Api
+import Cardano.Api.Experimental.Certificate qualified as Api.Cert
 import Data.Functor ((<&>))
 import GeniusYield.Imports ((&))
 import GeniusYield.Types.BuildScript
@@ -58,5 +59,5 @@ pattern GYTxCertWitnessScript v r = GYTxBuildWitnessPlutusScript v r
 
 txCertToApi ::
   GYTxCert' v ->
-  (Api.Certificate ApiEra, Maybe (Api.StakeCredential, Api.Witness Api.WitCtxStake ApiEra))
+  (Api.Cert.Certificate (Api.ShelleyLedgerEra ApiEra), Maybe (Api.StakeCredential, Api.Witness Api.WitCtxStake ApiEra))
 txCertToApi (GYTxCert' cert wit) = (certificateToApi cert, wit <&> (\wit' -> (certificateToStakeCredential cert & stakeCredentialToApi, buildWitnessToApi wit')))

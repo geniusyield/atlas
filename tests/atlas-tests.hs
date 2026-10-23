@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Cardano.Api qualified as Api
+import Control.Monad (filterM)
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as LBS
 import System.Directory (doesFileExist)
@@ -16,7 +17,6 @@ import Test.Tasty.HUnit (
 import GeniusYield.Examples.Gift
 import GeniusYield.GYConfig (
   coreConfigIO,
-  findMaestroTokenAndNetId,
  )
 import GeniusYield.Imports
 import GeniusYield.Test.Blueprint (blueprintTests)
@@ -26,7 +26,7 @@ import GeniusYield.Test.FeeTracking (feeTrackingTests)
 import GeniusYield.Test.GYTxBody (gyTxBodyTests)
 import GeniusYield.Test.GYTxOutRefCbor (gyTxOutRefCborTests)
 import GeniusYield.Test.GYTxSkeleton (gyTxSkeletonTests)
-import GeniusYield.Test.Providers (providersTests)
+import GeniusYield.Test.Providers.Mashup (providersMashupTests)
 import GeniusYield.Test.RefInput (refInputTests)
 import GeniusYield.Test.SimpleScript (simpleScriptTests)
 import GeniusYield.Test.SlotConfig (slotConversionTests)
@@ -39,13 +39,12 @@ import GeniusYield.Types
 
 main :: IO ()
 main = do
-  configs <- forM ["maestro-config.json", "blockfrost-config.json"] coreConfigIO
-  (providerToken, netId) <- findMaestroTokenAndNetId configs
+  configs <- filterM doesFileExist ["blockfrost-config.json"] >>= traverse coreConfigIO
   rootDir <- findPackageRoot
-  defaultMain $
-    testGroup
+  defaultMain
+    $ testGroup
       "atlas"
-      [ testGroup
+    $ [ testGroup
           "serializeToRawBytes"
           [ goldenVsString "serialized-v1" (rootDir </> "fixtures" </> "script-v1.cbor") $ do
               return $ LBS.fromStrict $ Api.serialiseToRawBytes simpleScriptAPIv1
@@ -68,10 +67,10 @@ main = do
               pure giftValidatorV2 @=? envelopeContentsParsed
           , -- we can deserialize v1 as v1.
             testCase "deserialize v1" $ do
-              e <- Api.readFileTextEnvelope (Api.proxyToAsType Proxy) (Api.File $ rootDir </> "fixtures" </> "script-env-v1.json")
+              e <- Api.readFileTextEnvelope (Api.File $ rootDir </> "fixtures" </> "script-env-v1.json")
               Right simpleScriptAPIv1 @=? first show e
           , testCase "deserialize v1" $ do
-              e <- Api.readFileTextEnvelope (Api.proxyToAsType Proxy) (Api.File $ rootDir </> "fixtures" </> "script-env-v1.json")
+              e <- Api.readFileTextEnvelope (Api.File $ rootDir </> "fixtures" </> "script-env-v1.json")
 
               let expected :: Either String (Api.PlutusScript Api.PlutusScriptV2)
                   expected = Left "(TextEnvelopeTypeError [TextEnvelopeType \"PlutusScriptV2\"] (TextEnvelopeType \"PlutusScriptV1\"))"
@@ -87,10 +86,10 @@ main = do
       , gyTxOutRefCborTests
       , refInputTests
       , feeTrackingTests
-      , stakeTests (head configs)
       , simpleScriptTests configs
-      , providersTests configs providerToken netId
       ]
+      <> [stakeTests cfg | cfg : _ <- [configs]]
+      <> [providersMashupTests configs | not (null configs)]
 
 -------------------------------------------------------------------------------
 -- simple script

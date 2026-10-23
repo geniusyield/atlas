@@ -48,11 +48,10 @@ module GeniusYield.Types.Governance (
   proposalsFromLedger,
 ) where
 
+import Cardano.Api qualified as Api
 import Cardano.Api.Ledger (maybeToStrictMaybe, strictMaybeToMaybe)
 import Cardano.Api.Ledger qualified as Ledger
-import Cardano.Api.Shelley qualified as Api
 import Cardano.Ledger.Api qualified as Ledger
-import Cardano.Ledger.Conway qualified as Conway
 import Cardano.Ledger.Conway.Governance (proposalsActionsMap)
 import Cardano.Ledger.Conway.Governance qualified as Conway
 import Cardano.Ledger.Conway.State qualified as ConwayState
@@ -71,6 +70,7 @@ import GeniusYield.Types.Anchor
 import GeniusYield.Types.BuildWitness
 import GeniusYield.Types.Credential (GYCredential, credentialFromLedger, credentialToLedger)
 import GeniusYield.Types.Epoch (GYEpochNo, epochNoFromLedger, epochNoToLedger)
+import GeniusYield.Types.Era (ApiLedgerEra)
 import GeniusYield.Types.KeyHash
 import GeniusYield.Types.KeyRole (GYKeyRole (..))
 import GeniusYield.Types.Ledger (PlutusToCardanoError (UnknownPlutusToCardanoError))
@@ -185,18 +185,18 @@ data GYVotingProcedure = GYVotingProcedure
   }
   deriving stock (Show, Eq, Ord)
 
-votingProcedureToLedger :: GYVotingProcedure -> Ledger.VotingProcedure Conway.ConwayEra
+votingProcedureToLedger :: GYVotingProcedure -> Ledger.VotingProcedure ApiLedgerEra
 votingProcedureToLedger (GYVotingProcedure v a) = Ledger.VotingProcedure (voteToLedger v) (maybeToStrictMaybe (anchorToLedger <$> a))
 
-votingProcedureFromLedger :: Ledger.VotingProcedure Conway.ConwayEra -> GYVotingProcedure
+votingProcedureFromLedger :: Ledger.VotingProcedure ApiLedgerEra -> GYVotingProcedure
 votingProcedureFromLedger (Ledger.VotingProcedure v a) = GYVotingProcedure (voteFromLedger v) (strictMaybeToMaybe (anchorFromLedger <$> a))
 
 type GYVotingProcedures = Map GYVoter (Map GYGovActionId GYVotingProcedure)
 
-votingProceduresToLedger :: GYVotingProcedures -> Ledger.VotingProcedures Conway.ConwayEra
+votingProceduresToLedger :: GYVotingProcedures -> Ledger.VotingProcedures ApiLedgerEra
 votingProceduresToLedger vp = Ledger.VotingProcedures $ Map.mapKeys voterToLedger $ Map.map (Map.mapKeys govActionIdToLedger . Map.map votingProcedureToLedger) vp
 
-votingProceduresFromLedger :: Ledger.VotingProcedures Conway.ConwayEra -> GYVotingProcedures
+votingProceduresFromLedger :: Ledger.VotingProcedures ApiLedgerEra -> GYVotingProcedures
 votingProceduresFromLedger (Ledger.VotingProcedures vp) = Map.mapKeys voterFromLedger $ Map.map (Map.mapKeys govActionIdFromLedger . Map.map votingProcedureFromLedger) vp
 
 -- | Combine two voting procedures. Here if a voter has voted on the same proposal in both procedures, the vote from the second procedure is taken.
@@ -233,7 +233,7 @@ completeProposalProcedure GYProposalProcedurePB {..} dep =
     , propProcAnchor = propProcPBAnchor
     }
 
-propProcToLedger :: GYProposalProcedure -> Ledger.ProposalProcedure Conway.ConwayEra
+propProcToLedger :: GYProposalProcedure -> Ledger.ProposalProcedure ApiLedgerEra
 propProcToLedger GYProposalProcedure {..} =
   Ledger.ProposalProcedure
     { Ledger.pProcDeposit = fromIntegral propProcDeposit
@@ -242,7 +242,7 @@ propProcToLedger GYProposalProcedure {..} =
     , Ledger.pProcAnchor = anchorToLedger propProcAnchor
     }
 
-propProcFromLedger :: Ledger.ProposalProcedure Conway.ConwayEra -> GYProposalProcedure
+propProcFromLedger :: Ledger.ProposalProcedure ApiLedgerEra -> GYProposalProcedure
 propProcFromLedger Ledger.ProposalProcedure {..} =
   GYProposalProcedure
     { propProcDeposit = fromIntegral pProcDeposit
@@ -257,10 +257,10 @@ data GYConstitution = GYConstitution
   }
   deriving stock (Eq, Ord, Show)
 
-constitutionToLedger :: GYConstitution -> Ledger.Constitution Conway.ConwayEra
+constitutionToLedger :: GYConstitution -> Ledger.Constitution ApiLedgerEra
 constitutionToLedger GYConstitution {..} = Ledger.Constitution (anchorToLedger constitutionAnchor) (maybeToStrictMaybe $ scriptHashToLedger <$> constitutionScript)
 
-constitutionFromLedger :: Ledger.Constitution Conway.ConwayEra -> GYConstitution
+constitutionFromLedger :: Ledger.Constitution ApiLedgerEra -> GYConstitution
 constitutionFromLedger (Ledger.Constitution a s) = GYConstitution (anchorFromLedger a) (strictMaybeToMaybe $ scriptHashFromLedger <$> s)
 
 data GYGovAction
@@ -268,7 +268,7 @@ data GYGovAction
       -- | Previous governance action id of `ParameterChange` type.
       !(Maybe GYGovActionId)
       -- | Proposed changes to PParams
-      !(Ledger.PParamsUpdate Conway.ConwayEra)
+      !(Ledger.PParamsUpdate ApiLedgerEra)
       -- | Policy hash protection
       !(Maybe GYScriptHash)
   | HardForkInitiation
@@ -300,7 +300,7 @@ data GYGovAction
   | InfoAction
   deriving stock (Eq, Show, Ord)
 
-govActionToLedger :: GYGovAction -> Ledger.GovAction Conway.ConwayEra
+govActionToLedger :: GYGovAction -> Ledger.GovAction ApiLedgerEra
 govActionToLedger ga = case ga of
   ParameterChange mgaid ppup msh -> Ledger.ParameterChange (castPurposeM mgaid) ppup (castScriptHashM msh)
   HardForkInitiation mgaid pv -> Ledger.HardForkInitiation (castPurposeM mgaid) pv
@@ -312,14 +312,14 @@ govActionToLedger ga = case ga of
  where
   ms = maybeToStrictMaybe
 
-  castPurpose :: GYGovActionId -> Ledger.GovPurposeId p Conway.ConwayEra
+  castPurpose :: GYGovActionId -> Ledger.GovPurposeId p
   castPurpose = Ledger.GovPurposeId . govActionIdToLedger
 
   castPurposeM mgid = ms $ castPurpose <$> mgid
 
   castScriptHashM sh = ms $ scriptHashToLedger <$> sh
 
-govActionFromLedger :: Ledger.GovAction Conway.ConwayEra -> GYGovAction
+govActionFromLedger :: Ledger.GovAction ApiLedgerEra -> GYGovAction
 govActionFromLedger ga = case ga of
   Ledger.ParameterChange mgaid ppup msh -> ParameterChange (govActionIdFromLedger' <$> strictMaybeToMaybe mgaid) ppup (scriptHashFromLedger <$> strictMaybeToMaybe msh)
   Ledger.HardForkInitiation mgaid pv -> HardForkInitiation (govActionIdFromLedger' <$> strictMaybeToMaybe mgaid) pv
@@ -342,7 +342,7 @@ data GYGovActionState = GYGovActionState
   }
   deriving stock (Eq, Show, Ord)
 
-govActionStateToLedger :: GYGovActionState -> Ledger.GovActionState Conway.ConwayEra
+govActionStateToLedger :: GYGovActionState -> Ledger.GovActionState ApiLedgerEra
 govActionStateToLedger GYGovActionState {..} =
   Ledger.GovActionState
     { Ledger.gasId = govActionIdToLedger gasId
@@ -354,7 +354,7 @@ govActionStateToLedger GYGovActionState {..} =
     , Ledger.gasExpiresAfter = epochNoToLedger gasExpiresAfter
     }
 
-govActionStateFromLedger :: Ledger.GovActionState Conway.ConwayEra -> GYGovActionState
+govActionStateFromLedger :: Ledger.GovActionState ApiLedgerEra -> GYGovActionState
 govActionStateFromLedger Ledger.GovActionState {..} =
   GYGovActionState
     { gasId = govActionIdFromLedger gasId
@@ -368,16 +368,16 @@ govActionStateFromLedger Ledger.GovActionState {..} =
 
 data GYGovState = GYGovState
   { cgsProposals :: !GYProposals
-  , cgsCommittee :: !(Maybe (Ledger.Committee Conway.ConwayEra))
-  , cgsConstitution :: !(Ledger.Constitution Conway.ConwayEra)
-  , cgsCurPParams :: !(Ledger.PParams Conway.ConwayEra)
-  , cgsPrevPParams :: !(Ledger.PParams Conway.ConwayEra)
-  , cgsFuturePParams :: !(ConwayState.FuturePParams Conway.ConwayEra)
-  , cgsDRepPulsingState :: !(Conway.DRepPulsingState Conway.ConwayEra)
+  , cgsCommittee :: !(Maybe (Ledger.Committee ApiLedgerEra))
+  , cgsConstitution :: !(Ledger.Constitution ApiLedgerEra)
+  , cgsCurPParams :: !(Ledger.PParams ApiLedgerEra)
+  , cgsPrevPParams :: !(Ledger.PParams ApiLedgerEra)
+  , cgsFuturePParams :: !(ConwayState.FuturePParams ApiLedgerEra)
+  , cgsDRepPulsingState :: !(Conway.DRepPulsingState ApiLedgerEra)
   }
   deriving stock (Eq, Show)
 
-govStateFromLedger :: Ledger.GovState Conway.ConwayEra -> GYGovState
+govStateFromLedger :: Ledger.GovState ApiLedgerEra -> GYGovState
 govStateFromLedger Ledger.ConwayGovState {..} =
   GYGovState
     { cgsProposals = proposalsFromLedger cgsProposals
@@ -391,12 +391,12 @@ govStateFromLedger Ledger.ConwayGovState {..} =
 
 data GYProposals = GYProposals
   { pProps :: !(Map GYGovActionId GYGovActionState)
-  , pRoots :: !(Ledger.GovRelation Conway.PRoot Conway.ConwayEra)
-  , pGraph :: !(Ledger.GovRelation Conway.PGraph Conway.ConwayEra)
+  , pRoots :: !(Ledger.GovRelation Conway.PRoot)
+  , pGraph :: !(Ledger.GovRelation Conway.PGraph)
   }
   deriving stock (Eq, Show)
 
-proposalsFromLedger :: Conway.Proposals Conway.ConwayEra -> GYProposals
+proposalsFromLedger :: Conway.Proposals ApiLedgerEra -> GYProposals
 proposalsFromLedger proposals =
   GYProposals
     { pProps =

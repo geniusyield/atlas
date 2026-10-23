@@ -1,3 +1,5 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+
 {- |
 Module      : GeniusYield.Providers.Ogmios
 Description : Ogmios provider for remote node connection.
@@ -26,11 +28,11 @@ module GeniusYield.Providers.Ogmios (
 ) where
 
 import Cardano.Api qualified as Api
+import Cardano.Api qualified as Api.S
 import Cardano.Api.Ledger qualified as Api.L
 import Cardano.Api.Ledger qualified as Ledger
-import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Alonzo.PParams qualified as Ledger
-import Cardano.Ledger.Conway qualified as Conway
+import Cardano.Ledger.Compactible qualified as Compactible
 import Cardano.Ledger.Conway.PParams (
   ConwayPParams (..),
   THKD (..),
@@ -41,16 +43,19 @@ import Cardano.Ledger.Plutus qualified as Ledger
 import Cardano.Slotting.Slot qualified as CSlot
 import Cardano.Slotting.Time qualified as CTime
 import Control.Monad ((<=<))
-import Data.Aeson (Value (Null), object, withArray, withObject, (.:), (.:?), (.=))
+import Data.Aeson (Value (Null), object, withArray, withObject, withText, (.:), (.:?), (.=))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Types qualified as Aeson
 import Data.ByteString.Lazy qualified as BSL
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromJust, listToMaybe)
+import Data.Ratio (denominator, numerator, (%))
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TE
+import Data.Text.Read qualified as TxtRead
+import Data.Time.Clock (NominalDiffTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Word (Word16, Word32, Word64)
 import Deriving.Aeson
@@ -62,8 +67,6 @@ import GeniusYield.Providers.Common (
   parseEraHist,
  )
 import GeniusYield.Types hiding (poolId)
-import Maestro.Types.V1 (AsAda (..), AsBytes, AsLovelace (..), CostModel, EpochNo, EpochSize, EpochSlotLength, EraBound, MaestroRational, MemoryCpuWith, MinFeeReferenceScripts, ProtocolParametersUpdateStakePool, ProtocolVersion)
-import Maestro.Types.V1 qualified as Maestro
 import Network.WebSockets qualified as WS
 import Ouroboros.Consensus.HardFork.History qualified as Ouroboros
 import Servant.API (
@@ -385,8 +388,8 @@ instance FromJSON OgmiosProposalResponse where
           removedMembersSet :: Set (GYCredential 'GYKeyRoleColdCommittee) <- Set.fromList <$> traverse getCredential removedMembers
           addedMembers <- obj .: "members" >>= (.: "added")
           addedMembersMap :: Map (GYCredential 'GYKeyRoleColdCommittee) GYEpochNo <- Map.fromList <$> traverse (\o -> (,) <$> getCredential o <*> (o .: "mandate" >>= (.: "epoch") <&> GYEpochNo)) addedMembers
-          quorum :: MaestroRational <- obj .: "quorum"
-          let quorumUnitInterval = (\r -> fromMaybe (error $ "parseJSON (OgmiosProposalResponse): unable to bound rational " <> show r) r) $ Ledger.boundRational $ Maestro.unMaestroRational quorum
+          quorum :: OgmiosRational <- obj .: "quorum"
+          let quorumUnitInterval = (\r -> fromMaybe (error $ "parseJSON (OgmiosProposalResponse): unable to bound rational " <> show r) r) $ Ledger.boundRational $ unOgmiosRational quorum
           pure $ UpdateCommittee mancestor removedMembersSet addedMembersMap quorumUnitInterval
         "treasuryWithdrawals" -> do
           withdrawals :: Map GYStakeAddressBech32 AsAda <- obj .: "withdrawals"
@@ -569,31 +572,153 @@ ogmiosSubmitTx env tx = do
   submitE :: Show a => a -> IO b
   submitE = throwIO . SubmitTxException . Text.pack . show
 
--- Luckily, for protocol parameters, types are similar to ones defined in Maestro's Haskell SDK. Most of the below types (related to protocol parameters) mimics the ones defined in Maestro's Haskell SDK.
+newtype EpochNo = EpochNo {unEpochNo :: Word64}
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving newtype (Enum, Num, Real, Integral, ToJSON, FromJSON)
+
+newtype EpochSize = EpochSize {unEpochSize :: Word64}
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving newtype (Enum, Num, Real, Integral, ToJSON, FromJSON)
+
+newtype SlotNo = SlotNo {unSlotNo :: Word64}
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving newtype (Num, Bounded, Enum, Real, Integral, FromJSON, ToJSON)
+
+newtype EpochSlotLength = EpochSlotLength
+  { epochSlotLengthMilliseconds :: NominalDiffTime
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "epochSlotLength", LowerFirst]] EpochSlotLength
+
+newtype EraBoundTime = EraBoundTime
+  { eraBoundTimeSeconds :: NominalDiffTime
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "eraBoundTime", LowerFirst]] EraBoundTime
+
+data EraBound = EraBound
+  { eraBoundEpoch :: !EpochNo
+  , eraBoundSlot :: !SlotNo
+  , eraBoundTime :: !EraBoundTime
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "eraBound", LowerFirst]] EraBound
+
+newtype AsLovelace = AsLovelace
+  { asLovelaceLovelace :: Natural
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "asLovelace", LowerFirst]] AsLovelace
+
+newtype AsBytes = AsBytes
+  { asBytesBytes :: Natural
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "asBytes", LowerFirst]] AsBytes
+
+newtype AsAda = AsAda
+  { asAdaAda :: AsLovelace
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "asAda", LowerFirst]] AsAda
+
+data ProtocolVersion = ProtocolVersion
+  { protocolVersionMajor :: !Natural
+  , protocolVersionMinor :: !Natural
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "protocolVersion", LowerFirst]] ProtocolVersion
+
+data MemoryCpuWith i = MemoryCpuWith
+  { memoryCpuWithMemory :: !i
+  , memoryCpuWithCpu :: !i
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "memoryCpuWith", LowerFirst]] (MemoryCpuWith i)
+
+newtype CostModel = CostModel [Int64]
+  deriving stock (Eq, Show)
+  deriving newtype (ToJSON, FromJSON)
+
+newtype OgmiosRational = OgmiosRational {unOgmiosRational :: Rational}
+  deriving stock Eq
+
+instance Show OgmiosRational where
+  show (OgmiosRational r) = show (numerator r) ++ '/' : show (denominator r)
+
+textFromOgmiosRational :: OgmiosRational -> Text
+textFromOgmiosRational = Text.pack . show . unOgmiosRational
+
+textToOgmiosRational :: Text -> Either String OgmiosRational
+textToOgmiosRational ratTxt =
+  case TxtRead.signed rationalReader ratTxt of
+    Right (rat, remainingTxt) ->
+      if Text.null remainingTxt
+        then pure $ OgmiosRational rat
+        else Left "Expected full string to be parsed"
+    Left e -> Left e
+ where
+  rationalReader :: TxtRead.Reader Rational
+  rationalReader ratTxt' = do
+    (numr, remaining) <- TxtRead.decimal ratTxt'
+    (nextChar, denmrTxt) <-
+      maybe
+        (Left "Unexpected end of string after parsing numerator")
+        pure
+        $ Text.uncons remaining
+    unless (nextChar == '/')
+      . Left
+      $ "Expected numerator to be immediately followed by '/', but it was followed by: " ++ show nextChar
+    (denmr, finalRemaining) <- TxtRead.decimal denmrTxt
+    when (denmr == 0) $
+      Left "Expected non-zero denominator"
+    pure (numr % denmr, finalRemaining)
+
+instance ToJSON OgmiosRational where
+  toEncoding = Aeson.toEncoding . textFromOgmiosRational
+  toJSON = Aeson.toJSON . textFromOgmiosRational
+
+instance FromJSON OgmiosRational where
+  parseJSON = withText "OgmiosRational" $ \ratTxt -> either fail pure $ textToOgmiosRational ratTxt
+
+newtype ProtocolParametersUpdateStakePool = ProtocolParametersUpdateStakePool
+  { ppUpdateStakePoolSecurity :: OgmiosRational
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "ppUpdateStakePool", LowerFirst]] ProtocolParametersUpdateStakePool
+
+data MinFeeReferenceScripts = MinFeeReferenceScripts
+  { minFeeReferenceScriptsBase :: !Rational
+  , minFeeReferenceScriptsMultiplier :: !Rational
+  , minFeeReferenceScriptsRange :: !Natural
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "minFeeReferenceScripts", LowerFirst]] MinFeeReferenceScripts
+
 data ProtocolParametersUpdateDRep = ProtocolParametersUpdateDRep
-  { ppUpdateDrepEconomic :: !MaestroRational
-  , ppUpdateDrepGovernance :: !MaestroRational
-  , ppUpdateDrepNetwork :: !MaestroRational
-  , ppUpdateDrepTechnical :: !MaestroRational
+  { ppUpdateDrepEconomic :: !OgmiosRational
+  , ppUpdateDrepGovernance :: !OgmiosRational
+  , ppUpdateDrepNetwork :: !OgmiosRational
+  , ppUpdateDrepTechnical :: !OgmiosRational
   }
   deriving stock (Eq, Show, Generic)
   deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "ppUpdateDrep", LowerFirst]] ProtocolParametersUpdateDRep
 
 -- | DRep voting thresholds.
 data DRepVotingThresholds = DRepVotingThresholds
-  { drepVotingThresholdsConstitution :: !MaestroRational
+  { drepVotingThresholdsConstitution :: !OgmiosRational
   , drepVotingThresholdsConstitutionalCommittee :: !ConstitutionalCommittee
-  , drepVotingThresholdsHardForkInitiation :: !MaestroRational
-  , drepVotingThresholdsNoConfidence :: !MaestroRational
+  , drepVotingThresholdsHardForkInitiation :: !OgmiosRational
+  , drepVotingThresholdsNoConfidence :: !OgmiosRational
   , drepVotingThresholdsProtocolParametersUpdate :: !ProtocolParametersUpdateDRep
-  , drepVotingThresholdsTreasuryWithdrawals :: !MaestroRational
+  , drepVotingThresholdsTreasuryWithdrawals :: !OgmiosRational
   }
   deriving stock (Eq, Show, Generic)
   deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "drepVotingThresholds", LowerFirst]] DRepVotingThresholds
 
 data ConstitutionalCommittee = ConstitutionalCommittee
-  { constitutionalCommitteeDefault :: !MaestroRational
-  , constitutionalCommitteeStateOfNoConfidence :: !MaestroRational
+  { constitutionalCommitteeDefault :: !OgmiosRational
+  , constitutionalCommitteeStateOfNoConfidence :: !OgmiosRational
   }
   deriving stock (Eq, Show, Generic)
   deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "constitutionalCommittee", LowerFirst]] ConstitutionalCommittee
@@ -601,8 +726,8 @@ data ConstitutionalCommittee = ConstitutionalCommittee
 -- | Stake pool voting thresholds.
 data StakePoolVotingThresholds = StakePoolVotingThresholds
   { stakePoolVotingThresholdsConstitutionalCommittee :: !ConstitutionalCommittee
-  , stakePoolVotingThresholdsHardForkInitiation :: !MaestroRational
-  , stakePoolVotingThresholdsNoConfidence :: !MaestroRational
+  , stakePoolVotingThresholdsHardForkInitiation :: !OgmiosRational
+  , stakePoolVotingThresholdsNoConfidence :: !OgmiosRational
   , stakePoolVotingThresholdsProtocolParametersUpdate :: !ProtocolParametersUpdateStakePool
   }
   deriving stock (Eq, Show, Generic)
@@ -640,15 +765,15 @@ data ProtocolParametersHKD f = ProtocolParameters
   , protocolParametersMinFeeReferenceScripts :: !(HKD f MinFeeReferenceScripts)
   , protocolParametersMinStakePoolCost :: !(HKD f AsAda)
   , protocolParametersMinUtxoDepositCoefficient :: !(HKD f Natural)
-  , protocolParametersMonetaryExpansion :: !(HKD f MaestroRational)
+  , protocolParametersMonetaryExpansion :: !(HKD f OgmiosRational)
   , protocolParametersPlutusCostModels :: !(HKD f CostModels)
-  , protocolParametersScriptExecutionPrices :: !(HKD f (MemoryCpuWith MaestroRational))
+  , protocolParametersScriptExecutionPrices :: !(HKD f (MemoryCpuWith OgmiosRational))
   , protocolParametersStakeCredentialDeposit :: !(HKD f AsAda)
   , protocolParametersStakePoolDeposit :: !(HKD f AsAda)
-  , protocolParametersStakePoolPledgeInfluence :: !(HKD f MaestroRational)
+  , protocolParametersStakePoolPledgeInfluence :: !(HKD f OgmiosRational)
   , protocolParametersStakePoolRetirementEpochBound :: !(HKD f EpochNo)
   , protocolParametersStakePoolVotingThresholds :: !(HKD f StakePoolVotingThresholds)
-  , protocolParametersTreasuryExpansion :: !(HKD f MaestroRational)
+  , protocolParametersTreasuryExpansion :: !(HKD f OgmiosRational)
   , protocolParametersVersion :: !(HKD f ProtocolVersion)
   }
   deriving stock Generic
@@ -667,36 +792,36 @@ deriving instance Show ProtocolParametersM
 protocolVersionFromOgmios :: String -> ProtocolVersion -> Ledger.ProtVer
 protocolVersionFromOgmios errPath protocolParametersVersion =
   Ledger.ProtVer
-    { Ledger.pvMajor = Ledger.mkVersion (Maestro.protocolVersionMajor protocolParametersVersion) & fromMaybe (error (errPath <> "Major version received from Maestro is out of bounds"))
-    , Ledger.pvMinor = Maestro.protocolVersionMinor protocolParametersVersion
+    { Ledger.pvMajor = Ledger.mkVersion (protocolVersionMajor protocolParametersVersion) & fromMaybe (error (errPath <> "Major version received from Ogmios is out of bounds"))
+    , Ledger.pvMinor = protocolVersionMinor protocolParametersVersion
     }
 
-pparamsFromOgmios :: forall f. HKDFunctor f => String -> ProtocolParametersHKD f -> ConwayPParams f Conway.ConwayEra
+pparamsFromOgmios :: forall f. HKDFunctor f => String -> ProtocolParametersHKD f -> ConwayPParams f ApiLedgerEra
 pparamsFromOgmios errPath ProtocolParameters {..} =
   ConwayPParams
-    { cppMinFeeA = THKD $ hkdMap prxy (Ledger.Coin . (toInteger @Natural)) protocolParametersMinFeeCoefficient
-    , cppMinFeeB = THKD $ hkdMap prxy (Ledger.Coin . toInteger . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersMinFeeConstant
-    , cppMaxBBSize = THKD $ hkdMap prxy ((fromIntegral @Natural @Word32) . Maestro.asBytesBytes) protocolParametersMaxBlockBodySize
-    , cppMaxTxSize = THKD $ hkdMap prxy ((fromIntegral @Natural @Word32) . Maestro.asBytesBytes) protocolParametersMaxTransactionSize
-    , cppMaxBHSize = THKD $ hkdMap prxy (fromIntegral @Natural @Word16 . Maestro.asBytesBytes) protocolParametersMaxBlockHeaderSize
-    , cppKeyDeposit = THKD $ hkdMap prxy (Ledger.Coin . toInteger . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersStakeCredentialDeposit
-    , cppPoolDeposit = THKD $ hkdMap prxy (Ledger.Coin . toInteger . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersStakePoolDeposit
+    { cppTxFeePerByte = THKD $ hkdMap prxy (Api.L.CoinPerByte . Compactible.toCompactPartial . Ledger.Coin . (toInteger @Natural)) protocolParametersMinFeeCoefficient
+    , cppTxFeeFixed = THKD $ hkdMap prxy (Compactible.toCompactPartial . Ledger.Coin . toInteger . asLovelaceLovelace . asAdaAda) protocolParametersMinFeeConstant
+    , cppMaxBBSize = THKD $ hkdMap prxy ((fromIntegral @Natural @Word32) . asBytesBytes) protocolParametersMaxBlockBodySize
+    , cppMaxTxSize = THKD $ hkdMap prxy ((fromIntegral @Natural @Word32) . asBytesBytes) protocolParametersMaxTransactionSize
+    , cppMaxBHSize = THKD $ hkdMap prxy (fromIntegral @Natural @Word16 . asBytesBytes) protocolParametersMaxBlockHeaderSize
+    , cppKeyDeposit = THKD $ hkdMap prxy (Compactible.toCompactPartial . Ledger.Coin . toInteger . asLovelaceLovelace . asAdaAda) protocolParametersStakeCredentialDeposit
+    , cppPoolDeposit = THKD $ hkdMap prxy (Compactible.toCompactPartial . Ledger.Coin . toInteger . asLovelaceLovelace . asAdaAda) protocolParametersStakePoolDeposit
     , cppEMax =
         THKD $
           hkdMap
             prxy
             ( Ledger.EpochInterval
                 . fromIntegral
-                . Maestro.unEpochNo
+                . unEpochNo
             )
             protocolParametersStakePoolRetirementEpochBound
     , cppNOpt = THKD $ hkdMap prxy (fromIntegral @Natural @Word16) protocolParametersDesiredNumberOfStakePools
-    , cppA0 = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Pool influence received from Maestro is out of bounds")) . Ledger.boundRational @Ledger.NonNegativeInterval . Maestro.unMaestroRational) protocolParametersStakePoolPledgeInfluence
-    , cppRho = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Monetory expansion parameter received from Maestro is out of bounds")) . Ledger.boundRational @Ledger.UnitInterval . Maestro.unMaestroRational) protocolParametersMonetaryExpansion
-    , cppTau = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Treasury expansion parameter received from Maestro is out of bounds")) . Ledger.boundRational @Ledger.UnitInterval . Maestro.unMaestroRational) protocolParametersTreasuryExpansion
+    , cppA0 = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Pool influence received from Ogmios is out of bounds")) . Ledger.boundRational @Ledger.NonNegativeInterval . unOgmiosRational) protocolParametersStakePoolPledgeInfluence
+    , cppRho = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Monetary expansion parameter received from Ogmios is out of bounds")) . Ledger.boundRational @Ledger.UnitInterval . unOgmiosRational) protocolParametersMonetaryExpansion
+    , cppTau = THKD $ hkdMap prxy (fromMaybe (error (errPath <> "Treasury expansion parameter received from Ogmios is out of bounds")) . Ledger.boundRational @Ledger.UnitInterval . unOgmiosRational) protocolParametersTreasuryExpansion
     , cppProtocolVersion = toNoUpdate @f @Ledger.ProtVer $ hkdMap prxy (protocolVersionFromOgmios errPath) protocolParametersVersion
-    , cppMinPoolCost = THKD $ hkdMap prxy (Ledger.Coin . toInteger . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersMinStakePoolCost
-    , cppCoinsPerUTxOByte = THKD $ hkdMap prxy (Api.L.CoinPerByte . Ledger.Coin . toInteger @Natural) protocolParametersMinUtxoDepositCoefficient
+    , cppMinPoolCost = THKD $ hkdMap prxy (Compactible.toCompactPartial . Ledger.Coin . toInteger . asLovelaceLovelace . asAdaAda) protocolParametersMinStakePoolCost
+    , cppCoinsPerUTxOByte = THKD $ hkdMap prxy (Api.L.CoinPerByte . Compactible.toCompactPartial . Ledger.Coin . toInteger @Natural) protocolParametersMinUtxoDepositCoefficient
     , cppCostModels =
         THKD $
           hkdMap
@@ -725,8 +850,8 @@ pparamsFromOgmios errPath ProtocolParameters {..} =
             prxy
             ( \ppScriptExecutionPrices ->
                 Ledger.Prices
-                  { Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Maestro's cpu steps")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithCpu ppScriptExecutionPrices
-                  , Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Maestro's memory units")) $ Ledger.boundRational $ Maestro.unMaestroRational $ Maestro.memoryCpuWithMemory ppScriptExecutionPrices
+                  { Ledger.prSteps = fromMaybe (error (errPath <> "Couldn't bound Ogmios's cpu steps")) $ Ledger.boundRational $ unOgmiosRational $ memoryCpuWithCpu ppScriptExecutionPrices
+                  , Ledger.prMem = fromMaybe (error (errPath <> "Couldn't bound Ogmios's memory units")) $ Ledger.boundRational $ unOgmiosRational $ memoryCpuWithMemory ppScriptExecutionPrices
                   }
             )
             protocolParametersScriptExecutionPrices
@@ -738,9 +863,9 @@ pparamsFromOgmios errPath ProtocolParameters {..} =
                 Ledger.OrdExUnits $
                   Ledger.ExUnits
                     { Ledger.exUnitsSteps =
-                        Maestro.memoryCpuWithCpu ppMaxExecutionUnitsPerTransaction
+                        memoryCpuWithCpu ppMaxExecutionUnitsPerTransaction
                     , Ledger.exUnitsMem =
-                        Maestro.memoryCpuWithMemory ppMaxExecutionUnitsPerTransaction
+                        memoryCpuWithMemory ppMaxExecutionUnitsPerTransaction
                     }
             )
             protocolParametersMaxExecutionUnitsPerTransaction
@@ -752,13 +877,13 @@ pparamsFromOgmios errPath ProtocolParameters {..} =
                 Ledger.OrdExUnits $
                   Ledger.ExUnits
                     { Ledger.exUnitsSteps =
-                        Maestro.memoryCpuWithCpu ppMaxExecutionUnitsPerBlock
+                        memoryCpuWithCpu ppMaxExecutionUnitsPerBlock
                     , Ledger.exUnitsMem =
-                        Maestro.memoryCpuWithMemory ppMaxExecutionUnitsPerBlock
+                        memoryCpuWithMemory ppMaxExecutionUnitsPerBlock
                     }
             )
             protocolParametersMaxExecutionUnitsPerBlock
-    , cppMaxValSize = THKD $ hkdMap prxy (fromIntegral @Natural @Word32 . Maestro.asBytesBytes) protocolParametersMaxValueSize
+    , cppMaxValSize = THKD $ hkdMap prxy (fromIntegral @Natural @Word32 . asBytesBytes) protocolParametersMaxValueSize
     , cppCollateralPercentage = THKD $ hkdMap prxy (fromIntegral @Natural @Word16) protocolParametersCollateralPercentage
     , cppMaxCollateralInputs = THKD $ hkdMap prxy (fromIntegral @Natural @Word16) protocolParametersMaxCollateralInputs
     , cppPoolVotingThresholds =
@@ -767,11 +892,11 @@ pparamsFromOgmios errPath ProtocolParameters {..} =
             prxy
             ( \ppStakePoolVotingThresholds ->
                 Ledger.PoolVotingThresholds
-                  { pvtPPSecurityGroup = unsafeBoundRational $ Maestro.unMaestroRational $ Maestro.ppUpdateStakePoolSecurity $ stakePoolVotingThresholdsProtocolParametersUpdate ppStakePoolVotingThresholds
-                  , pvtMotionNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ stakePoolVotingThresholdsNoConfidence ppStakePoolVotingThresholds
-                  , pvtHardForkInitiation = unsafeBoundRational $ Maestro.unMaestroRational $ stakePoolVotingThresholdsHardForkInitiation ppStakePoolVotingThresholds
-                  , pvtCommitteeNormal = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeDefault $ stakePoolVotingThresholdsConstitutionalCommittee ppStakePoolVotingThresholds
-                  , pvtCommitteeNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeStateOfNoConfidence $ stakePoolVotingThresholdsConstitutionalCommittee ppStakePoolVotingThresholds
+                  { pvtPPSecurityGroup = unsafeBoundRational $ unOgmiosRational $ ppUpdateStakePoolSecurity $ stakePoolVotingThresholdsProtocolParametersUpdate ppStakePoolVotingThresholds
+                  , pvtMotionNoConfidence = unsafeBoundRational $ unOgmiosRational $ stakePoolVotingThresholdsNoConfidence ppStakePoolVotingThresholds
+                  , pvtHardForkInitiation = unsafeBoundRational $ unOgmiosRational $ stakePoolVotingThresholdsHardForkInitiation ppStakePoolVotingThresholds
+                  , pvtCommitteeNormal = unsafeBoundRational $ unOgmiosRational $ constitutionalCommitteeDefault $ stakePoolVotingThresholdsConstitutionalCommittee ppStakePoolVotingThresholds
+                  , pvtCommitteeNoConfidence = unsafeBoundRational $ unOgmiosRational $ constitutionalCommitteeStateOfNoConfidence $ stakePoolVotingThresholdsConstitutionalCommittee ppStakePoolVotingThresholds
                   }
             )
             protocolParametersStakePoolVotingThresholds
@@ -781,26 +906,26 @@ pparamsFromOgmios errPath ProtocolParameters {..} =
             prxy
             ( \ppDelegateRepresentativeVotingThresholds ->
                 Ledger.DRepVotingThresholds
-                  { dvtUpdateToConstitution = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsConstitution ppDelegateRepresentativeVotingThresholds
-                  , dvtTreasuryWithdrawal = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsTreasuryWithdrawals ppDelegateRepresentativeVotingThresholds
-                  , dvtPPTechnicalGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepTechnical $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
-                  , dvtPPNetworkGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepNetwork $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
-                  , dvtPPGovGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepGovernance $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
-                  , dvtPPEconomicGroup = unsafeBoundRational $ Maestro.unMaestroRational $ ppUpdateDrepEconomic $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
-                  , dvtMotionNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsNoConfidence ppDelegateRepresentativeVotingThresholds
-                  , dvtHardForkInitiation = unsafeBoundRational $ Maestro.unMaestroRational $ drepVotingThresholdsHardForkInitiation ppDelegateRepresentativeVotingThresholds
-                  , dvtCommitteeNormal = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeDefault $ drepVotingThresholdsConstitutionalCommittee ppDelegateRepresentativeVotingThresholds
-                  , dvtCommitteeNoConfidence = unsafeBoundRational $ Maestro.unMaestroRational $ constitutionalCommitteeStateOfNoConfidence $ drepVotingThresholdsConstitutionalCommittee ppDelegateRepresentativeVotingThresholds
+                  { dvtUpdateToConstitution = unsafeBoundRational $ unOgmiosRational $ drepVotingThresholdsConstitution ppDelegateRepresentativeVotingThresholds
+                  , dvtTreasuryWithdrawal = unsafeBoundRational $ unOgmiosRational $ drepVotingThresholdsTreasuryWithdrawals ppDelegateRepresentativeVotingThresholds
+                  , dvtPPTechnicalGroup = unsafeBoundRational $ unOgmiosRational $ ppUpdateDrepTechnical $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
+                  , dvtPPNetworkGroup = unsafeBoundRational $ unOgmiosRational $ ppUpdateDrepNetwork $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
+                  , dvtPPGovGroup = unsafeBoundRational $ unOgmiosRational $ ppUpdateDrepGovernance $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
+                  , dvtPPEconomicGroup = unsafeBoundRational $ unOgmiosRational $ ppUpdateDrepEconomic $ drepVotingThresholdsProtocolParametersUpdate ppDelegateRepresentativeVotingThresholds
+                  , dvtMotionNoConfidence = unsafeBoundRational $ unOgmiosRational $ drepVotingThresholdsNoConfidence ppDelegateRepresentativeVotingThresholds
+                  , dvtHardForkInitiation = unsafeBoundRational $ unOgmiosRational $ drepVotingThresholdsHardForkInitiation ppDelegateRepresentativeVotingThresholds
+                  , dvtCommitteeNormal = unsafeBoundRational $ unOgmiosRational $ constitutionalCommitteeDefault $ drepVotingThresholdsConstitutionalCommittee ppDelegateRepresentativeVotingThresholds
+                  , dvtCommitteeNoConfidence = unsafeBoundRational $ unOgmiosRational $ constitutionalCommitteeStateOfNoConfidence $ drepVotingThresholdsConstitutionalCommittee ppDelegateRepresentativeVotingThresholds
                   }
             )
             protocolParametersDelegateRepresentativeVotingThresholds
     , cppCommitteeMinSize = THKD $ hkdMap prxy (fromIntegral @Natural @Word16) protocolParametersConstitutionalCommitteeMinSize
     , cppCommitteeMaxTermLength = THKD $ hkdMap prxy (Ledger.EpochInterval . fromIntegral @Natural) protocolParametersConstitutionalCommitteeMaxTermLength
     , cppGovActionLifetime = THKD $ hkdMap prxy (Ledger.EpochInterval . fromIntegral @Natural) protocolParametersGovernanceActionLifetime
-    , cppGovActionDeposit = THKD $ hkdMap prxy (Ledger.Coin . fromIntegral . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersGovernanceActionDeposit
-    , cppDRepDeposit = THKD $ hkdMap prxy (Ledger.Coin . fromIntegral . Maestro.asLovelaceLovelace . Maestro.asAdaAda) protocolParametersDelegateRepresentativeDeposit
+    , cppGovActionDeposit = THKD $ hkdMap prxy (Compactible.toCompactPartial . Ledger.Coin . fromIntegral . asLovelaceLovelace . asAdaAda) protocolParametersGovernanceActionDeposit
+    , cppDRepDeposit = THKD $ hkdMap prxy (Compactible.toCompactPartial . Ledger.Coin . fromIntegral . asLovelaceLovelace . asAdaAda) protocolParametersDelegateRepresentativeDeposit
     , cppDRepActivity = THKD $ hkdMap prxy (Ledger.EpochInterval . fromIntegral @Natural) protocolParametersDelegateRepresentativeMaxIdleTime
-    , cppMinFeeRefScriptCostPerByte = THKD $ hkdMap prxy (unsafeBoundRational @Ledger.NonNegativeInterval . Maestro.minFeeReferenceScriptsBase) protocolParametersMinFeeReferenceScripts
+    , cppMinFeeRefScriptCostPerByte = THKD $ hkdMap prxy (unsafeBoundRational @Ledger.NonNegativeInterval . minFeeReferenceScriptsBase) protocolParametersMinFeeReferenceScripts
     }
  where
   prxy = Proxy @f
@@ -903,24 +1028,25 @@ data EraSummary = EraSummary
   deriving stock (Eq, Show, Generic)
   deriving (FromJSON, ToJSON) via CustomJSON '[FieldLabelModifier '[StripPrefix "eraSummary", LowerFirst]] EraSummary
 
--- Largely similar to how we handle for Maestro.
 ogmiosEraSummaries :: OgmiosApiEnv -> IO Api.EraHistory
 ogmiosEraSummaries env = do
   eraSumms <- handleOgmiosError fn <=< runOgmiosClient env $ eraSummaries (OgmiosRequest OgmiosEraSummaries)
   maybe (throwIO $ OgmiosIncorrectEraHistoryLength eraSumms) pure $ parseEraHist mkEra eraSumms
  where
-  mkBound Maestro.EraBound {eraBoundEpoch, eraBoundSlot, eraBoundTime} =
+  mkBound EraBound {eraBoundEpoch, eraBoundSlot, eraBoundTime} =
     Ouroboros.Bound
-      { boundTime = CTime.RelativeTime $ Maestro.eraBoundTimeSeconds eraBoundTime
+      { boundTime = CTime.RelativeTime $ eraBoundTimeSeconds eraBoundTime
       , boundSlot = CSlot.SlotNo $ fromIntegral eraBoundSlot
       , boundEpoch = CSlot.EpochNo $ fromIntegral eraBoundEpoch
+      , boundPerasRound = Ouroboros.NoPerasEnabled
       }
   mkEraParams EraParameters {eraParametersEpochLength, eraParametersSlotLength, eraParametersSafeZone} =
     Ouroboros.EraParams
       { eraEpochSize = CSlot.EpochSize $ fromIntegral eraParametersEpochLength
-      , eraSlotLength = CTime.mkSlotLength $ Maestro.epochSlotLengthMilliseconds eraParametersSlotLength / 1000
+      , eraSlotLength = CTime.mkSlotLength $ epochSlotLengthMilliseconds eraParametersSlotLength / 1000
       , eraSafeZone = Ouroboros.StandardSafeZone $ fromJust eraParametersSafeZone
       , eraGenesisWin = fromIntegral $ fromJust eraParametersSafeZone -- TODO: Get it from provider? It is supposed to be 3k/f where k is security parameter (at present 2160) and f is active slot coefficient. Usually ledger set the safe zone size such that it guarantees at least k blocks...
+      , eraPerasRoundLength = Ouroboros.NoPerasEnabled
       }
   mkEra EraSummary {eraSummaryStart, eraSummaryEnd, eraSummaryParameters} =
     Ouroboros.EraSummary

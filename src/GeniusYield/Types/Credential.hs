@@ -39,7 +39,6 @@ module GeniusYield.Types.Credential (
 
 import Cardano.Api qualified as Api
 import Cardano.Api.Ledger qualified as Ledger
-import Cardano.Api.Shelley qualified as Api
 import Data.Hashable (Hashable (..))
 import Data.Text (Text)
 import Data.Text qualified as Text

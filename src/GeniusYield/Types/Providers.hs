@@ -74,7 +74,7 @@ module GeniusYield.Types.Providers (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Api qualified as Api.S
 import Cardano.Slotting.Time (SystemStart)
 import Control.AutoUpdate (
   UpdateSettings (..),

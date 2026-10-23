@@ -13,7 +13,7 @@ module GeniusYield.Transaction.CoinSelection (
   selectInputs,
 ) where
 
-import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Api qualified as Api.S
 import Cardano.Ledger.Binary qualified as CBOR
 import Cardano.Ledger.Conway (ConwayEra)
 import Cardano.Ledger.Conway.Core (eraProtVerHigh)

@@ -53,7 +53,7 @@ mkBetRefValidator brp =
         Right s -> applyParam s brp
 
 -- | Address of the validator, given params.
-betRefAddress :: (HasCallStack, GYTxQueryMonad m) => BetRefParams -> m GYAddress
+betRefAddress :: GYTxQueryMonad m => BetRefParams -> m GYAddress
 betRefAddress brp = scriptAddress $ mkBetRefValidator brp
 
 -- | Operation to place bet.
@@ -115,7 +115,7 @@ placeBet refScript brp guess bet ownAddr mPreviousBetsUtxoRef = do
 
 -- | Operation to take UTxO corresponding to previous bets.
 takeBets ::
-  (HasCallStack, GYTxQueryMonad m) =>
+  GYTxQueryMonad m =>
   -- | Reference Script.
   GYTxOutRef ->
   -- | Validator params.

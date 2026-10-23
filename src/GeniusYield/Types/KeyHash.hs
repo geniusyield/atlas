@@ -28,7 +28,6 @@ module GeniusYield.Types.KeyHash (
 
 import Cardano.Api qualified as Api
 import Cardano.Api.Ledger qualified as Ledger
-import Cardano.Api.Shelley qualified as Api
 import Cardano.Crypto.Hash.Class qualified as Crypto
 import Cardano.Ledger.Keys qualified as Ledger
 import Control.Lens ((?~))
@@ -132,7 +131,7 @@ keyHashToApi = case singGYKeyRole @kr of
 
 {- |
 
->>> keyHashFromApi @'GYKeyRolePayment "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
+>>> keyHashFromApi @'GYKeyRolePayment $ keyHashToApi @'GYKeyRolePayment "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
 GYKeyHash (GYKeyRolePayment) "e1cbb80db89e292269aeb93ec15eb963dda5176b66949fe1c2a6a38d"
 -}
 keyHashFromApi :: forall kr. SingGYKeyRoleI kr => GYHashToApi kr -> GYKeyHash kr

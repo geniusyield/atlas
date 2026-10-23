@@ -25,7 +25,7 @@ buildTxBodyContentTests config =
         buildBodyContent <- withCfgProviders config mempty $ \provider -> do
           runGYTxQueryMonadIO (cfgNetworkId config) provider $ do
             obtainTxBodyContentBuildTx txBody
-        let txBodyRT = either (error . show) txBodyFromApi $ Api.createTransactionBody Api.ShelleyBasedEraConway buildBodyContent
+        let txBodyRT = either (error . show) txBodyFromApi $ Api.createTransactionBody apiSBE buildBodyContent
         -- Following actually fails as protocol parameters used to build is likely different. But still is useful to make sure that there is no semantic difference.
         txBodyRT @?= txBody
     ]

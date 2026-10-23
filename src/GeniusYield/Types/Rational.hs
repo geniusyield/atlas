@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-identities #-}
+
 {- |
 Module      : GeniusYield.Types.Rational
 Copyright   : (c) 2023 GYELD GMBH
@@ -50,10 +52,10 @@ rationalToGHC :: GYRational -> Rational
 rationalToGHC = coerce
 
 rationalFromPlutus :: Plutus.Rational -> GYRational
-rationalFromPlutus = rationalFromGHC . Plutus.toGHC
+rationalFromPlutus = rationalFromGHC . Plutus.toHaskellRatio
 
 rationalToPlutus :: GYRational -> Plutus.Rational
-rationalToPlutus = Plutus.fromGHC . rationalToGHC
+rationalToPlutus = Plutus.fromHaskellRatio . rationalToGHC
 
 {- |
 

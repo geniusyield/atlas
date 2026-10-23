@@ -49,7 +49,7 @@ module GeniusYield.Types.TxBody (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Api qualified as Api.S
 import Cardano.Ledger.Coin qualified as Ledger
 import Data.ByteString qualified as BS
 import Data.ByteString.Base16 qualified as BS16
@@ -91,7 +91,7 @@ signTx :: ToShelleyWitnessSigningKey a => GYTxBody -> [a] -> GYTx
 signTx (GYTxBody txBody) skeys =
   txFromApi
     $ Api.signShelleyTransaction
-      Api.ShelleyBasedEraConway
+      apiSBE
       txBody
     $ map toShelleyWitnessSigningKey skeys
 
@@ -100,7 +100,7 @@ signGYTxBody' :: GYTxBody -> [GYSomeSigningKey] -> GYTx
 signGYTxBody' (txBodyToApi -> txBody) skeys =
   txFromApi
     $ Api.signShelleyTransaction
-      Api.ShelleyBasedEraConway
+      apiSBE
       txBody
     $ map (\(GYSomeSigningKey a) -> toShelleyWitnessSigningKey a) skeys
 
@@ -133,7 +133,7 @@ signGYTx'' previousTx skeys =
   -- but that would duplicate work to obtain @txBody@ as it's also
   -- required here to get for `appendKeyWitnessList`.
   let (txBody, previousKeyWitnessesList) = Api.S.getTxBodyAndWitnesses $ txToApi previousTx
-      appendKeyWitnessList = map (Api.makeShelleyKeyWitness Api.ShelleyBasedEraConway txBody) skeys
+      appendKeyWitnessList = map (Api.makeShelleyKeyWitness apiSBE txBody) skeys
    in makeSignedTransaction' (previousKeyWitnessesList ++ appendKeyWitnessList) txBody
 
 -- | Sign a transaction with (potentially) multiple keys of potentially different nature and add your witness(s) among previous key witnesses, if any.
@@ -154,7 +154,7 @@ txBodyFromHexBS bs = BS16.decode bs >>= txBodyFromCBOR
 
 -- | Get `GYTxBody` from it's CBOR encoding. Note that the given serialized input is not of form @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
 txBodyFromCBOR :: BS.ByteString -> Either String GYTxBody
-txBodyFromCBOR = fmap txBodyFromApi . first show . Api.deserialiseFromCBOR (Api.AsTxBody Api.AsConwayEra)
+txBodyFromCBOR = fmap txBodyFromApi . first show . Api.deserialiseFromCBOR (Api.AsTxBody apiAsType)
 
 -- | Serialise `GYTxBody` to get hex encoded CBOR string represented as `String`. Obtained result does not correspond to @transaction_body@ as defined in [CDDL](https://github.com/input-output-hk/cardano-ledger/blob/master/eras/babbage/test-suite/cddl-files/babbage.cddl) but rather it's the serialisation of Cardano API library's `TxBody` type.
 txBodyToHex :: GYTxBody -> String
@@ -203,7 +203,7 @@ txBodyTxInsReference :: GYTxBody -> [GYTxOutRef]
 txBodyTxInsReference (GYTxBody body) =
   case Api.txInsReference $ Api.getTxBodyContent body of
     Api.TxInsReferenceNone -> []
-    Api.TxInsReference Api.S.BabbageEraOnwardsConway inRefs -> map txOutRefFromApi inRefs
+    Api.TxInsReference _ inRefs _ -> map txOutRefFromApi inRefs
 
 -- | Returns the 'GYTxId' of the given 'GYTxBody'.
 txBodyTxId :: GYTxBody -> GYTxId

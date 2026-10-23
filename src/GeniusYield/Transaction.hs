@@ -61,12 +61,11 @@ module GeniusYield.Transaction (
 ) where
 
 import Cardano.Api qualified as Api
+import Cardano.Api qualified as Api.S
 import Cardano.Api.Ledger qualified as Ledger
-import Cardano.Api.Shelley qualified as Api
-import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Crypto.DSIGN (
-  sizeSigDSIGN,
-  sizeVerKeyDSIGN,
+  sigSizeDSIGN,
+  verKeySizeDSIGN,
  )
 import Cardano.Ledger.Alonzo.PParams qualified as Ledger
 import Cardano.Ledger.Alonzo.Scripts qualified as AlonzoScripts
@@ -172,8 +171,10 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub sig
     )
  where
   pp = gyBTxEnvProtocolParams env
-  feea = pp ^. ppMinFeeAL
-  feeb = pp ^. ppMinFeeBL
+  feea :: Integer
+  feea = Ledger.unCoin $ Ledger.fromCompact $ Ledger.unCoinPerByte $ pp ^. Ledger.ppTxFeePerByteL
+  feeb :: Integer
+  feeb = Ledger.unCoin $ pp ^. Ledger.ppTxFeeFixedL
   Ledger.Prices {prMem, prSteps} = pp ^. ppPricesL
   certsFinalised = finaliseTxCert (gyBTxEnvProtocolParams env) <$> certs
 
@@ -189,7 +190,7 @@ buildUnsignedTxBody env cstrat insOld outsOld refIns mmint wdrls certs lb ub sig
         case res of
           {- These errors generally indicate the input selection process selected less ada
           than necessary. Try again with double the extra lovelace amount -}
-          Left (GYBuildTxBodyErrorAutoBalance Api.TxBodyErrorAdaBalanceNegative {}) -> buildTxLoop stepStrat (n * 2)
+          Left (GYBuildTxBodyErrorAutoBalance Api.TxBodyErrorBalanceNegative {}) -> buildTxLoop stepStrat (n * 2)
           Left (GYBuildTxBodyErrorAutoBalance Api.TxBodyErrorAdaBalanceTooSmall {}) -> buildTxLoop stepStrat (n * 2)
           -- @RandomImprove@ may result into many change outputs, where their minimum ada requirements might be unsatisfiable with available ada.
           Left (GYBuildTxBalancingError err@(GYBalancingErrorChangeShortFall _)) ->
@@ -367,7 +368,7 @@ balanceTxStep
                       . flip valueAssetClass GYLovelace
                       . gyTxOutValue
                       . adjustTxOut (minimumUTxO pp)
-                , maxValueSize = pp ^. Ledger.ppMaxValSizeL
+                , maxValueSize = fromIntegral $ pp ^. Ledger.ppMaxValSizeL
                 , adaSource = adaSource
                 , adaSink = adaSink
                 , inputMapper = gytxecUtxoInputMapper ec
@@ -385,7 +386,7 @@ balanceTxStep
     isPlutusScriptWitness _ = False
 
 retColSup :: Api.BabbageEraOnwards ApiEra
-retColSup = Api.BabbageEraOnwardsConway
+retColSup = apiBabbageEraOnwards
 
 finalizeGYBalancedTx :: GYBuildTxEnv v -> GYBalancedTx v -> Int -> Either GYBuildTxError GYTxBody
 finalizeGYBalancedTx
@@ -430,7 +431,7 @@ finalizeGYBalancedTx
           estimateKeyWitnesses
           numSkeletonOuts
           (isJust $ gytxecFeeUtxo ec)
-    b <- first (GYBuildTxBodyErrorAutoBalance . Api.TxBodyError) $ Api.createTransactionBody Api.ShelleyBasedEraConway bc
+    b <- first (GYBuildTxBodyErrorAutoBalance . Api.TxBodyError) $ Api.createTransactionBody apiSBE bc
     first GYBuildTxCborSimplificationError $ simplifyGYTxBodyCbor (txBodyFromApi b)
    where
     -- Over-estimate the number of key witnesses required for the transaction.
@@ -476,10 +477,10 @@ finalizeGYBalancedTx
             GYBuildSimpleScriptReference _ s -> getTotalKeysInSimpleScript s <> acc
         estimateKeyWitnessesFromNativeScripts acc _ = acc
 
-    inRefs :: Api.TxInsReference ApiEra
+    inRefs :: Api.TxInsReference Api.BuildTx ApiEra
     inRefs = case inRefs' of
       [] -> Api.TxInsReferenceNone
-      _ -> Api.TxInsReference Api.BabbageEraOnwardsConway inRefs'
+      _ -> Api.TxInsReference apiBabbageEraOnwards inRefs' mempty
 
     inRefs' :: [Api.TxIn]
     inRefs' = [txOutRefToApi r | r <- utxosRefs utxosRefInputs]
@@ -503,26 +504,26 @@ finalizeGYBalancedTx
     collaterals' :: Api.TxInsCollateral ApiEra
     collaterals' = case utxosRefs collaterals of
       [] -> Api.TxInsCollateralNone
-      orefs -> Api.TxInsCollateral Api.AlonzoEraOnwardsConway $ txOutRefToApi <$> orefs
+      orefs -> Api.TxInsCollateral apiAlonzoEraOnwards $ txOutRefToApi <$> orefs
 
     -- will be filled by makeTransactionBodyAutoBalance
     fee :: Api.TxFee ApiEra
-    fee = Api.TxFeeExplicit Api.ShelleyBasedEraConway $ Ledger.Coin 0
+    fee = Api.TxFeeExplicit apiSBE $ Ledger.Coin 0
 
     lb' :: Api.TxValidityLowerBound ApiEra
     lb' =
       maybe
         Api.TxValidityNoLowerBound
-        (Api.TxValidityLowerBound Api.AllegraEraOnwardsConway . slotToApi)
+        (Api.TxValidityLowerBound apiAllegraEraOnwards . slotToApi)
         lb
 
     ub' :: Api.TxValidityUpperBound ApiEra
-    ub' = Api.TxValidityUpperBound Api.ShelleyBasedEraConway $ slotToApi <$> ub
+    ub' = Api.TxValidityUpperBound apiSBE $ slotToApi <$> ub
 
     extra :: Api.TxExtraKeyWitnesses ApiEra
     extra = case toList signers of
       [] -> Api.TxExtraKeyWitnessesNone
-      pkhs -> Api.TxExtraKeyWitnesses Api.AlonzoEraOnwardsConway $ pubKeyHashToApi <$> pkhs
+      pkhs -> Api.TxExtraKeyWitnesses apiAlonzoEraOnwards $ pubKeyHashToApi <$> pkhs
 
     mint :: Api.TxMintValue Api.BuildTx ApiEra
     mint = case mmint of
@@ -558,7 +559,7 @@ finalizeGYBalancedTx
                             acc
                   )
                   mempty
-         in Api.TxMintValue Api.MaryEraOnwardsConway mintVal
+         in Api.TxMintValue apiMaryEraOnwards mintVal
 
     -- Putting `TxTotalCollateralNone` & `TxReturnCollateralNone` would have them appropriately calculated by `makeTransactionBodyAutoBalance` but then return collateral it generates is only for ada. To support multi-asset collateral input we therefore calculate correct values ourselves and put appropriate entries here to have `makeTransactionBodyAutoBalance` calculate appropriate overestimated fees.
     (dummyTotCol :: Api.TxTotalCollateral ApiEra, dummyRetCol :: Api.TxReturnCollateral Api.CtxTx ApiEra) =
@@ -581,17 +582,17 @@ finalizeGYBalancedTx
       toMetaInEra :: GYTxMetadata -> Api.TxMetadataInEra ApiEra
       toMetaInEra gymd =
         let md = txMetadataToApi gymd
-         in if md == mempty then Api.TxMetadataNone else Api.TxMetadataInEra Api.ShelleyBasedEraConway md
+         in if md == mempty then Api.TxMetadataNone else Api.TxMetadataInEra apiSBE md
 
     wdrls' :: Api.TxWithdrawals Api.BuildTx ApiEra
-    wdrls' = if wdrls == mempty then Api.TxWithdrawalsNone else Api.TxWithdrawals Api.ShelleyBasedEraConway $ map txWdrlToApi wdrls
+    wdrls' = if wdrls == mempty then Api.TxWithdrawalsNone else Api.TxWithdrawals apiSBE $ map txWdrlToApi wdrls
 
     certs' =
       if certs == mempty
         then Api.TxCertificatesNone
         else
           let apiCerts = map (Data.Binfunctor.second pure . txCertToApi) certs
-           in Api.TxCertificates Api.ShelleyBasedEraConway (fromList apiCerts)
+           in Api.TxCertificates apiSBE (fromList apiCerts)
 
     unregisteredStakeCredsMap = Map.fromList [(stakeCredentialToApi sc, fromIntegral amt) | GYStakeAddressDeregistrationCertificate amt sc <- map gyTxCertCertificate' certs]
 
@@ -694,7 +695,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body ch
   -- First we obtain the calculated fees to correct for our collaterals.
   bodyBeforeCollUpdate@(Api.BalancedTxBody _ _ _ (Ledger.Coin feeOld)) <-
     Api.makeTransactionBodyAutoBalance
-      Api.ShelleyBasedEraConway
+      apiSBE
       ss
       (Api.toLedgerEpochInfo eh)
       (Api.LedgerProtocolParameters pp)
@@ -707,7 +708,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body ch
       (Just nkeys)
       & first
         ( \case
-            e@Api.TxBodyErrorAdaBalanceNegative {} -> if isFeeUtxo then GYBuildTxFeeUtxoAdaInsufficient e else GYBuildTxBodyErrorAutoBalance e
+            e@Api.TxBodyErrorBalanceNegative {} -> if isFeeUtxo then GYBuildTxFeeUtxoAdaInsufficient e else GYBuildTxBodyErrorAutoBalance e
             e@Api.TxBodyErrorAdaBalanceTooSmall {} -> if isFeeUtxo then GYBuildTxFeeUtxoAdaInsufficient e else GYBuildTxBodyErrorAutoBalance e
             anyOtherBuildError -> GYBuildTxBodyErrorAutoBalance anyOtherBuildError
         )
@@ -737,7 +738,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body ch
 
             first GYBuildTxBodyErrorAutoBalance $
               Api.makeTransactionBodyAutoBalance
-                Api.ShelleyBasedEraConway
+                apiSBE
                 ss
                 (Api.toLedgerEpochInfo eh)
                 (Api.LedgerProtocolParameters pp)
@@ -761,7 +762,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body ch
         -- This low level code is taken verbatim from here: https://github.com/IntersectMBO/cardano-ledger/blob/6db84a7b77e19af58feb2f45dfc50aa70435967b/eras/shelley/impl/src/Cardano/Ledger/Shelley/API/Wallet.hs#L475-L494, as this is what is referred by @cardano-api@ under the hood.
         -- This does not take into account the bootstrap (byron) witnesses.
         version = eraProtVerLow @ShelleyBasedConwayEra
-        sigSize = fromIntegral $ sizeSigDSIGN (Proxy @DSIGN)
+        sigSize = fromIntegral $ sigSizeDSIGN (Proxy @DSIGN)
         dummySig =
           fromRight
             (error "corrupt dummy signature")
@@ -771,7 +772,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body ch
                 CBOR.decodeSignedDSIGN
                 (CBOR.serialize version $ LBS.replicate sigSize 0)
             )
-        vkeySize = fromIntegral $ sizeVerKeyDSIGN (Proxy @DSIGN)
+        vkeySize = fromIntegral $ verKeySizeDSIGN (Proxy @DSIGN)
         dummyVKey w =
           let padding = LBS.replicate paddingSize 0
               paddingSize = vkeySize - LBS.length sw
@@ -779,7 +780,7 @@ makeTransactionBodyAutoBalanceWrapper collaterals ss eh pp poolids utxos body ch
               keyBytes = CBOR.serialize version $ padding <> sw
            in fromRight (error "corrupt dummy vkey") (CBOR.decodeFull version keyBytes)
        in
-        fromInteger $ view sizeTxF $ Shelley.addKeyWitnesses ltx (Set.fromList [WitVKey (dummyVKey x) dummySig | x <- [1 .. nkeys]])
+        fromIntegral $ view sizeTxF $ Shelley.addKeyWitnesses ltx (Set.fromList [WitVKey (dummyVKey x) dummySig | x <- [1 .. nkeys]])
   -- See: Cardano.Ledger.Alonzo.Rules.validateExUnitsTooBigUTxO
   unless (steps <= maxSteps && mem <= maxMemory) $
     Left $
@@ -816,8 +817,8 @@ collapseExtraOut apiOut@(Api.TxOut _ outVal _ _) bodyContent@Api.TxBodyContent {
         ((Api.TxOut sOutAddr sOutVal sOutDat sOutRefScript) : remOuts) ->
           let
             nOutVal =
-              Api.TxOutValueShelleyBased Api.ShelleyBasedEraConway $
-                Api.toLedgerValue Api.MaryEraOnwardsConway $
+              Api.TxOutValueShelleyBased apiSBE $
+                Api.toLedgerValue apiMaryEraOnwards $
                   foldMap' Api.txOutValueToValue [sOutVal, outVal]
 
             -- nOut == new Out == The merging of both apiOut and sOut

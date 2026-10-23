@@ -12,10 +12,12 @@ module GeniusYield.Types.Pool (
   poolParamsFromLedger,
 ) where
 
-import Cardano.Api.Internal.Address qualified as Api
-import Cardano.Ledger.Address qualified as Ledger
 import Cardano.Ledger.BaseTypes
-import Cardano.Ledger.PoolParams qualified as Ledger
+import Cardano.Ledger.State qualified as Ledger
+import Data.Array.Byte qualified as BA
+import Data.ByteString qualified as BS
+import Data.ByteString.Short qualified as SBS
+import Data.ByteString.Short.Internal qualified as SBSI
 import Data.IP (IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Set qualified as Set
@@ -50,18 +52,18 @@ data GYPoolParams = GYPoolParams
   }
   deriving stock (Show, Eq, Ord)
 
-poolParamsToLedger :: GYPoolParams -> Ledger.PoolParams
+poolParamsToLedger :: GYPoolParams -> Ledger.StakePoolParams
 poolParamsToLedger GYPoolParams {..} =
-  Ledger.PoolParams
-    { Ledger.ppId = keyHashToLedger poolId
-    , Ledger.ppVrf = vrfVerKeyHashToLedger poolVrf
-    , Ledger.ppPledge = fromIntegral poolPledge
-    , Ledger.ppCost = fromIntegral poolCost
-    , Ledger.ppMargin = poolMargin
-    , Ledger.ppRewardAccount = stakeAddressToLedger poolRewardAccount
-    , Ledger.ppOwners = Set.map keyHashToLedger poolOwners
-    , Ledger.ppRelays = fromList $ relayToLedger <$> poolRelays
-    , Ledger.ppMetadata = ms $ anchorToLedgerPoolMetadata <$> poolMetadata
+  Ledger.StakePoolParams
+    { Ledger.sppId = keyHashToLedger poolId
+    , Ledger.sppVrf = vrfVerKeyHashToLedger poolVrf
+    , Ledger.sppPledge = fromIntegral poolPledge
+    , Ledger.sppCost = fromIntegral poolCost
+    , Ledger.sppMargin = poolMargin
+    , Ledger.sppAccountAddress = stakeAddressToLedger poolRewardAccount
+    , Ledger.sppOwners = Set.map keyHashToLedger poolOwners
+    , Ledger.sppRelays = fromList $ relayToLedger <$> poolRelays
+    , Ledger.sppMetadata = ms $ anchorToLedgerPoolMetadata <$> poolMetadata
     }
  where
   relayToLedger :: GYStakePoolRelay -> Ledger.StakePoolRelay
@@ -77,22 +79,22 @@ poolParamsToLedger GYPoolParams {..} =
   anchorToLedgerPoolMetadata GYAnchor {..} =
     Ledger.PoolMetadata
       { Ledger.pmUrl = urlToLedger anchorUrl
-      , Ledger.pmHash = anchorDataHashToByteString anchorDataHash
+      , Ledger.pmHash = byteStringToByteArray $ anchorDataHashToByteString anchorDataHash
       }
   ms = maybeToStrictMaybe
 
-poolParamsFromLedger :: Ledger.PoolParams -> GYPoolParams
-poolParamsFromLedger Ledger.PoolParams {..} =
+poolParamsFromLedger :: Ledger.StakePoolParams -> GYPoolParams
+poolParamsFromLedger Ledger.StakePoolParams {..} =
   GYPoolParams
-    { poolId = keyHashFromLedger ppId
-    , poolVrf = vrfVerKeyHashFromLedger ppVrf
-    , poolPledge = fromIntegral ppPledge
-    , poolCost = fromIntegral ppCost
-    , poolMargin = ppMargin
-    , poolRewardAccount = stakeAddressFromApi $ Api.StakeAddress nw sc
-    , poolOwners = Set.map keyHashFromLedger ppOwners
-    , poolRelays = toList $ relayFromLedger <$> ppRelays
-    , poolMetadata = sm $ anchorFromLedgerPoolMetadata <$> ppMetadata
+    { poolId = keyHashFromLedger sppId
+    , poolVrf = vrfVerKeyHashFromLedger sppVrf
+    , poolPledge = fromIntegral sppPledge
+    , poolCost = fromIntegral sppCost
+    , poolMargin = sppMargin
+    , poolRewardAccount = stakeAddressFromLedger sppAccountAddress
+    , poolOwners = Set.map keyHashFromLedger sppOwners
+    , poolRelays = toList $ relayFromLedger <$> sppRelays
+    , poolMetadata = sm $ anchorFromLedgerPoolMetadata <$> sppMetadata
     }
  where
   relayFromLedger :: Ledger.StakePoolRelay -> GYStakePoolRelay
@@ -110,6 +112,13 @@ poolParamsFromLedger Ledger.PoolParams {..} =
   anchorFromLedgerPoolMetadata Ledger.PoolMetadata {..} =
     GYAnchor
       { anchorUrl = urlFromLedger pmUrl
-      , anchorDataHash = fromMaybe (error "GeniusYield.Types.Pool.anchorFromLedgerPoolMetadata: Invalid metadata hash") (anchorDataHashFromByteString pmHash)
+      , anchorDataHash = fromMaybe (error "GeniusYield.Types.Pool.anchorFromLedgerPoolMetadata: Invalid metadata hash") (anchorDataHashFromByteString $ byteArrayToByteString pmHash)
       }
-  Ledger.RewardAccount nw sc = ppRewardAccount
+
+byteStringToByteArray :: BS.ByteString -> BA.ByteArray
+byteStringToByteArray bs =
+  case SBS.toShort bs of
+    SBSI.SBS bytes -> BA.ByteArray bytes
+
+byteArrayToByteString :: BA.ByteArray -> BS.ByteString
+byteArrayToByteString (BA.ByteArray bytes) = SBS.fromShort $ SBSI.SBS bytes

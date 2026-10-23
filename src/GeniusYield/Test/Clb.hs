@@ -42,7 +42,7 @@ import Data.Time.Clock (
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Api qualified as Api.S
 import Cardano.Ledger.Conway.Core qualified as ConwayCore
 import Cardano.Ledger.Shelley.API qualified as L.S
 import Cardano.Ledger.State qualified as L
@@ -266,7 +266,7 @@ instance Monad m => MonadError GYTxMonadException (GYTxMonadClbT m) where
 allUTxOs :: Monad m => GYTxMonadClbT m GYUTxOs
 allUTxOs = do
   utxos <- liftClb $ gets (L.unUTxO . L.S.utxosUtxo . L.S.lsUTxOState . _ledgerState . _chainState)
-  pure $ utxosFromList $ map (\(ref, o) -> utxoFromApi' (Api.S.fromShelleyTxIn ref) (Api.S.fromShelleyTxOut Api.ShelleyBasedEraConway o)) $ Map.toList utxos
+  pure $ utxosFromList $ map (\(ref, o) -> utxoFromApi' (Api.S.fromShelleyTxIn ref) (Api.S.fromShelleyTxOut apiSBE o)) $ Map.toList utxos
 
 instance Monad m => GYTxQueryMonad (GYTxMonadClbT m) where
   networkId = do
@@ -503,45 +503,45 @@ instance Monad m => GYTxSpecialQueryMonad (GYTxMonadClbT m) where
 
     byronEra =
       Ouroboros.EraSummary
-        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-        , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864, eraGenesisWin = 0}
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 4320, eraSlotLength = mkSlotLength 20, eraSafeZone = Ouroboros.StandardSafeZone 864, eraGenesisWin = 0, eraPerasRoundLength = Ouroboros.NoPerasEnabled}
         }
     shelleyEra =
       Ouroboros.EraSummary
-        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0, eraPerasRoundLength = Ouroboros.NoPerasEnabled}
         }
     allegraEra =
       Ouroboros.EraSummary
-        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0, eraPerasRoundLength = Ouroboros.NoPerasEnabled}
         }
     maryEra =
       Ouroboros.EraSummary
-        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0, eraPerasRoundLength = Ouroboros.NoPerasEnabled}
         }
     alonzoEra =
       Ouroboros.EraSummary
-        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0, eraPerasRoundLength = Ouroboros.NoPerasEnabled}
         }
     babbageEra =
       Ouroboros.EraSummary
-        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
-        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0})
-        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled}
+        , eraEnd = Ouroboros.EraEnd (Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled})
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength 1, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0, eraPerasRoundLength = Ouroboros.NoPerasEnabled}
         }
     conwayEra len =
       Ouroboros.EraSummary
-        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0}
+        { eraStart = Ouroboros.Bound {boundTime = RelativeTime 0, boundSlot = 0, boundEpoch = 0, boundPerasRound = Ouroboros.NoPerasEnabled}
         , eraEnd = Ouroboros.EraUnbounded
-        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0}
+        , eraParams = Ouroboros.EraParams {eraEpochSize = 86400, eraSlotLength = mkSlotLength len, eraSafeZone = Ouroboros.StandardSafeZone 25920, eraGenesisWin = 0, eraPerasRoundLength = Ouroboros.NoPerasEnabled}
         }
 
 dumpUtxoState :: Monad m => GYTxMonadClbT m ()

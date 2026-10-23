@@ -21,7 +21,7 @@ module GeniusYield.Providers.Node.Query (
 import Data.Set qualified as Set
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Api qualified as Api.S
 
 import GeniusYield.CardanoApi.Query
 import GeniusYield.Types

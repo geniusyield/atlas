@@ -56,8 +56,7 @@ module GeniusYield.Types.Address (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Byron qualified as Api.B
-import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Api qualified as Api.S
 import Cardano.Chain.Common (addrToBase58)
 import Cardano.Crypto.Hash.Class qualified as Crypto
 import Cardano.Ledger.BaseTypes qualified as Ledger
@@ -89,7 +88,6 @@ import PlutusTx.Prelude qualified as PlutusTx
 import Text.Printf qualified as Printf
 import Web.HttpApiData qualified as Web
 
-import Cardano.Api.Internal.Address qualified as Api
 import Cardano.Ledger.Api qualified as Ledger
 import GeniusYield.Imports
 import GeniusYield.Types.Credential (
@@ -168,7 +166,7 @@ addressToApi' = coerce addrAnyToConwayEra
 -- not exported
 addrAnyToConwayEra :: Api.AddressAny -> Api.AddressInEra ApiEra
 addrAnyToConwayEra (Api.AddressByron addr) = Api.AddressInEra Api.ByronAddressInAnyEra addr
-addrAnyToConwayEra (Api.AddressShelley addr) = Api.AddressInEra (Api.ShelleyAddressInEra Api.ShelleyBasedEraConway) addr
+addrAnyToConwayEra (Api.AddressShelley addr) = Api.AddressInEra (Api.ShelleyAddressInEra apiSBE) addr
 
 addressFromApi :: Api.AddressAny -> GYAddress
 addressFromApi = coerce
@@ -197,7 +195,7 @@ addressToPlutus addr = case addressToApi addr of
 
 -- Lookup Ledger.Tx.CardanoAPI module in plutus-ledger.
 byronAddressToPlutus :: Api.S.Address Api.S.ByronAddr -> Plutus.Address
-byronAddressToPlutus (Api.B.ByronAddress addr) = Plutus.Address plutusCredential Nothing
+byronAddressToPlutus (Api.ByronAddress addr) = Plutus.Address plutusCredential Nothing
  where
   plutusCredential :: Plutus.Credential
   plutusCredential = Plutus.PubKeyCredential $ Plutus.PubKeyHash $ PlutusTx.toBuiltin $ addrToBase58 addr
@@ -242,7 +240,7 @@ addressFromPlutus nid addr =
   credential (Plutus.PubKeyCredential (Plutus.PubKeyHash (Plutus.BuiltinByteString bs))) = Ledger.KeyHashObj . Ledger.KeyHash <$> Crypto.hashFromBytes bs
   credential (Plutus.ScriptCredential (Plutus.ScriptHash (Plutus.BuiltinByteString bs))) = Ledger.ScriptHashObj . Ledger.ScriptHash <$> Crypto.hashFromBytes bs
 
-  paymentCredential :: Maybe Ledger.PaymentCredential
+  paymentCredential :: Maybe (Ledger.Credential Ledger.Payment)
   paymentCredential = credential $ Plutus.addressCredential addr
 
   stakeReference :: Maybe Ledger.StakeReference
@@ -383,7 +381,7 @@ addressFromValidator :: GYNetworkId -> GYScript v -> GYAddress
 addressFromValidator nid v = addressFromValidatorHash nid (validatorHash v)
 
 addressToPubKeyHash :: GYAddress -> Maybe GYPubKeyHash
-addressToPubKeyHash (GYAddress (Api.AddressByron (Api.B.ByronAddress _addr))) =
+addressToPubKeyHash (GYAddress (Api.AddressByron (Api.ByronAddress _addr))) =
   Nothing -- It's not clear what to do with these, and whether GY should support Byron addresses at all (as owners of pools)
 addressToPubKeyHash (GYAddress (Api.AddressShelley (Api.S.ShelleyAddress _network credential _stake))) = f (Api.S.fromShelleyPaymentCredential credential)
  where
@@ -471,7 +469,7 @@ Right (unsafeAddressFromText "addr_test1qrsuhwqdhz0zjgnf46unas27h93amfghddnff8lp
 Left "Not an address: 00; Reason: RawBytesHexErrorRawBytesDecodeFail \"00\" AddressAny (SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise AddressAny\"})"
 -}
 instance Web.FromHttpApiData GYAddress where
-  parseUrlPiece t = case Api.deserialiseFromRawBytesHex Api.AsAddressAny (TE.encodeUtf8 t) of
+  parseUrlPiece t = case Api.deserialiseFromRawBytesHex (TE.encodeUtf8 t) of
     Right addr -> Right (GYAddress addr)
     Left x -> Left $ "Not an address: " <> t <> "; Reason: " <> Text.pack (show x)
 
@@ -674,11 +672,11 @@ unsafeStakeAddressFromText t =
 stakeAddressToText :: GYStakeAddress -> Text.Text
 stakeAddressToText = Api.serialiseAddress . stakeAddressToApi
 
-stakeAddressToLedger :: GYStakeAddress -> Ledger.RewardAccount
-stakeAddressToLedger (stakeAddressToApi -> Api.StakeAddress nw sc) = Ledger.RewardAccount nw sc
+stakeAddressToLedger :: GYStakeAddress -> Ledger.AccountAddress
+stakeAddressToLedger (stakeAddressToApi -> Api.StakeAddress nw sc) = Ledger.AccountAddress nw (Ledger.AccountId sc)
 
-stakeAddressFromLedger :: Ledger.RewardAccount -> GYStakeAddress
-stakeAddressFromLedger (Ledger.RewardAccount nw sc) = stakeAddressFromApi $ Api.StakeAddress nw sc
+stakeAddressFromLedger :: Ledger.AccountAddress -> GYStakeAddress
+stakeAddressFromLedger (Ledger.AccountAddress nw sc) = stakeAddressFromApi $ Api.StakeAddress nw (coerce sc)
 
 {-# DEPRECATED stakeAddressCredential "Use stakeAddressToCredential." #-}
 
@@ -757,7 +755,7 @@ Right (unsafeStakeAddressFromText "stake_test1upa805fqh85x4hw88zxmhvdaydgyjzmazs
 Left "Not a stake address: 00; Reason: RawBytesHexErrorRawBytesDecodeFail \"00\" StakeAddress (SerialiseAsRawBytesError {unSerialiseAsRawBytesError = \"Unable to deserialise StakeAddress\"})"
 -}
 instance Web.FromHttpApiData GYStakeAddress where
-  parseUrlPiece t = case Api.deserialiseFromRawBytesHex Api.AsStakeAddress (TE.encodeUtf8 t) of
+  parseUrlPiece t = case Api.deserialiseFromRawBytesHex (TE.encodeUtf8 t) of
     Right addr -> Right $ stakeAddressFromApi addr
     Left x -> Left $ "Not a stake address: " <> t <> "; Reason: " <> Text.pack (show x)
 

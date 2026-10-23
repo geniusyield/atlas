@@ -28,8 +28,8 @@ module GeniusYield.Types.Script.ScriptHash (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Internal.Script qualified as Api
 import Cardano.Ledger.Hashes qualified as Ledger
+import Data.ByteString.Char8 qualified as BS8
 import Data.Text qualified as Text
 import GeniusYield.Imports
 import GeniusYield.Types.Ledger (PlutusToCardanoError (..))
@@ -54,7 +54,9 @@ newtype GYScriptHash = GYScriptHash Api.ScriptHash
 GYScriptHash "cabdd19b58d4299fde05b53c2c0baf978bf9ade734b490fc0cc8b7d0"
 -}
 instance IsString GYScriptHash where
-  fromString = GYScriptHash . fromString
+  fromString s =
+    either (error . show) GYScriptHash $
+      Api.deserialiseFromRawBytesHex (BS8.pack s)
 
 {- |
 

@@ -30,8 +30,7 @@ module GeniusYield.Types.BuildScript (
 ) where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Internal.Script qualified as Api
-import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Api qualified as Api.S
 import Data.GADT.Compare
 import GeniusYield.Imports
 import GeniusYield.Types.Era
@@ -73,14 +72,8 @@ instance Ord (GYBuildPlutusScript v) where
 
 -- | Returns the 'PlutusVersion' of the given 'GYBuildPlutusScript'.
 buildPlutusScriptVersion :: GYBuildPlutusScript v -> PlutusVersion
-buildPlutusScriptVersion (GYBuildPlutusScriptReference _ s) = case scriptVersion s of
-  SingPlutusV3 -> PlutusV3
-  SingPlutusV2 -> PlutusV2
-  SingPlutusV1 -> PlutusV1
-buildPlutusScriptVersion (GYBuildPlutusScriptInlined v) = case validatorVersion v of
-  SingPlutusV3 -> PlutusV3
-  SingPlutusV2 -> PlutusV2
-  SingPlutusV1 -> PlutusV1
+buildPlutusScriptVersion (GYBuildPlutusScriptReference _ s) = fromSingPlutusVersion $ scriptVersion s
+buildPlutusScriptVersion (GYBuildPlutusScriptInlined v) = fromSingPlutusVersion $ validatorVersion v
 
 data GYBuildSimpleScript (u :: PlutusVersion) where
   GYBuildSimpleScriptInlined :: !GYSimpleScript -> GYBuildSimpleScript u
@@ -99,8 +92,8 @@ instance Ord (GYBuildSimpleScript v) where
   GYBuildSimpleScriptInlined p `compare` GYBuildSimpleScriptInlined p' = compare p p'
   GYBuildSimpleScriptInlined _ `compare` _ = GT
 
-simpleScriptWitnessToApi :: GYBuildSimpleScript u -> Api.S.ScriptWitness witctx Api.S.ConwayEra
-simpleScriptWitnessToApi = Api.SimpleScriptWitness Api.SimpleScriptInConway . h
+simpleScriptWitnessToApi :: GYBuildSimpleScript u -> Api.S.ScriptWitness witctx ApiEra
+simpleScriptWitnessToApi = Api.SimpleScriptWitness apiSimpleScriptInEra . h
  where
   h :: GYBuildSimpleScript u -> Api.S.SimpleScriptOrReferenceInput lang
   h (GYBuildSimpleScriptInlined v) = Api.SScript $ simpleScriptToApi v

@@ -59,7 +59,7 @@ module GeniusYield.Types.UTxO (
 import GeniusYield.Imports
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Shelley qualified as Api.S
+import Cardano.Api qualified as Api.S
 import Control.Monad.Random (MonadRandom (getRandomR))
 import Data.Map.Strict qualified as Map
 import PlutusLedgerApi.V2.Tx qualified as Plutus
@@ -90,9 +90,9 @@ isInlineDatum _ = False
 outDatumToApi :: GYOutDatum -> Api.S.TxOutDatum ctx ApiEra
 outDatumToApi GYOutDatumNone = Api.TxOutDatumNone
 outDatumToApi (GYOutDatumHash h) =
-  Api.TxOutDatumHash Api.AlonzoEraOnwardsConway $ datumHashToApi h
+  Api.TxOutDatumHash apiAlonzoEraOnwards $ datumHashToApi h
 outDatumToApi (GYOutDatumInline d) =
-  Api.TxOutDatumInline Api.BabbageEraOnwardsConway $ datumToApi' d
+  Api.TxOutDatumInline apiBabbageEraOnwards $ datumToApi' d
 
 outDatumToPlutus :: GYOutDatum -> Plutus.OutputDatum
 outDatumToPlutus GYOutDatumNone = Plutus.NoOutputDatum

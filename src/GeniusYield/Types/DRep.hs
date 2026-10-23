@@ -16,6 +16,7 @@ module GeniusYield.Types.DRep (
 
 import Cardano.Api.Ledger (maybeToStrictMaybe, strictMaybeToMaybe)
 import Cardano.Api.Ledger qualified as Ledger
+import Cardano.Ledger.Compactible qualified as Compactible
 import Data.Set qualified as Set
 import GeniusYield.Imports (Natural, Set)
 import GeniusYield.Types.Anchor
@@ -56,7 +57,7 @@ drepStateToLedger GYDRepState {..} =
   Ledger.DRepState
     { Ledger.drepExpiry = epochNoToLedger drepExpiry
     , Ledger.drepAnchor = maybeToStrictMaybe (anchorToLedger <$> drepAnchor)
-    , Ledger.drepDeposit = fromIntegral drepDeposit
+    , Ledger.drepDeposit = Compactible.toCompactPartial $ Ledger.Coin $ fromIntegral drepDeposit
     , Ledger.drepDelegs = Set.map credentialToLedger drepDelegs
     }
 
@@ -65,6 +66,7 @@ drepStateFromLedger Ledger.DRepState {..} =
   GYDRepState
     { drepExpiry = epochNoFromLedger drepExpiry
     , drepAnchor = strictMaybeToMaybe (anchorFromLedger <$> drepAnchor)
-    , drepDeposit = fromIntegral drepDeposit
+    , drepDeposit = case Compactible.fromCompact drepDeposit of
+        Ledger.Coin c -> fromIntegral c
     , drepDelegs = Set.map credentialFromLedger drepDelegs
     }

@@ -17,6 +17,7 @@ import GeniusYield.Providers.Common (
  )
 import GeniusYield.TxBuilder
 import GeniusYield.Types
+import System.Directory (doesFileExist)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (
   assertBool,
@@ -49,7 +50,6 @@ providersMashupTests configs =
           delayBySecond
           eraHist <- extractEraSummaries <$> gyGetEraHistory provider
           delayBySecond
-          -- TODO: There is a bug in Maestro due to which it returns extra pools. Thus, this is ignored for now.
           _sp <- gyGetStakePools provider
           delayBySecond
           slotConfig' <- gyGetSlotConfig provider
@@ -144,31 +144,33 @@ providersMashupTests configs =
           delayBySecond
           handle handler $ gySubmitTx . fromRight (error "absurd") $ txFromHexBS "84a30083825820cd1fd0900870f19cba004ad73996d5f01f22790c7e2efcd46b7d1bacbf97ca6d00825820cd1fd0900870f19cba004ad73996d5f01f22790c7e2efcd46b7d1bacbf97ca6d01825820cd1fd0900870f19cba004ad73996d5f01f22790c7e2efcd46b7d1bacbf97ca6d020183a200581d6007fb2b78b3917d3f6bfa3a59de61f3c225cbf0d5564a1cbc6f96d6eb011a3b3b81d5a200581d6007fb2b78b3917d3f6bfa3a59de61f3c225cbf0d5564a1cbc6f96d6eb011a002dc6c0a200581d6007fb2b78b3917d3f6bfa3a59de61f3c225cbf0d5564a1cbc6f96d6eb011a001bc75b021a0002bd25a10081825820b8ee2dc03ba6f88baa7e4430675df3e559d63a1282f7763de71227041e351023584020313e571def2f09145ae6b0eb26e99260d14885789929a354fea4a585d5f053fc2eae86d36f484269b0d95a25abb7acc3b15033565d00afd83af83f24d9be0ef5f6"
     , testCase "Submitting a valid transaction" $ do
-        skey <- readPaymentSigningKey "preprod-submit-test-wallet.skey"
-        let nid = GYTestnetPreprod
-            senderAddress = addressFromPaymentKeyHash GYTestnetPreprod $ paymentKeyHash $ paymentVerificationKey skey
-        forM_ configs $ \config -> withCfgProviders config mempty $ \provider@GYProviders {..} -> do
-          delayBySecond
-          senderUTxOs <- runGYTxQueryMonadIO nid provider $ utxosAtAddress senderAddress Nothing
-          delayBySecond
-          let totalSenderFunds = foldMapUTxOs utxoValue senderUTxOs
-              valueToSend = totalSenderFunds `valueMinus` valueFromLovelace 5_000_000
-          -- This way, UTxO distribution in test wallet should remain same.
-          txBody <- runGYTxBuilderMonadIO nid provider [senderAddress] senderAddress Nothing $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum @'PlutusV2 senderAddress valueToSend
-          delayBySecond
-          let signedTxBody = signGYTxBody txBody [skey]
-          printf "Signed tx: %s\n" (txToHex signedTxBody)
-          tid <- gySubmitTx signedTxBody
-          printf "Submitted tx: %s\n" tid
-          when (isProviderSupported config) $ do
-            mempoolTxs' <- runGYTxQueryMonadIO nid provider mempoolTxs
-            mempoolAugmentedSenderUTxOs <- runGYTxQueryMonadIO nid provider $ utxosAtAddress senderAddress Nothing
-            let mempoolUTxOsList = txBodyUTxOs . getTxBody <$> mempoolTxs'
-            assertBool "Submitted tx not found in mempool" $ signedTxBody `elem` mempoolTxs'
-            case listToMaybe mempoolUTxOsList of
-              Nothing -> assertFailure "No UTxOs found in mempool transactions"
-              Just mempoolUTxOs -> assertBool "not (mempool UTxOs are not empty and sender augmented UTxOs contain them)" $ (mempoolUTxOs /= mempty) && (utxosRefs' mempoolUTxOs `Set.isSubsetOf` utxosRefs' mempoolAugmentedSenderUTxOs)
-          gyAwaitTxConfirmed (GYAwaitTxParameters {maxAttempts = 20, confirmations = 1, checkInterval = 10_000_000}) tid
+        hasSkey <- doesFileExist "preprod-submit-test-wallet.skey"
+        when hasSkey $ do
+          skey <- readPaymentSigningKey "preprod-submit-test-wallet.skey"
+          let nid = GYTestnetPreprod
+              senderAddress = addressFromPaymentKeyHash GYTestnetPreprod $ paymentKeyHash $ paymentVerificationKey skey
+          forM_ configs $ \config -> withCfgProviders config mempty $ \provider@GYProviders {..} -> do
+            delayBySecond
+            senderUTxOs <- runGYTxQueryMonadIO nid provider $ utxosAtAddress senderAddress Nothing
+            delayBySecond
+            let totalSenderFunds = foldMapUTxOs utxoValue senderUTxOs
+                valueToSend = totalSenderFunds `valueMinus` valueFromLovelace 5_000_000
+            -- This way, UTxO distribution in test wallet should remain same.
+            txBody <- runGYTxBuilderMonadIO nid provider [senderAddress] senderAddress Nothing $ buildTxBody $ mustHaveOutput $ mkGYTxOutNoDatum @'PlutusV2 senderAddress valueToSend
+            delayBySecond
+            let signedTxBody = signGYTxBody txBody [skey]
+            printf "Signed tx: %s\n" (txToHex signedTxBody)
+            tid <- gySubmitTx signedTxBody
+            printf "Submitted tx: %s\n" tid
+            when (isProviderSupported config) $ do
+              mempoolTxs' <- runGYTxQueryMonadIO nid provider mempoolTxs
+              mempoolAugmentedSenderUTxOs <- runGYTxQueryMonadIO nid provider $ utxosAtAddress senderAddress Nothing
+              let mempoolUTxOsList = txBodyUTxOs . getTxBody <$> mempoolTxs'
+              assertBool "Submitted tx not found in mempool" $ signedTxBody `elem` mempoolTxs'
+              case listToMaybe mempoolUTxOsList of
+                Nothing -> assertFailure "No UTxOs found in mempool transactions"
+                Just mempoolUTxOs -> assertBool "not (mempool UTxOs are not empty and sender augmented UTxOs contain them)" $ (mempoolUTxOs /= mempty) && (utxosRefs' mempoolUTxOs `Set.isSubsetOf` utxosRefs' mempoolAugmentedSenderUTxOs)
+            gyAwaitTxConfirmed (GYAwaitTxParameters {maxAttempts = 20, confirmations = 1, checkInterval = 10_000_000}) tid
     , testCase "Await Tx Confirmed - Submitted Tx" $
         forM_ configs $ \config -> withCfgProviders config mempty $
           \GYProviders {..} -> gyAwaitTxConfirmed def "c67b57d63e846c6dc17f0c2647893d5f7376690cde62b8b392ecfcb75a4697e2" -- A transaction id which generated UTxO at the always fail address. Thus it is guaranteed to be always there (unless of course network is respun).
@@ -191,6 +193,5 @@ supportedProviders = filter isProviderSupported
 
 isProviderSupported :: GYCoreConfig -> Bool
 isProviderSupported (cfgCoreProvider -> cp) = case cp of
-  GYCoreLayer1ProviderInfo GYMaestro {} -> False
   GYCoreLayer1ProviderInfo GYBlockfrost {} -> False
   _anyOther -> True

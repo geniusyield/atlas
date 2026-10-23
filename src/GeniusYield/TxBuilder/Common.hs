@@ -23,8 +23,8 @@ module GeniusYield.TxBuilder.Common (
 ) where
 
 import Cardano.Api qualified as Api
+import Cardano.Api qualified as Api.S
 import Cardano.Api.Ledger qualified as Ledger
-import Cardano.Api.Shelley qualified as Api.S
 import Cardano.Ledger.Alonzo.Core qualified as Ledger
 import Cardano.Ledger.Conway.PParams qualified as Ledger
 import Cardano.Ledger.Conway.Tx qualified as Ledger
@@ -33,6 +33,7 @@ import Control.Lens ((^.))
 import Control.Monad.Except (MonadError (throwError))
 import Control.Monad.Random (MonadRandom)
 import Data.List (nubBy)
+import Data.List qualified as List
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
@@ -174,7 +175,21 @@ instance Semigroup (GYTxSkeleton v) where
       }
    where
     -- we keep only one input per utxo to spend
-    combineIns u v = nubBy ((==) `on` gyTxInTxOutRef) (u ++ v)
+    -- JS: actually if we have duplicate inputs we would rather keep the one
+    -- with a script witness, even if it doesn't make sense to for one to
+    -- have a script witness and the other not to
+    combineIns u v = do
+      let (hasWcriptWitnesses, hasKeyWitnesses) =
+            List.partition
+              ( \GYTxIn {gyTxInWitness} ->
+                  gyTxInWitness & \case
+                    GYTxInWitnessScript {} -> True
+                    GYTxInWitnessSimpleScript {} -> True
+                    GYTxInWitnessKey {} -> False
+              )
+              (u ++ v)
+      nubBy ((==) `on` gyTxInTxOutRef) (hasWcriptWitnesses ++ hasKeyWitnesses)
+
     -- we cannot combine redeemers, so we just pick first.
     combineMint = Map.unionWith (\(amt, r) (amt', _r) -> (Map.unionWith (+) amt amt', r))
     -- we keep only one withdrawal per stake address
@@ -418,7 +433,7 @@ collateralValue = valueFromLovelace collateralLovelace
 
 -- | What is the maximum possible collateral requirement as per current protocol parameters?
 maximumRequiredCollateralLovelace :: ApiProtocolParameters -> Int -> Integer
-maximumRequiredCollateralLovelace pp refScriptSize = ceiling $ fromIntegral (maximumFee pp refScriptSize) * ((pp ^. Ledger.ppCollateralPercentageL) % 100)
+maximumRequiredCollateralLovelace pp refScriptSize = ceiling $ fromIntegral (maximumFee pp refScriptSize) * (toInteger (pp ^. Ledger.ppCollateralPercentageL) % 100)
 
 {-# INLINEABLE maximumFee #-}
 
@@ -426,7 +441,10 @@ maximumRequiredCollateralLovelace pp refScriptSize = ceiling $ fromIntegral (max
 maximumFee :: ApiProtocolParameters -> Int -> Integer
 maximumFee pp refScriptSize =
   let txFee :: Integer
-      txFee = fromIntegral $ pp ^. Ledger.ppMinFeeBL + (pp ^. Ledger.ppMinFeeAL) * fromIntegral (pp ^. Ledger.ppMaxTxSizeL)
+      txFee = fixedFee + feePerByte * fromIntegral (pp ^. Ledger.ppMaxTxSizeL)
+       where
+        fixedFee = Ledger.unCoin $ pp ^. Ledger.ppTxFeeFixedL
+        feePerByte = Ledger.unCoin $ Ledger.fromCompact $ Ledger.unCoinPerByte $ pp ^. Ledger.ppTxFeePerByteL
       executionFee :: Rational
       executionFee =
         case (pp ^. Ledger.ppPricesL, pp ^. Ledger.ppMaxTxExUnitsL) of

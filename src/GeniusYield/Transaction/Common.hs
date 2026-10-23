@@ -174,7 +174,7 @@ minimumApiUTxO :: ApiProtocolParameters -> Api.TxOut Api.CtxTx ApiEra -> Natural
 minimumApiUTxO pp txOut =
   fromInteger $
     coerce $
-      Api.calculateMinimumUTxO Api.ShelleyBasedEraConway txOut pp
+      Api.calculateMinimumUTxO apiSBE pp txOut
 
 minimumUTxO :: ApiProtocolParameters -> GYTxOut v -> Natural
 minimumUTxO pp = minimumApiUTxO pp . txOutToApi
